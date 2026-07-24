@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isValidWebhookSignature, parseInboundPayload } from "@/server/services/whatsapp";
-import { getWhatsappInboundQueue } from "@/server/queue/whatsapp-inbound.queue";
+import { handleIncomingMessage } from "@/server/services/conversation";
 
 // Handshake de verificación que hace Meta al configurar el webhook.
 export async function GET(req: NextRequest) {
@@ -16,8 +16,10 @@ export async function GET(req: NextRequest) {
   return new NextResponse("Forbidden", { status: 403 });
 }
 
-// Recepción de eventos (mensajes entrantes). Debe responder rápido: solo
-// valida, parsea y encola — el procesamiento real ocurre en el worker.
+// Recepción de eventos (mensajes entrantes). Se procesa directamente aquí
+// (sin cola/worker aparte): esta variante solo guarda el mensaje y, si trae
+// media, la descarga — no hay llamada a un LLM que justifique desacoplar el
+// trabajo pesado a un proceso de fondo.
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const signature = req.headers.get("x-hub-signature-256");
@@ -34,15 +36,14 @@ export async function POST(req: NextRequest) {
   }
 
   const messages = parseInboundPayload(payload);
-  const queue = getWhatsappInboundQueue();
 
-  await Promise.all(
-    messages.map((message) =>
-      queue.add("inbound-message", message, {
-        jobId: message.messageId, // idempotencia: Meta puede reenviar el mismo evento
-      }),
-    ),
-  );
+  for (const message of messages) {
+    try {
+      await handleIncomingMessage(message);
+    } catch (error) {
+      console.error("[webhook] Error procesando mensaje entrante:", error);
+    }
+  }
 
   return new NextResponse("OK", { status: 200 });
 }

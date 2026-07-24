@@ -205,6 +205,7 @@ model Message {
   mediaType      MediaType?
   mimeType       String?
   fileName       String?
+  externalId     String?      @unique // id del mensaje en WhatsApp, para idempotencia del webhook
   createdAt      DateTime     @default(now())
 
   @@index([conversationId])

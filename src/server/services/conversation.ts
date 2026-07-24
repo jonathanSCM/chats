@@ -16,6 +16,14 @@ const MEDIA_TYPE_MAP = {
 // respuestas automáticas. Cada mensaje entrante (texto o media) se guarda
 // tal cual, y alguien del equipo responde desde el inbox.
 export async function handleIncomingMessage(inbound: ParsedInboundMessage): Promise<void> {
+  // Idempotencia: Meta puede reenviar el mismo evento si no confirmamos a
+  // tiempo. Sin cola de por medio, la deduplicación vive en esta unicidad.
+  const alreadyProcessed = await prisma.message.findUnique({
+    where: { externalId: inbound.messageId },
+    select: { id: true },
+  });
+  if (alreadyProcessed) return;
+
   const connection = await prisma.whatsAppConnection.findUnique({
     where: { phoneNumberId: inbound.phoneNumberId },
     include: { bot: { include: { organization: true } } },
@@ -54,6 +62,7 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
       mediaType,
       mimeType,
       fileName: inbound.media?.fileName ?? null,
+      externalId: inbound.messageId,
     },
   });
 

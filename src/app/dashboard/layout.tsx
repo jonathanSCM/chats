@@ -6,7 +6,6 @@ import { prisma } from "@/server/db/client";
 import { logoutAction } from "@/server/actions/logout";
 import { NavLink } from "@/components/layout/nav-link";
 import { Logo } from "@/components/logo";
-import { VerifyEmailBanner } from "@/components/layout/verify-email-banner";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -17,17 +16,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/admin");
   }
 
-  const [org, user] = await Promise.all([
-    session?.user.organizationId
-      ? prisma.organization.findUnique({ where: { id: session.user.organizationId } })
-      : null,
-    session?.user.id
-      ? prisma.user.findUnique({
-          where: { id: session.user.id },
-          select: { emailVerified: true },
-        })
-      : null,
-  ]);
+  const org = session?.user.organizationId
+    ? await prisma.organization.findUnique({ where: { id: session.user.organizationId } })
+    : null;
 
   return (
     <div className="flex min-h-screen">
@@ -86,10 +77,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </p>
           </div>
         ) : (
-          <>
-            {user && !user.emailVerified && <VerifyEmailBanner />}
-            {children}
-          </>
+          children
         )}
       </main>
     </div>

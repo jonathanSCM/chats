@@ -6,7 +6,6 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { signIn } from "@/server/auth";
 import { slugify } from "@/lib/slugify";
-import { sendVerificationEmail } from "./email-verification";
 import type { ActionState } from "./bots";
 
 const TRIAL_DAYS = 14;
@@ -55,6 +54,15 @@ export async function signupAction(
 
   const { name, companyName, email, password, planId } = parsed.data;
 
+  // Registro cerrado: solo la primera cuenta se crea así. Después de eso,
+  // sumar gente pasa únicamente por invitación (/invite).
+  const organizationCount = await prisma.organization.count();
+  if (organizationCount > 0) {
+    return {
+      error: "El registro está cerrado. Pide una invitación al equipo para unirte.",
+    };
+  }
+
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     return { error: "Ese correo ya está registrado" };
@@ -74,10 +82,10 @@ export async function signupAction(
   const periodEnd = new Date(periodStart);
   periodEnd.setDate(periodEnd.getDate() + TRIAL_DAYS);
 
-  const { userId } = await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     const org = await tx.organization.create({ data: { name: companyName, slug } });
 
-    const user = await tx.user.create({
+    await tx.user.create({
       data: { email, passwordHash, name, role: "OWNER", organizationId: org.id },
     });
 
@@ -90,11 +98,7 @@ export async function signupAction(
         currentPeriodEnd: periodEnd,
       },
     });
-
-    return { userId: user.id };
   });
-
-  await sendVerificationEmail(userId, email);
 
   try {
     await signIn("credentials", { email, password, redirectTo: "/dashboard" });

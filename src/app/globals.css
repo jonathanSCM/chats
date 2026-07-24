@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+:root {
+  --canvas: #f7f7f4;
+  --surface: #ffffff;
+  --surface-2: #eeeeea;
+  --border: #e0e0da;
+  --border-strong: #c7c7be;
+  --ink: #17171a;
+  --ink-muted: #57575d;
+  --ink-faint: #8b8b90;
+
+  --accent: #5c7a1f;
+  --accent-ink: #ffffff;
+  --accent-dim: #7e8f2e;
+
+  --warning: #a3650a;
+  --danger: #c62828;
+  --danger-dim: #fbe3e3;
+}
+
+.dark {
+  --canvas: #0a0a0b;
+  --surface: #131316;
+  --surface-2: #1c1c21;
+  --border: #27272d;
+  --border-strong: #38383f;
+  --ink: #f3f2ec;
+  --ink-muted: #96959d;
+  --ink-faint: #616167;
+
+  --accent: #d4ff3d;
+  --accent-ink: #0a0a0b;
+  --accent-dim: #7e8f2e;
+
+  --warning: #ffb020;
+  --danger: #ff5d5d;
+  --danger-dim: #4a2323;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-dim: var(--accent-dim);
+
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-danger-dim: var(--danger-dim);
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  position: relative;
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+/* textura de grano sutil para dar profundidad al fondo casi negro */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* Firma visual: esquinas tipo visor/HUD, usadas en tarjetas y estados activos */
+.corner-brackets {
+  position: relative;
+}
+
+.corner-brackets::before,
+.corner-brackets::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.corner-brackets::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+}
+
+.corner-brackets::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid;
+  border-right: 2px solid;
+}
+
+.corner-brackets:hover::before,
+.corner-brackets:hover::after,
+.corner-brackets[data-active="true"]::before,
+.corner-brackets[data-active="true"]::after {
+  opacity: 1;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}

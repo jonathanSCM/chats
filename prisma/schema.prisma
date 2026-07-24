@@ -1,0 +1,283 @@
+// Prisma schema — WhatsApp Bots Platform
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth / Tenancy ─────────────────────────────────────────────
+
+enum UserRole {
+  SUPERADMIN // dueño de la plataforma, ve todo
+  OWNER      // dueño de la organización/cliente
+  MEMBER     // usuario dentro de la organización del cliente
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  suspended Boolean  @default(false) // desactivada por el superadmin (ej. impago, abuso)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  bots         Bot[]
+  subscription Subscription?
+  invites      OrganizationInvite[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String       @id @default(cuid())
+  email          String       @unique
+  passwordHash   String?
+  name           String?
+  role           UserRole     @default(OWNER)
+  emailVerified  DateTime?
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+// ─── Tokens de un solo uso (reset de password, verificación de email) ──
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+// Invitación para unirse a una organización existente como MEMBER (u OWNER).
+model OrganizationInvite {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String? // opcional: restringe la invitación a un correo específico
+  role           UserRole     @default(MEMBER)
+  tokenHash      String       @unique
+  invitedById    String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@map("organization_invites")
+}
+
+// ─── Bots ───────────────────────────────────────────────────────
+
+model Bot {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  status         BotStatus    @default(DRAFT)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  config             BotConfig?
+  whatsappConnection WhatsAppConnection?
+  catalogItems       CatalogItem[]
+  conversations      Conversation[]
+
+  @@index([organizationId])
+  @@map("bots")
+}
+
+enum BotStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+model BotConfig {
+  id               String   @id @default(cuid())
+  botId            String   @unique
+  bot              Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  companyName      String?
+  personality      String?  @db.Text // tono/carácter del bot
+  instructions     String?  @db.Text // prompt/instrucciones de venta
+  welcomeMessage   String?  @db.Text
+  primaryColor     String?
+  logoUrl          String?
+  updatedAt        DateTime @updatedAt
+
+  @@map("bot_configs")
+}
+
+model WhatsAppConnection {
+  id                  String   @id @default(cuid())
+  botId               String   @unique
+  bot                 Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  phoneNumberId       String   @unique // Meta phone_number_id
+  wabaId              String? // WhatsApp Business Account ID
+  displayNumber       String? // número visible (ej. +591 700 12345), para el link "click to chat"
+  accessToken         String   @db.Text // cifrado a nivel de aplicación
+  verified            Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  @@map("whatsapp_connections")
+}
+
+model CatalogItem {
+  id          String   @id @default(cuid())
+  botId       String
+  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  name        String
+  description String?  @db.Text
+  price       Decimal? @db.Decimal(12, 2)
+  imageUrl    String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([botId])
+  @@map("catalog_items")
+}
+
+// ─── Conversaciones ─────────────────────────────────────────────
+
+model Conversation {
+  id             String    @id @default(cuid())
+  botId          String
+  bot            Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  customerPhone  String
+  startedAt      DateTime  @default(now())
+  lastMessageAt  DateTime  @default(now())
+  billed         Boolean   @default(false) // ya contabilizada contra el plan/uso
+  botPaused      Boolean   @default(false) // un humano tomó la conversación; el bot no responde solo
+
+  messages Message[]
+
+  @@index([botId])
+  @@index([customerPhone])
+  @@map("conversations")
+}
+
+enum MessageRole {
+  CUSTOMER
+  BOT
+  STAFF  // enviado manualmente por alguien del equipo, con el bot pausado
+  SYSTEM
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           MessageRole
+  content        String       @db.Text
+  mediaUrl       String?
+  mediaType      MediaType?
+  mimeType       String?
+  fileName       String?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+  @@map("messages")
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+}
+
+// ─── Planes / Suscripciones / Uso ───────────────────────────────
+
+model Plan {
+  id                  String   @id @default(cuid())
+  name                String   @unique
+  aiModel             String   // modelo de OpenAI asignado a este plan
+  conversationLimit   Int      // conversaciones incluidas por ciclo
+  priceCents          Int
+  stripePriceId       String?  @unique
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  organizationId       String             @unique
+  organization         Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planId               String
+  plan                 Plan               @relation(fields: [planId], references: [id])
+  status               SubscriptionStatus @default(TRIALING)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  currentPeriodStart   DateTime           @default(now())
+  currentPeriodEnd     DateTime
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  usageRecords UsageRecord[]
+
+  @@index([planId])
+  @@index([stripeSubscriptionId])
+  @@map("subscriptions")
+}
+
+// Contabiliza conversaciones consumidas en el período, incluyendo extras comprados
+model UsageRecord {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  type           UsageType
+  quantity       Int          // conversaciones consumidas o compradas (positivo)
+  note           String?
+  createdAt      DateTime     @default(now())
+
+  @@index([subscriptionId])
+  @@map("usage_records")
+}
+
+enum UsageType {
+  CONSUMED       // conversación consumida del plan
+  EXTRA_PURCHASE // paquete extra comprado
+}

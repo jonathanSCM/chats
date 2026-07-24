@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
-import { requireBotAccess } from "@/server/auth/guards";
+import { requireBotOwnerAccess } from "@/server/auth/guards";
 import { encrypt } from "@/lib/crypto";
 import { verifyPhoneNumber } from "@/server/services/whatsapp";
 import type { ActionState } from "./bots";
@@ -19,7 +19,7 @@ export async function connectWhatsAppAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { bot } = await requireBotAccess(botId);
+  const { bot } = await requireBotOwnerAccess(botId);
 
   const parsed = connectSchema.safeParse({
     phoneNumberId: formData.get("phoneNumberId"),

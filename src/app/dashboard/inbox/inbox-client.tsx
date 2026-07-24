@@ -158,6 +158,7 @@ export function InboxClient() {
 
   // Polling de la lista de conversaciones cada 3s — tiempo real sin websockets.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch inicial + polling es intencional
     fetchConversations();
     const interval = setInterval(fetchConversations, 3000);
     return () => clearInterval(interval);
@@ -166,6 +167,7 @@ export function InboxClient() {
   // Polling de los mensajes del chat abierto cada 2s.
   useEffect(() => {
     if (!selectedId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch inicial + polling es intencional
     fetchMessages(selectedId);
     const interval = setInterval(() => fetchMessages(selectedId), 2000);
     return () => clearInterval(interval);

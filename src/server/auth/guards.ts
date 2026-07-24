@@ -23,8 +23,23 @@ export async function requireBotAccess(botId: string) {
   if (!bot) throw new HttpError(404, "Bot no encontrado");
 
   const isSuperadmin = session.user.role === "SUPERADMIN";
-  const isOwner = bot.organizationId === session.user.organizationId;
-  if (!isSuperadmin && !isOwner) throw new HttpError(403, "Sin acceso a este bot");
+  const isOrgMember = bot.organizationId === session.user.organizationId;
+  if (!isSuperadmin && !isOrgMember) throw new HttpError(403, "Sin acceso a este bot");
+
+  return { session, bot };
+}
+
+// Igual que requireBotAccess, pero exige además el rol OWNER dentro de la
+// organización (o SUPERADMIN) — para operaciones sensibles como conectar
+// WhatsApp, que un MEMBER no debería poder tocar.
+export async function requireBotOwnerAccess(botId: string) {
+  const { session, bot } = await requireBotAccess(botId);
+
+  const isSuperadmin = session.user.role === "SUPERADMIN";
+  const isOwner = session.user.role === "OWNER";
+  if (!isSuperadmin && !isOwner) {
+    throw new HttpError(403, "Solo el dueño de la organización puede hacer esto");
+  }
 
   return { session, bot };
 }

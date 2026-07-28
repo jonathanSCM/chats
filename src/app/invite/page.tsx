@@ -3,6 +3,10 @@ import { hashToken } from "@/lib/tokens";
 import { Logo } from "@/components/logo";
 import { AcceptInviteForm } from "./accept-invite-form";
 
+// Consulta la DB en cada visita (valida el token) — nunca debe
+// prerenderizarse en build time, cuando la base todavía no es alcanzable.
+export const dynamic = "force-dynamic";
+
 export default async function InvitePage({
   searchParams,
 }: {

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
-import type { ActionState } from "./bots";
+import type { ActionState } from "./types";
 
 const renameSchema = z.object({ name: z.string().min(2, "Requerido").max(120) });
 

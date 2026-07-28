@@ -36,4 +36,36 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  callbacks: {
+    ...authConfig.callbacks,
+    // Sobrescribe el jwt "edge-safe" de authConfig: este sí puede tocar la
+    // DB (corre en Node, no en el middleware). En cada request que no sea
+    // el login mismo, refresca rol/organización desde la DB — así, si el
+    // dueño quita a alguien del equipo o le cambia el rol, se refleja de
+    // inmediato en vez de esperar a que el JWT expire solo (hasta 30 días).
+    jwt: async ({ token, user }) => {
+      if (user) {
+        token.role = user.role;
+        token.organizationId = user.organizationId;
+        return token;
+      }
+
+      if (!token.sub) return token;
+
+      const dbUser = await prisma.user.findUnique({
+        where: { id: token.sub },
+        select: { role: true, organizationId: true },
+      });
+
+      if (!dbUser) {
+        // El usuario fue eliminado: invalida el token en vez de dejarlo
+        // "vivo" con datos viejos.
+        return {};
+      }
+
+      token.role = dbUser.role;
+      token.organizationId = dbUser.organizationId;
+      return token;
+    },
+  },
 });

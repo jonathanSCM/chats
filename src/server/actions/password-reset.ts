@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { generateToken, hashToken } from "@/lib/tokens";
 import { sendMail } from "@/server/services/mailer";
-import type { ActionState } from "./bots";
+import type { ActionState } from "./types";
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const GENERIC_SUCCESS =

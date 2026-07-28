@@ -6,7 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { signIn } from "@/server/auth";
 import { slugify } from "@/lib/slugify";
-import type { ActionState } from "./bots";
+import type { ActionState } from "./types";
 
 const TRIAL_DAYS = 14;
 const DEFAULT_PLAN_NAME = "Starter";

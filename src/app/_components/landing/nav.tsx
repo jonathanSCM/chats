@@ -10,9 +10,6 @@ export function Nav() {
         <a href="#como-funciona" className="hidden text-sm text-ink-muted hover:text-ink sm:inline">
           Cómo funciona
         </a>
-        <a href="#precios" className="hidden text-sm text-ink-muted hover:text-ink sm:inline">
-          Precios
-        </a>
         <a href="#faq" className="hidden text-sm text-ink-muted hover:text-ink sm:inline">
           FAQ
         </a>

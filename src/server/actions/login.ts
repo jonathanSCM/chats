@@ -2,7 +2,7 @@
 
 import { AuthError } from "next-auth";
 import { signIn } from "@/server/auth";
-import type { ActionState } from "./bots";
+import type { ActionState } from "./types";
 
 export async function loginAction(
   _prevState: ActionState,

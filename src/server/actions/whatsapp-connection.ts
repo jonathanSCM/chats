@@ -6,7 +6,7 @@ import { prisma } from "@/server/db/client";
 import { requireBotOwnerAccess } from "@/server/auth/guards";
 import { encrypt } from "@/lib/crypto";
 import { verifyPhoneNumber } from "@/server/services/whatsapp";
-import type { ActionState } from "./bots";
+import type { ActionState } from "./types";
 
 const connectSchema = z.object({
   phoneNumberId: z.string().min(1, "Requerido"),

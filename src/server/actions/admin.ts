@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession, HttpError } from "@/server/auth/guards";
-import type { ActionState } from "./bots";
+import type { ActionState } from "./types";
 
 async function requireSuperadmin() {
   const session = await requireSession();

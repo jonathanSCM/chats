@@ -3,6 +3,10 @@ import { prisma } from "@/server/db/client";
 import { Logo } from "@/components/logo";
 import { SignupForm } from "./signup-form";
 
+// Consulta la DB en cada visita (¿ya hay una organización?) — nunca debe
+// prerenderizarse en build time, cuando la base todavía no es alcanzable.
+export const dynamic = "force-dynamic";
+
 export default async function SignupPage({
   searchParams,
 }: {

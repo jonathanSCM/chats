@@ -9,7 +9,7 @@ import { requireSession } from "@/server/auth/guards";
 import { signIn } from "@/server/auth";
 import { generateToken, hashToken } from "@/lib/tokens";
 import { sendMail } from "@/server/services/mailer";
-import type { ActionState } from "./bots";
+import type { ActionState } from "./types";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 días
 

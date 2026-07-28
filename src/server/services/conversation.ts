@@ -1,3 +1,4 @@
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/server/db/client";
 import { decrypt } from "@/lib/crypto";
 import { getMediaUrl, downloadMedia, type ParsedInboundMessage } from "@/server/services/whatsapp";
@@ -53,18 +54,30 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
     }
   }
 
-  await prisma.message.create({
-    data: {
-      conversationId,
-      role: "CUSTOMER",
-      content: inbound.text ?? "",
-      mediaUrl,
-      mediaType,
-      mimeType,
-      fileName: inbound.media?.fileName ?? null,
-      externalId: inbound.messageId,
-    },
-  });
+  try {
+    await prisma.message.create({
+      data: {
+        conversationId,
+        role: "CUSTOMER",
+        content: inbound.text ?? "",
+        mediaUrl,
+        mediaType,
+        mimeType,
+        fileName: inbound.media?.fileName ?? null,
+        externalId: inbound.messageId,
+      },
+    });
+  } catch (error) {
+    // P2002 = violación de unicidad en externalId: dos requests casi
+    // simultáneas para el mismo mensaje (Meta reintentando el webhook)
+    // pasaron el chequeo de idempotencia de arriba antes de que la primera
+    // terminara de escribir. La segunda no debe fallar ruidosamente — ya
+    // se guardó, es exactamente lo que se buscaba evitar duplicar.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return;
+    }
+    throw error;
+  }
 
   await prisma.conversation.update({
     where: { id: conversationId },

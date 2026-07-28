@@ -15,8 +15,8 @@ export function FinalCta() {
           <Link href="/signup">
             <Button>Empieza gratis</Button>
           </Link>
-          <a href="#precios">
-            <Button variant="secondary">Ver planes</Button>
+          <a href="#como-funciona">
+            <Button variant="secondary">Cómo funciona</Button>
           </a>
         </div>
       </div>

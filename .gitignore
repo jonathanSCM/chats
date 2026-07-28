@@ -52,3 +52,6 @@ dump.rdb
 
 # media subida en runtime (imágenes/audio/video/docs de WhatsApp)
 /public/media
+
+# respaldos locales de la base de datos
+/backups

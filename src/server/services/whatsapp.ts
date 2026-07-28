@@ -8,8 +8,18 @@ const GRAPH_API_VERSION = "v21.0";
 export function isValidWebhookSignature(rawBody: string, signatureHeader: string | null): boolean {
   const appSecret = process.env.WHATSAPP_APP_SECRET;
 
-  // En desarrollo sin secret configurado, acepta todo (testing local)
-  if (!appSecret) return true;
+  if (!appSecret) {
+    // En producción esto es un error de configuración, no un modo válido:
+    // sin secret, cualquiera podría mandar webhooks falsos haciéndose pasar
+    // por Meta. Solo se permite en desarrollo, para probar sin credenciales.
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[whatsapp] WHATSAPP_APP_SECRET no está configurada en producción — rechazando el webhook.",
+      );
+      return false;
+    }
+    return true;
+  }
 
   if (!signatureHeader) return false;
 

@@ -1,21 +1,5 @@
-import { Nav } from "./_components/landing/nav";
-import { Hero } from "./_components/landing/hero";
-import { HowItWorks } from "./_components/landing/how-it-works";
-import { Features } from "./_components/landing/features";
-import { Faq } from "./_components/landing/faq";
-import { FinalCta } from "./_components/landing/final-cta";
-import { Footer } from "./_components/landing/footer";
+import { redirect } from "next/navigation";
 
-export default function LandingPage() {
-  return (
-    <main className="flex-1">
-      <Nav />
-      <Hero />
-      <HowItWorks />
-      <Features />
-      <Faq />
-      <FinalCta />
-      <Footer />
-    </main>
-  );
+export default function RootPage() {
+  redirect("/login");
 }

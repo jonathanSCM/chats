@@ -15,7 +15,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm animate-fade-up">
         <div className="mb-8 flex flex-col items-center text-center">
           <Logo size="lg" className="mb-1" />
-          <p className="text-sm text-ink-muted">Panel de control de tus bots</p>
+          <p className="text-sm text-ink-muted">Bandeja de conversaciones de WhatsApp</p>
         </div>
 
         <div className="corner-brackets rounded-lg border border-border bg-surface p-6">
@@ -52,12 +52,6 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="mt-4 text-center text-sm text-ink-muted">
-          ¿No tienes cuenta?{" "}
-          <Link href="/signup" className="text-ink hover:text-accent">
-            Crea una
-          </Link>
-        </p>
       </div>
     </main>
   );

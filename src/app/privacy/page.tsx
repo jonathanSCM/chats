@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 
-export const metadata = { title: "Política de privacidad — Zócalo" };
+export const metadata = { title: "Política de privacidad — WhatsApp ProShop" };
 
 export default function PrivacyPage() {
   return (

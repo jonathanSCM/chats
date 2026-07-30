@@ -9,7 +9,7 @@ import type { ActionState } from "./types";
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const GENERIC_SUCCESS =
-  "Si ese correo existe en Zócalo, te enviamos un enlace para restablecer tu contraseña.";
+  "Si ese correo existe en WhatsApp ProShop, te enviamos un enlace para restablecer tu contraseña.";
 
 const requestSchema = z.object({ email: z.string().email("Correo inválido") });
 
@@ -34,7 +34,7 @@ export async function requestPasswordResetAction(
     const resetUrl = `${process.env.NEXTAUTH_URL}/reset-password?token=${token}`;
     await sendMail({
       to: user.email,
-      subject: "Restablece tu contraseña de Zócalo",
+      subject: "Restablece tu contraseña de WhatsApp ProShop",
       text: `Entra a este enlace para elegir una nueva contraseña (vence en 1 hora):\n\n${resetUrl}\n\nSi no pediste esto, ignora el mensaje.`,
     });
   }

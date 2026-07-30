@@ -21,8 +21,8 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Zócalo — Bots de venta para WhatsApp",
-  description: "Crea y opera bots de ventas para WhatsApp Business en minutos.",
+  title: "WhatsApp ProShop",
+  description: "Bandeja de conversaciones de WhatsApp para el equipo.",
 };
 
 // Se ejecuta antes de hidratar React para evitar el flash del tema

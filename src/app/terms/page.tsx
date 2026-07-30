@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 
-export const metadata = { title: "Términos de servicio — Zócalo" };
+export const metadata = { title: "Términos de servicio — WhatsApp ProShop" };
 
 export default function TermsPage() {
   return (
@@ -22,9 +22,9 @@ export default function TermsPage() {
       <p className="mb-10 text-sm text-ink-faint">Última actualización: {new Date().toLocaleDateString("es")}</p>
 
       <div className="space-y-8 text-sm leading-relaxed text-ink-muted">
-        <Section title="1. Qué es Zócalo">
+        <Section title="1. Qué es WhatsApp ProShop">
           <p>
-            Zócalo es una plataforma que te permite crear y operar bots de ventas para WhatsApp
+            WhatsApp ProShop es una plataforma que te permite crear y operar bots de ventas para WhatsApp
             Business, conectados a tu catálogo de productos y a un modelo de inteligencia
             artificial de terceros para generar respuestas automáticas.
           </p>
@@ -51,7 +51,7 @@ export default function TermsPage() {
 
         <Section title="4. Uso del servicio con WhatsApp y con IA">
           <p>
-            Al conectar tu número de WhatsApp Business, autorizas a Zócalo a enviar y recibir
+            Al conectar tu número de WhatsApp Business, autorizas a WhatsApp ProShop a enviar y recibir
             mensajes en tu nombre a través de la API oficial de Meta (WhatsApp Cloud API). El
             contenido de las conversaciones con tus clientes se procesa mediante un proveedor de
             inteligencia artificial externo para generar las respuestas automáticas. Eres
@@ -62,7 +62,7 @@ export default function TermsPage() {
 
         <Section title="5. Uso aceptable">
           <p>
-            No puedes usar Zócalo para enviar spam, contenido ilegal, engañoso, o que viole los
+            No puedes usar WhatsApp ProShop para enviar spam, contenido ilegal, engañoso, o que viole los
             términos de WhatsApp/Meta. Nos reservamos el derecho de suspender cuentas que
             incumplan esto, o que representen un riesgo de abuso para la plataforma.
           </p>
@@ -78,7 +78,7 @@ export default function TermsPage() {
 
         <Section title="7. Límite de responsabilidad">
           <p>
-            El servicio se ofrece &ldquo;tal cual&rdquo;. En la medida permitida por la ley, Zócalo no es
+            El servicio se ofrece &ldquo;tal cual&rdquo;. En la medida permitida por la ley, WhatsApp ProShop no es
             responsable por daños indirectos derivados del uso del servicio, incluyendo ventas
             perdidas por respuestas incorrectas del bot o interrupciones del servicio de
             WhatsApp/Meta u otros terceros de los que dependemos.

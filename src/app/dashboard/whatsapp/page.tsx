@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { WhatsAppTab } from "./_components/whatsapp-tab";
+import { CopyField } from "./_components/copy-field";
+import { Card, CardTitle } from "@/components/ui/card";
 
 // En esta variante no hay concepto de "bots" a nivel de UI: cada
 // organización tiene un único número de WhatsApp conectado por debajo.
@@ -36,6 +38,9 @@ export default async function WhatsAppSettingsPage() {
     }
   }
 
+  const webhookUrl = `${process.env.NEXTAUTH_URL ?? ""}/api/webhooks/whatsapp`;
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN ?? "";
+
   return (
     <div className="max-w-2xl animate-fade-up">
       <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">
@@ -46,6 +51,13 @@ export default async function WhatsAppSettingsPage() {
           ? "Conecta el número de WhatsApp Business de tu organización."
           : "Solo el dueño de la organización puede conectar o cambiar el número de WhatsApp."}
       </p>
+
+      <Card className="mb-6 space-y-4">
+        <CardTitle className="text-sm">Configuración del webhook en Meta</CardTitle>
+        <CopyField label="Webhook URL (callback URL)" value={webhookUrl} />
+        <CopyField label="Identificador de verificación (verify token)" value={verifyToken} />
+      </Card>
+
       {bot ? (
         <WhatsAppTab botId={bot.id} connection={bot.whatsappConnection} readOnly={!isOwner} />
       ) : (

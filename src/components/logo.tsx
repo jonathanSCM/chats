@@ -41,7 +41,7 @@ export function Logo({
     <span className={cn("inline-flex items-center gap-1.5", className)}>
       <LogoMark size={markSizes[size]} />
       <span className={cn("font-display font-bold tracking-tight text-ink", wordmarkSizes[size])}>
-        Zócalo
+        WhatsApp ProShop
       </span>
     </span>
   );

@@ -52,7 +52,7 @@ export async function createInviteAction(
     const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId } });
     await sendMail({
       to: parsed.data.email,
-      subject: `Te invitaron a unirte a ${org.name} en Zócalo`,
+      subject: `Te invitaron a unirte a ${org.name} en WhatsApp ProShop`,
       text: `Entra a este enlace para crear tu cuenta (vence en 7 días):\n\n${inviteUrl}`,
     });
   }
@@ -125,7 +125,7 @@ export async function acceptInviteAction(
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    return { error: "Ese correo ya tiene una cuenta en Zócalo. Inicia sesión en su lugar." };
+    return { error: "Ese correo ya tiene una cuenta en WhatsApp ProShop. Inicia sesión en su lugar." };
   }
 
   const passwordHash = await bcrypt.hash(password, 12);

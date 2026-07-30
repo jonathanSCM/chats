@@ -22,10 +22,11 @@ RUN npm run build
 
 # ── Runtime ─────────────────────────────────────────────────────
 # Nota: no usamos el output "standalone" de Next (que solo empaqueta lo
-# mínimo para el servidor web). Este contenedor lleva node_modules completo
-# a propósito, para poder correr `npx prisma migrate deploy` o
-# `npx tsx prisma/seed.ts` directamente en producción sin que falten
-# dependencias como bcryptjs.
+# mínimo para el servidor web), y copiamos TODO el directorio del builder
+# (código fuente, tsconfig.json, prisma.config.ts, node_modules completo)
+# en vez de listar archivo por archivo — a propósito, para poder correr
+# `npx prisma migrate deploy` o `npx tsx prisma/seed.ts` directamente en
+# el contenedor desplegado sin descubrir a los golpes qué archivo faltó.
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -34,12 +35,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/src/generated ./src/generated
+COPY --from=builder --chown=nextjs:nodejs /app ./
 
 USER nextjs
 

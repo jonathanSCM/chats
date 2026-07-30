@@ -4,7 +4,12 @@ FROM node:24-alpine AS base
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+# --include=dev es a propósito: si Coolify (u otra plataforma) inyecta
+# NODE_ENV=production también en build-time, npm por defecto omite las
+# devDependencies — y entre ellas está @tailwindcss/postcss, que el build
+# necesita sí o sí. Esto lo hace robusto sin depender de que alguien marque
+# bien el toggle "solo en runtime" para NODE_ENV en la plataforma.
+RUN npm ci --include=dev
 
 # ── Build ───────────────────────────────────────────────────────
 FROM base AS builder

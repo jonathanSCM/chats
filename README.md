@@ -61,16 +61,18 @@ sincronizan (incluye historial de conversaciones previas). Esto requiere el fluj
    → **Configuración de la API embebida (Embedded Signup)**.
 2. Crea una configuración nueva (`Configuration`) y **activa la opción de Coexistence**
    ("permitir vincular números que ya usan la app de WhatsApp Business"). Guarda el
-   `config_id` que te da — es el que va en `NEXT_PUBLIC_WHATSAPP_CONFIG_ID`.
+   `config_id` que te da — es el que va en `WHATSAPP_CONFIG_ID`.
 3. Copia el **App ID** de tu app de Meta (arriba a la izquierda del dashboard) →
-   `NEXT_PUBLIC_WHATSAPP_APP_ID`.
+   `WHATSAPP_APP_ID`.
 4. En **Configuración básica** de la app, copia el **App Secret** → `WHATSAPP_APP_SECRET`
    (esta es la misma que ya usa el webhook, no hay que sacarla dos veces).
 5. Agrega el dominio de tu panel (`https://tu-dominio`) a **Dominios permitidos de la app** y a
    los orígenes válidos de OAuth, si Meta te lo pide.
-6. Estas dos variables (`NEXT_PUBLIC_WHATSAPP_APP_ID`, `NEXT_PUBLIC_WHATSAPP_CONFIG_ID`) **no son
-   secretas** — van al bundle del navegador, por eso el prefijo `NEXT_PUBLIC_`. Se pueden ver en
-   el código fuente del cliente, es normal.
+6. `WHATSAPP_APP_ID` y `WHATSAPP_CONFIG_ID` no son secretas (el navegador las necesita para
+   inicializar el SDK de Facebook), pero se sirven en runtime desde el servidor
+   (`/api/whatsapp/embedded-signup-config`, solo a usuarios con sesión) — son variables de
+   entorno normales, **no hace falta marcarlas como "Available at Buildtime" ni rehacer el
+   build** cuando las cambies, solo reiniciar el servicio en Coolify.
 
 ### Uso desde el panel
 
@@ -96,10 +98,8 @@ sirve y qué pasa si falta.
    (R2, Spaces, S3).
 3. **App**: New Resource → Application → Public Repository → build pack **Dockerfile**
    (el `Dockerfile` del repo ya está listo), puerto `3000`.
-4. Configura todas las variables de `.env.example` en el servicio de la app. Las que empiezan
-   con `NEXT_PUBLIC_` (Coexistence) se hornean en el bundle **al momento del build**, así que
-   en Coolify marca "Available at Buildtime" para `NEXT_PUBLIC_WHATSAPP_APP_ID` y
-   `NEXT_PUBLIC_WHATSAPP_CONFIG_ID` — si no, quedan vacías aunque las hayas puesto.
+4. Configura todas las variables de `.env.example` en el servicio de la app (todas son de
+   runtime — ninguna necesita marcarse como "Available at Buildtime").
 5. Corre las migraciones una vez desplegado:
    ```bash
    npx prisma migrate deploy

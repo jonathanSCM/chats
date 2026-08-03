@@ -61,10 +61,17 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "connecting" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<{ appId: string | null; configId: string | null } | null>(
+    null,
+  );
   const sessionRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
 
-  const appId = process.env.NEXT_PUBLIC_WHATSAPP_APP_ID;
-  const configId = process.env.NEXT_PUBLIC_WHATSAPP_CONFIG_ID;
+  useEffect(() => {
+    fetch("/api/whatsapp/embedded-signup-config")
+      .then((res) => res.json())
+      .then(setConfig)
+      .catch(() => setConfig({ appId: null, configId: null }));
+  }, []);
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
@@ -86,10 +93,10 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
   }, []);
 
   async function handleClick() {
+    const appId = config?.appId;
+    const configId = config?.configId;
     if (!appId || !configId) {
-      setError(
-        "Faltan NEXT_PUBLIC_WHATSAPP_APP_ID / NEXT_PUBLIC_WHATSAPP_CONFIG_ID en el servidor.",
-      );
+      setError("Faltan WHATSAPP_APP_ID / WHATSAPP_CONFIG_ID en el servidor.");
       setStatus("error");
       return;
     }

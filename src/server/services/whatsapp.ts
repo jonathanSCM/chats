@@ -565,14 +565,10 @@ export async function verifyPhoneNumber(params: {
 export async function exchangeEmbeddedSignupCode(params: {
   code: string;
 }): Promise<{ accessToken: string }> {
-  // El App ID no es secreto (por eso NEXT_PUBLIC_ — el cliente también lo
-  // necesita para inicializar el SDK de Facebook); el App Secret sí.
-  const appId = process.env.NEXT_PUBLIC_WHATSAPP_APP_ID;
+  const appId = process.env.WHATSAPP_APP_ID;
   const appSecret = process.env.WHATSAPP_APP_SECRET;
   if (!appId || !appSecret) {
-    throw new Error(
-      "Faltan NEXT_PUBLIC_WHATSAPP_APP_ID/WHATSAPP_APP_SECRET para el Embedded Signup.",
-    );
+    throw new Error("Faltan WHATSAPP_APP_ID/WHATSAPP_APP_SECRET para el Embedded Signup.");
   }
 
   const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/oauth/access_token`);

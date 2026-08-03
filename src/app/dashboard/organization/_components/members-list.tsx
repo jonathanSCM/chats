@@ -5,6 +5,13 @@ import { UserX } from "lucide-react";
 import { removeMemberAction } from "@/server/actions/team";
 import { Badge } from "@/components/ui/badge";
 import { Table, Thead, Th, Td, Tr } from "@/components/ui/table";
+import { vendorColor } from "@/lib/vendor-color";
+
+const roleLabel: Record<string, string> = {
+  SUPERADMIN: "Superadmin",
+  OWNER: "Admin",
+  MEMBER: "Vendedor",
+};
 
 interface Member {
   id: string;
@@ -44,10 +51,20 @@ function MemberRow({ member, isSelf }: { member: Member; isSelf: boolean }) {
 
   return (
     <Tr>
-      <Td>{member.name ?? "—"}</Td>
+      <Td>
+        <span className="flex items-center gap-2">
+          <span
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: vendorColor(member.id) }}
+          />
+          {member.name ?? "—"}
+        </span>
+      </Td>
       <Td className="text-ink-muted">{member.email}</Td>
       <Td>
-        <Badge tone={member.role === "OWNER" ? "accent" : "neutral"}>{member.role}</Badge>
+        <Badge tone={member.role === "OWNER" ? "accent" : "neutral"}>
+          {roleLabel[member.role] ?? member.role}
+        </Badge>
       </Td>
       <Td>
         {!isSelf && member.role !== "OWNER" && (

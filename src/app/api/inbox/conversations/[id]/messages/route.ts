@@ -12,16 +12,29 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const conversation = await prisma.conversation.findUnique({
     where: { id },
-    include: { bot: true },
+    include: { bot: true, assignedTo: { select: { id: true, name: true, email: true } } },
   });
 
   if (!conversation || conversation.bot.organizationId !== session.user.organizationId) {
     return NextResponse.json({ error: "No encontrada" }, { status: 404 });
   }
 
+  const isAdmin = session.user.role === "OWNER" || session.user.role === "SUPERADMIN";
+  const isMine = !conversation.assignedToId || conversation.assignedToId === session.user.id;
+  if (!isAdmin && !isMine) {
+    return NextResponse.json({ error: "Este chat está asignado a otro vendedor" }, { status: 403 });
+  }
+
   const messages = await prisma.message.findMany({
     where: { conversationId: id },
     orderBy: { createdAt: "asc" },
+    include: { sentBy: { select: { id: true, name: true, email: true } } },
+  });
+
+  await prisma.conversationRead.upsert({
+    where: { conversationId_userId: { conversationId: id, userId: session.user.id } },
+    create: { conversationId: id, userId: session.user.id },
+    update: { lastReadAt: new Date() },
   });
 
   return NextResponse.json({
@@ -29,6 +42,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       id: conversation.id,
       customerPhone: conversation.customerPhone,
       customerName: conversation.customerName,
+      assignedTo: conversation.assignedTo
+        ? { id: conversation.assignedTo.id, name: conversation.assignedTo.name || conversation.assignedTo.email }
+        : null,
     },
     messages: messages.map((m) => ({
       id: m.id,
@@ -41,6 +57,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       fileName: m.fileName,
       viaPhoneApp: m.viaPhoneApp,
       isHistorical: m.isHistorical,
+      sentBy: m.sentBy ? { id: m.sentBy.id, name: m.sentBy.name || m.sentBy.email } : null,
     })),
   });
 }

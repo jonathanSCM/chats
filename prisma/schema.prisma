@@ -48,6 +48,9 @@ model User {
 
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
+  assignedConversations   Conversation[]           @relation("ConversationAssignee")
+  sentMessages            Message[]                @relation("MessageSender")
+  conversationReads       ConversationRead[]
 
   @@index([organizationId])
   @@map("users")
@@ -190,11 +193,34 @@ model Conversation {
   billed         Boolean   @default(false) // ya contabilizada contra el plan/uso
   botPaused      Boolean   @default(false) // un humano tomó la conversación; el bot no responde solo
 
+  // Vendedor dueño de esta conversación — se asigna automáticamente al
+  // primer vendedor que responde. Mientras sea null, cualquier vendedor la
+  // ve en su bandeja como "sin asignar"; una vez asignada, solo ese
+  // vendedor (y los admins/OWNER) la ven.
+  assignedToId String?
+  assignedTo   User?     @relation("ConversationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
   messages Message[]
+  reads    ConversationRead[]
 
   @@index([botId])
   @@index([customerPhone])
+  @@index([assignedToId])
   @@map("conversations")
+}
+
+// Marca de "leído" por vendedor/admin — cada usuario tiene su propio
+// puntero de lectura sobre una conversación (no es un estado global).
+model ConversationRead {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+  @@map("conversation_reads")
 }
 
 enum MessageRole {
@@ -217,6 +243,8 @@ model Message {
   externalId     String?      @unique // id del mensaje en WhatsApp, para idempotencia del webhook
   viaPhoneApp    Boolean      @default(false) // llegó como eco de un mensaje mandado desde la app de WhatsApp Business (coexistence), no desde este panel
   isHistorical   Boolean      @default(false) // importado del historial (webhook "history"), no un mensaje en vivo
+  sentById       String? // vendedor que mandó este mensaje desde el panel (solo para role STAFF enviado aquí, no vía phone app)
+  sentBy         User?        @relation("MessageSender", fields: [sentById], references: [id], onDelete: SetNull)
   createdAt      DateTime     @default(now())
 
   @@index([conversationId])

@@ -3,12 +3,20 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Send, Paperclip, FileText, X, Smartphone } from "lucide-react";
 import { sendInboxMessageAction, sendInboxAttachmentAction } from "@/server/actions/inbox";
+import { vendorColor } from "@/lib/vendor-color";
+
+interface Vendor {
+  id: string;
+  name: string;
+}
 
 interface ConversationSummary {
   id: string;
   customerPhone: string;
   customerName: string | null;
   lastMessageAt: string;
+  assignedTo: Vendor | null;
+  unreadCount: number;
   lastMessage: {
     content: string;
     role: string;
@@ -30,6 +38,7 @@ interface Message {
   fileName: string | null;
   viaPhoneApp: boolean;
   isHistorical: boolean;
+  sentBy: Vendor | null;
 }
 
 const roleLabel: Record<Message["role"], string> = {
@@ -114,12 +123,19 @@ function MessageMedia({ message }: { message: Message }) {
 const ACCEPTED_FILE_TYPES =
   "image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.zip,.rar,.apk,.json";
 
-export function InboxClient() {
+export function InboxClient({
+  currentUserId,
+  isAdmin,
+}: {
+  currentUserId: string;
+  isAdmin: boolean;
+}) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerName, setCustomerName] = useState<string | null>(null);
+  const [assignedTo, setAssignedTo] = useState<Vendor | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -128,6 +144,19 @@ export function InboxClient() {
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectedIdRef = useRef<string | null>(null);
+  const prevUnreadRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
+
+  // Pide permiso de notificaciones del navegador una sola vez, al entrar al inbox.
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   // Alto calculado en JS (no vh-fijo): se adapta a lo que haya arriba
   // (banner de verificación, etc.) sin dejar el compositor "flotando" abajo.
@@ -149,7 +178,30 @@ export function InboxClient() {
   const fetchConversations = useCallback(async () => {
     const res = await fetch("/api/inbox/conversations");
     if (!res.ok) return;
-    setConversations(await res.json());
+    const list: ConversationSummary[] = await res.json();
+
+    // Detecta mensajes nuevos desde el último poll para avisar por
+    // notificación del navegador (solo si el chat no es el que está abierto).
+    for (const c of list) {
+      const prevUnread = prevUnreadRef.current.get(c.id) ?? 0;
+      if (
+        c.unreadCount > prevUnread &&
+        c.id !== selectedIdRef.current &&
+        typeof Notification !== "undefined" &&
+        Notification.permission === "granted"
+      ) {
+        new Notification(c.customerName || c.customerPhone, {
+          body: c.lastMessage?.content || "Nuevo mensaje",
+          tag: c.id,
+        });
+      }
+    }
+    prevUnreadRef.current = new Map(list.map((c) => [c.id, c.unreadCount]));
+
+    const totalUnread = list.reduce((sum, c) => sum + c.unreadCount, 0);
+    document.title = totalUnread > 0 ? `(${totalUnread}) WhatsApp ProShop` : "WhatsApp ProShop";
+
+    setConversations(list);
   }, []);
 
   const fetchMessages = useCallback(async (id: string) => {
@@ -159,6 +211,7 @@ export function InboxClient() {
     setMessages(data.messages);
     setCustomerPhone(data.conversation.customerPhone);
     setCustomerName(data.conversation.customerName ?? null);
+    setAssignedTo(data.conversation.assignedTo ?? null);
   }, []);
 
   // Polling de la lista de conversaciones cada 3s — tiempo real sin websockets.
@@ -210,6 +263,7 @@ export function InboxClient() {
         fileName: null,
         viaPhoneApp: false,
         isHistorical: false,
+        sentBy: null,
       };
       setMessages((prev) => [...prev, optimistic]);
 
@@ -241,6 +295,7 @@ export function InboxClient() {
       <aside className="w-80 shrink-0 border-r border-border bg-surface/60 overflow-y-auto">
         <div className="sticky top-0 border-b border-border bg-surface/90 px-4 py-4 backdrop-blur">
           <h1 className="font-display text-lg font-semibold text-ink">Chats</h1>
+          {isAdmin && <p className="text-xs text-ink-faint">Vista de administrador — todas las conversaciones</p>}
         </div>
         {conversations.length === 0 && (
           <p className="px-4 py-6 text-sm text-ink-faint">No hay conversaciones todavía.</p>
@@ -257,11 +312,18 @@ export function InboxClient() {
               <span className="truncate text-sm font-medium text-ink">
                 {c.customerName || c.customerPhone}
               </span>
-              {c.lastMessage && (
-                <span className="shrink-0 font-mono text-[11px] text-ink-faint">
-                  {timeFmt(c.lastMessage.createdAt)}
-                </span>
-              )}
+              <div className="flex shrink-0 items-center gap-1.5">
+                {c.unreadCount > 0 && (
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-ink">
+                    {c.unreadCount}
+                  </span>
+                )}
+                {c.lastMessage && (
+                  <span className="font-mono text-[11px] text-ink-faint">
+                    {timeFmt(c.lastMessage.createdAt)}
+                  </span>
+                )}
+              </div>
             </div>
             {c.lastMessage && (
               <span className="truncate text-xs text-ink-muted">
@@ -271,6 +333,21 @@ export function InboxClient() {
                   : c.lastMessage.content}
               </span>
             )}
+            <span className="flex items-center gap-1.5 text-[11px]">
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{
+                  backgroundColor: c.assignedTo ? vendorColor(c.assignedTo.id) : "var(--color-ink-faint)",
+                }}
+              />
+              <span className="text-ink-faint">
+                {c.assignedTo
+                  ? c.assignedTo.id === currentUserId
+                    ? "Tú"
+                    : c.assignedTo.name
+                  : "Sin asignar"}
+              </span>
+            </span>
           </button>
         ))}
       </aside>
@@ -284,12 +361,24 @@ export function InboxClient() {
         ) : (
           <>
             <div className="border-b border-border bg-surface/60 px-5 py-3">
-              <p className="font-display text-sm font-semibold text-ink">
-                {customerName || customerPhone}
-              </p>
-              {customerName && (
-                <p className="font-mono text-xs text-ink-faint">{customerPhone}</p>
-              )}
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="font-display text-sm font-semibold text-ink">
+                    {customerName || customerPhone}
+                  </p>
+                  {customerName && (
+                    <p className="font-mono text-xs text-ink-faint">{customerPhone}</p>
+                  )}
+                </div>
+                {assignedTo && (
+                  <span
+                    className="flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium text-white"
+                    style={{ backgroundColor: vendorColor(assignedTo.id) }}
+                  >
+                    {assignedTo.id === currentUserId ? "Tú" : assignedTo.name}
+                  </span>
+                )}
+              </div>
             </div>
 
             <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto px-5 py-4">
@@ -313,7 +402,13 @@ export function InboxClient() {
                             <span>·</span>
                           </>
                         )}
-                        <span>{roleLabel[m.role]}</span>
+                        <span>
+                          {m.sentBy
+                            ? m.sentBy.id === currentUserId
+                              ? "Tú"
+                              : m.sentBy.name
+                            : roleLabel[m.role]}
+                        </span>
                         <span>·</span>
                         <span>{timeFmt(m.createdAt)}</span>
                       </div>

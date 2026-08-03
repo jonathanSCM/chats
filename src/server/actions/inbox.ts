@@ -50,13 +50,25 @@ export async function sendInboxMessageAction(
     return { error: "No se pudo enviar el mensaje por WhatsApp." };
   }
 
+  const session = await requireSession();
+
   await prisma.$transaction([
     prisma.message.create({
-      data: { conversationId, role: "STAFF", content: parsed.data.content },
+      data: {
+        conversationId,
+        role: "STAFF",
+        content: parsed.data.content,
+        sentById: session.user.id,
+      },
     }),
     prisma.conversation.update({
       where: { id: conversationId },
       data: { lastMessageAt: new Date(), botPaused: true },
+    }),
+    // Auto-asignación: si nadie la tenía, el primero que responde se queda con ella.
+    prisma.conversation.updateMany({
+      where: { id: conversationId, assignedToId: null },
+      data: { assignedToId: session.user.id },
     }),
   ]);
 
@@ -139,6 +151,7 @@ export async function sendInboxAttachmentAction(
   }
 
   const localUrl = await saveMediaFile(buffer, mimeType);
+  const session = await requireSession();
 
   await prisma.$transaction([
     prisma.message.create({
@@ -150,11 +163,16 @@ export async function sendInboxAttachmentAction(
         mediaType: MEDIA_TYPE_MAP[outboundType],
         mimeType,
         fileName: file.name,
+        sentById: session.user.id,
       },
     }),
     prisma.conversation.update({
       where: { id: conversationId },
       data: { lastMessageAt: new Date(), botPaused: true },
+    }),
+    prisma.conversation.updateMany({
+      where: { id: conversationId, assignedToId: null },
+      data: { assignedToId: session.user.id },
     }),
   ]);
 

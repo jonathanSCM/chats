@@ -20,6 +20,7 @@ export async function GET() {
     conversations.map((c) => ({
       id: c.id,
       customerPhone: c.customerPhone,
+      customerName: c.customerName,
       lastMessageAt: c.lastMessageAt,
       lastMessage: c.messages[0]
         ? {

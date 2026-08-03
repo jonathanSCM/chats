@@ -48,6 +48,7 @@ const inboundSchema = z.object({
     z.object({
       changes: z.array(
         z.object({
+          field: z.string().optional(),
           value: z.object({
             metadata: z.object({
               phone_number_id: z.string(),
@@ -91,6 +92,19 @@ export interface ParsedInboundMessage {
 
 const MEDIA_TYPES: InboundMediaType[] = ["image", "video", "audio", "document"];
 
+// Meta manda varios tipos de evento por el mismo webhook, distinguidos por
+// `field` dentro de cada change: "messages" (normal), "smb_message_echoes"
+// (coexistence: alguien respondió desde la app del celular), "history"
+// (coexistence: import inicial de conversaciones viejas) y
+// "smb_app_state_sync" (coexistence: contactos del negocio). Cada
+// parseXxx() de abajo filtra por su propio `field` e ignora el resto.
+function isFieldMatch(field: unknown, expected: string): boolean {
+  // Si el evento no trae `field` (algunos payloads de prueba lo omiten),
+  // se asume "messages" por compatibilidad — es el caso histórico/normal.
+  if (field === undefined) return expected === "messages";
+  return field === expected;
+}
+
 export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
   const parsed = inboundSchema.safeParse(payload);
   if (!parsed.success) return [];
@@ -98,6 +112,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
   const results: ParsedInboundMessage[] = [];
   for (const entry of parsed.data.entry) {
     for (const change of entry.changes) {
+      if (!isFieldMatch(change.field, "messages")) continue;
       const { phone_number_id } = change.value.metadata;
       for (const message of change.value.messages ?? []) {
         if (message.type === "text" && message.text?.body) {
@@ -129,6 +144,258 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
             });
           }
         }
+      }
+    }
+  }
+  return results;
+}
+
+// ─── Coexistence: ecos de mensajes mandados desde la app del celular ────
+
+const echoSchema = z.object({
+  object: z.string(),
+  entry: z.array(
+    z.object({
+      changes: z.array(
+        z.object({
+          field: z.string().optional(),
+          value: z.object({
+            metadata: z.object({ phone_number_id: z.string() }),
+            message_echoes: z
+              .array(
+                z.object({
+                  from: z.string(),
+                  to: z.string(),
+                  id: z.string(),
+                  timestamp: z.string(),
+                  type: z.string(),
+                  text: z.object({ body: z.string() }).optional(),
+                  image: mediaObjectSchema.optional(),
+                  video: mediaObjectSchema.optional(),
+                  audio: mediaObjectSchema.optional(),
+                  document: mediaObjectSchema.optional(),
+                }),
+              )
+              .optional(),
+          }),
+        }),
+      ),
+    }),
+  ),
+});
+
+export interface ParsedEcho {
+  phoneNumberId: string;
+  to: string; // número del cliente
+  messageId: string;
+  text: string | null;
+  media: {
+    type: InboundMediaType;
+    mediaId: string;
+    mimeType?: string;
+    fileName?: string;
+  } | null;
+}
+
+export function parseMessageEchoes(payload: unknown): ParsedEcho[] {
+  const parsed = echoSchema.safeParse(payload);
+  if (!parsed.success) return [];
+
+  const results: ParsedEcho[] = [];
+  for (const entry of parsed.data.entry) {
+    for (const change of entry.changes) {
+      if (!isFieldMatch(change.field, "smb_message_echoes")) continue;
+      const { phone_number_id } = change.value.metadata;
+      for (const echo of change.value.message_echoes ?? []) {
+        if (echo.type === "text" && echo.text?.body) {
+          results.push({
+            phoneNumberId: phone_number_id,
+            to: echo.to,
+            messageId: echo.id,
+            text: echo.text.body,
+            media: null,
+          });
+          continue;
+        }
+        const mediaType = MEDIA_TYPES.find((t) => t === echo.type);
+        if (mediaType) {
+          const mediaObj = echo[mediaType];
+          if (mediaObj) {
+            results.push({
+              phoneNumberId: phone_number_id,
+              to: echo.to,
+              messageId: echo.id,
+              text: mediaObj.caption ?? null,
+              media: {
+                type: mediaType,
+                mediaId: mediaObj.id,
+                mimeType: mediaObj.mime_type,
+                fileName: mediaObj.filename,
+              },
+            });
+          }
+        }
+      }
+    }
+  }
+  return results;
+}
+
+// ─── Coexistence: import de historial previo a conectar ────────────────
+
+const historySchema = z.object({
+  object: z.string(),
+  entry: z.array(
+    z.object({
+      changes: z.array(
+        z.object({
+          field: z.string().optional(),
+          value: z.object({
+            metadata: z.object({
+              phone_number_id: z.string(),
+              display_phone_number: z.string().optional(),
+            }),
+            history: z
+              .array(
+                z.object({
+                  metadata: z
+                    .object({
+                      phase: z.string().optional(),
+                      chunk_order: z.union([z.string(), z.number()]).optional(),
+                      progress: z.union([z.string(), z.number()]).optional(),
+                    })
+                    .optional(),
+                  threads: z.array(
+                    z.object({
+                      id: z.string(), // número del cliente
+                      messages: z.array(
+                        z.object({
+                          from: z.string(),
+                          to: z.string().optional(),
+                          id: z.string(),
+                          timestamp: z.string(),
+                          type: z.string(),
+                          text: z.object({ body: z.string() }).optional(),
+                        }),
+                      ),
+                    }),
+                  ),
+                }),
+              )
+              .optional(),
+          }),
+        }),
+      ),
+    }),
+  ),
+});
+
+export interface ParsedHistoryMessage {
+  phoneNumberId: string;
+  displayPhoneNumber: string | null;
+  customerPhone: string;
+  messageId: string;
+  timestamp: string;
+  text: string | null;
+  fromBusiness: boolean; // true = lo mandó el negocio (STAFF histórico), false = lo mandó el cliente
+}
+
+export interface ParsedHistoryBatch {
+  messages: ParsedHistoryMessage[];
+  isComplete: boolean; // metadata.phase === "complete" (Meta manda el historial en chunks)
+}
+
+export function parseHistoryPayload(payload: unknown): ParsedHistoryBatch {
+  const parsed = historySchema.safeParse(payload);
+  if (!parsed.success) return { messages: [], isComplete: false };
+
+  const messages: ParsedHistoryMessage[] = [];
+  let isComplete = false;
+
+  for (const entry of parsed.data.entry) {
+    for (const change of entry.changes) {
+      if (!isFieldMatch(change.field, "history")) continue;
+      const { phone_number_id, display_phone_number } = change.value.metadata;
+
+      for (const chunk of change.value.history ?? []) {
+        if (chunk.metadata?.phase === "complete") isComplete = true;
+
+        for (const thread of chunk.threads) {
+          for (const message of thread.messages) {
+            if (message.type !== "text" || !message.text?.body) continue;
+            messages.push({
+              phoneNumberId: phone_number_id,
+              displayPhoneNumber: display_phone_number ?? null,
+              customerPhone: thread.id,
+              messageId: message.id,
+              timestamp: message.timestamp,
+              text: message.text.body,
+              fromBusiness: display_phone_number ? message.from === display_phone_number : false,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return { messages, isComplete };
+}
+
+// ─── Coexistence: sincronización de contactos del negocio ───────────────
+
+const contactSyncSchema = z.object({
+  object: z.string(),
+  entry: z.array(
+    z.object({
+      changes: z.array(
+        z.object({
+          field: z.string().optional(),
+          value: z.object({
+            metadata: z.object({ phone_number_id: z.string() }),
+            state_sync: z
+              .array(
+                z.object({
+                  type: z.string(),
+                  action: z.string().optional(),
+                  contact: z
+                    .object({
+                      full_name: z.string().optional(),
+                      first_name: z.string().optional(),
+                      phone_number: z.string().optional(),
+                    })
+                    .optional(),
+                }),
+              )
+              .optional(),
+          }),
+        }),
+      ),
+    }),
+  ),
+});
+
+export interface ParsedContactSync {
+  phoneNumberId: string;
+  contactPhone: string;
+  name: string | null;
+}
+
+export function parseContactSync(payload: unknown): ParsedContactSync[] {
+  const parsed = contactSyncSchema.safeParse(payload);
+  if (!parsed.success) return [];
+
+  const results: ParsedContactSync[] = [];
+  for (const entry of parsed.data.entry) {
+    for (const change of entry.changes) {
+      if (!isFieldMatch(change.field, "smb_app_state_sync")) continue;
+      const { phone_number_id } = change.value.metadata;
+      for (const item of change.value.state_sync ?? []) {
+        if (item.type !== "contact" || !item.contact?.phone_number) continue;
+        results.push({
+          phoneNumberId: phone_number_id,
+          contactPhone: item.contact.phone_number,
+          name: item.contact.full_name ?? item.contact.first_name ?? null,
+        });
       }
     }
   }
@@ -288,4 +555,54 @@ export async function verifyPhoneNumber(params: {
     verifiedName: data.verified_name ?? "Sin nombre verificado",
     displayNumber: data.display_phone_number ?? "",
   };
+}
+
+// ─── Embedded Signup (Coexistence) ──────────────────────────────
+
+// Intercambia el "code" que devuelve FB.login() (válido solo 30 segundos)
+// por un access token utilizable contra la Graph API. Requiere que la app
+// de Meta tenga configurado el Embedded Signup con Coexistence habilitado.
+export async function exchangeEmbeddedSignupCode(params: {
+  code: string;
+}): Promise<{ accessToken: string }> {
+  // El App ID no es secreto (por eso NEXT_PUBLIC_ — el cliente también lo
+  // necesita para inicializar el SDK de Facebook); el App Secret sí.
+  const appId = process.env.NEXT_PUBLIC_WHATSAPP_APP_ID;
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  if (!appId || !appSecret) {
+    throw new Error(
+      "Faltan NEXT_PUBLIC_WHATSAPP_APP_ID/WHATSAPP_APP_SECRET para el Embedded Signup.",
+    );
+  }
+
+  const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/oauth/access_token`);
+  url.searchParams.set("client_id", appId);
+  url.searchParams.set("client_secret", appSecret);
+  url.searchParams.set("code", params.code);
+
+  const res = await fetch(url.toString());
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`No se pudo intercambiar el código del Embedded Signup (${res.status}): ${errorBody}`);
+  }
+
+  const data = (await res.json()) as { access_token: string };
+  return { accessToken: data.access_token };
+}
+
+// Suscribe esta app a los webhooks de la WABA — sin esto, Meta no manda
+// ni mensajes ni los eventos de coexistence (history, echoes, contactos).
+export async function subscribeAppToWaba(params: {
+  wabaId: string;
+  accessToken: string;
+}): Promise<void> {
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_API_VERSION}/${params.wabaId}/subscribed_apps`,
+    { method: "POST", headers: { Authorization: `Bearer ${params.accessToken}` } },
+  );
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`No se pudo suscribir la app a la WABA (${res.status}): ${errorBody}`);
+  }
 }

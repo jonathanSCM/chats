@@ -25,7 +25,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   });
 
   return NextResponse.json({
-    conversation: { id: conversation.id, customerPhone: conversation.customerPhone },
+    conversation: {
+      id: conversation.id,
+      customerPhone: conversation.customerPhone,
+      customerName: conversation.customerName,
+    },
     messages: messages.map((m) => ({
       id: m.id,
       role: m.role,
@@ -35,6 +39,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       mediaType: m.mediaType,
       mimeType: m.mimeType,
       fileName: m.fileName,
+      viaPhoneApp: m.viaPhoneApp,
+      isHistorical: m.isHistorical,
     })),
   });
 }

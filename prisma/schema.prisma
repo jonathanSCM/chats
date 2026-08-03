@@ -148,9 +148,17 @@ model WhatsAppConnection {
   displayNumber       String? // número visible (ej. +591 700 12345), para el link "click to chat"
   accessToken         String   @db.Text // cifrado a nivel de aplicación
   verified            Boolean  @default(false)
+  coexistence         Boolean  @default(false) // conectado vía Embedded Signup en modo Coexistence (mismo número también usado en la app de WhatsApp Business)
+  historySyncStatus   HistorySyncStatus @default(NONE)
   createdAt           DateTime @default(now())
 
   @@map("whatsapp_connections")
+}
+
+enum HistorySyncStatus {
+  NONE       // no aplica (conexión sin coexistence) o todavía no llegó nada
+  PENDING    // coexistence conectado, esperando el webhook "history" de Meta
+  COMPLETE   // historial ya importado
 }
 
 model CatalogItem {
@@ -176,6 +184,7 @@ model Conversation {
   botId          String
   bot            Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
   customerPhone  String
+  customerName   String? // viene del webhook smb_app_state_sync (contactos del negocio) o del profile.name del contacto
   startedAt      DateTime  @default(now())
   lastMessageAt  DateTime  @default(now())
   billed         Boolean   @default(false) // ya contabilizada contra el plan/uso
@@ -206,6 +215,8 @@ model Message {
   mimeType       String?
   fileName       String?
   externalId     String?      @unique // id del mensaje en WhatsApp, para idempotencia del webhook
+  viaPhoneApp    Boolean      @default(false) // llegó como eco de un mensaje mandado desde la app de WhatsApp Business (coexistence), no desde este panel
+  isHistorical   Boolean      @default(false) // importado del historial (webhook "history"), no un mensaje en vivo
   createdAt      DateTime     @default(now())
 
   @@index([conversationId])

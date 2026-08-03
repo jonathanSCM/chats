@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Send, Paperclip, FileText, X } from "lucide-react";
+import { Send, Paperclip, FileText, X, Smartphone } from "lucide-react";
 import { sendInboxMessageAction, sendInboxAttachmentAction } from "@/server/actions/inbox";
 
 interface ConversationSummary {
   id: string;
   customerPhone: string;
+  customerName: string | null;
   lastMessageAt: string;
   lastMessage: {
     content: string;
@@ -27,6 +28,8 @@ interface Message {
   mediaType: MediaType | null;
   mimeType: string | null;
   fileName: string | null;
+  viaPhoneApp: boolean;
+  isHistorical: boolean;
 }
 
 const roleLabel: Record<Message["role"], string> = {
@@ -116,6 +119,7 @@ export function InboxClient() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerName, setCustomerName] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -154,6 +158,7 @@ export function InboxClient() {
     const data = await res.json();
     setMessages(data.messages);
     setCustomerPhone(data.conversation.customerPhone);
+    setCustomerName(data.conversation.customerName ?? null);
   }, []);
 
   // Polling de la lista de conversaciones cada 3s — tiempo real sin websockets.
@@ -203,6 +208,8 @@ export function InboxClient() {
         mediaType: null,
         mimeType: null,
         fileName: null,
+        viaPhoneApp: false,
+        isHistorical: false,
       };
       setMessages((prev) => [...prev, optimistic]);
 
@@ -247,7 +254,9 @@ export function InboxClient() {
             }`}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-sm font-medium text-ink">{c.customerPhone}</span>
+              <span className="truncate text-sm font-medium text-ink">
+                {c.customerName || c.customerPhone}
+              </span>
               {c.lastMessage && (
                 <span className="shrink-0 font-mono text-[11px] text-ink-faint">
                   {timeFmt(c.lastMessage.createdAt)}
@@ -275,7 +284,12 @@ export function InboxClient() {
         ) : (
           <>
             <div className="border-b border-border bg-surface/60 px-5 py-3">
-              <p className="font-display text-sm font-semibold text-ink">{customerPhone}</p>
+              <p className="font-display text-sm font-semibold text-ink">
+                {customerName || customerPhone}
+              </p>
+              {customerName && (
+                <p className="font-mono text-xs text-ink-faint">{customerPhone}</p>
+              )}
             </div>
 
             <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto px-5 py-4">
@@ -293,6 +307,12 @@ export function InboxClient() {
                         <p className="whitespace-pre-wrap">{linkify(m.content, mine)}</p>
                       )}
                       <div className="mt-1 flex items-center gap-1.5 text-[10px] opacity-70">
+                        {m.viaPhoneApp && (
+                          <>
+                            <Smartphone size={11} />
+                            <span>·</span>
+                          </>
+                        )}
                         <span>{roleLabel[m.role]}</span>
                         <span>·</span>
                         <span>{timeFmt(m.createdAt)}</span>

@@ -8,6 +8,7 @@ import {
   type ParsedEcho,
   type ParsedHistoryBatch,
   type ParsedContactSync,
+  type ParsedStatusUpdate,
 } from "@/server/services/whatsapp";
 import { saveMediaFile } from "@/lib/media-storage";
 
@@ -227,6 +228,27 @@ export async function handleHistoryImport(batch: ParsedHistoryBatch): Promise<vo
       data: { historySyncStatus: "COMPLETE" },
     });
   }
+}
+
+// ─── Confirmaciones de entrega/lectura de mensajes salientes ────────────
+//
+// Meta manda "sent" -> "delivered" -> "read" en orden, pero por si llega
+// alguno fuera de orden (reintentos, red), solo avanza el status, nunca
+// retrocede (un mensaje ya leído no debería volver a "entregado").
+const STATUS_RANK: Record<string, number> = { SENT: 0, DELIVERED: 1, READ: 2, FAILED: 3 };
+
+export async function handleStatusUpdate(update: ParsedStatusUpdate): Promise<void> {
+  const newStatus = update.status.toUpperCase() as "SENT" | "DELIVERED" | "READ" | "FAILED";
+
+  const message = await prisma.message.findUnique({
+    where: { externalId: update.messageId },
+    select: { id: true, status: true },
+  });
+  if (!message) return; // mensaje mandado antes de este cambio, o de otra org
+
+  if (STATUS_RANK[newStatus] <= STATUS_RANK[message.status]) return;
+
+  await prisma.message.update({ where: { id: message.id }, data: { status: newStatus } });
 }
 
 // ─── Coexistence: sincronización de contactos del negocio ───────────────

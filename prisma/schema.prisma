@@ -245,10 +245,18 @@ model Message {
   isHistorical   Boolean      @default(false) // importado del historial (webhook "history"), no un mensaje en vivo
   sentById       String? // vendedor que mandó este mensaje desde el panel (solo para role STAFF enviado aquí, no vía phone app)
   sentBy         User?        @relation("MessageSender", fields: [sentById], references: [id], onDelete: SetNull)
+  status         MessageStatus @default(SENT) // solo relevante para mensajes salientes (STAFF): confirmación de entrega/lectura de Meta
   createdAt      DateTime     @default(now())
 
   @@index([conversationId])
   @@map("messages")
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
 }
 
 enum MediaType {

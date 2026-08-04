@@ -38,13 +38,14 @@ export async function sendInboxMessageAction(
     return { error: "WhatsApp no está conectado." };
   }
 
+  let messageId: string | null;
   try {
-    await sendTextMessage({
+    ({ messageId } = await sendTextMessage({
       phoneNumberId: connection.phoneNumberId,
       accessToken: decrypt(connection.accessToken),
       to: conversation.customerPhone,
       body: parsed.data.content,
-    });
+    }));
   } catch (error) {
     console.error(error);
     return { error: "No se pudo enviar el mensaje por WhatsApp." };
@@ -59,6 +60,7 @@ export async function sendInboxMessageAction(
         role: "STAFF",
         content: parsed.data.content,
         sentById: session.user.id,
+        externalId: messageId,
       },
     }),
     prisma.conversation.update({
@@ -127,6 +129,7 @@ export async function sendInboxAttachmentAction(
   const accessToken = decrypt(connection.accessToken);
 
   let mediaId: string;
+  let messageId: string | null;
   try {
     mediaId = await uploadMedia({
       phoneNumberId: connection.phoneNumberId,
@@ -136,7 +139,7 @@ export async function sendInboxAttachmentAction(
       fileName: file.name,
     });
 
-    await sendMediaMessage({
+    ({ messageId } = await sendMediaMessage({
       phoneNumberId: connection.phoneNumberId,
       accessToken,
       to: conversation.customerPhone,
@@ -144,7 +147,7 @@ export async function sendInboxAttachmentAction(
       mediaId,
       caption: caption || undefined,
       fileName: file.name,
-    });
+    }));
   } catch (error) {
     console.error(error);
     return { error: "No se pudo enviar el archivo por WhatsApp." };
@@ -164,6 +167,7 @@ export async function sendInboxAttachmentAction(
         mimeType,
         fileName: file.name,
         sentById: session.user.id,
+        externalId: messageId,
       },
     }),
     prisma.conversation.update({

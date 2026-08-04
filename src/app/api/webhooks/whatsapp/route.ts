@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   isValidWebhookSignature,
   parseInboundPayload,
+  parseStatusUpdates,
   parseMessageEchoes,
   parseHistoryPayload,
   parseContactSync,
 } from "@/server/services/whatsapp";
 import {
   handleIncomingMessage,
+  handleStatusUpdate,
   handlePhoneAppEcho,
   handleHistoryImport,
   handleContactSync,
@@ -68,6 +70,15 @@ export async function POST(req: NextRequest) {
       );
     } catch (error) {
       console.error("[webhook] Error procesando mensaje entrante:", error);
+    }
+  }
+
+  const statusUpdates = parseStatusUpdates(payload);
+  for (const update of statusUpdates) {
+    try {
+      await handleStatusUpdate(update);
+    } catch (error) {
+      console.error("[webhook] Error procesando confirmación de entrega/lectura:", error);
     }
   }
 

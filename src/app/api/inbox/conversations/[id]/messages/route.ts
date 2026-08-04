@@ -58,6 +58,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       viaPhoneApp: m.viaPhoneApp,
       isHistorical: m.isHistorical,
       sentBy: m.sentBy ? { id: m.sentBy.id, name: m.sentBy.name || m.sentBy.email } : null,
+      status: m.status,
     })),
   });
 }

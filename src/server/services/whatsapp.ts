@@ -68,6 +68,15 @@ const inboundSchema = z.object({
                 }),
               )
               .optional(),
+            statuses: z
+              .array(
+                z.object({
+                  id: z.string(),
+                  status: z.string(), // "sent" | "delivered" | "read" | "failed"
+                  timestamp: z.string(),
+                }),
+              )
+              .optional(),
           }),
         }),
       ),
@@ -143,6 +152,36 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
               },
             });
           }
+        }
+      }
+    }
+  }
+  return results;
+}
+
+export interface ParsedStatusUpdate {
+  messageId: string;
+  status: "sent" | "delivered" | "read" | "failed";
+}
+
+// Confirmaciones de entrega/lectura de los mensajes que mandamos nosotros
+// (los "check azul") — vienen en el mismo campo "messages" del webhook,
+// mezcladas con los mensajes entrantes, distinguidas por venir en `statuses`
+// en vez de `messages`.
+export function parseStatusUpdates(payload: unknown): ParsedStatusUpdate[] {
+  const parsed = inboundSchema.safeParse(payload);
+  if (!parsed.success) return [];
+
+  const results: ParsedStatusUpdate[] = [];
+  for (const entry of parsed.data.entry) {
+    for (const change of entry.changes) {
+      if (!isFieldMatch(change.field, "messages")) continue;
+      for (const status of change.value.statuses ?? []) {
+        if (["sent", "delivered", "read", "failed"].includes(status.status)) {
+          results.push({
+            messageId: status.id,
+            status: status.status as ParsedStatusUpdate["status"],
+          });
         }
       }
     }
@@ -404,12 +443,16 @@ export function parseContactSync(payload: unknown): ParsedContactSync[] {
 
 // ─── Envío de mensajes ──────────────────────────────────────────
 
+interface SendMessageResponse {
+  messages?: { id: string }[];
+}
+
 export async function sendTextMessage(params: {
   phoneNumberId: string;
   accessToken: string;
   to: string;
   body: string;
-}): Promise<void> {
+}): Promise<{ messageId: string | null }> {
   const { phoneNumberId, accessToken, to, body } = params;
 
   const res = await fetch(
@@ -433,6 +476,9 @@ export async function sendTextMessage(params: {
     const errorBody = await res.text();
     throw new Error(`WhatsApp send failed (${res.status}): ${errorBody}`);
   }
+
+  const data = (await res.json()) as SendMessageResponse;
+  return { messageId: data.messages?.[0]?.id ?? null };
 }
 
 // ─── Media: descarga de lo entrante, subida/envío de lo saliente ──
@@ -505,7 +551,7 @@ export async function sendMediaMessage(params: {
   mediaId: string;
   caption?: string;
   fileName?: string;
-}): Promise<void> {
+}): Promise<{ messageId: string | null }> {
   const { phoneNumberId, accessToken, to, type, mediaId, caption, fileName } = params;
 
   const mediaPayload: Record<string, unknown> = { id: mediaId };
@@ -537,6 +583,9 @@ export async function sendMediaMessage(params: {
     const errorBody = await res.text();
     throw new Error(`WhatsApp send media failed (${res.status}): ${errorBody}`);
   }
+
+  const data = (await res.json()) as SendMessageResponse;
+  return { messageId: data.messages?.[0]?.id ?? null };
 }
 
 // ─── Verificación de conexión ───────────────────────────────────

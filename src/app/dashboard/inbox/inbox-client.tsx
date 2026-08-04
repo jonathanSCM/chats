@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Send, Paperclip, FileText, X, Smartphone } from "lucide-react";
+import { Send, Paperclip, FileText, X, Smartphone, Check, CheckCheck } from "lucide-react";
 import { sendInboxMessageAction, sendInboxAttachmentAction } from "@/server/actions/inbox";
 import { vendorColor } from "@/lib/vendor-color";
 
@@ -39,6 +39,14 @@ interface Message {
   viaPhoneApp: boolean;
   isHistorical: boolean;
   sentBy: Vendor | null;
+  status: "SENT" | "DELIVERED" | "READ" | "FAILED";
+}
+
+function StatusTicks({ status }: { status: Message["status"] }) {
+  if (status === "FAILED") return <span className="text-danger">⚠️</span>;
+  if (status === "READ") return <CheckCheck size={13} className="text-sky-400" />;
+  if (status === "DELIVERED") return <CheckCheck size={13} />;
+  return <Check size={13} />;
 }
 
 const roleLabel: Record<Message["role"], string> = {
@@ -158,6 +166,17 @@ export function InboxClient({
     }
   }, []);
 
+  // Esc cierra el chat abierto y vuelve a la lista.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && selectedIdRef.current) {
+        setSelectedId(null);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   // Alto calculado en JS (no vh-fijo): se adapta a lo que haya arriba
   // (banner de verificación, etc.) sin dejar el compositor "flotando" abajo.
   useEffect(() => {
@@ -264,6 +283,7 @@ export function InboxClient({
         viaPhoneApp: false,
         isHistorical: false,
         sentBy: null,
+        status: "SENT",
       };
       setMessages((prev) => [...prev, optimistic]);
 
@@ -411,6 +431,7 @@ export function InboxClient({
                         </span>
                         <span>·</span>
                         <span>{timeFmt(m.createdAt)}</span>
+                        {m.role === "STAFF" && !m.viaPhoneApp && <StatusTicks status={m.status} />}
                       </div>
                     </div>
                   </div>

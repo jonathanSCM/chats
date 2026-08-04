@@ -62,6 +62,16 @@ function dateFmt(iso: string | null): string {
   });
 }
 
+/** Versión corta para la tabla, donde cada píxel de ancho cuenta. */
+function dateShort(iso: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("es", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
+}
+
 function dateInputValue(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
 }
@@ -178,7 +188,7 @@ export function TrackingTable({ rows, contacts, currentUserId, summary, ai }: Pr
               </p>
             )}
 
-            <p className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-faint">
+            <p className="mt-4 flex flex-wrap items-center gap-1.5 text-xs text-ink-faint">
               <Sparkles size={11} />
               Las últimas cinco columnas las propone el asesor IA; el vendedor decide.
               {ai.enabled ? (
@@ -203,7 +213,7 @@ export function TrackingTable({ rows, contacts, currentUserId, summary, ai }: Pr
 function Th({ children, ai }: { children?: React.ReactNode; ai?: boolean }) {
   return (
     <th
-      className={`sticky top-0 z-20 whitespace-nowrap border-b border-border bg-surface px-2 py-2 text-left font-mono text-[10px] font-medium uppercase tracking-wide ${
+      className={`sticky top-0 z-20 whitespace-nowrap border-b border-border bg-surface px-3 py-2.5 text-left font-mono text-[11px] font-semibold uppercase tracking-wide ${
         ai ? "text-accent" : "text-ink-muted"
       }`}
     >
@@ -214,7 +224,7 @@ function Th({ children, ai }: { children?: React.ReactNode; ai?: boolean }) {
 
 function Td({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
   return (
-    <td className={`border-b border-border/50 px-2 py-2 align-top ${className}`}>{children}</td>
+    <td className={`border-b border-border/50 px-3 py-3 align-top ${className}`}>{children}</td>
   );
 }
 
@@ -237,8 +247,8 @@ function TableRow({
 
   return (
     <tr className={`transition-colors hover:bg-surface-2/40 ${isPending ? "opacity-60" : ""}`}>
-      <Td className="whitespace-nowrap font-mono text-xs text-ink-muted">
-        {dateFmt(row.registeredAt)}
+      <Td className="whitespace-nowrap font-mono text-[13px] text-ink-muted">
+        {dateShort(row.registeredAt)}
       </Td>
 
       <Td className="sticky left-0 z-10 max-w-[9rem] bg-surface">
@@ -250,7 +260,7 @@ function TableRow({
           {row.client || "—"}
         </button>
         {row.assignedTo && (
-          <span className="mt-0.5 flex items-center gap-1 text-[10px] text-ink-faint">
+          <span className="mt-1 flex items-center gap-1.5 text-[11px] text-ink-faint">
             <span
               className="h-1.5 w-1.5 rounded-full"
               style={{ backgroundColor: vendorColor(row.assignedTo.id) }}
@@ -260,15 +270,15 @@ function TableRow({
         )}
       </Td>
 
-      <Td className="whitespace-nowrap font-mono text-xs text-ink-muted">{row.phone}</Td>
-      <Td className="whitespace-nowrap text-xs text-ink-muted">{row.city || "—"}</Td>
+      <Td className="whitespace-nowrap font-mono text-[13px] text-ink-muted">{row.phone}</Td>
+      <Td className="whitespace-nowrap text-sm text-ink-muted">{row.city || "—"}</Td>
 
       <Td>
         <Select
           value={row.service}
           disabled={isPending}
           onChange={(e) => save("serviceInterest", e.target.value)}
-          className="w-28 py-1 text-xs"
+          className="w-28 py-1.5 text-sm"
         >
           <option value="">—</option>
           {SERVICES.map((s) => (
@@ -282,8 +292,8 @@ function TableRow({
         </Select>
       </Td>
 
-      <Td className="max-w-[13rem]">
-        <p className="line-clamp-2 text-xs text-ink-muted">{row.need || "—"}</p>
+      <Td className="max-w-[14rem]">
+        <p className="line-clamp-2 w-56 text-sm leading-snug text-ink">{row.need || "—"}</p>
       </Td>
 
       <Td>
@@ -291,7 +301,7 @@ function TableRow({
           value={row.stage}
           disabled={isPending}
           onChange={(e) => save("stage", e.target.value)}
-          className="w-32 py-1 text-xs font-medium"
+          className="w-32 py-1.5 text-sm font-semibold"
           style={{ color: STAGE_COLOR[row.stage] }}
         >
           {ALL_STAGES.map((s) => (
@@ -302,8 +312,8 @@ function TableRow({
         </Select>
       </Td>
 
-      <Td className="max-w-[13rem]">
-        <p className="line-clamp-2 text-xs text-ink-muted">{row.lastUpdate || "—"}</p>
+      <Td className="max-w-[14rem]">
+        <p className="line-clamp-2 w-56 text-sm leading-snug text-ink-muted">{row.lastUpdate || "—"}</p>
       </Td>
 
       {/* ── Columnas del asesor IA ── */}
@@ -312,7 +322,7 @@ function TableRow({
           value={row.priority ?? ""}
           disabled={isPending}
           onChange={(e) => save("priority", e.target.value)}
-          className="w-20 py-1 text-xs font-medium"
+          className="w-24 py-1.5 text-sm font-semibold"
           style={{ color: row.priority ? PRIORITY_COLOR[row.priority] : undefined }}
         >
           <option value="">—</option>
@@ -328,7 +338,7 @@ function TableRow({
           defaultValue={dateInputValue(row.nextContactAt)}
           disabled={isPending}
           onBlur={(e) => save("nextContactAt", e.target.value)}
-          className="w-32 py-1 text-xs"
+          className="w-32 py-1.5 text-sm"
         />
       </Td>
 
@@ -341,17 +351,17 @@ function TableRow({
             defaultValue={row.probability ?? ""}
             disabled={isPending}
             onBlur={(e) => e.target.value && save("probability", e.target.value)}
-            className="w-16 py-1 text-xs"
+            className="w-16 py-1.5 text-sm"
           />
-          <span className="text-[10px] text-ink-faint">%</span>
+          <span className="text-xs text-ink-faint">%</span>
         </div>
       </Td>
 
-      <Td className="max-w-[13rem]">
-        <p className="line-clamp-2 text-xs text-ink-muted">{row.aiRecommendation || "—"}</p>
+      <Td className="max-w-[14rem]">
+        <p className="line-clamp-2 w-56 text-sm leading-snug text-ink">{row.aiRecommendation || "—"}</p>
       </Td>
 
-      <Td className="max-w-[13rem]">
+      <Td className="max-w-[14rem]">
         {row.aiSuggestedMessage ? (
           <CopyableMessage text={row.aiSuggestedMessage} />
         ) : (
@@ -367,7 +377,7 @@ function TableRow({
         <button
           type="button"
           onClick={onOpen}
-          className="cursor-pointer whitespace-nowrap text-[11px] text-ink-faint hover:text-accent"
+          className="cursor-pointer whitespace-nowrap text-xs text-ink-muted hover:text-accent"
         >
           Ver
         </button>
@@ -399,12 +409,17 @@ function AnalyzeButton({
             if (result.error) setError(result.error);
           })
         }
-        className="flex cursor-pointer items-center gap-1 rounded-md border border-accent-dim/50 px-2 py-1 text-[11px] text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex cursor-pointer items-center gap-1 rounded-md border border-accent-dim/50 px-2.5 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {isPending ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-        {isPending ? "Analizando…" : "Analizar"}
+        {isPending ? (
+          <>
+            <Loader2 size={12} className="animate-spin" /> Analizando…
+          </>
+        ) : (
+          <Sparkles size={13} />
+        )}
       </button>
-      {error && <p className="mt-1 max-w-[10rem] text-[10px] text-danger">{error}</p>}
+      {error && <p className="mt-1 max-w-[11rem] text-[11px] text-danger">{error}</p>}
     </div>
   );
 }
@@ -414,7 +429,7 @@ function CopyableMessage({ text }: { text: string }) {
 
   return (
     <div className="flex items-start gap-1.5">
-      <p className="line-clamp-2 flex-1 text-xs text-ink-muted">{text}</p>
+      <p className="line-clamp-2 w-48 text-sm leading-snug text-ink">{text}</p>
       <button
         type="button"
         onClick={() => {
@@ -434,7 +449,7 @@ function CopyableMessage({ text }: { text: string }) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <Card className="py-3">
-      <CardDescription className="mb-1 font-mono text-[10px] uppercase tracking-wide">
+      <CardDescription className="mb-1 font-mono text-[11px] uppercase tracking-wide">
         {label}
       </CardDescription>
       <CardTitle className="font-mono text-xl">{value}</CardTitle>
@@ -539,7 +554,7 @@ function DetailPanel({
             <h2 className="font-display text-lg font-semibold text-ink">
               {row.client || row.phone}
             </h2>
-            <p className="font-mono text-xs text-ink-faint">
+            <p className="font-mono text-[13px] text-ink-faint">
               {row.phone}
               {row.city && ` · ${row.city}`}
             </p>
@@ -580,12 +595,12 @@ function DetailPanel({
           )}
 
           <div className="rounded-lg border border-accent-dim/40 bg-accent/5 p-3">
-            <p className="mb-2 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-accent">
+            <p className="mb-2 flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent">
               <Sparkles size={11} /> Asesor IA
             </p>
 
             <Field label="Recomendación para cerrar">
-              <p className="whitespace-pre-wrap text-xs text-ink-muted">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">
                 {row.aiRecommendation || "Todavía sin análisis."}
               </p>
             </Field>
@@ -595,7 +610,7 @@ function DetailPanel({
                 {row.aiSuggestedMessage ? (
                   <CopyableMessage text={row.aiSuggestedMessage} />
                 ) : (
-                  <p className="text-xs text-ink-faint">Todavía sin análisis.</p>
+                  <p className="text-sm text-ink-faint">Todavía sin análisis.</p>
                 )}
               </Field>
             </div>
@@ -669,7 +684,7 @@ function EditableText({
         rows={4}
         disabled={disabled}
         placeholder={placeholder}
-        className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-accent-dim"
+        className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm leading-relaxed text-ink outline-none focus:border-accent-dim"
       />
       {dirty && (
         <Button
@@ -677,7 +692,7 @@ function EditableText({
           variant="secondary"
           disabled={disabled}
           onClick={() => onSave(draft)}
-          className="py-1 text-xs"
+          className="py-1.5 text-xs"
         >
           Guardar
         </Button>

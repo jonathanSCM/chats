@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Menu, X } from "lucide-react";
 
 // Barra superior + drawer para móvil. El contenido del drawer se pasa como
@@ -28,34 +29,45 @@ export function MobileNav({ children }: { children: React.ReactNode }) {
         <Menu size={20} />
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <button
-            type="button"
-            aria-label="Cerrar menú"
-            onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-          />
-          {/* Al tocar un enlace o botón de la navegación, el drawer se cierra
-              solo — se detecta por delegación en vez de observar la ruta. */}
-          <aside
-            onClick={(e) => {
-              if ((e.target as HTMLElement).closest("a, button[type=submit]")) setOpen(false);
-            }}
-            className="animate-slide-in absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-border bg-surface px-3 py-5"
-          >
+      {/* Se monta en el <body> mediante un portal, no donde vive el
+          componente: la barra superior que lo contiene usa backdrop-blur, y
+          un filtro crea un contenedor nuevo para los elementos `fixed`, así
+          que el drawer quedaba encajonado dentro del header y el contenido
+          de la página se le encimaba. Con el portal ningún estilo de un
+          ancestro puede volver a atraparlo.
+
+          No hace falta comprobar si estamos en el cliente: `open` arranca
+          en false, así que el portal solo se crea después de un clic. */}
+      {open &&
+        createPortal(
+          <div data-portal className="fixed inset-0 z-[100] md:hidden">
             <button
               type="button"
-              onClick={() => setOpen(false)}
               aria-label="Cerrar menú"
-              className="absolute right-3 top-4 flex h-9 w-9 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-surface-2"
+              onClick={() => setOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            {/* Al tocar un enlace o botón de la navegación, el drawer se cierra
+                solo — se detecta por delegación en vez de observar la ruta. */}
+            <aside
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest("a, button[type=submit]")) setOpen(false);
+              }}
+              className="animate-slide-in absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col overflow-y-auto border-r border-border bg-surface px-3 py-5"
             >
-              <X size={18} />
-            </button>
-            {children}
-          </aside>
-        </div>
-      )}
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Cerrar menú"
+                className="absolute right-3 top-4 flex h-9 w-9 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-surface-2"
+              >
+                <X size={18} />
+              </button>
+              {children}
+            </aside>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

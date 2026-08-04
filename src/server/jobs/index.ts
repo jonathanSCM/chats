@@ -1,5 +1,6 @@
 import { claimJobs, completeJob, failJob, requeueStaleJobs } from "./queue";
 import { handleDownloadMedia, markMediaFailed } from "./handlers/download-media";
+import { handleAnalyzeFollowUp } from "./handlers/analyze-follow-up";
 
 export { enqueue, enqueueOrReschedule } from "./queue";
 
@@ -10,6 +11,7 @@ type JobExhaustedHandler = (payload: unknown) => Promise<void>;
 
 const handlers: Record<string, JobHandler> = {
   download_media: handleDownloadMedia,
+  analyze_follow_up: handleAnalyzeFollowUp,
 };
 
 const onExhausted: Record<string, JobExhaustedHandler> = {

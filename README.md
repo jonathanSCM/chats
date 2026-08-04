@@ -1,7 +1,11 @@
 # WhatsApp ProShop — Inbox
 
-Bandeja de conversaciones de WhatsApp Business para un equipo — sin bots, sin IA. Varias
-personas atienden el mismo número desde un solo panel, en tiempo real.
+Bandeja de conversaciones de WhatsApp Business y CRM comercial para un equipo. Varias personas
+atienden el mismo número desde un solo panel, en tiempo real, con seguimiento de clientes y un
+asesor IA que recomienda el siguiente paso.
+
+El asesor **no responde a los clientes**: analiza, prioriza y sugiere. Quien conversa y decide
+siempre es el vendedor.
 
 ## Desarrollo local
 
@@ -47,6 +51,29 @@ manejarlo tú, hay un script:
 ```bash
 DATABASE_URL="postgresql://..." npm run db:backup
 ```
+
+## Asesor IA
+
+En **Seguimiento**, las últimas cinco columnas (prioridad, próximo contacto,
+probabilidad de cierre, recomendación y mensaje sugerido) las propone el asesor IA con el
+botón **Analizar** de cada fila. La IA propone; el vendedor decide y puede corregir cualquier
+celda.
+
+Para activarlo basta con poner `OPENAI_API_KEY`. Sin esa variable la app funciona igual: las
+columnas quedan vacías y el botón aparece deshabilitado con el motivo.
+
+**Control de gasto.** Cada llamada al modelo queda registrada con sus tokens y costo estimado.
+`AI_DAILY_BUDGET_USD` (por defecto 2 USD) corta los análisis al superarse y se reanuda al día
+siguiente; el gasto del día se muestra al pie de la tabla. Los nombres de modelo y los precios
+por millón de tokens son variables de entorno porque cambian seguido.
+
+**Qué ve el modelo.** No se le manda la base entera: solo la ficha del cliente, sus últimos 25
+mensajes, las notas internas y la base de conocimiento activa. Si la base de conocimiento está
+vacía, las recomendaciones salen genéricas — cargarla es lo que más mejora la calidad.
+
+**Formato estricto.** Se usa la Responses API con *structured outputs* y un esquema JSON
+validado con Zod antes de tocar la base. Si el modelo devuelve algo que no valida, se reintenta
+una vez y, si vuelve a fallar, se guarda el error sin escribir datos dudosos.
 
 ## Cola de trabajos y tarea programada
 

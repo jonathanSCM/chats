@@ -35,6 +35,7 @@ model Organization {
   opportunities  Opportunity[]
   activities     Activity[]
   meetings       Meeting[]
+  aiAnalyses     AiAnalysis[]
 
   @@map("organizations")
 }
@@ -613,4 +614,31 @@ model Meeting {
 
   @@index([organizationId, scheduledAt])
   @@map("meetings")
+}
+
+// ─── Asesor IA ──────────────────────────────────────────────────
+//
+// Registro de cada llamada al modelo: qué se pidió, qué devolvió, cuántos
+// tokens costó y con qué versión de prompt. Sin esto no se puede medir el
+// costo por conversación ni reproducir un análisis viejo (manual §21, §34).
+model AiAnalysis {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entityType     String // "Opportunity", "Conversation"…
+  entityId       String
+  analysisType   String // "seguimiento", "coaching"…
+  model          String
+  promptVersion  String
+  inputTokens    Int
+  outputTokens   Int
+  costEstimate   Decimal?     @db.Decimal(10, 6)
+  result         Json?
+  error          String?      @db.Text
+  durationMs     Int?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+  @@map("ai_analyses")
 }

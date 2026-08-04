@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { isOpenStage, type Stage, type Priority } from "@/lib/pipeline";
+import { getAiSpendToday } from "@/server/actions/crm";
 import { TrackingTable } from "./_components/tracking-table";
 
 export default async function SeguimientoPage() {
@@ -14,7 +15,7 @@ export default async function SeguimientoPage() {
   // El vendedor ve su cartera; el admin ve todo, igual que en la bandeja.
   const scope = isAdmin ? {} : { assignedToId: session.user.id };
 
-  const [opportunities, contacts] = await Promise.all([
+  const [opportunities, contacts, ai] = await Promise.all([
     prisma.opportunity.findMany({
       where: { organizationId, ...scope },
       include: {
@@ -29,6 +30,7 @@ export default async function SeguimientoPage() {
       orderBy: { lastContactAt: "desc" },
       take: 300,
     }),
+    getAiSpendToday(organizationId),
   ]);
 
   const rows = opportunities.map((o) => ({
@@ -69,6 +71,7 @@ export default async function SeguimientoPage() {
         rows={rows}
         contacts={contacts.map((c) => ({ id: c.id, label: c.fullName || c.phone }))}
         currentUserId={session.user.id}
+        ai={ai}
         summary={{
           inFollowUp: open.length,
           quotesSent: rows.filter((r) => r.stage === "COTI_ENVIADA").length,

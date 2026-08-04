@@ -6,6 +6,8 @@ import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { audit } from "@/server/services/audit";
 import { ALL_STAGES, OPEN_STAGES, type Stage } from "@/lib/pipeline";
+import { analyzeFollowUp } from "@/server/services/ai/follow-up";
+import { isAiEnabled, isWithinBudget, spentToday } from "@/server/services/ai/client";
 import type { ActionState } from "./types";
 
 const PATH = "/dashboard/seguimiento";
@@ -197,4 +199,51 @@ export async function countWithoutNextContact(organizationId: string): Promise<n
       nextContactAt: null,
     },
   });
+}
+
+/**
+ * Pide un análisis del asesor IA para un cliente. Se ejecuta al momento
+ * (no encolado) porque el vendedor está esperando el resultado en pantalla.
+ */
+export async function analyzeOpportunityAction(
+  opportunityId: string,
+): Promise<ActionState> {
+  const { organizationId } = await requireOrg();
+
+  const opportunity = await prisma.opportunity.findUnique({
+    where: { id: opportunityId },
+    select: { organizationId: true },
+  });
+  if (!opportunity || opportunity.organizationId !== organizationId) {
+    return { error: "Cliente no encontrado" };
+  }
+
+  if (!isAiEnabled()) {
+    return { error: "El asesor IA no está configurado. Falta OPENAI_API_KEY." };
+  }
+
+  if (!(await isWithinBudget(organizationId))) {
+    return {
+      error: "Se alcanzó el tope de gasto diario de IA. Vuelve a intentar mañana.",
+    };
+  }
+
+  try {
+    await analyzeFollowUp(opportunityId);
+  } catch (error) {
+    console.error("[crm] Falló el análisis:", error);
+    return { error: "No se pudo analizar. Intenta de nuevo en un momento." };
+  }
+
+  revalidatePath(PATH);
+  return { error: null, message: "Análisis listo." };
+}
+
+/** Gasto de IA de hoy, para mostrarlo junto al tope configurado. */
+export async function getAiSpendToday(organizationId: string) {
+  return {
+    spent: await spentToday(organizationId),
+    budget: Number(process.env.AI_DAILY_BUDGET_USD ?? 2),
+    enabled: isAiEnabled(),
+  };
 }

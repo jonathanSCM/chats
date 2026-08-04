@@ -1,11 +1,12 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useState, useTransition } from "react";
-import { Plus, X, Copy, Check, Trash2, Sparkles } from "lucide-react";
+import { Plus, X, Copy, Check, Trash2, Sparkles, Loader2 } from "lucide-react";
 import {
   createOpportunityAction,
   updateOpportunityFieldAction,
   deleteOpportunityAction,
+  analyzeOpportunityAction,
 } from "@/server/actions/crm";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -49,6 +50,7 @@ interface Props {
     highPriority: number;
     nextContact: string | null;
   };
+  ai: { spent: number; budget: number; enabled: boolean };
 }
 
 function dateFmt(iso: string | null): string {
@@ -64,7 +66,7 @@ function dateInputValue(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
 }
 
-export function TrackingTable({ rows, contacts, currentUserId, summary }: Props) {
+export function TrackingTable({ rows, contacts, currentUserId, summary, ai }: Props) {
   const [creating, setCreating] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
   const [query, setQuery] = useState("");
@@ -159,12 +161,13 @@ export function TrackingTable({ rows, contacts, currentUserId, summary }: Props)
                       </Th>
                     ),
                   )}
+                  <Th ai>Analizar</Th>
                   <Th />
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((row) => (
-                  <TableRow key={row.id} row={row} onOpen={() => setDetail(row)} />
+                  <TableRow key={row.id} row={row} aiEnabled={ai.enabled} onOpen={() => setDetail(row)} />
                 ))}
               </tbody>
             </table>
@@ -175,9 +178,16 @@ export function TrackingTable({ rows, contacts, currentUserId, summary }: Props)
               </p>
             )}
 
-            <p className="mt-3 flex items-center gap-1.5 text-[11px] text-ink-faint">
+            <p className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-faint">
               <Sparkles size={11} />
               Las últimas cinco columnas las propone el asesor IA; el vendedor decide.
+              {ai.enabled ? (
+                <span className="font-mono">
+                  · Gasto de hoy: {ai.spent.toFixed(3)} / {ai.budget.toFixed(2)} US$
+                </span>
+              ) : (
+                <span className="text-warning">· Asesor IA sin configurar (falta OPENAI_API_KEY)</span>
+              )}
             </p>
           </div>
         </div>
@@ -208,7 +218,15 @@ function Td({ children, className = "" }: { children?: React.ReactNode; classNam
   );
 }
 
-function TableRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
+function TableRow({
+  row,
+  aiEnabled,
+  onOpen,
+}: {
+  row: Row;
+  aiEnabled: boolean;
+  onOpen: () => void;
+}) {
   const [isPending, startTransition] = useTransition();
 
   function save(field: string, value: string) {
@@ -342,6 +360,10 @@ function TableRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
       </Td>
 
       <Td>
+        <AnalyzeButton opportunityId={row.id} disabled={!aiEnabled} />
+      </Td>
+
+      <Td>
         <button
           type="button"
           onClick={onOpen}
@@ -351,6 +373,39 @@ function TableRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
         </button>
       </Td>
     </tr>
+  );
+}
+
+function AnalyzeButton({
+  opportunityId,
+  disabled,
+}: {
+  opportunityId: string;
+  disabled: boolean;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <div className="whitespace-nowrap">
+      <button
+        type="button"
+        disabled={disabled || isPending}
+        title={disabled ? "Falta configurar OPENAI_API_KEY" : "Pedir análisis al asesor IA"}
+        onClick={() =>
+          startTransition(async () => {
+            setError(null);
+            const result = await analyzeOpportunityAction(opportunityId);
+            if (result.error) setError(result.error);
+          })
+        }
+        className="flex cursor-pointer items-center gap-1 rounded-md border border-accent-dim/50 px-2 py-1 text-[11px] text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {isPending ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+        {isPending ? "Analizando…" : "Analizar"}
+      </button>
+      {error && <p className="mt-1 max-w-[10rem] text-[10px] text-danger">{error}</p>}
+    </div>
   );
 }
 

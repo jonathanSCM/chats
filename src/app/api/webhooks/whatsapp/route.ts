@@ -51,10 +51,21 @@ export async function POST(req: NextRequest) {
     return new NextResponse("Invalid JSON", { status: 400 });
   }
 
+  // `next start` no loguea requests por default (a diferencia de `next dev`),
+  // así que sin esto no hay forma de saber si Meta llegó a mandar el evento.
+  console.log(
+    "[webhook] POST recibido:",
+    JSON.stringify(payload).slice(0, 2000),
+  );
+
   const messages = parseInboundPayload(payload);
+  console.log(`[webhook] ${messages.length} mensaje(s) parseado(s) del campo "messages"`);
   for (const message of messages) {
     try {
       await handleIncomingMessage(message);
+      console.log(
+        `[webhook] Mensaje ${message.messageId} procesado OK (${message.media ? message.media.type : "texto"})`,
+      );
     } catch (error) {
       console.error("[webhook] Error procesando mensaje entrante:", error);
     }

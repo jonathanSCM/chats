@@ -110,6 +110,49 @@ const MEDIA_PREVIEW: Record<string, string> = {
   document: "📄 Documento",
 };
 
+/**
+ * Ficha de CRM del cliente. Se identifica por teléfono dentro de la
+ * organización, así que el mismo número nunca genera contactos duplicados
+ * aunque abra varias conversaciones (manual §14).
+ */
+async function findOrCreateContact(params: {
+  organizationId: string;
+  phone: string;
+  name?: string | null;
+}): Promise<string> {
+  const { organizationId, phone, name } = params;
+
+  const existing = await prisma.contact.findUnique({
+    where: { organizationId_phone: { organizationId, phone } },
+    select: { id: true, fullName: true },
+  });
+
+  if (existing) {
+    await prisma.contact.update({
+      where: { id: existing.id },
+      data: {
+        lastContactAt: new Date(),
+        // Solo se rellena si estaba vacío: lo que edite el vendedor a mano
+        // manda sobre el nombre de perfil de WhatsApp.
+        ...(name && !existing.fullName ? { fullName: name } : {}),
+      },
+    });
+    return existing.id;
+  }
+
+  const created = await prisma.contact.create({
+    data: {
+      organizationId,
+      phone,
+      fullName: name ?? null,
+      source: "whatsapp",
+      lastContactAt: new Date(),
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
 async function findOrCreateConversation(
   botId: string,
   customerPhone: string,
@@ -134,8 +177,25 @@ async function findOrCreateConversation(
     return existing.id;
   }
 
+  const bot = await prisma.bot.findUniqueOrThrow({
+    where: { id: botId },
+    select: { organizationId: true },
+  });
+  const contactId = await findOrCreateContact({
+    organizationId: bot.organizationId,
+    phone: customerPhone,
+    name: customerName,
+  });
+
   const created = await prisma.conversation.create({
-    data: { botId, customerPhone, customerName: customerName ?? null, billed: true, botPaused: true },
+    data: {
+      botId,
+      customerPhone,
+      customerName: customerName ?? null,
+      contactId,
+      billed: true,
+      botPaused: true,
+    },
   });
   return created.id;
 }

@@ -15,6 +15,7 @@
   --accent-dim: #7e8f2e;
 
   --warning: #a3650a;
+  --warning-dim: #fdf3e0;
   --danger: #c62828;
   --danger-dim: #fbe3e3;
 }
@@ -34,6 +35,7 @@
   --accent-dim: #7e8f2e;
 
   --warning: #ffb020;
+  --warning-dim: #40320f;
   --danger: #ff5d5d;
   --danger-dim: #4a2323;
 }
@@ -53,6 +55,7 @@
   --color-accent-dim: var(--accent-dim);
 
   --color-warning: var(--warning);
+  --color-warning-dim: var(--warning-dim);
   --color-danger: var(--danger);
   --color-danger-dim: var(--danger-dim);
 

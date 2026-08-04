@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MessageCircle, ShieldCheck, LogOut, Building2, Smartphone, BookOpen } from "lucide-react";
+import {
+  MessageCircle,
+  ShieldCheck,
+  LogOut,
+  Building2,
+  Smartphone,
+  BookOpen,
+  KanbanSquare,
+} from "lucide-react";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { logoutAction } from "@/server/actions/logout";
@@ -31,6 +39,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <nav className="flex flex-1 flex-col gap-0.5">
         <NavLink href="/dashboard/inbox">
           <MessageCircle size={16} /> Chats
+        </NavLink>
+        <NavLink href="/dashboard/pipeline">
+          <KanbanSquare size={16} /> Embudo
         </NavLink>
         <NavLink href="/dashboard/whatsapp">
           <Smartphone size={16} /> Conexión WhatsApp

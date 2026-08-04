@@ -14,8 +14,8 @@ datasource db {
 
 enum UserRole {
   SUPERADMIN // dueño de la plataforma, ve todo
-  OWNER      // dueño de la organización/cliente
-  MEMBER     // usuario dentro de la organización del cliente
+  OWNER // dueño de la organización/cliente
+  MEMBER // usuario dentro de la organización del cliente
 }
 
 model Organization {
@@ -30,21 +30,26 @@ model Organization {
   bots           Bot[]
   invites        OrganizationInvite[]
   knowledgeItems KnowledgeItem[]
+  companies      Company[]
+  contacts       Contact[]
+  opportunities  Opportunity[]
+  activities     Activity[]
+  meetings       Meeting[]
 
   @@map("organizations")
 }
 
 model User {
-  id             String       @id @default(cuid())
-  email          String       @unique
+  id             String        @id @default(cuid())
+  email          String        @unique
   passwordHash   String?
   name           String?
-  role           UserRole     @default(OWNER)
+  role           UserRole      @default(OWNER)
   emailVerified  DateTime?
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
@@ -53,6 +58,9 @@ model User {
   conversationReads       ConversationRead[]
   pushSubscriptions       PushSubscription[]
   knowledgeEdits          KnowledgeItem[]          @relation("KnowledgeEditor")
+  ownedContacts           Contact[]                @relation("ContactOwner")
+  ownedOpportunities      Opportunity[]            @relation("OpportunityOwner")
+  ownedActivities         Activity[]               @relation("ActivityOwner")
 
   @@index([organizationId])
   @@map("users")
@@ -128,25 +136,25 @@ enum BotStatus {
 }
 
 model WhatsAppConnection {
-  id                  String   @id @default(cuid())
-  botId               String   @unique
-  bot                 Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
-  phoneNumberId       String   @unique // Meta phone_number_id
-  wabaId              String? // WhatsApp Business Account ID
-  displayNumber       String? // número visible (ej. +591 700 12345), para el link "click to chat"
-  accessToken         String   @db.Text // cifrado a nivel de aplicación
-  verified            Boolean  @default(false)
-  coexistence         Boolean  @default(false) // conectado vía Embedded Signup en modo Coexistence (mismo número también usado en la app de WhatsApp Business)
-  historySyncStatus   HistorySyncStatus @default(NONE)
-  createdAt           DateTime @default(now())
+  id                String            @id @default(cuid())
+  botId             String            @unique
+  bot               Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
+  phoneNumberId     String            @unique // Meta phone_number_id
+  wabaId            String? // WhatsApp Business Account ID
+  displayNumber     String? // número visible (ej. +591 700 12345), para el link "click to chat"
+  accessToken       String            @db.Text // cifrado a nivel de aplicación
+  verified          Boolean           @default(false)
+  coexistence       Boolean           @default(false) // conectado vía Embedded Signup en modo Coexistence (mismo número también usado en la app de WhatsApp Business)
+  historySyncStatus HistorySyncStatus @default(NONE)
+  createdAt         DateTime          @default(now())
 
   @@map("whatsapp_connections")
 }
 
 enum HistorySyncStatus {
-  NONE       // no aplica (conexión sin coexistence) o todavía no llegó nada
-  PENDING    // coexistence conectado, esperando el webhook "history" de Meta
-  COMPLETE   // historial ya importado
+  NONE // no aplica (conexión sin coexistence) o todavía no llegó nada
+  PENDING // coexistence conectado, esperando el webhook "history" de Meta
+  COMPLETE // historial ya importado
 }
 
 // ─── Base de conocimiento ───────────────────────────────────────
@@ -174,36 +182,41 @@ model KnowledgeItem {
 }
 
 enum KnowledgeCategory {
-  SERVICE          // servicio que ofrece la empresa
-  PRICING          // precios aprobados o reglas de cotización
-  SCOPE            // alcances típicos y tiempos estimados
-  EXCLUSION        // lo que NO se incluye
-  FAQ              // preguntas frecuentes
-  POLICY           // políticas comerciales
-  CASE_STUDY       // ejemplos de proyectos
-  QUALIFICATION    // guías para calificar leads
-  TONE             // tono y estilo de comunicación
+  SERVICE // servicio que ofrece la empresa
+  PRICING // precios aprobados o reglas de cotización
+  SCOPE // alcances típicos y tiempos estimados
+  EXCLUSION // lo que NO se incluye
+  FAQ // preguntas frecuentes
+  POLICY // políticas comerciales
+  CASE_STUDY // ejemplos de proyectos
+  QUALIFICATION // guías para calificar leads
+  TONE // tono y estilo de comunicación
 }
 
 // ─── Conversaciones ─────────────────────────────────────────────
 
 model Conversation {
-  id             String    @id @default(cuid())
-  botId          String
-  bot            Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
-  customerPhone  String
-  customerName   String? // viene del webhook smb_app_state_sync (contactos del negocio) o del profile.name del contacto
-  startedAt      DateTime  @default(now())
-  lastMessageAt  DateTime  @default(now())
-  billed         Boolean   @default(false) // ya contabilizada contra el plan/uso
-  botPaused      Boolean   @default(false) // un humano tomó la conversación; el bot no responde solo
+  id            String   @id @default(cuid())
+  botId         String
+  bot           Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  customerPhone String
+  customerName  String? // viene del webhook smb_app_state_sync (contactos del negocio) o del profile.name del contacto
+  startedAt     DateTime @default(now())
+  lastMessageAt DateTime @default(now())
+  billed        Boolean  @default(false) // ya contabilizada contra el plan/uso
+  botPaused     Boolean  @default(false) // un humano tomó la conversación; el bot no responde solo
 
   // Vendedor dueño de esta conversación — se asigna automáticamente al
   // primer vendedor que responde. Mientras sea null, cualquier vendedor la
   // ve en su bandeja como "sin asignar"; una vez asignada, solo ese
   // vendedor (y los admins/OWNER) la ven.
   assignedToId String?
-  assignedTo   User?     @relation("ConversationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo   User?   @relation("ConversationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  // Se enlaza al contacto del CRM por teléfono. Es nullable porque el
+  // mensaje entra por el webhook antes de que exista ficha de CRM.
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
   messages Message[]
   reads    ConversationRead[]
@@ -247,16 +260,16 @@ model ConversationRead {
 enum MessageRole {
   CUSTOMER
   BOT
-  STAFF  // enviado manualmente por alguien del equipo, con el bot pausado
+  STAFF // enviado manualmente por alguien del equipo, con el bot pausado
   SYSTEM
 }
 
 model Message {
-  id             String       @id @default(cuid())
+  id             String        @id @default(cuid())
   conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role           MessageRole
-  content        String       @db.Text
+  content        String        @db.Text
   mediaUrl       String?
   mediaType      MediaType?
   // Solo aplica cuando mediaType no es null: la descarga desde el CDN de
@@ -265,13 +278,13 @@ model Message {
   mediaStatus    MediaStatus?
   mimeType       String?
   fileName       String?
-  externalId     String?      @unique // id del mensaje en WhatsApp, para idempotencia del webhook
-  viaPhoneApp    Boolean      @default(false) // llegó como eco de un mensaje mandado desde la app de WhatsApp Business (coexistence), no desde este panel
-  isHistorical   Boolean      @default(false) // importado del historial (webhook "history"), no un mensaje en vivo
+  externalId     String?       @unique // id del mensaje en WhatsApp, para idempotencia del webhook
+  viaPhoneApp    Boolean       @default(false) // llegó como eco de un mensaje mandado desde la app de WhatsApp Business (coexistence), no desde este panel
+  isHistorical   Boolean       @default(false) // importado del historial (webhook "history"), no un mensaje en vivo
   sentById       String? // vendedor que mandó este mensaje desde el panel (solo para role STAFF enviado aquí, no vía phone app)
-  sentBy         User?        @relation("MessageSender", fields: [sentById], references: [id], onDelete: SetNull)
+  sentBy         User?         @relation("MessageSender", fields: [sentById], references: [id], onDelete: SetNull)
   status         MessageStatus @default(SENT) // solo relevante para mensajes salientes (STAFF): confirmación de entrega/lectura de Meta
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime      @default(now())
 
   @@index([conversationId])
   @@map("messages")
@@ -293,10 +306,9 @@ enum MediaType {
 
 enum MediaStatus {
   PENDING // encolada para descargar del CDN de Meta
-  READY   // guardada y servible
-  FAILED  // se agotaron los reintentos
+  READY // guardada y servible
+  FAILED // se agotaron los reintentos
 }
-
 
 // ─── Cola de trabajos ───────────────────────────────────────────
 //
@@ -357,4 +369,203 @@ enum AuditActor {
   USER
   SYSTEM
   AI
+}
+
+// ─── CRM ────────────────────────────────────────────────────────
+//
+// Nota de diseño: el manual separa `leads` de `opportunities`, pero su
+// propio MVP (§40) pide "contactos y oportunidades". Mantener las dos
+// entidades obliga al vendedor a actualizar lo mismo en dos lugares y en
+// equipos chicos terminan desincronizadas, así que los campos de
+// calificación (necesidad, presupuesto, urgencia, autoridad, score) viven
+// directamente en Opportunity.
+
+model Company {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  industry       String?
+  size           String?
+  website        String?
+  city           String?
+  country        String?
+  notes          String?      @db.Text
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  contacts Contact[]
+
+  @@index([organizationId])
+  @@map("companies")
+}
+
+model Contact {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fullName       String?
+  phone          String
+  email          String?
+  jobTitle       String?
+  city           String?
+  country        String?
+  source         String? // de dónde salió (WhatsApp, referido, campaña…)
+  companyId      String?
+  company        Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  assignedToId   String?
+  assignedTo     User?        @relation("ContactOwner", fields: [assignedToId], references: [id], onDelete: SetNull)
+  firstContactAt DateTime     @default(now())
+  lastContactAt  DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  conversations Conversation[]
+  opportunities Opportunity[]
+  activities    Activity[]
+
+  // El teléfono identifica al contacto dentro de la organización: es la
+  // llave con la que llega WhatsApp y evita duplicados (manual §14).
+  @@unique([organizationId, phone])
+  @@index([organizationId])
+  @@map("contacts")
+}
+
+// Etapas del embudo (manual §7). Cada una debería tener criterios claros de
+// entrada y salida documentados en la base de conocimiento.
+enum OpportunityStage {
+  NEW // nuevo lead
+  CONTACTED // contactado
+  QUALIFYING // en calificación
+  MEETING_SCHEDULED // reunión agendada
+  NEED_CONFIRMED // necesidad confirmada
+  PROPOSAL_DRAFT // propuesta en preparación
+  PROPOSAL_SENT // propuesta enviada
+  NEGOTIATION // negociación
+  WON // ganado
+  LOST // perdido
+  ON_HOLD // en pausa
+}
+
+enum DataStatus {
+  CONFIRMED // lo dijo el cliente
+  INFERRED // lo dedujo la IA y falta que el vendedor lo confirme
+  UNKNOWN
+}
+
+model Opportunity {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  assignedToId   String?
+  assignedTo     User?        @relation("OpportunityOwner", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  title             String
+  stage             OpportunityStage @default(NEW)
+  serviceInterest   String?
+  estimatedValue    Decimal?         @db.Decimal(12, 2)
+  currency          String           @default("USD")
+  probability       Int? // 0-100
+  expectedCloseDate DateTime?
+
+  // Calificación (manual §9): score 0-100 con el desglose que lo justifica.
+  leadScore      Int?
+  needSummary    String?    @db.Text
+  needStatus     DataStatus @default(UNKNOWN)
+  budgetRange    String?
+  budgetStatus   DataStatus @default(UNKNOWN)
+  urgency        String?
+  authorityLevel String?
+
+  // Regla dura del manual (§45): toda oportunidad activa debe tener
+  // próximo paso. Se valida en la aplicación, no en la base, para poder
+  // avisar en vez de reventar.
+  nextAction   String?
+  nextActionAt DateTime?
+
+  proposalSentAt DateTime?
+  wonAt          DateTime?
+  lostAt         DateTime?
+  lostReason     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  activities Activity[]
+  meetings   Meeting[]
+
+  @@index([organizationId, stage])
+  @@index([contactId])
+  @@map("opportunities")
+}
+
+enum ActivityType {
+  TASK
+  CALL
+  MESSAGE
+  PROPOSAL
+  FOLLOW_UP
+}
+
+enum ActivityStatus {
+  PENDING
+  DONE
+  CANCELED
+}
+
+model Activity {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String?
+  contact        Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  opportunityId  String?
+  opportunity    Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  assignedToId   String?
+  assignedTo     User?        @relation("ActivityOwner", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  type        ActivityType   @default(TASK)
+  title       String
+  description String?        @db.Text
+  dueAt       DateTime?
+  completedAt DateTime?
+  status      ActivityStatus @default(PENDING)
+  // "user" si la creó una persona, "ai" si salió de un análisis: sirve para
+  // medir cuánto aporta realmente el asesor (manual §38).
+  source      String         @default("user")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([organizationId, status, dueAt])
+  @@index([opportunityId])
+  @@map("activities")
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  CONFIRMED
+  DONE
+  CANCELED
+  NO_SHOW
+}
+
+model Meeting {
+  id              String        @id @default(cuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  opportunityId   String?
+  opportunity     Opportunity?  @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  scheduledAt     DateTime
+  durationMinutes Int           @default(30)
+  meetingUrl      String?
+  location        String?
+  status          MeetingStatus @default(SCHEDULED)
+  notes           String?       @db.Text
+  aiSummary       String?       @db.Text
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([organizationId, scheduledAt])
+  @@map("meetings")
 }

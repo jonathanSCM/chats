@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { Plus, X, Copy, Check, Trash2, Sparkles, Loader2 } from "lucide-react";
 import {
   createOpportunityAction,
@@ -540,8 +541,11 @@ function DetailPanel({
     });
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+  // Se monta en el <body>: si queda dentro del árbol de la página, cualquier
+  // ancestro con transform (por ejemplo la animación de entrada) lo atrapa y
+  // el panel se recorta al alto del contenido en vez de cubrir la pantalla.
+  return createPortal(
+    <div data-portal className="fixed inset-0 z-[100] flex justify-end">
       <button
         type="button"
         aria-label="Cerrar"
@@ -649,7 +653,8 @@ function DetailPanel({
           </div>
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -143,8 +143,13 @@ body > *:not([data-portal]) {
   }
 }
 
+/* `backwards` y no `both`: con `both` el elemento conserva el
+   `transform: translateY(0)` del fotograma final para siempre, y un
+   transform crea un contenedor para los hijos `position: fixed` — los
+   paneles a pantalla completa quedaban recortados al alto del contenido.
+   Visualmente es idéntico, porque el estado final coincide con el natural. */
 .animate-fade-up {
-  animation: fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 @keyframes slide-in {

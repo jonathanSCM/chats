@@ -46,6 +46,7 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
   let mediaType: (typeof MEDIA_TYPE_MAP)[keyof typeof MEDIA_TYPE_MAP] | null = null;
   let mimeType: string | null = null;
 
+  let mediaFailed = false;
   if (inbound.media) {
     try {
       const { url, mimeType: resolvedMime } = await getMediaUrl({
@@ -57,7 +58,11 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
       mediaType = MEDIA_TYPE_MAP[inbound.media.type];
       mimeType = inbound.media.mimeType ?? resolvedMime;
     } catch (error) {
-      console.error("[conversation] Error descargando media entrante:", error);
+      mediaFailed = true;
+      console.error(
+        `[conversation] Error descargando media entrante (mensaje ${inbound.messageId}, tipo ${inbound.media.type}):`,
+        error,
+      );
     }
   }
 
@@ -66,7 +71,8 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
       data: {
         conversationId,
         role: "CUSTOMER",
-        content: inbound.text ?? "",
+        content:
+          inbound.text ?? (mediaFailed ? "⚠️ No se pudo descargar el archivo adjunto." : ""),
         mediaUrl,
         mediaType,
         mimeType,
@@ -135,6 +141,7 @@ export async function handlePhoneAppEcho(echo: ParsedEcho): Promise<void> {
   let mediaType: (typeof MEDIA_TYPE_MAP)[keyof typeof MEDIA_TYPE_MAP] | null = null;
   let mimeType: string | null = null;
 
+  let mediaFailed = false;
   if (echo.media) {
     try {
       const accessToken = decrypt(connection.accessToken);
@@ -147,7 +154,11 @@ export async function handlePhoneAppEcho(echo: ParsedEcho): Promise<void> {
       mediaType = MEDIA_TYPE_MAP[echo.media.type];
       mimeType = echo.media.mimeType ?? resolvedMime;
     } catch (error) {
-      console.error("[conversation] Error descargando media de un eco:", error);
+      mediaFailed = true;
+      console.error(
+        `[conversation] Error descargando media de un eco (mensaje ${echo.messageId}, tipo ${echo.media.type}):`,
+        error,
+      );
     }
   }
 
@@ -156,7 +167,7 @@ export async function handlePhoneAppEcho(echo: ParsedEcho): Promise<void> {
       data: {
         conversationId,
         role: "STAFF",
-        content: echo.text ?? "",
+        content: echo.text ?? (mediaFailed ? "⚠️ No se pudo descargar el archivo adjunto." : ""),
         mediaUrl,
         mediaType,
         mimeType,

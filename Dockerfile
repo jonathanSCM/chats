@@ -1,4 +1,13 @@
-FROM node:24-alpine AS base
+# Debian slim y no Alpine a propósito.
+#
+# Alpine usa musl, así que npm resuelve `@img/sharp-linuxmusl-*` (con sus
+# dependencias `@emnapi/*`), mientras que el CI corre en Ubuntu con glibc y
+# resuelve `@img/sharp-linux-x64`. Con dos árboles distintos, `npm ci`
+# reventaba en el build por dependencias "Missing from lock file" que el CI
+# nunca veía, cada vez que se tocaba una dependencia desde Windows.
+# Con glibc, CI y producción resuelven exactamente lo mismo y el CI vuelve a
+# ser una barrera de verdad. Cuesta unos MB más de imagen; vale la pena.
+FROM node:24-slim AS base
 
 # ── Dependencies ────────────────────────────────────────────────
 FROM base AS deps
@@ -35,10 +44,13 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # ffmpeg convierte las notas de voz grabadas en el panel: Chrome las graba
 # en audio/webm y la Cloud API de WhatsApp solo acepta ogg/opus, mp4, aac,
 # amr o mpeg. Sin esto, las notas de voz desde Chrome fallan al enviarse.
-RUN apk add --no-cache ffmpeg
+# curl viene bien para diagnosticar desde el terminal del contenedor.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg curl openssl \
+  && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup --system --gid 1001 nodejs \
-  && adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs \
+  && useradd --system --uid 1001 --gid nodejs nextjs
 
 COPY --from=builder --chown=nextjs:nodejs /app ./
 

@@ -7,6 +7,9 @@ on:
 
 jobs:
   check:
+    # Ubuntu usa glibc, igual que la imagen node:24-slim del Dockerfile: así
+    # `npm ci` resuelve aquí el mismo árbol de dependencias que en el deploy,
+    # y un lockfile desincronizado falla en el CI y no en producción.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,3 +29,12 @@ jobs:
       - run: npx tsc --noEmit
 
       - run: npm test
+
+      # El build también entra al CI: es el paso que más veces rompió el
+      # deploy, y no necesita base de datos (ninguna página consulta la DB
+      # durante el prerender).
+      - run: npm run build
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+          AUTH_SECRET: ci-placeholder
+          APP_ENCRYPTION_KEY: Y2ktcGxhY2Vob2xkZXIta2V5Y2ktcGxhY2Vob2xkZXI=

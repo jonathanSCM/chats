@@ -7,7 +7,7 @@ import {
   Building2,
   Smartphone,
   BookOpen,
-  KanbanSquare,
+  ClipboardList,
 } from "lucide-react";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
@@ -40,8 +40,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <NavLink href="/dashboard/inbox">
           <MessageCircle size={16} /> Chats
         </NavLink>
-        <NavLink href="/dashboard/pipeline">
-          <KanbanSquare size={16} /> Embudo
+        <NavLink href="/dashboard/seguimiento">
+          <ClipboardList size={16} /> Seguimiento
         </NavLink>
         <NavLink href="/dashboard/whatsapp">
           <Smartphone size={16} /> Conexión WhatsApp

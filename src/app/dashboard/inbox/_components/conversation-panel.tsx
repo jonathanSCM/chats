@@ -279,11 +279,11 @@ export function ConversationPanel({
         {data.contact && (
           <div className="space-y-2 border-t border-border pt-4">
             <Label>
-              <Briefcase size={11} className="mr-1 inline" /> Oportunidades
+              <Briefcase size={11} className="mr-1 inline" /> En seguimiento
             </Label>
             {data.contact.opportunities.length === 0 ? (
               <p className="text-[11px] text-ink-faint">
-                Ninguna todavía. Se crean desde el Embudo.
+                Ninguno todavía. Se agregan desde Seguimiento.
               </p>
             ) : (
               <div className="space-y-1.5">

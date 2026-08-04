@@ -1,75 +1,79 @@
+/**
+ * Estados tal como los usa el equipo en su planilla de seguimiento.
+ * No son los del manual: si el sistema no habla el idioma del vendedor,
+ * termina sin usarse.
+ */
 export type Stage =
-  | "NEW"
-  | "CONTACTED"
-  | "QUALIFYING"
-  | "MEETING_SCHEDULED"
-  | "NEED_CONFIRMED"
-  | "PROPOSAL_DRAFT"
-  | "PROPOSAL_SENT"
-  | "NEGOTIATION"
-  | "WON"
-  | "LOST"
-  | "ON_HOLD";
+  | "LLAMAR"
+  | "ENVIAR_COTI"
+  | "COTI_ENVIADA"
+  | "REUNION"
+  | "NEGOCIACION"
+  | "CERRADO"
+  | "PERDIDO";
 
 export const STAGE_LABEL: Record<Stage, string> = {
-  NEW: "Nuevo",
-  CONTACTED: "Contactado",
-  QUALIFYING: "En calificación",
-  MEETING_SCHEDULED: "Reunión agendada",
-  NEED_CONFIRMED: "Necesidad confirmada",
-  PROPOSAL_DRAFT: "Propuesta en preparación",
-  PROPOSAL_SENT: "Propuesta enviada",
-  NEGOTIATION: "Negociación",
-  WON: "Ganado",
-  LOST: "Perdido",
-  ON_HOLD: "En pausa",
+  LLAMAR: "LLAMAR",
+  ENVIAR_COTI: "ENVIAR COTI",
+  COTI_ENVIADA: "COTI ENVIADA",
+  REUNION: "REUNIÓN",
+  NEGOCIACION: "NEGOCIACIÓN",
+  CERRADO: "CERRADO",
+  PERDIDO: "PERDIDO",
 };
 
-/** Criterios de salida de cada etapa (manual §7). Se muestran como ayuda. */
-export const STAGE_CRITERIA: Record<Stage, string> = {
-  NEW: "Escribió por primera vez y nadie le respondió todavía.",
-  CONTACTED: "Ya hubo respuesta del equipo, pero aún no se sabe qué necesita.",
-  QUALIFYING: "Se están haciendo las preguntas para entender el problema.",
-  MEETING_SCHEDULED: "Hay fecha y hora acordadas con el cliente.",
-  NEED_CONFIRMED:
-    "Se conocen el problema, el objetivo, quién decide y qué tan urgente es.",
-  PROPOSAL_DRAFT: "Se está armando la propuesta con alcance y precio.",
-  PROPOSAL_SENT: "La propuesta ya está en manos del cliente.",
-  NEGOTIATION: "Se discuten precio, alcance o condiciones.",
-  WON: "Cerrado. Hay acuerdo confirmado.",
-  LOST: "No se concretó. Registrar el motivo para aprender de ello.",
-  ON_HOLD: "Pausado por el cliente, con fecha de retomar.",
-};
-
-/** Etapas que siguen en juego: las que necesitan próximo paso (manual §45). */
-export const OPEN_STAGES: Stage[] = [
-  "NEW",
-  "CONTACTED",
-  "QUALIFYING",
-  "MEETING_SCHEDULED",
-  "NEED_CONFIRMED",
-  "PROPOSAL_DRAFT",
-  "PROPOSAL_SENT",
-  "NEGOTIATION",
+export const ALL_STAGES: Stage[] = [
+  "LLAMAR",
+  "ENVIAR_COTI",
+  "COTI_ENVIADA",
+  "REUNION",
+  "NEGOCIACION",
+  "CERRADO",
+  "PERDIDO",
 ];
 
-export const ALL_STAGES: Stage[] = [...OPEN_STAGES, "WON", "LOST", "ON_HOLD"];
+/** Sigue en juego: necesita próximo paso y entra en los conteos. */
+export const OPEN_STAGES: Stage[] = [
+  "LLAMAR",
+  "ENVIAR_COTI",
+  "COTI_ENVIADA",
+  "REUNION",
+  "NEGOCIACION",
+];
 
 export function isOpenStage(stage: Stage): boolean {
   return OPEN_STAGES.includes(stage);
 }
 
-/** Color por etapa, de frío a caliente, para leer el tablero de un vistazo. */
-export const STAGE_COLOR: Record<Stage, string> = {
-  NEW: "#64748b",
-  CONTACTED: "#0891b2",
-  QUALIFYING: "#0d9488",
-  MEETING_SCHEDULED: "#2563eb",
-  NEED_CONFIRMED: "#7c3aed",
-  PROPOSAL_DRAFT: "#ca8a04",
-  PROPOSAL_SENT: "#ea580c",
-  NEGOTIATION: "#db2777",
-  WON: "#059669",
-  LOST: "#dc2626",
-  ON_HOLD: "#78716c",
+/** Qué tiene que pasar para salir de cada estado. */
+export const STAGE_CRITERIA: Record<Stage, string> = {
+  LLAMAR: "Hay que contactarlo o retomar el contacto.",
+  ENVIAR_COTI: "Ya se sabe qué necesita; falta armar y mandar la cotización.",
+  COTI_ENVIADA: "La cotización está en manos del cliente, esperando respuesta.",
+  REUNION: "Hay reunión acordada o en curso.",
+  NEGOCIACION: "Se discuten precio, alcance o condiciones.",
+  CERRADO: "Acuerdo confirmado.",
+  PERDIDO: "No se concretó. Registrar el motivo para aprender de ello.",
 };
+
+/** Color por estado, de frío a caliente, para leer la tabla de un vistazo. */
+export const STAGE_COLOR: Record<Stage, string> = {
+  LLAMAR: "#64748b",
+  ENVIAR_COTI: "#ca8a04",
+  COTI_ENVIADA: "#ea580c",
+  REUNION: "#2563eb",
+  NEGOCIACION: "#db2777",
+  CERRADO: "#059669",
+  PERDIDO: "#dc2626",
+};
+
+export type Priority = "ALTA" | "MEDIA" | "BAJA";
+
+export const PRIORITY_COLOR: Record<Priority, string> = {
+  ALTA: "#dc2626",
+  MEDIA: "#ca8a04",
+  BAJA: "#64748b",
+};
+
+/** Servicios que ofrece la empresa, como los escribe el equipo. */
+export const SERVICES = ["AGENTES IA", "SISTEMAS", "APP", "TAXI"] as const;

@@ -5,8 +5,10 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { audit } from "@/server/services/audit";
-import { ALL_STAGES, isOpenStage, type Stage } from "@/lib/pipeline";
+import { ALL_STAGES, OPEN_STAGES, type Stage } from "@/lib/pipeline";
 import type { ActionState } from "./types";
+
+const PATH = "/dashboard/seguimiento";
 
 async function requireOrg() {
   const session = await requireSession();
@@ -62,116 +64,103 @@ export async function createOpportunityAction(
     after: { title: created.title, stage: created.stage },
   });
 
-  revalidatePath("/dashboard/pipeline");
-  return { error: null, message: "Oportunidad creada." };
+  revalidatePath(PATH);
+  return { error: null, message: "Cliente agregado." };
 }
 
-const stageSchema = z.object({
-  stage: z.enum(ALL_STAGES as [Stage, ...Stage[]]),
-  lostReason: z.string().max(500).optional(),
-});
+/**
+ * Guarda una celda editada en la tabla de seguimiento. Es la forma en que
+ * el equipo ya trabaja en su planilla: se corrige el dato en su lugar.
+ */
+const fieldSchema = z.discriminatedUnion("field", [
+  z.object({ field: z.literal("stage"), value: z.enum(ALL_STAGES as [Stage, ...Stage[]]) }),
+  z.object({ field: z.literal("priority"), value: z.enum(["ALTA", "MEDIA", "BAJA"]) }),
+  z.object({ field: z.literal("serviceInterest"), value: z.string().max(160) }),
+  z.object({ field: z.literal("needSummary"), value: z.string().max(5000) }),
+  z.object({ field: z.literal("lastUpdate"), value: z.string().max(5000) }),
+  z.object({ field: z.literal("nextContactAt"), value: z.string() }),
+  z.object({ field: z.literal("probability"), value: z.coerce.number().min(0).max(100) }),
+  z.object({ field: z.literal("lostReason"), value: z.string().max(500) }),
+]);
 
-export async function changeStageAction(
+export async function updateOpportunityFieldAction(
   opportunityId: string,
-  stage: Stage,
-  lostReason?: string,
+  field: string,
+  value: string,
 ): Promise<ActionState> {
   const { organizationId, userId } = await requireOrg();
 
-  const parsed = stageSchema.safeParse({ stage, lostReason });
-  if (!parsed.success) return { error: "Etapa inválida" };
+  const parsed = fieldSchema.safeParse({ field, value });
+  if (!parsed.success) return { error: "Valor inválido" };
 
   const opportunity = await prisma.opportunity.findUnique({ where: { id: opportunityId } });
   if (!opportunity || opportunity.organizationId !== organizationId) {
-    return { error: "Oportunidad no encontrada" };
-  }
-
-  // El manual (§7) pide registrar por qué se perdió: sin eso, el reporte de
-  // motivos de pérdida queda vacío y no se aprende nada.
-  if (parsed.data.stage === "LOST" && !parsed.data.lostReason?.trim()) {
-    return { error: "Indica el motivo de la pérdida" };
+    return { error: "Cliente no encontrado" };
   }
 
   const now = new Date();
-  await prisma.opportunity.update({
-    where: { id: opportunityId },
-    data: {
-      stage: parsed.data.stage,
-      wonAt: parsed.data.stage === "WON" ? now : null,
-      lostAt: parsed.data.stage === "LOST" ? now : null,
-      lostReason: parsed.data.stage === "LOST" ? parsed.data.lostReason : null,
-      proposalSentAt:
-        parsed.data.stage === "PROPOSAL_SENT" && !opportunity.proposalSentAt
-          ? now
-          : opportunity.proposalSentAt,
-    },
-  });
+  const data: Record<string, unknown> = {};
+
+  switch (parsed.data.field) {
+    case "stage": {
+      const stage = parsed.data.value;
+      data.stage = stage;
+      data.wonAt = stage === "CERRADO" ? now : null;
+      data.lostAt = stage === "PERDIDO" ? now : null;
+      if (stage === "COTI_ENVIADA" && !opportunity.proposalSentAt) data.proposalSentAt = now;
+      break;
+    }
+    case "nextContactAt":
+      data.nextContactAt = parsed.data.value ? new Date(parsed.data.value) : null;
+      break;
+    case "probability":
+      data.probability = Math.round(parsed.data.value);
+      break;
+    default:
+      data[parsed.data.field] = parsed.data.value || null;
+  }
+
+  await prisma.opportunity.update({ where: { id: opportunityId }, data });
+
+  // Solo se auditan los cambios de estado: son los que después explican el
+  // embudo. Auditar cada tecleo de una nota solo generaría ruido.
+  if (parsed.data.field === "stage") {
+    await audit({
+      entityType: "Opportunity",
+      entityId: opportunityId,
+      action: "stage_change",
+      userId,
+      organizationId,
+      before: { stage: opportunity.stage },
+      after: { stage: parsed.data.value },
+    });
+  }
+
+  revalidatePath(PATH);
+  return { error: null };
+}
+
+export async function deleteOpportunityAction(opportunityId: string): Promise<ActionState> {
+  const { organizationId, userId } = await requireOrg();
+
+  const opportunity = await prisma.opportunity.findUnique({ where: { id: opportunityId } });
+  if (!opportunity || opportunity.organizationId !== organizationId) {
+    return { error: "Cliente no encontrado" };
+  }
+
+  await prisma.opportunity.delete({ where: { id: opportunityId } });
 
   await audit({
     entityType: "Opportunity",
     entityId: opportunityId,
-    action: "stage_change",
+    action: "delete",
     userId,
     organizationId,
-    before: { stage: opportunity.stage },
-    after: { stage: parsed.data.stage },
+    before: { title: opportunity.title, stage: opportunity.stage },
   });
 
-  revalidatePath("/dashboard/pipeline");
+  revalidatePath(PATH);
   return { error: null };
-}
-
-const nextActionSchema = z.object({
-  nextAction: z.string().min(2, "Describe el próximo paso").max(300),
-  nextActionAt: z.string().optional(),
-});
-
-export async function setNextActionAction(
-  opportunityId: string,
-  _prevState: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const { organizationId, userId } = await requireOrg();
-
-  const parsed = nextActionSchema.safeParse({
-    nextAction: formData.get("nextAction"),
-    nextActionAt: formData.get("nextActionAt") || undefined,
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
-  }
-
-  const opportunity = await prisma.opportunity.findUnique({ where: { id: opportunityId } });
-  if (!opportunity || opportunity.organizationId !== organizationId) {
-    return { error: "Oportunidad no encontrada" };
-  }
-
-  await prisma.opportunity.update({
-    where: { id: opportunityId },
-    data: {
-      nextAction: parsed.data.nextAction,
-      nextActionAt: parsed.data.nextActionAt ? new Date(parsed.data.nextActionAt) : null,
-    },
-  });
-
-  // Todo próximo paso con fecha se refleja como tarea, para que entre en los
-  // recordatorios y en el reporte diario.
-  if (parsed.data.nextActionAt) {
-    await prisma.activity.create({
-      data: {
-        organizationId,
-        opportunityId,
-        contactId: opportunity.contactId,
-        assignedToId: opportunity.assignedToId ?? userId,
-        type: "FOLLOW_UP",
-        title: parsed.data.nextAction,
-        dueAt: new Date(parsed.data.nextActionAt),
-      },
-    });
-  }
-
-  revalidatePath("/dashboard/pipeline");
-  return { error: null, message: "Próximo paso guardado." };
 }
 
 export async function completeActivityAction(activityId: string): Promise<ActionState> {
@@ -195,19 +184,17 @@ export async function completeActivityAction(activityId: string): Promise<Action
     organizationId,
   });
 
-  revalidatePath("/dashboard/pipeline");
+  revalidatePath(PATH);
   return { error: null };
 }
 
-/** Oportunidades activas sin próximo paso definido — la regla dura del manual §45. */
-export async function countOpportunitiesWithoutNextAction(
-  organizationId: string,
-): Promise<number> {
+/** Clientes activos sin próximo contacto agendado. */
+export async function countWithoutNextContact(organizationId: string): Promise<number> {
   return prisma.opportunity.count({
     where: {
       organizationId,
-      stage: { in: ALL_STAGES.filter(isOpenStage) },
-      nextAction: null,
+      stage: { in: OPEN_STAGES },
+      nextContactAt: null,
     },
   });
 }

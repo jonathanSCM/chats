@@ -1,17 +1,14 @@
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/server/db/client";
-import { decrypt } from "@/lib/crypto";
-import {
-  getMediaUrl,
-  downloadMedia,
-  type ParsedInboundMessage,
-  type ParsedEcho,
-  type ParsedHistoryBatch,
-  type ParsedContactSync,
-  type ParsedStatusUpdate,
+import type {
+  ParsedInboundMessage,
+  ParsedEcho,
+  ParsedHistoryBatch,
+  ParsedContactSync,
+  ParsedStatusUpdate,
 } from "@/server/services/whatsapp";
-import { saveMediaFile } from "@/lib/media-storage";
 import { notifyNewMessage } from "@/server/services/push";
+import { enqueue } from "@/server/jobs";
 
 const CONVERSATION_WINDOW_MS = 24 * 60 * 60 * 1000; // ventana de conversación de WhatsApp
 
@@ -41,51 +38,31 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
 
   if (!connection) return;
 
-  const accessToken = decrypt(connection.accessToken);
   const conversationId = await findOrCreateConversation(
     connection.bot.id,
     inbound.from,
     inbound.customerName,
   );
 
-  let mediaUrl: string | null = null;
-  let mediaType: (typeof MEDIA_TYPE_MAP)[keyof typeof MEDIA_TYPE_MAP] | null = null;
-  let mimeType: string | null = null;
-
-  let mediaFailed = false;
-  if (inbound.media) {
-    try {
-      const { url, mimeType: resolvedMime } = await getMediaUrl({
-        mediaId: inbound.media.mediaId,
-        accessToken,
-      });
-      const buffer = await downloadMedia({ url, accessToken });
-      mediaUrl = await saveMediaFile(buffer, inbound.media.mimeType ?? resolvedMime);
-      mediaType = MEDIA_TYPE_MAP[inbound.media.type];
-      mimeType = inbound.media.mimeType ?? resolvedMime;
-    } catch (error) {
-      mediaFailed = true;
-      console.error(
-        `[conversation] Error descargando media entrante (mensaje ${inbound.messageId}, tipo ${inbound.media.type}):`,
-        error,
-      );
-    }
-  }
-
+  // El mensaje se guarda de inmediato para que aparezca en la bandeja al
+  // instante; el archivo se descarga después en un job (tarda segundos y
+  // Meta reintenta el webhook si tardamos en responder).
+  let messageId: string;
   try {
-    await prisma.message.create({
+    const created = await prisma.message.create({
       data: {
         conversationId,
         role: "CUSTOMER",
-        content:
-          inbound.text ?? (mediaFailed ? "⚠️ No se pudo descargar el archivo adjunto." : ""),
-        mediaUrl,
-        mediaType,
-        mimeType,
+        content: inbound.text ?? "",
+        mediaType: inbound.media ? MEDIA_TYPE_MAP[inbound.media.type] : null,
+        mediaStatus: inbound.media ? "PENDING" : null,
+        mimeType: inbound.media?.mimeType ?? null,
         fileName: inbound.media?.fileName ?? null,
         externalId: inbound.messageId,
       },
+      select: { id: true },
     });
+    messageId = created.id;
   } catch (error) {
     // P2002 = violación de unicidad en externalId: dos requests casi
     // simultáneas para el mismo mensaje (Meta reintentando el webhook)
@@ -96,6 +73,18 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
       return;
     }
     throw error;
+  }
+
+  if (inbound.media) {
+    await enqueue({
+      type: "download_media",
+      uniqueKey: `download_media:${messageId}`,
+      payload: {
+        messageId,
+        mediaId: inbound.media.mediaId,
+        phoneNumberId: inbound.phoneNumberId,
+      },
+    });
   }
 
   const conversation = await prisma.conversation.update({
@@ -173,48 +162,38 @@ export async function handlePhoneAppEcho(echo: ParsedEcho): Promise<void> {
 
   const conversationId = await findOrCreateConversation(connection.bot.id, echo.to);
 
-  let mediaUrl: string | null = null;
-  let mediaType: (typeof MEDIA_TYPE_MAP)[keyof typeof MEDIA_TYPE_MAP] | null = null;
-  let mimeType: string | null = null;
-
-  let mediaFailed = false;
-  if (echo.media) {
-    try {
-      const accessToken = decrypt(connection.accessToken);
-      const { url, mimeType: resolvedMime } = await getMediaUrl({
-        mediaId: echo.media.mediaId,
-        accessToken,
-      });
-      const buffer = await downloadMedia({ url, accessToken });
-      mediaUrl = await saveMediaFile(buffer, echo.media.mimeType ?? resolvedMime);
-      mediaType = MEDIA_TYPE_MAP[echo.media.type];
-      mimeType = echo.media.mimeType ?? resolvedMime;
-    } catch (error) {
-      mediaFailed = true;
-      console.error(
-        `[conversation] Error descargando media de un eco (mensaje ${echo.messageId}, tipo ${echo.media.type}):`,
-        error,
-      );
-    }
-  }
-
+  let messageId: string;
   try {
-    await prisma.message.create({
+    const created = await prisma.message.create({
       data: {
         conversationId,
         role: "STAFF",
-        content: echo.text ?? (mediaFailed ? "⚠️ No se pudo descargar el archivo adjunto." : ""),
-        mediaUrl,
-        mediaType,
-        mimeType,
+        content: echo.text ?? "",
+        mediaType: echo.media ? MEDIA_TYPE_MAP[echo.media.type] : null,
+        mediaStatus: echo.media ? "PENDING" : null,
+        mimeType: echo.media?.mimeType ?? null,
         fileName: echo.media?.fileName ?? null,
         externalId: echo.messageId,
         viaPhoneApp: true,
       },
+      select: { id: true },
     });
+    messageId = created.id;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return;
     throw error;
+  }
+
+  if (echo.media) {
+    await enqueue({
+      type: "download_media",
+      uniqueKey: `download_media:${messageId}`,
+      payload: {
+        messageId,
+        mediaId: echo.media.mediaId,
+        phoneNumberId: echo.phoneNumberId,
+      },
+    });
   }
 
   await prisma.conversation.update({

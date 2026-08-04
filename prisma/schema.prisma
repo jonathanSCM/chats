@@ -259,6 +259,10 @@ model Message {
   content        String       @db.Text
   mediaUrl       String?
   mediaType      MediaType?
+  // Solo aplica cuando mediaType no es null: la descarga desde el CDN de
+  // Meta ocurre en un job aparte, así que el mensaje aparece en la bandeja
+  // antes de que el archivo esté disponible.
+  mediaStatus    MediaStatus?
   mimeType       String?
   fileName       String?
   externalId     String?      @unique // id del mensaje en WhatsApp, para idempotencia del webhook
@@ -287,3 +291,70 @@ enum MediaType {
   DOCUMENT
 }
 
+enum MediaStatus {
+  PENDING // encolada para descargar del CDN de Meta
+  READY   // guardada y servible
+  FAILED  // se agotaron los reintentos
+}
+
+
+// ─── Cola de trabajos ───────────────────────────────────────────
+//
+// Cola en Postgres en vez de Redis/BullMQ: el volumen de este producto
+// (decenas de conversaciones al día) no justifica otro servicio que operar.
+// El reclamo de trabajos usa FOR UPDATE SKIP LOCKED, así que varios ticks
+// concurrentes nunca toman el mismo job.
+model Job {
+  id          String    @id @default(cuid())
+  type        String
+  payload     Json
+  // Clave de idempotencia: evita encolar dos veces lo mismo cuando Meta
+  // reenvía un webhook o el cron se solapa (manual §37).
+  uniqueKey   String?   @unique
+  status      JobStatus @default(PENDING)
+  runAfter    DateTime  @default(now()) // permite trabajos diferidos (debounce, recordatorios)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  lastError   String?   @db.Text
+  lockedAt    DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, runAfter])
+  @@map("jobs")
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
+// ─── Auditoría ──────────────────────────────────────────────────
+//
+// Quién cambió qué y desde dónde. El manual (§38) lo exige sobre todo para
+// distinguir lo que tocó la IA de lo que aprobó una persona.
+model AuditLog {
+  id             String     @id @default(cuid())
+  organizationId String?
+  userId         String? // null cuando el actor es el sistema o la IA
+  actor          AuditActor @default(USER)
+  entityType     String
+  entityId       String
+  action         String
+  before         Json?
+  after          Json?
+  createdAt      DateTime   @default(now())
+
+  @@index([entityType, entityId])
+  @@index([organizationId, createdAt])
+  @@map("audit_logs")
+}
+
+enum AuditActor {
+  USER
+  SYSTEM
+  AI
+}

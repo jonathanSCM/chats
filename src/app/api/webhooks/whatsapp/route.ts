@@ -14,6 +14,7 @@ import {
   handleHistoryImport,
   handleContactSync,
 } from "@/server/services/conversation";
+import { runJobsSoon } from "@/server/jobs";
 
 // Handshake de verificación que hace Meta al configurar el webhook.
 export async function GET(req: NextRequest) {
@@ -108,6 +109,11 @@ export async function POST(req: NextRequest) {
       console.error("[webhook] Error sincronizando contactos (coexistence):", error);
     }
   }
+
+  // Se responde a Meta de inmediato y la cola sigue trabajando en segundo
+  // plano dentro del mismo proceso (el servidor es de larga vida). El cron
+  // queda solo como red de seguridad para reintentos y trabajos diferidos.
+  runJobsSoon();
 
   return new NextResponse("OK", { status: 200 });
 }

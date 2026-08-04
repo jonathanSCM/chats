@@ -48,6 +48,26 @@ manejarlo tú, hay un script:
 DATABASE_URL="postgresql://..." npm run db:backup
 ```
 
+## Cola de trabajos y tarea programada
+
+El trabajo pesado (descargar la media que llega de WhatsApp, y más adelante el análisis con
+IA) **no corre dentro del webhook**: si tardamos en responder, Meta reintenta y termina
+duplicando trabajo. En su lugar se encola en una tabla `jobs` de Postgres — sin Redis ni un
+worker aparte.
+
+En la práctica el webhook dispara el procesamiento al instante, así que los archivos llegan en
+segundos. La tarea programada es la **red de seguridad**: reintentos con espera progresiva y
+trabajos diferidos (recordatorios, reportes).
+
+Configúrala en Coolify → recurso de la app → **Scheduled Tasks**, cada minuto (`* * * * *`):
+
+```bash
+curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://tu-dominio/api/cron/tick
+```
+
+Genera `CRON_SECRET` con `openssl rand -base64 32`. Sin esa variable el endpoint responde 503
+y la cola solo avanza cuando llegan mensajes nuevos.
+
 ## Notificaciones e instalación como app (PWA)
 
 El panel se puede **instalar** en el celular o el escritorio (Chrome: menú →

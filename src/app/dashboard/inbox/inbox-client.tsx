@@ -14,6 +14,8 @@ import {
   Trash2,
   ArrowLeft,
   Bell,
+  Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import { sendInboxMessageAction, sendInboxAttachmentAction } from "@/server/actions/inbox";
 import { vendorColor } from "@/lib/vendor-color";
@@ -48,6 +50,7 @@ interface Message {
   createdAt: string;
   mediaUrl: string | null;
   mediaType: MediaType | null;
+  mediaStatus: "PENDING" | "READY" | "FAILED" | null;
   mimeType: string | null;
   fileName: string | null;
   viaPhoneApp: boolean;
@@ -109,7 +112,27 @@ function durationFmt(seconds: number) {
 }
 
 function MessageMedia({ message }: { message: Message }) {
-  if (!message.mediaUrl || !message.mediaType) return null;
+  if (!message.mediaType) return null;
+
+  // El archivo se descarga en un job aparte, así que el mensaje puede
+  // aparecer antes de que esté disponible.
+  if (message.mediaStatus === "PENDING") {
+    return (
+      <div className="mb-1.5 flex items-center gap-2 rounded-md border border-black/10 bg-black/5 px-3 py-2 text-xs">
+        <Loader2 size={14} className="shrink-0 animate-spin" />
+        <span>Descargando {mediaPreviewLabel[message.mediaType].toLowerCase()}…</span>
+      </div>
+    );
+  }
+
+  if (message.mediaStatus === "FAILED" || !message.mediaUrl) {
+    return (
+      <div className="mb-1.5 flex items-center gap-2 rounded-md border border-danger/30 bg-danger-dim px-3 py-2 text-xs text-danger">
+        <AlertTriangle size={14} className="shrink-0" />
+        <span>No se pudo descargar el archivo.</span>
+      </div>
+    );
+  }
 
   switch (message.mediaType) {
     case "IMAGE":
@@ -391,6 +414,7 @@ export function InboxClient({
         createdAt: new Date().toISOString(),
         mediaUrl: null,
         mediaType: null,
+        mediaStatus: null,
         mimeType: null,
         fileName: null,
         viaPhoneApp: false,

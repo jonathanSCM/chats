@@ -53,6 +53,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       createdAt: m.createdAt,
       mediaUrl: m.mediaUrl,
       mediaType: m.mediaType,
+      mediaStatus: m.mediaStatus,
       mimeType: m.mimeType,
       fileName: m.fileName,
       viaPhoneApp: m.viaPhoneApp,

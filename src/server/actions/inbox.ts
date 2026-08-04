@@ -179,6 +179,8 @@ export async function sendInboxAttachmentAction(
         content: caption,
         mediaUrl: localUrl,
         mediaType: MEDIA_TYPE_MAP[outboundType],
+        // Lo saliente ya se subió aquí mismo: no pasa por la cola.
+        mediaStatus: "READY",
         mimeType,
         fileName,
         sentById: session.user.id,

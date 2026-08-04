@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MessageCircle, ShieldCheck, LogOut, Building2, Smartphone } from "lucide-react";
+import { MessageCircle, ShieldCheck, LogOut, Building2, Smartphone, BookOpen } from "lucide-react";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { logoutAction } from "@/server/actions/logout";
@@ -36,9 +36,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Smartphone size={16} /> Conexión WhatsApp
         </NavLink>
         {session?.user.role === "OWNER" && (
-          <NavLink href="/dashboard/organization">
-            <Building2 size={16} /> Organización
-          </NavLink>
+          <>
+            <NavLink href="/dashboard/knowledge">
+              <BookOpen size={16} /> Conocimiento
+            </NavLink>
+            <NavLink href="/dashboard/organization">
+              <Building2 size={16} /> Organización
+            </NavLink>
+          </>
         )}
         {session?.user.role === "SUPERADMIN" && (
           <NavLink href="/admin">

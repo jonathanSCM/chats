@@ -1,21 +1,10 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/client";
-import { getUsageStatus } from "@/server/services/subscription";
-import { Card, CardTitle, CardDescription, CardHeader } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import { Badge, StatusDot } from "@/components/ui/badge";
-import { UsageMeter } from "@/components/ui/usage-meter";
 import { Table, Thead, Th, Td, Tr } from "@/components/ui/table";
 import { SuspendToggle } from "./_components/suspend-toggle";
-import { ChangePlanForm } from "./_components/change-plan-form";
-import { GrantExtraForm } from "./_components/grant-extra-form";
-import type { SubscriptionStatus, BotStatus } from "@/generated/prisma/enums";
-
-const subStatusTone: Record<SubscriptionStatus, "accent" | "warning" | "danger"> = {
-  ACTIVE: "accent",
-  TRIALING: "accent",
-  PAST_DUE: "warning",
-  CANCELED: "danger",
-};
+import type { BotStatus } from "@/generated/prisma/enums";
 
 const botStatusTone: Record<BotStatus, "accent" | "warning" | "neutral"> = {
   ACTIVE: "accent",
@@ -33,20 +22,12 @@ export default async function AdminOrganizationDetailPage({
   const org = await prisma.organization.findUnique({
     where: { id },
     include: {
-      subscription: { include: { plan: true } },
       bots: { include: { whatsappConnection: true, _count: { select: { conversations: true } } } },
       users: { select: { id: true, name: true, email: true, role: true } },
     },
   });
 
   if (!org) notFound();
-
-  const [plans, usage] = await Promise.all([
-    prisma.plan.findMany({ where: { active: true }, orderBy: { priceCents: "asc" } }),
-    org.subscription
-      ? getUsageStatus(org.subscription.id, org.subscription.plan.conversationLimit)
-      : null,
-  ]);
 
   return (
     <div className="max-w-3xl animate-fade-up">
@@ -61,38 +42,10 @@ export default async function AdminOrganizationDetailPage({
         </div>
       </div>
 
-      {org.subscription && usage && (
-        <Card className="mb-6">
-          <CardHeader>
-            <div>
-              <CardTitle>Plan {org.subscription.plan.name}</CardTitle>
-              <CardDescription className="mt-1 font-mono text-xs">
-                Modelo: {org.subscription.plan.aiModel}
-              </CardDescription>
-            </div>
-            <Badge tone={subStatusTone[org.subscription.status]}>
-              <StatusDot tone={subStatusTone[org.subscription.status]} />
-              {org.subscription.status}
-            </Badge>
-          </CardHeader>
-
-          <UsageMeter consumed={usage.consumed} allowed={usage.allowed} label="Uso del período" />
-
-          <div className="mt-6 space-y-4 border-t border-border pt-4">
-            <ChangePlanForm
-              orgId={org.id}
-              plans={plans.map((p) => ({ id: p.id, name: p.name }))}
-              currentPlanId={org.subscription.plan.id}
-            />
-            <GrantExtraForm orgId={org.id} />
-          </div>
-        </Card>
-      )}
-
       <Card className="mb-6">
-        <CardTitle className="mb-4">Bots</CardTitle>
+        <CardTitle className="mb-4">Números de WhatsApp</CardTitle>
         {org.bots.length === 0 ? (
-          <p className="text-sm text-ink-muted">Esta organización no tiene bots.</p>
+          <p className="text-sm text-ink-muted">Esta organización no tiene números conectados.</p>
         ) : (
           <Table>
             <Thead>

@@ -126,10 +126,12 @@ Cada fase termina en algo desplegable y útil por sí solo.
 
 ### Fase 0 — Cimientos (sin funcionalidad visible)
 
-1. Tabla `Job` + `/api/cron/tick` + Scheduled Task en Coolify.
-2. Mover el procesamiento pesado del webhook a la cola (el webhook solo guarda y encola).
-3. Tabla `AuditLog` (§38): quién cambió qué, qué tocó la IA, qué aprobó el vendedor.
-4. Limpieza de la deuda del fork (decisión pendiente, ver §5).
+1. ✅ Limpieza de la deuda del fork.
+2. ✅ Base de conocimiento editable desde el panel (adelantada de la Fase 3 porque la IA
+   depende de ella).
+3. Tabla `Job` + `/api/cron/tick` + Scheduled Task en Coolify.
+4. Mover el procesamiento pesado del webhook a la cola (el webhook solo guarda y encola).
+5. Tabla `AuditLog` (§38): quién cambió qué, qué tocó la IA, qué aprobó el vendedor.
 
 ### Fase 1 — CRM núcleo
 
@@ -241,21 +243,20 @@ Cambios sobre lo existente:
 
 ---
 
-## 5. Decisiones pendientes (necesitan respuesta antes de empezar)
+## 5. Decisiones tomadas
 
-1. **Privacidad (§33).** Enviar conversaciones de clientes a OpenAI es una decisión de negocio,
-   no técnica. Hay que definir qué se manda, cuánto se guarda y actualizar la política de
-   privacidad pública (`/privacy`). El manual recomienda anonimizar lo sensible antes del
-   análisis.
-2. **Limpieza del fork.** ¿Se elimina Stripe / `Plan` / `Subscription` / `BotConfig`? Simplifica
-   mucho el esquema, pero es irreversible sin volver a git.
-3. **Base de conocimiento (§26).** El manual la exige (servicios, precios, alcances,
-   exclusiones, guías de calificación). Sin ella la IA recomienda a ciegas. ¿Existe ese material
-   escrito en ProShop, o hay que redactarlo?
-4. **Presupuesto de IA.** El manual sugiere USD 5–20/mes para dos vendedores (§35). ¿Qué tope
-   mensual configuramos para el corte automático?
-5. **Embudo.** Las 11 etapas de §7 son una sugerencia. ¿Se adoptan tal cual o ProShop tiene las
-   suyas? Cambiarlas después implica migrar datos.
+1. **Privacidad (§33).** Se deja para el final, junto con la actualización de `/privacy`.
+   ⚠️ Pendiente: no se puede lanzar el análisis en producción con clientes reales sin cerrar
+   esto.
+2. **Limpieza del fork.** ✅ Hecha. Fuera Stripe, `Plan`, `Subscription`, `UsageRecord`,
+   `BotConfig`, `CatalogItem` y `openai.ts`. El panel `/admin` pasó de tablero SaaS (MRR,
+   planes, uso) a métricas del negocio.
+3. **Base de conocimiento (§26).** ✅ Hecha, editable desde `/dashboard/knowledge` por el
+   administrador, con versión y responsable por entrada. Falta cargarla con el material real
+   de ProShop — sin eso la IA recomienda a ciegas.
+4. **Presupuesto de IA.** USD 5–20/mes, como sugiere el manual (§35). Se implementa como tope
+   con corte automático en la Fase 3.
+5. **Embudo.** Las 11 etapas de §7 tal cual.
 
 ---
 

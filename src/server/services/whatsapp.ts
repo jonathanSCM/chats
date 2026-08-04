@@ -437,6 +437,11 @@ export async function sendTextMessage(params: {
 
 // ─── Media: descarga de lo entrante, subida/envío de lo saliente ──
 
+// Sin timeout, un fetch colgado (red del servidor, CDN de Meta lento, etc.)
+// se queda esperando para siempre — el mensaje nunca se guarda ni se loguea
+// el error, y Meta reintenta el mismo webhook una y otra vez sin que avancemos.
+const MEDIA_FETCH_TIMEOUT_MS = 15_000;
+
 export async function getMediaUrl(params: {
   mediaId: string;
   accessToken: string;
@@ -444,6 +449,7 @@ export async function getMediaUrl(params: {
   const { mediaId, accessToken } = params;
   const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${mediaId}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(MEDIA_FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`No se pudo resolver el media (${res.status})`);
   const data = (await res.json()) as { url: string; mime_type: string };
@@ -456,6 +462,7 @@ export async function downloadMedia(params: {
 }): Promise<Buffer> {
   const res = await fetch(params.url, {
     headers: { Authorization: `Bearer ${params.accessToken}` },
+    signal: AbortSignal.timeout(MEDIA_FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`No se pudo descargar el media (${res.status})`);
   return Buffer.from(await res.arrayBuffer());

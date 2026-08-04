@@ -32,6 +32,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# ffmpeg convierte las notas de voz grabadas en el panel: Chrome las graba
+# en audio/webm y la Cloud API de WhatsApp solo acepta ogg/opus, mp4, aac,
+# amr o mpeg. Sin esto, las notas de voz desde Chrome fallan al enviarse.
+RUN apk add --no-cache ffmpeg
+
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 

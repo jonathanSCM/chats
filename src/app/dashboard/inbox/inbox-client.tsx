@@ -1,9 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Send, Paperclip, FileText, X, Smartphone, Check, CheckCheck } from "lucide-react";
+import {
+  Send,
+  Paperclip,
+  FileText,
+  X,
+  Smartphone,
+  Check,
+  CheckCheck,
+  Mic,
+  Square,
+  Trash2,
+  ArrowLeft,
+  Bell,
+} from "lucide-react";
 import { sendInboxMessageAction, sendInboxAttachmentAction } from "@/server/actions/inbox";
 import { vendorColor } from "@/lib/vendor-color";
+import { usePushNotifications } from "@/lib/use-push-notifications";
 
 interface Vendor {
   id: string;
@@ -88,6 +102,12 @@ function timeFmt(iso: string) {
   return new Date(iso).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 }
 
+function durationFmt(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 function MessageMedia({ message }: { message: Message }) {
   if (!message.mediaUrl || !message.mediaType) return null;
 
@@ -106,7 +126,9 @@ function MessageMedia({ message }: { message: Message }) {
         <video src={message.mediaUrl} controls className="mb-1.5 max-h-72 w-full rounded-md" />
       );
     case "AUDIO":
-      return <audio src={message.mediaUrl} controls className="mb-1.5 w-64 max-w-full" />;
+      return (
+        <audio src={message.mediaUrl} controls className="mb-1.5 w-56 max-w-full sm:w-64" />
+      );
     case "DOCUMENT":
       return (
         <a
@@ -131,6 +153,20 @@ function MessageMedia({ message }: { message: Message }) {
 const ACCEPTED_FILE_TYPES =
   "image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.zip,.rar,.apk,.json";
 
+// El navegador elige el primero que soporte. Safari da audio/mp4 (que
+// WhatsApp acepta tal cual); Chrome da webm y el servidor lo convierte.
+const RECORDER_MIME_TYPES = [
+  "audio/ogg;codecs=opus",
+  "audio/mp4",
+  "audio/webm;codecs=opus",
+  "audio/webm",
+];
+
+function pickRecorderMime(): string | undefined {
+  if (typeof MediaRecorder === "undefined") return undefined;
+  return RECORDER_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type));
+}
+
 export function InboxClient({
   currentUserId,
   isAdmin,
@@ -149,47 +185,63 @@ export function InboxClient({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [height, setHeight] = useState<number | null>(null);
+
+  const [recording, setRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedIdRef = useRef<string | null>(null);
   const prevUnreadRef = useRef<Map<string, number>>(new Map());
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cancelRecordRef = useRef(false);
+
+  const { status: pushStatus, subscribe: subscribePush } = usePushNotifications();
 
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
 
-  // Pide permiso de notificaciones del navegador una sola vez, al entrar al inbox.
-  useEffect(() => {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
-
   // Esc cierra el chat abierto y vuelve a la lista.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && selectedIdRef.current) {
-        setSelectedId(null);
-      }
+      if (e.key === "Escape" && selectedIdRef.current) setSelectedId(null);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  // Tocar una notificación del sistema abre esa conversación.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    function onMessage(event: MessageEvent) {
+      if (event.data?.type === "OPEN_CONVERSATION" && event.data.conversationId) {
+        setSelectedId(event.data.conversationId);
+      }
+    }
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, []);
+
   // Alto calculado en JS (no vh-fijo): se adapta a lo que haya arriba
-  // (banner de verificación, etc.) sin dejar el compositor "flotando" abajo.
+  // (barra móvil, banners) y a la barra de direcciones de los navegadores
+  // móviles, que cambia de alto al hacer scroll.
   useEffect(() => {
     function recalc() {
       if (!rootRef.current) return;
       const top = rootRef.current.getBoundingClientRect().top;
-      setHeight(window.innerHeight - top);
+      const viewport = window.visualViewport?.height ?? window.innerHeight;
+      setHeight(viewport - top);
     }
     recalc();
     window.addEventListener("resize", recalc);
-    const timeout = setTimeout(recalc, 200); // por si el banner tarda en pintar
+    window.visualViewport?.addEventListener("resize", recalc);
+    const timeout = setTimeout(recalc, 200);
     return () => {
       window.removeEventListener("resize", recalc);
+      window.visualViewport?.removeEventListener("resize", recalc);
       clearTimeout(timeout);
     };
   }, []);
@@ -199,19 +251,21 @@ export function InboxClient({
     if (!res.ok) return;
     const list: ConversationSummary[] = await res.json();
 
-    // Detecta mensajes nuevos desde el último poll para avisar por
-    // notificación del navegador (solo si el chat no es el que está abierto).
+    // Notificación en primer plano (la app abierta). Con la app cerrada,
+    // el service worker recibe el push del servidor.
     for (const c of list) {
       const prevUnread = prevUnreadRef.current.get(c.id) ?? 0;
       if (
         c.unreadCount > prevUnread &&
         c.id !== selectedIdRef.current &&
         typeof Notification !== "undefined" &&
-        Notification.permission === "granted"
+        Notification.permission === "granted" &&
+        document.visibilityState === "visible"
       ) {
         new Notification(c.customerName || c.customerPhone, {
           body: c.lastMessage?.content || "Nuevo mensaje",
           tag: c.id,
+          icon: "/icon-192.png",
         });
       }
     }
@@ -254,6 +308,67 @@ export function InboxClient({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
+  const sendFile = useCallback(
+    async (file: File, caption: string) => {
+      const conversationId = selectedIdRef.current;
+      if (!conversationId) return;
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("caption", caption);
+      const result = await sendInboxAttachmentAction(conversationId, formData);
+      if (result.error) setError(result.error);
+      await fetchMessages(conversationId);
+      await fetchConversations();
+    },
+    [fetchMessages, fetchConversations],
+  );
+
+  async function startRecording() {
+    if (recording) return;
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = pickRecorderMime();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const chunks: BlobPart[] = [];
+      cancelRecordRef.current = false;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+        setRecording(false);
+        setRecordSeconds(0);
+
+        if (cancelRecordRef.current || chunks.length === 0) return;
+
+        const type = recorder.mimeType || "audio/webm";
+        const blob = new Blob(chunks, { type });
+        const ext = type.includes("ogg") ? "ogg" : type.includes("mp4") ? "m4a" : "webm";
+        setSending(true);
+        await sendFile(new File([blob], `nota-de-voz.${ext}`, { type }), "");
+        setSending(false);
+      };
+
+      recorderRef.current = recorder;
+      recorder.start();
+      setRecording(true);
+      setRecordSeconds(0);
+      recordTimerRef.current = setInterval(() => setRecordSeconds((s) => s + 1), 1000);
+    } catch {
+      setError("No se pudo acceder al micrófono. Revisa los permisos del navegador.");
+    }
+  }
+
+  function stopRecording(cancel: boolean) {
+    cancelRecordRef.current = cancel;
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+  }
+
   async function handleSend() {
     if (!selectedId || sending) return;
     if (!pendingFile && !draft.trim()) return;
@@ -261,13 +376,11 @@ export function InboxClient({
     setError(null);
 
     if (pendingFile) {
-      const formData = new FormData();
-      formData.append("file", pendingFile);
-      formData.append("caption", draft);
-      const result = await sendInboxAttachmentAction(selectedId, formData);
-      if (result.error) setError(result.error);
+      const file = pendingFile;
+      const caption = draft;
       setPendingFile(null);
       setDraft("");
+      await sendFile(file, caption);
     } else {
       const content = draft;
       setDraft("");
@@ -292,10 +405,10 @@ export function InboxClient({
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
         setError(result.error);
       }
+      await fetchMessages(selectedId);
+      await fetchConversations();
     }
 
-    fetchMessages(selectedId);
-    fetchConversations();
     setSending(false);
   }
 
@@ -308,15 +421,36 @@ export function InboxClient({
   return (
     <div
       ref={rootRef}
-      className="flex -mx-8 -mb-8 overflow-hidden"
+      className="-mx-4 -mb-5 flex overflow-hidden md:-mx-8 md:-mb-8"
       style={{ height: height ? `${height}px` : "calc(100vh - 8rem)" }}
     >
-      {/* Lista de conversaciones */}
-      <aside className="w-80 shrink-0 border-r border-border bg-surface/60 overflow-y-auto">
-        <div className="sticky top-0 border-b border-border bg-surface/90 px-4 py-4 backdrop-blur">
-          <h1 className="font-display text-lg font-semibold text-ink">Chats</h1>
-          {isAdmin && <p className="text-xs text-ink-faint">Vista de administrador — todas las conversaciones</p>}
+      {/* Lista de conversaciones — pantalla completa en móvil, columna fija en escritorio */}
+      <aside
+        className={`w-full shrink-0 flex-col overflow-y-auto border-r border-border bg-surface/60 md:flex md:w-80 ${
+          selectedId ? "hidden md:flex" : "flex"
+        }`}
+      >
+        <div className="sticky top-0 z-10 border-b border-border bg-surface/90 px-4 py-3.5 backdrop-blur">
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="font-display text-lg font-semibold text-ink">Chats</h1>
+            {pushStatus === "prompt" && (
+              <button
+                type="button"
+                onClick={subscribePush}
+                className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-ink-muted transition-colors hover:bg-surface-2"
+                title="Recibir notificaciones de mensajes nuevos"
+              >
+                <Bell size={12} /> Activar avisos
+              </button>
+            )}
+          </div>
+          {isAdmin && (
+            <p className="text-xs text-ink-faint">
+              Vista de administrador — todas las conversaciones
+            </p>
+          )}
         </div>
+
         {conversations.length === 0 && (
           <p className="px-4 py-6 text-sm text-ink-faint">No hay conversaciones todavía.</p>
         )}
@@ -324,7 +458,7 @@ export function InboxClient({
           <button
             key={c.id}
             onClick={() => setSelectedId(c.id)}
-            className={`flex w-full flex-col gap-0.5 border-b border-border/60 px-4 py-3 text-left transition-colors hover:bg-surface-2/60 ${
+            className={`flex w-full flex-col gap-0.5 border-b border-border/60 px-4 py-3.5 text-left transition-colors hover:bg-surface-2/60 ${
               selectedId === c.id ? "bg-surface-2" : ""
             }`}
           >
@@ -357,7 +491,9 @@ export function InboxClient({
               <span
                 className="h-1.5 w-1.5 shrink-0 rounded-full"
                 style={{
-                  backgroundColor: c.assignedTo ? vendorColor(c.assignedTo.id) : "var(--color-ink-faint)",
+                  backgroundColor: c.assignedTo
+                    ? vendorColor(c.assignedTo.id)
+                    : "var(--color-ink-faint)",
                 }}
               />
               <span className="text-ink-faint">
@@ -373,47 +509,60 @@ export function InboxClient({
       </aside>
 
       {/* Chat activo */}
-      <section className="flex flex-1 flex-col overflow-hidden">
+      <section
+        className={`min-w-0 flex-1 flex-col overflow-hidden ${selectedId ? "flex" : "hidden md:flex"}`}
+      >
         {!selectedId ? (
-          <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">
+          <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-ink-faint">
             Selecciona una conversación para empezar.
           </div>
         ) : (
           <>
-            <div className="border-b border-border bg-surface/60 px-5 py-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="font-display text-sm font-semibold text-ink">
-                    {customerName || customerPhone}
-                  </p>
-                  {customerName && (
-                    <p className="font-mono text-xs text-ink-faint">{customerPhone}</p>
-                  )}
-                </div>
-                {assignedTo && (
-                  <span
-                    className="flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium text-white"
-                    style={{ backgroundColor: vendorColor(assignedTo.id) }}
-                  >
-                    {assignedTo.id === currentUserId ? "Tú" : assignedTo.name}
-                  </span>
+            <div className="flex items-center gap-2 border-b border-border bg-surface/60 px-3 py-2.5 md:px-5 md:py-3">
+              <button
+                type="button"
+                onClick={() => setSelectedId(null)}
+                aria-label="Volver a la lista"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-2 md:hidden"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-display text-sm font-semibold text-ink">
+                  {customerName || customerPhone}
+                </p>
+                {customerName && (
+                  <p className="truncate font-mono text-xs text-ink-faint">{customerPhone}</p>
                 )}
               </div>
+              {assignedTo && (
+                <span
+                  className="max-w-[7rem] shrink-0 truncate rounded-full px-2.5 py-1 text-xs font-medium text-white"
+                  style={{ backgroundColor: vendorColor(assignedTo.id) }}
+                >
+                  {assignedTo.id === currentUserId ? "Tú" : assignedTo.name}
+                </span>
+              )}
             </div>
 
-            <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto px-5 py-4">
+            <div
+              ref={scrollRef}
+              className="flex-1 space-y-2 overflow-y-auto px-3 py-4 md:px-5"
+            >
               {messages.map((m) => {
                 const mine = m.role === "STAFF" || m.role === "BOT";
                 return (
                   <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                     <div
-                      className={`max-w-[70%] rounded-lg px-3 py-2 text-sm ${
+                      className={`max-w-[85%] rounded-lg px-3 py-2 text-sm md:max-w-[70%] ${
                         mine ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink"
                       }`}
                     >
                       <MessageMedia message={m} />
                       {m.content && (
-                        <p className="whitespace-pre-wrap">{linkify(m.content, mine)}</p>
+                        <p className="whitespace-pre-wrap break-words">
+                          {linkify(m.content, mine)}
+                        </p>
                       )}
                       <div className="mt-1 flex items-center gap-1.5 text-[10px] opacity-70">
                         {m.viaPhoneApp && (
@@ -439,60 +588,98 @@ export function InboxClient({
               })}
             </div>
 
-            {/* Input de mensaje fijo abajo, estilo WhatsApp */}
-            <div className="border-t border-border bg-surface/80 px-4 py-3">
+            {/* Compositor fijo abajo, estilo WhatsApp */}
+            <div className="border-t border-border bg-surface/80 px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] md:px-4 md:py-3">
               {error && (
-                <div className="mb-2 flex items-center justify-between rounded-md bg-danger-dim px-3 py-1.5 text-xs text-danger">
-                  <span>{error}</span>
-                  <button onClick={() => setError(null)}>
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-danger-dim px-3 py-1.5 text-xs text-danger">
+                  <span className="min-w-0">{error}</span>
+                  <button onClick={() => setError(null)} className="shrink-0">
                     <X size={14} />
                   </button>
                 </div>
               )}
               {pendingFile && (
-                <div className="mb-2 flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2 text-xs text-ink-muted">
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs text-ink-muted">
                   <span className="truncate">📎 {pendingFile.name}</span>
-                  <button onClick={() => setPendingFile(null)}>
+                  <button onClick={() => setPendingFile(null)} className="shrink-0">
                     <X size={14} />
                   </button>
                 </div>
               )}
-              <div className="flex items-end gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  accept={ACCEPTED_FILE_TYPES}
-                  onChange={handleFilePick}
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-2"
-                  title="Adjuntar archivo"
-                >
-                  <Paperclip size={18} />
-                </button>
-                <textarea
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  placeholder={pendingFile ? "Agrega un texto (opcional)…" : "Escribe un mensaje…"}
-                  rows={1}
-                  className="max-h-32 flex-1 resize-none rounded-full border border-border bg-surface px-4 py-2.5 text-sm text-ink outline-none focus:border-accent-dim"
-                />
-                <button
-                  onClick={handleSend}
-                  disabled={(!draft.trim() && !pendingFile) || sending}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition-opacity disabled:opacity-40"
-                >
-                  <Send size={18} />
-                </button>
-              </div>
+
+              {recording ? (
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => stopRecording(true)}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-2 hover:text-danger"
+                    title="Cancelar"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                  <div className="flex flex-1 items-center gap-2 text-sm text-ink">
+                    <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-danger" />
+                    <span className="font-mono">{durationFmt(recordSeconds)}</span>
+                    <span className="text-ink-faint">Grabando…</span>
+                  </div>
+                  <button
+                    onClick={() => stopRecording(false)}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink"
+                    title="Enviar nota de voz"
+                  >
+                    <Square size={16} fill="currentColor" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-end gap-1.5 md:gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept={ACCEPTED_FILE_TYPES}
+                    onChange={handleFilePick}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-2"
+                    title="Adjuntar archivo"
+                  >
+                    <Paperclip size={19} />
+                  </button>
+                  <textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    placeholder={pendingFile ? "Agrega un texto (opcional)…" : "Escribe un mensaje…"}
+                    rows={1}
+                    // text-base evita que iOS haga zoom automático al enfocar
+                    className="max-h-32 min-w-0 flex-1 resize-none rounded-3xl border border-border bg-surface px-4 py-2.5 text-base text-ink outline-none focus:border-accent-dim md:text-sm"
+                  />
+                  {draft.trim() || pendingFile ? (
+                    <button
+                      onClick={handleSend}
+                      disabled={sending}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition-opacity disabled:opacity-40"
+                      title="Enviar"
+                    >
+                      <Send size={18} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={startRecording}
+                      disabled={sending}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition-opacity disabled:opacity-40"
+                      title="Grabar nota de voz"
+                    >
+                      <Mic size={19} />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </>
         )}

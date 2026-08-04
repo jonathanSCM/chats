@@ -141,6 +141,19 @@ body > * {
   animation: fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+@keyframes slide-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @keyframes pulse-dot {
   0%,
   100% {

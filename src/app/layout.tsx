@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -23,6 +23,26 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "WhatsApp ProShop",
   description: "Bandeja de conversaciones de WhatsApp para el equipo.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "ProShop",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
+};
+
+// viewportFit cover + maximumScale evitan el zoom al enfocar inputs en iOS
+// y dejan que la app use la pantalla completa cuando se instala.
+export const viewport: Viewport = {
+  themeColor: "#0d0d0f",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
 };
 
 // Se ejecuta antes de hidratar React para evitar el flash del tema

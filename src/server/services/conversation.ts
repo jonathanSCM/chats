@@ -11,6 +11,7 @@ import {
   type ParsedStatusUpdate,
 } from "@/server/services/whatsapp";
 import { saveMediaFile } from "@/lib/media-storage";
+import { notifyNewMessage } from "@/server/services/push";
 
 const CONVERSATION_WINDOW_MS = 24 * 60 * 60 * 1000; // ventana de conversación de WhatsApp
 
@@ -41,7 +42,11 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
   if (!connection) return;
 
   const accessToken = decrypt(connection.accessToken);
-  const conversationId = await findOrCreateConversation(connection.bot.id, inbound.from);
+  const conversationId = await findOrCreateConversation(
+    connection.bot.id,
+    inbound.from,
+    inbound.customerName,
+  );
 
   let mediaUrl: string | null = null;
   let mediaType: (typeof MEDIA_TYPE_MAP)[keyof typeof MEDIA_TYPE_MAP] | null = null;
@@ -93,13 +98,34 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
     throw error;
   }
 
-  await prisma.conversation.update({
+  const conversation = await prisma.conversation.update({
     where: { id: conversationId },
     data: { lastMessageAt: new Date() },
+    select: { assignedToId: true, customerName: true, customerPhone: true },
   });
+
+  const preview = inbound.text ?? (inbound.media ? MEDIA_PREVIEW[inbound.media.type] : "");
+  await notifyNewMessage({
+    conversationId,
+    organizationId: connection.bot.organizationId,
+    assignedToId: conversation.assignedToId,
+    customerLabel: conversation.customerName || conversation.customerPhone,
+    preview,
+  }).catch((error) => console.error("[conversation] Error notificando por push:", error));
 }
 
-async function findOrCreateConversation(botId: string, customerPhone: string): Promise<string> {
+const MEDIA_PREVIEW: Record<string, string> = {
+  image: "📷 Foto",
+  video: "🎥 Video",
+  audio: "🎵 Audio",
+  document: "📄 Documento",
+};
+
+async function findOrCreateConversation(
+  botId: string,
+  customerPhone: string,
+  customerName?: string | null,
+): Promise<string> {
   const existing = await prisma.conversation.findFirst({
     where: { botId, customerPhone },
     orderBy: { lastMessageAt: "desc" },
@@ -108,10 +134,19 @@ async function findOrCreateConversation(botId: string, customerPhone: string): P
   const withinWindow =
     existing && Date.now() - existing.lastMessageAt.getTime() < CONVERSATION_WINDOW_MS;
 
-  if (withinWindow) return existing.id;
+  if (withinWindow) {
+    // El perfil de WhatsApp puede cambiar de nombre; se refresca si vino uno nuevo.
+    if (customerName && customerName !== existing.customerName) {
+      await prisma.conversation.update({
+        where: { id: existing.id },
+        data: { customerName },
+      });
+    }
+    return existing.id;
+  }
 
   const created = await prisma.conversation.create({
-    data: { botId, customerPhone, billed: true, botPaused: true },
+    data: { botId, customerPhone, customerName: customerName ?? null, billed: true, botPaused: true },
   });
   return created.id;
 }

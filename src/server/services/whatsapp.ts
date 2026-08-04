@@ -53,6 +53,17 @@ const inboundSchema = z.object({
             metadata: z.object({
               phone_number_id: z.string(),
             }),
+            // Meta manda el nombre del perfil de WhatsApp junto con cada
+            // mensaje entrante — es la fuente más confiable del nombre del
+            // cliente (el webhook de contactos de coexistence casi nunca llega).
+            contacts: z
+              .array(
+                z.object({
+                  wa_id: z.string(),
+                  profile: z.object({ name: z.string() }).optional(),
+                }),
+              )
+              .optional(),
             messages: z
               .array(
                 z.object({
@@ -89,6 +100,7 @@ export type InboundMediaType = "image" | "video" | "audio" | "document";
 export interface ParsedInboundMessage {
   phoneNumberId: string;
   from: string;
+  customerName: string | null;
   messageId: string;
   text: string | null;
   media: {
@@ -123,11 +135,20 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
     for (const change of entry.changes) {
       if (!isFieldMatch(change.field, "messages")) continue;
       const { phone_number_id } = change.value.metadata;
+
+      const namesByWaId = new Map<string, string>();
+      for (const contact of change.value.contacts ?? []) {
+        if (contact.profile?.name) namesByWaId.set(contact.wa_id, contact.profile.name);
+      }
+
       for (const message of change.value.messages ?? []) {
+        const customerName = namesByWaId.get(message.from) ?? null;
+
         if (message.type === "text" && message.text?.body) {
           results.push({
             phoneNumberId: phone_number_id,
             from: message.from,
+            customerName,
             messageId: message.id,
             text: message.text.body,
             media: null,
@@ -142,6 +163,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
             results.push({
               phoneNumberId: phone_number_id,
               from: message.from,
+              customerName,
               messageId: message.id,
               text: mediaObj.caption ?? null,
               media: {

@@ -48,6 +48,33 @@ manejarlo tú, hay un script:
 DATABASE_URL="postgresql://..." npm run db:backup
 ```
 
+## Notificaciones e instalación como app (PWA)
+
+El panel se puede **instalar** en el celular o el escritorio (Chrome: menú →
+"Instalar app"; iPhone: Safari → Compartir → "Añadir a pantalla de inicio") y manda
+**notificaciones del sistema** cuando llega un mensaje nuevo — al vendedor asignado, o a
+todo el equipo si el chat todavía no tiene dueño.
+
+Para que funcionen con la app cerrada hay que generar un par de llaves VAPID una sola vez:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+Y ponerlas en `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (más `VAPID_SUBJECT` con tu correo).
+Sin ellas la app sigue andando, pero los avisos solo aparecen mientras la pestaña está abierta.
+
+Cada vendedor activa sus avisos con el botón **"Activar avisos"** que aparece arriba de la
+lista de chats. En iPhone, las notificaciones **solo funcionan si la app se instaló** en la
+pantalla de inicio — es una restricción de Safari, no del panel.
+
+## Notas de voz
+
+Se pueden grabar y enviar notas de voz desde el panel (el botón de micrófono aparece cuando
+el campo de texto está vacío). Chrome graba en `audio/webm`, que la Cloud API de WhatsApp
+rechaza, así que el servidor las convierte a ogg/opus con **ffmpeg** — ya viene instalado en
+la imagen de Docker. Para desarrollo local hay que tener `ffmpeg` en el PATH.
+
 ## Coexistence — usar el número que ya está en el celular
 
 Con Coexistence, un negocio conecta su número al panel **sin dejar de usar la app de WhatsApp

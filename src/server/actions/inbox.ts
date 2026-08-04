@@ -6,6 +6,7 @@ import { requireSession } from "@/server/auth/guards";
 import { decrypt } from "@/lib/crypto";
 import { sendTextMessage, sendMediaMessage, uploadMedia, type OutboundMediaType } from "@/server/services/whatsapp";
 import { saveMediaFile } from "@/lib/media-storage";
+import { isWhatsAppAudioType, transcodeToOpus } from "@/lib/audio-transcode";
 
 const messageSchema = z.object({ content: z.string().min(1).max(4000) });
 
@@ -117,13 +118,27 @@ export async function sendInboxAttachmentAction(
   }
 
   const caption = (formData.get("caption") as string | null) ?? "";
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const mimeType = file.type || "application/octet-stream";
+  let buffer = Buffer.from(await file.arrayBuffer());
+  let mimeType = file.type || "application/octet-stream";
+  let fileName = file.name;
   const outboundType = outboundTypeForMime(mimeType);
 
   const maxSize = MAX_SIZE_BY_TYPE[outboundType];
   if (file.size > maxSize) {
     return { error: `El archivo supera el límite de ${Math.round(maxSize / 1024 / 1024)}MB de WhatsApp para este tipo.` };
+  }
+
+  // Chrome graba las notas de voz en audio/webm, que WhatsApp rechaza.
+  // Se convierte a ogg/opus antes de subirla.
+  if (outboundType === "audio" && !isWhatsAppAudioType(mimeType)) {
+    try {
+      buffer = await transcodeToOpus(buffer);
+      mimeType = "audio/ogg";
+      fileName = fileName.replace(/\.[^.]+$/, "") + ".ogg";
+    } catch (error) {
+      console.error("[inbox] No se pudo convertir el audio:", error);
+      return { error: "No se pudo procesar el audio. Intenta de nuevo." };
+    }
   }
 
   const accessToken = decrypt(connection.accessToken);
@@ -136,7 +151,7 @@ export async function sendInboxAttachmentAction(
       accessToken,
       file: buffer,
       mimeType,
-      fileName: file.name,
+      fileName,
     });
 
     ({ messageId } = await sendMediaMessage({
@@ -146,7 +161,7 @@ export async function sendInboxAttachmentAction(
       type: outboundType,
       mediaId,
       caption: caption || undefined,
-      fileName: file.name,
+      fileName,
     }));
   } catch (error) {
     console.error(error);
@@ -165,7 +180,7 @@ export async function sendInboxAttachmentAction(
         mediaUrl: localUrl,
         mediaType: MEDIA_TYPE_MAP[outboundType],
         mimeType,
-        fileName: file.name,
+        fileName,
         sentById: session.user.id,
         externalId: messageId,
       },

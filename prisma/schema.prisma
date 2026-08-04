@@ -51,6 +51,7 @@ model User {
   assignedConversations   Conversation[]           @relation("ConversationAssignee")
   sentMessages            Message[]                @relation("MessageSender")
   conversationReads       ConversationRead[]
+  pushSubscriptions       PushSubscription[]
 
   @@index([organizationId])
   @@map("users")
@@ -207,6 +208,22 @@ model Conversation {
   @@index([customerPhone])
   @@index([assignedToId])
   @@map("conversations")
+}
+
+// Suscripción de Web Push por dispositivo/navegador — un mismo vendedor
+// puede tener varias (celular, laptop, etc.). Se borra sola cuando el
+// navegador la invalida (respuesta 404/410 al mandar la notificación).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique @db.Text
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 // Marca de "leído" por vendedor/admin — cada usuario tiene su propio

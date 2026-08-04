@@ -14,6 +14,7 @@ import { prisma } from "@/server/db/client";
 import { logoutAction } from "@/server/actions/logout";
 import { NavLink } from "@/components/layout/nav-link";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { SidebarToggle } from "@/components/layout/sidebar-toggle";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -86,18 +87,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex min-h-screen">
       {/* Sidebar fijo: solo escritorio */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface/60 px-3 py-5 md:flex">
+      <aside className="app-sidebar hidden w-60 shrink-0 flex-col border-r border-border bg-surface/60 px-3 py-5 md:flex">
         {navContent}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Barra superior con hamburguesa: solo móvil */}
-        <header className="flex items-center gap-2 border-b border-border bg-surface/80 px-2 py-2 backdrop-blur md:hidden">
+        {/* Hamburguesa en móvil; plegado del menú en escritorio. */}
+        <header className="flex items-center gap-2 border-b border-border bg-surface/80 px-2 py-2 backdrop-blur">
           <MobileNav>{navContent}</MobileNav>
-          <Logo size="sm" />
+          <SidebarToggle />
+          <span className="md:hidden">
+            <Logo size="sm" />
+          </span>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-8">
+        <main className="flex-1 overflow-y-auto px-4 py-5 md:px-6 md:py-6">
           {org?.suspended ? (
             <div className="mx-auto max-w-md rounded-lg border border-danger/40 bg-danger-dim px-6 py-8 text-center">
               <p className="mb-1 font-display text-lg font-semibold text-ink">

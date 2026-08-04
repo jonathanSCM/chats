@@ -193,7 +193,7 @@ export function TrackingTable({ rows, contacts, currentUserId, summary }: Props)
 function Th({ children, ai }: { children?: React.ReactNode; ai?: boolean }) {
   return (
     <th
-      className={`sticky top-0 z-10 whitespace-nowrap border-b border-border bg-surface px-2.5 py-2 text-left font-mono text-[10px] font-medium uppercase tracking-wide ${
+      className={`sticky top-0 z-20 whitespace-nowrap border-b border-border bg-surface px-2 py-2 text-left font-mono text-[10px] font-medium uppercase tracking-wide ${
         ai ? "text-accent" : "text-ink-muted"
       }`}
     >
@@ -204,7 +204,7 @@ function Th({ children, ai }: { children?: React.ReactNode; ai?: boolean }) {
 
 function Td({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
   return (
-    <td className={`border-b border-border/50 px-2.5 py-2 align-top ${className}`}>{children}</td>
+    <td className={`border-b border-border/50 px-2 py-2 align-top ${className}`}>{children}</td>
   );
 }
 
@@ -223,7 +223,7 @@ function TableRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
         {dateFmt(row.registeredAt)}
       </Td>
 
-      <Td className="max-w-[10rem]">
+      <Td className="sticky left-0 z-10 max-w-[9rem] bg-surface">
         <button
           type="button"
           onClick={onOpen}
@@ -250,7 +250,7 @@ function TableRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
           value={row.service}
           disabled={isPending}
           onChange={(e) => save("serviceInterest", e.target.value)}
-          className="w-32 py-1 text-xs"
+          className="w-28 py-1 text-xs"
         >
           <option value="">—</option>
           {SERVICES.map((s) => (
@@ -264,8 +264,8 @@ function TableRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
         </Select>
       </Td>
 
-      <Td className="max-w-[18rem]">
-        <p className="line-clamp-3 text-xs text-ink-muted">{row.need || "—"}</p>
+      <Td className="max-w-[13rem]">
+        <p className="line-clamp-2 text-xs text-ink-muted">{row.need || "—"}</p>
       </Td>
 
       <Td>
@@ -273,7 +273,7 @@ function TableRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
           value={row.stage}
           disabled={isPending}
           onChange={(e) => save("stage", e.target.value)}
-          className="w-36 py-1 text-xs font-medium"
+          className="w-32 py-1 text-xs font-medium"
           style={{ color: STAGE_COLOR[row.stage] }}
         >
           {ALL_STAGES.map((s) => (
@@ -284,8 +284,8 @@ function TableRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
         </Select>
       </Td>
 
-      <Td className="max-w-[20rem]">
-        <p className="line-clamp-3 text-xs text-ink-muted">{row.lastUpdate || "—"}</p>
+      <Td className="max-w-[13rem]">
+        <p className="line-clamp-2 text-xs text-ink-muted">{row.lastUpdate || "—"}</p>
       </Td>
 
       {/* ── Columnas del asesor IA ── */}
@@ -294,7 +294,7 @@ function TableRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
           value={row.priority ?? ""}
           disabled={isPending}
           onChange={(e) => save("priority", e.target.value)}
-          className="w-24 py-1 text-xs font-medium"
+          className="w-20 py-1 text-xs font-medium"
           style={{ color: row.priority ? PRIORITY_COLOR[row.priority] : undefined }}
         >
           <option value="">—</option>
@@ -310,7 +310,7 @@ function TableRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
           defaultValue={dateInputValue(row.nextContactAt)}
           disabled={isPending}
           onBlur={(e) => save("nextContactAt", e.target.value)}
-          className="w-36 py-1 text-xs"
+          className="w-32 py-1 text-xs"
         />
       </Td>
 
@@ -329,11 +329,11 @@ function TableRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
         </div>
       </Td>
 
-      <Td className="max-w-[20rem]">
-        <p className="line-clamp-3 text-xs text-ink-muted">{row.aiRecommendation || "—"}</p>
+      <Td className="max-w-[13rem]">
+        <p className="line-clamp-2 text-xs text-ink-muted">{row.aiRecommendation || "—"}</p>
       </Td>
 
-      <Td className="max-w-[20rem]">
+      <Td className="max-w-[13rem]">
         {row.aiSuggestedMessage ? (
           <CopyableMessage text={row.aiSuggestedMessage} />
         ) : (
@@ -359,7 +359,7 @@ function CopyableMessage({ text }: { text: string }) {
 
   return (
     <div className="flex items-start gap-1.5">
-      <p className="line-clamp-3 flex-1 text-xs text-ink-muted">{text}</p>
+      <p className="line-clamp-2 flex-1 text-xs text-ink-muted">{text}</p>
       <button
         type="button"
         onClick={() => {

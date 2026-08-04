@@ -170,3 +170,19 @@ body > * {
 .animate-pulse-dot {
   animation: pulse-dot 2s ease-in-out infinite;
 }
+
+/* Menú lateral plegable en escritorio. El estado vive en un data-attribute
+   del <html> puesto antes de hidratar, para que no parpadee al cargar. */
+:root[data-sidebar="closed"] .app-sidebar {
+  display: none;
+}
+
+/* El botón de plegado renderiza ambos íconos; el CSS muestra el correcto. */
+.icon-when-closed,
+:root[data-sidebar="closed"] .icon-when-open {
+  display: none;
+}
+
+:root[data-sidebar="closed"] .icon-when-closed {
+  display: block;
+}

@@ -46,13 +46,15 @@ export const viewport: Viewport = {
 };
 
 // Se ejecuta antes de hidratar React para evitar el flash del tema
-// equivocado (aplica la clase "dark" desde localStorage o preferencia del SO).
+// equivocado, y lo mismo con el menú lateral plegado: si se decidiera en
+// React, la barra aparecería y desaparecería en cada carga.
 const themeInitScript = `
 (function () {
   try {
     var stored = localStorage.getItem("theme");
     var isDark = stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
     document.documentElement.classList.toggle("dark", isDark);
+    document.documentElement.dataset.sidebar = localStorage.getItem("sidebar") || "open";
   } catch (e) {}
 })();
 `;

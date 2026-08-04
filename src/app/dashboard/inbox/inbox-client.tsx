@@ -16,10 +16,12 @@ import {
   Bell,
   Loader2,
   AlertTriangle,
+  PanelRight,
 } from "lucide-react";
 import { sendInboxMessageAction, sendInboxAttachmentAction } from "@/server/actions/inbox";
 import { vendorColor } from "@/lib/vendor-color";
 import { usePushNotifications } from "@/lib/use-push-notifications";
+import { ConversationPanel } from "./_components/conversation-panel";
 
 interface Vendor {
   id: string;
@@ -208,6 +210,8 @@ export function InboxClient({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [height, setHeight] = useState<number | null>(null);
+
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const [recording, setRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
@@ -445,7 +449,7 @@ export function InboxClient({
   return (
     <div
       ref={rootRef}
-      className="-mx-4 -mb-5 flex overflow-hidden md:-mx-8 md:-mb-8"
+      className="relative -mx-4 -mb-5 flex overflow-hidden md:-mx-8 md:-mb-8"
       style={{ height: height ? `${height}px` : "calc(100vh - 8rem)" }}
     >
       {/* Lista de conversaciones — pantalla completa en móvil, columna fija en escritorio */}
@@ -567,6 +571,17 @@ export function InboxClient({
                   {assignedTo.id === currentUserId ? "Tú" : assignedTo.name}
                 </span>
               )}
+              <button
+                type="button"
+                onClick={() => setPanelOpen((v) => !v)}
+                aria-label="Ficha del contacto"
+                title="Ficha del contacto"
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface-2 ${
+                  panelOpen ? "text-accent" : "text-ink-muted"
+                }`}
+              >
+                <PanelRight size={18} />
+              </button>
             </div>
 
             <div
@@ -708,6 +723,20 @@ export function InboxClient({
           </>
         )}
       </section>
+
+      {/* Ficha del contacto. En pantallas chicas ocupa todo el ancho para
+          no espachurrar el chat; en escritorio va como tercera columna. */}
+      {selectedId && panelOpen && (
+        <div className="absolute inset-0 z-20 flex lg:static lg:z-auto lg:w-80 lg:shrink-0">
+          <ConversationPanel
+            key={selectedId}
+            conversationId={selectedId}
+            currentUserId={currentUserId}
+            onClose={() => setPanelOpen(false)}
+            onChanged={fetchConversations}
+          />
+        </div>
+      )}
     </div>
   );
 }

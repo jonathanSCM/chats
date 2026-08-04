@@ -58,6 +58,7 @@ model User {
   conversationReads       ConversationRead[]
   pushSubscriptions       PushSubscription[]
   knowledgeEdits          KnowledgeItem[]          @relation("KnowledgeEditor")
+  conversationNotes       ConversationNote[]       @relation("NoteAuthor")
   ownedContacts           Contact[]                @relation("ContactOwner")
   ownedOpportunities      Opportunity[]            @relation("OpportunityOwner")
   ownedActivities         Activity[]               @relation("ActivityOwner")
@@ -218,6 +219,13 @@ model Conversation {
   contactId String?
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
+  status ConversationStatus @default(OPEN)
+  // Etiquetas libres para clasificar (el equipo ya usa "AGENTES IA",
+  // "SISTEMAS", "APP", "TAXI" en su planilla).
+  tags   String[]           @default([])
+
+  notes ConversationNote[]
+
   messages Message[]
   reads    ConversationRead[]
 
@@ -255,6 +263,28 @@ model ConversationRead {
 
   @@unique([conversationId, userId])
   @@map("conversation_reads")
+}
+
+enum ConversationStatus {
+  OPEN    // el cliente espera respuesta o el tema sigue vivo
+  ON_HOLD // pausada a propósito, se retoma después
+  CLOSED  // atendida; no aparece en la bandeja del día a día
+}
+
+// Nota interna del equipo: no se envía a WhatsApp. Equivale a la columna
+// "Última actualización" que el equipo mantiene a mano en su planilla, que
+// es donde de verdad vive el contexto de cada cliente.
+model ConversationNote {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?        @relation("NoteAuthor", fields: [userId], references: [id], onDelete: SetNull)
+  body           String       @db.Text
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("conversation_notes")
 }
 
 enum MessageRole {

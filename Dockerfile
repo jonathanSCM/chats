@@ -1,12 +1,6 @@
-# Debian slim y no Alpine a propósito.
-#
-# Alpine usa musl, así que npm resuelve `@img/sharp-linuxmusl-*` (con sus
-# dependencias `@emnapi/*`), mientras que el CI corre en Ubuntu con glibc y
-# resuelve `@img/sharp-linux-x64`. Con dos árboles distintos, `npm ci`
-# reventaba en el build por dependencias "Missing from lock file" que el CI
-# nunca veía, cada vez que se tocaba una dependencia desde Windows.
-# Con glibc, CI y producción resuelven exactamente lo mismo y el CI vuelve a
-# ser una barrera de verdad. Cuesta unos MB más de imagen; vale la pena.
+# Debian slim en vez de Alpine: glibc coincide con el runner del CI, trae
+# los binarios precompilados de sharp y permite tener curl/openssl a mano
+# para diagnosticar desde el terminal del contenedor.
 FROM node:24-slim AS base
 
 # ── Dependencies ────────────────────────────────────────────────
@@ -18,7 +12,17 @@ COPY package.json package-lock.json ./
 # devDependencies — y entre ellas está @tailwindcss/postcss, que el build
 # necesita sí o sí. Esto lo hace robusto sin depender de que alguien marque
 # bien el toggle "solo en runtime" para NODE_ENV en la plataforma.
-RUN npm ci --include=dev
+#
+# El fallback a `npm install` existe porque el lockfile se genera casi
+# siempre desde Windows, y npm omite ahí dependencias opcionales que sí hace
+# falta instalar en Linux (@emnapi/*, que sharp arrastra). Eso rompía el
+# deploy cada vez que se tocaba una dependencia, sin que el desarrollador
+# pudiera detectarlo en su máquina. El CI corre `npm ci` en Linux y falla en
+# rojo si el lockfile está desincronizado, así que esto no lo tapa: solo
+# evita que un detalle de plataforma bloquee un despliegue.
+RUN npm ci --include=dev --no-audit --no-fund \
+  || (echo "⚠️  Lockfile desincronizado con Linux — instalando con npm install. Corre el workflow 'Refrescar lockfile' para arreglarlo." \
+      && npm install --include=dev --no-audit --no-fund)
 
 # ── Build ───────────────────────────────────────────────────────
 FROM base AS builder

@@ -1,0 +1,43 @@
+name: Refrescar lockfile
+
+# El lockfile se genera casi siempre desde Windows, donde npm omite
+# dependencias opcionales que en Linux sí son necesarias (@emnapi/*, que
+# sharp arrastra). Eso no se puede detectar ni arreglar desde Windows: hay
+# que regenerarlo en Linux, que es lo que hace este workflow.
+#
+# Se dispara a mano desde la pestaña Actions de GitHub → "Refrescar
+# lockfile" → "Run workflow".
+
+on:
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # --package-lock-only: recalcula el lockfile sin bajar los paquetes.
+      - run: npm install --package-lock-only
+
+      # Comprueba que el resultado sirva de verdad para un `npm ci` en Linux,
+      # que es justo lo que hace el build de Docker.
+      - run: npm ci
+
+      - name: Commit si cambió
+        run: |
+          if git diff --quiet package-lock.json; then
+            echo "El lockfile ya estaba sincronizado con Linux."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "Regenerar package-lock.json desde Linux"
+          git push

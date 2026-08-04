@@ -3,7 +3,7 @@
 import { useActionState, useState, useTransition } from "react";
 import { Copy, Check, X } from "lucide-react";
 import { createInviteAction, revokeInviteAction } from "@/server/actions/team";
-import { Input, Label } from "@/components/ui/input";
+import { Input, Label, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, Thead, Th, Td, Tr } from "@/components/ui/table";
 
@@ -23,6 +23,13 @@ export function InvitePanel({ invites }: { invites: PendingInvite[] }) {
         <div className="flex-1 space-y-1.5">
           <Label htmlFor="email">Correo (opcional)</Label>
           <Input id="email" name="email" type="email" placeholder="persona@empresa.com" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="role">Rol</Label>
+          <Select id="role" name="role" defaultValue="MEMBER">
+            <option value="MEMBER">Vendedor</option>
+            <option value="OWNER">Admin</option>
+          </Select>
         </div>
         <Button type="submit" disabled={isPending}>
           {isPending ? "Generando…" : "Generar invitación"}

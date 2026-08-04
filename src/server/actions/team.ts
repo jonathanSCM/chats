@@ -21,7 +21,10 @@ async function requireOwner() {
   return { organizationId: session.user.organizationId, userId: session.user.id };
 }
 
-const inviteSchema = z.object({ email: z.string().email("Correo inválido").optional() });
+const inviteSchema = z.object({
+  email: z.string().email("Correo inválido").optional(),
+  role: z.enum(["OWNER", "MEMBER"]).default("MEMBER"),
+});
 
 export async function createInviteAction(
   _prevState: ActionState,
@@ -29,7 +32,10 @@ export async function createInviteAction(
 ): Promise<ActionState> {
   const { organizationId, userId } = await requireOwner();
 
-  const parsed = inviteSchema.safeParse({ email: formData.get("email") || undefined });
+  const parsed = inviteSchema.safeParse({
+    email: formData.get("email") || undefined,
+    role: formData.get("role") || undefined,
+  });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   }
@@ -39,7 +45,7 @@ export async function createInviteAction(
     data: {
       organizationId,
       email: parsed.data.email,
-      role: "MEMBER",
+      role: parsed.data.role,
       tokenHash,
       invitedById: userId,
       expiresAt: new Date(Date.now() + INVITE_TTL_MS),
@@ -87,6 +93,33 @@ export async function removeMemberAction(memberId: string): Promise<ActionState>
   }
 
   await prisma.user.update({ where: { id: memberId }, data: { organizationId: null } });
+  revalidatePath("/dashboard/organization");
+  return { error: null };
+}
+
+const roleSchema = z.enum(["OWNER", "MEMBER"]);
+
+export async function changeMemberRoleAction(
+  memberId: string,
+  role: "OWNER" | "MEMBER",
+): Promise<ActionState> {
+  const { organizationId, userId } = await requireOwner();
+
+  if (memberId === userId) {
+    return { error: "No puedes cambiar tu propio rol" };
+  }
+
+  const parsedRole = roleSchema.safeParse(role);
+  if (!parsedRole.success) {
+    return { error: "Rol inválido" };
+  }
+
+  const member = await prisma.user.findUnique({ where: { id: memberId } });
+  if (!member || member.organizationId !== organizationId) {
+    return { error: "Miembro no encontrado" };
+  }
+
+  await prisma.user.update({ where: { id: memberId }, data: { role: parsedRole.data } });
   revalidatePath("/dashboard/organization");
   return { error: null };
 }

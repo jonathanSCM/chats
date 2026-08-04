@@ -2,16 +2,10 @@
 
 import { useTransition } from "react";
 import { UserX } from "lucide-react";
-import { removeMemberAction } from "@/server/actions/team";
-import { Badge } from "@/components/ui/badge";
+import { removeMemberAction, changeMemberRoleAction } from "@/server/actions/team";
+import { Select } from "@/components/ui/input";
 import { Table, Thead, Th, Td, Tr } from "@/components/ui/table";
 import { vendorColor } from "@/lib/vendor-color";
-
-const roleLabel: Record<string, string> = {
-  SUPERADMIN: "Superadmin",
-  OWNER: "Admin",
-  MEMBER: "Vendedor",
-};
 
 interface Member {
   id: string;
@@ -62,12 +56,27 @@ function MemberRow({ member, isSelf }: { member: Member; isSelf: boolean }) {
       </Td>
       <Td className="text-ink-muted">{member.email}</Td>
       <Td>
-        <Badge tone={member.role === "OWNER" ? "accent" : "neutral"}>
-          {roleLabel[member.role] ?? member.role}
-        </Badge>
+        {isSelf ? (
+          <span className="text-sm text-ink-muted">{member.role === "OWNER" ? "Admin" : "Vendedor"}</span>
+        ) : (
+          <Select
+            defaultValue={member.role}
+            disabled={isPending}
+            className="w-32 py-1.5 text-xs"
+            onChange={(e) => {
+              const role = e.target.value as "OWNER" | "MEMBER";
+              startTransition(async () => {
+                await changeMemberRoleAction(member.id, role);
+              });
+            }}
+          >
+            <option value="OWNER">Admin</option>
+            <option value="MEMBER">Vendedor</option>
+          </Select>
+        )}
       </Td>
       <Td>
-        {!isSelf && member.role !== "OWNER" && (
+        {!isSelf && (
           <button
             type="button"
             disabled={isPending}

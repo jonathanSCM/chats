@@ -1,83 +1,58 @@
 @import "tailwindcss";
 
+/* La paleta de todo el panel (no solo el inbox) se adaptó de WhatsApp Web:
+   mismo verde-azulado de acento en ambos temas (WhatsApp no cambia su verde
+   entre claro/oscuro) y los grises fríos característicos en vez del
+   blanco/negro puro que había antes. Las variables --wa-* de abajo cubren
+   lo que sigue siendo específico del chat (el papel tapiz del hilo y el
+   verde de las burbujas enviadas, que en WhatsApp real es distinto del
+   verde de los botones). */
 :root {
-  --canvas: #f7f7f4;
+  --canvas: #eef2f3;
   --surface: #ffffff;
-  --surface-2: #eeeeea;
-  --border: #e0e0da;
-  --border-strong: #c7c7be;
-  --ink: #17171a;
-  --ink-muted: #57575d;
-  --ink-faint: #8b8b90;
+  --surface-2: #f0f2f5;
+  --border: #e9edef;
+  --border-strong: #d1d7db;
+  --ink: #111b21;
+  --ink-muted: #667781;
+  --ink-faint: #8696a0;
 
-  --accent: #5c7a1f;
+  --accent: #00a884;
   --accent-ink: #ffffff;
-  --accent-dim: #7e8f2e;
+  --accent-dim: #06cf9c;
 
   --warning: #a3650a;
   --warning-dim: #fdf3e0;
   --danger: #c62828;
   --danger-dim: #fbe3e3;
 
-  /* Paleta solo para la bandeja de chats (src/app/dashboard/inbox): imita
-     los colores de WhatsApp Web para que el equipo reconozca la interfaz al
-     instante. No toca --accent/--surface, que sigue usando el resto del
-     panel (botones, Seguimiento, etc). */
-  --wa-panel-bg: #ffffff;
-  --wa-panel-header: #f0f2f5;
-  --wa-row-hover: #f5f6f6;
-  --wa-row-active: #f0f2f5;
-  --wa-divider: #e9edef;
   --wa-wallpaper: #efeae2;
   --wa-wallpaper-dot: rgb(0 0 0 / 4.5%);
   --wa-bubble-out: #d9fdd3;
-  --wa-bubble-out-ink: #111b21;
-  --wa-bubble-in: #ffffff;
-  --wa-bubble-in-ink: #111b21;
-  --wa-composer-bg: #f0f2f5;
-  --wa-composer-field: #ffffff;
-  --wa-green: #00a884;
-  --wa-green-ink: #ffffff;
-  --wa-badge: #25d366;
-  --wa-badge-ink: #ffffff;
 }
 
 .dark {
-  --canvas: #0a0a0b;
-  --surface: #131316;
-  --surface-2: #1c1c21;
-  --border: #27272d;
-  --border-strong: #38383f;
-  --ink: #f3f2ec;
-  --ink-muted: #96959d;
-  --ink-faint: #616167;
+  --canvas: #0b141a;
+  --surface: #111b21;
+  --surface-2: #202c33;
+  --border: #222d34;
+  --border-strong: #2a3942;
+  --ink: #e9edef;
+  --ink-muted: #8696a0;
+  --ink-faint: #667781;
 
-  --accent: #d4ff3d;
-  --accent-ink: #0a0a0b;
-  --accent-dim: #7e8f2e;
+  --accent: #00a884;
+  --accent-ink: #ffffff;
+  --accent-dim: #06cf9c;
 
   --warning: #ffb020;
   --warning-dim: #40320f;
   --danger: #ff5d5d;
   --danger-dim: #4a2323;
 
-  --wa-panel-bg: #111b21;
-  --wa-panel-header: #202c33;
-  --wa-row-hover: #202c33;
-  --wa-row-active: #2a3942;
-  --wa-divider: #222d34;
   --wa-wallpaper: #0b141a;
   --wa-wallpaper-dot: rgb(255 255 255 / 3.5%);
   --wa-bubble-out: #005c4b;
-  --wa-bubble-out-ink: #e9edef;
-  --wa-bubble-in: #202c33;
-  --wa-bubble-in-ink: #e9edef;
-  --wa-composer-bg: #202c33;
-  --wa-composer-field: #2a3942;
-  --wa-green: #00a884;
-  --wa-green-ink: #ffffff;
-  --wa-badge: #25d366;
-  --wa-badge-ink: #0b141a;
 }
 
 @theme inline {

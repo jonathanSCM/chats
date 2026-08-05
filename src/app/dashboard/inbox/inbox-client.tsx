@@ -27,6 +27,7 @@ import { ConversationPanel } from "./_components/conversation-panel";
 interface Vendor {
   id: string;
   name: string;
+  color: string | null;
 }
 
 interface ConversationSummary {
@@ -573,7 +574,7 @@ export function InboxClient({
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{
                     backgroundColor: c.assignedTo
-                      ? vendorColor(c.assignedTo.id)
+                      ? vendorColor(c.assignedTo.id, c.assignedTo.color)
                       : "var(--color-ink-faint)",
                   }}
                 />
@@ -621,7 +622,7 @@ export function InboxClient({
               {assignedTo && (
                 <span
                   className="max-w-[7rem] shrink-0 truncate rounded-full px-2.5 py-1 text-xs font-medium text-white"
-                  style={{ backgroundColor: vendorColor(assignedTo.id) }}
+                  style={{ backgroundColor: vendorColor(assignedTo.id, assignedTo.color) }}
                 >
                   {assignedTo.id === currentUserId ? "Tú" : assignedTo.name}
                 </span>

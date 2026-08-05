@@ -15,7 +15,7 @@ export default async function OrganizationSettingsPage() {
     prisma.organization.findUniqueOrThrow({ where: { id: session.user.organizationId } }),
     prisma.user.findMany({
       where: { organizationId: session.user.organizationId },
-      select: { id: true, name: true, email: true, role: true },
+      select: { id: true, name: true, email: true, role: true, color: true },
       orderBy: { createdAt: "asc" },
     }),
     prisma.organizationInvite.findMany({

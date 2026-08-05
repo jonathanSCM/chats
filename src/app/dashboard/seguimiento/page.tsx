@@ -20,7 +20,7 @@ export default async function SeguimientoPage() {
       where: { organizationId, ...scope },
       include: {
         contact: { select: { id: true, fullName: true, phone: true, city: true } },
-        assignedTo: { select: { id: true, name: true, email: true } },
+        assignedTo: { select: { id: true, name: true, email: true, color: true } },
       },
       orderBy: [{ nextContactAt: "asc" }, { updatedAt: "desc" }],
     }),
@@ -49,7 +49,7 @@ export default async function SeguimientoPage() {
     aiRecommendation: o.aiRecommendation ?? "",
     aiSuggestedMessage: o.aiSuggestedMessage ?? "",
     assignedTo: o.assignedTo
-      ? { id: o.assignedTo.id, name: o.assignedTo.name || o.assignedTo.email }
+      ? { id: o.assignedTo.id, name: o.assignedTo.name || o.assignedTo.email, color: o.assignedTo.color }
       : null,
   }));
 

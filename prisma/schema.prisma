@@ -45,8 +45,16 @@ model User {
   email          String        @unique
   passwordHash   String?
   name           String?
-  role           UserRole      @default(OWNER)
+  // MEMBER, no OWNER: el default debe ser el rol menos privilegiado. Los dos
+  // flujos que crean usuarios (signup.ts, team.ts) siempre pasan `role`
+  // explícito, así que esto solo protege un camino futuro que lo olvide.
+  role           UserRole      @default(MEMBER)
   emailVerified  DateTime?
+  // Color fijo para identificar al vendedor de un vistazo (asignaciones,
+  // avatares, notas). Si es null, se deriva un color determinístico del id
+  // (ver src/lib/vendor-color.ts) — así nadie tiene que elegir uno antes de
+  // que exista esta opción.
+  color          String?
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime      @default(now())

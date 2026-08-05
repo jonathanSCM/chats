@@ -20,7 +20,7 @@ export async function GET() {
     orderBy: { lastMessageAt: "desc" },
     include: {
       messages: { orderBy: { createdAt: "desc" }, take: 1 },
-      assignedTo: { select: { id: true, name: true, email: true } },
+      assignedTo: { select: { id: true, name: true, email: true, color: true } },
       reads: { where: { userId }, select: { lastReadAt: true } },
     },
   });
@@ -33,7 +33,11 @@ export async function GET() {
         customerName: c.customerName,
         lastMessageAt: c.lastMessageAt,
         assignedTo: c.assignedTo
-          ? { id: c.assignedTo.id, name: c.assignedTo.name || c.assignedTo.email }
+          ? {
+              id: c.assignedTo.id,
+              name: c.assignedTo.name || c.assignedTo.email,
+              color: c.assignedTo.color,
+            }
           : null,
         unreadCount: await prisma.message.count({
           where: {

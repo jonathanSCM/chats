@@ -38,7 +38,7 @@ export interface Row {
   probability: number | null;
   aiRecommendation: string;
   aiSuggestedMessage: string;
-  assignedTo: { id: string; name: string } | null;
+  assignedTo: { id: string; name: string; color: string | null } | null;
 }
 
 interface Props {
@@ -264,7 +264,7 @@ function TableRow({
           <span className="mt-1 flex items-center gap-1.5 text-[11px] text-ink-faint">
             <span
               className="h-1.5 w-1.5 rounded-full"
-              style={{ backgroundColor: vendorColor(row.assignedTo.id) }}
+              style={{ backgroundColor: vendorColor(row.assignedTo.id, row.assignedTo.color) }}
             />
             {row.assignedTo.name}
           </span>
@@ -624,7 +624,7 @@ function DetailPanel({
             <p className="flex items-center gap-1.5 text-xs text-ink-muted">
               <span
                 className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: vendorColor(row.assignedTo.id) }}
+                style={{ backgroundColor: vendorColor(row.assignedTo.id, row.assignedTo.color) }}
               />
               {row.assignedTo.id === currentUserId ? "Tú" : row.assignedTo.name}
             </p>

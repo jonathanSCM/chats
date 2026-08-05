@@ -97,6 +97,36 @@ export async function removeMemberAction(memberId: string): Promise<ActionState>
   return { error: null };
 }
 
+const colorSchema = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, "Color inválido");
+
+/**
+ * Cualquiera puede fijar su propio color; el dueño además puede fijar el
+ * de otros (útil si alguien todavía no entró a elegir el suyo).
+ */
+export async function updateUserColorAction(userId: string, color: string): Promise<ActionState> {
+  const session = await requireSession();
+  if (!session.user.organizationId) return { error: "Sin organización" };
+
+  const member = await prisma.user.findUnique({ where: { id: userId } });
+  if (!member || member.organizationId !== session.user.organizationId) {
+    return { error: "Miembro no encontrado" };
+  }
+
+  const isOwner = session.user.role === "OWNER";
+  if (userId !== session.user.id && !isOwner) {
+    return { error: "No puedes cambiar el color de otro miembro" };
+  }
+
+  const parsed = colorSchema.safeParse(color);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Color inválido" };
+
+  await prisma.user.update({ where: { id: userId }, data: { color: parsed.data } });
+  revalidatePath("/dashboard/organization");
+  return { error: null };
+}
+
 const roleSchema = z.enum(["OWNER", "MEMBER"]);
 
 export async function changeMemberRoleAction(

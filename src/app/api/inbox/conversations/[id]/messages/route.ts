@@ -12,7 +12,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const conversation = await prisma.conversation.findUnique({
     where: { id },
-    include: { bot: true, assignedTo: { select: { id: true, name: true, email: true } } },
+    include: { bot: true, assignedTo: { select: { id: true, name: true, email: true, color: true } } },
   });
 
   if (!conversation || conversation.bot.organizationId !== session.user.organizationId) {
@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const messages = await prisma.message.findMany({
     where: { conversationId: id },
     orderBy: { createdAt: "asc" },
-    include: { sentBy: { select: { id: true, name: true, email: true } } },
+    include: { sentBy: { select: { id: true, name: true, email: true, color: true } } },
   });
 
   await prisma.conversationRead.upsert({
@@ -43,7 +43,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       customerPhone: conversation.customerPhone,
       customerName: conversation.customerName,
       assignedTo: conversation.assignedTo
-        ? { id: conversation.assignedTo.id, name: conversation.assignedTo.name || conversation.assignedTo.email }
+        ? {
+            id: conversation.assignedTo.id,
+            name: conversation.assignedTo.name || conversation.assignedTo.email,
+            color: conversation.assignedTo.color,
+          }
         : null,
     },
     messages: messages.map((m) => ({
@@ -58,7 +62,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       fileName: m.fileName,
       viaPhoneApp: m.viaPhoneApp,
       isHistorical: m.isHistorical,
-      sentBy: m.sentBy ? { id: m.sentBy.id, name: m.sentBy.name || m.sentBy.email } : null,
+      sentBy: m.sentBy
+        ? { id: m.sentBy.id, name: m.sentBy.name || m.sentBy.email, color: m.sentBy.color }
+        : null,
       status: m.status,
     })),
   });

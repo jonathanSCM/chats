@@ -50,7 +50,7 @@ interface PanelData {
     id: string;
     body: string;
     createdAt: string;
-    author: { id: string; name: string } | null;
+    author: { id: string; name: string; color: string | null } | null;
   }[];
   team: { id: string; name: string }[];
 }
@@ -352,7 +352,7 @@ export function ConversationPanel({
                     {note.author && (
                       <span
                         className="h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: vendorColor(note.author.id) }}
+                        style={{ backgroundColor: vendorColor(note.author.id, note.author.color) }}
                       />
                     )}
                     {note.author?.name ?? "Sistema"} ·{" "}

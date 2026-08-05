@@ -37,7 +37,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         },
       },
       notes: {
-        include: { user: { select: { id: true, name: true, email: true } } },
+        include: { user: { select: { id: true, name: true, email: true, color: true } } },
         orderBy: { createdAt: "desc" },
       },
     },
@@ -87,7 +87,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       id: n.id,
       body: n.body,
       createdAt: n.createdAt.toISOString(),
-      author: n.user ? { id: n.user.id, name: n.user.name || n.user.email } : null,
+      author: n.user
+        ? { id: n.user.id, name: n.user.name || n.user.email, color: n.user.color }
+        : null,
     })),
     team: team.map((u) => ({ id: u.id, name: u.name || u.email })),
   });

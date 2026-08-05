@@ -19,6 +19,7 @@ import {
   PanelRight,
 } from "lucide-react";
 import { sendInboxMessageAction, sendInboxAttachmentAction } from "@/server/actions/inbox";
+import { deleteMessageAction } from "@/server/actions/conversation-panel";
 import { vendorColor } from "@/lib/vendor-color";
 import { usePushNotifications } from "@/lib/use-push-notifications";
 import { ConversationPanel } from "./_components/conversation-panel";
@@ -212,6 +213,8 @@ export function InboxClient({
   const [height, setHeight] = useState<number | null>(null);
 
   const [panelOpen, setPanelOpen] = useState(false);
+  const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState<string | null>(null);
+  const confirmDeleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [recording, setRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
@@ -446,6 +449,33 @@ export function InboxClient({
     e.target.value = "";
   }
 
+  // Doble toque para confirmar, mismo patrón que "Eliminar chat": el primer
+  // toque arma el borrado por 3s, el segundo lo ejecuta.
+  function handleDeleteMessage(messageId: string) {
+    if (confirmDeleteMessageId !== messageId) {
+      setConfirmDeleteMessageId(messageId);
+      if (confirmDeleteTimeoutRef.current) clearTimeout(confirmDeleteTimeoutRef.current);
+      confirmDeleteTimeoutRef.current = setTimeout(() => setConfirmDeleteMessageId(null), 3000);
+      return;
+    }
+    setConfirmDeleteMessageId(null);
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    deleteMessageAction(messageId).then((result) => {
+      if (result.error) {
+        setError(result.error);
+        if (selectedIdRef.current) fetchMessages(selectedIdRef.current);
+      }
+    });
+  }
+
+  function handleConversationDeleted() {
+    const deletedId = selectedIdRef.current;
+    setPanelOpen(false);
+    setSelectedId(null);
+    setConversations((prev) => prev.filter((c) => c.id !== deletedId));
+    fetchConversations();
+  }
+
   return (
     <div
       ref={rootRef}
@@ -590,8 +620,24 @@ export function InboxClient({
             >
               {messages.map((m) => {
                 const mine = m.role === "STAFF" || m.role === "BOT";
+                const confirming = confirmDeleteMessageId === m.id;
                 return (
-                  <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                  <div
+                    key={m.id}
+                    className={`group flex items-center gap-1.5 ${mine ? "justify-end" : "justify-start"}`}
+                  >
+                    {mine && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMessage(m.id)}
+                        title={confirming ? "¿Seguro? Toca de nuevo" : "Borrar mensaje"}
+                        className={`shrink-0 rounded-full p-1 opacity-0 transition-opacity group-hover:opacity-100 active:opacity-100 ${
+                          confirming ? "opacity-100 text-danger" : "text-ink-faint hover:text-danger"
+                        }`}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                     <div
                       className={`max-w-[85%] rounded-lg px-3 py-2 text-sm md:max-w-[70%] ${
                         mine ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink"
@@ -622,6 +668,18 @@ export function InboxClient({
                         {m.role === "STAFF" && !m.viaPhoneApp && <StatusTicks status={m.status} />}
                       </div>
                     </div>
+                    {!mine && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMessage(m.id)}
+                        title={confirming ? "¿Seguro? Toca de nuevo" : "Borrar mensaje"}
+                        className={`shrink-0 rounded-full p-1 opacity-0 transition-opacity group-hover:opacity-100 active:opacity-100 ${
+                          confirming ? "opacity-100 text-danger" : "text-ink-faint hover:text-danger"
+                        }`}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -734,6 +792,7 @@ export function InboxClient({
             currentUserId={currentUserId}
             onClose={() => setPanelOpen(false)}
             onChanged={fetchConversations}
+            onDeleted={handleConversationDeleted}
           />
         </div>
       )}

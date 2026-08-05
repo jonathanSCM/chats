@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
 const MEDIA_DIR = path.join(process.cwd(), "public", "media");
 
@@ -115,6 +115,33 @@ export async function readMediaFileFromS3(
     return { body: res.Body.transformToWebStream(), contentType: res.ContentType };
   } catch {
     return null;
+  }
+}
+
+// Usado al borrar un mensaje: limpia el archivo asociado para no dejar
+// basura huérfana en el bucket o en disco. `mediaUrl` guarda `/api/media/{f}`
+// (S3) o `/media/{f}` (disco local) — el nombre de archivo es lo último del
+// path en ambos casos.
+export async function deleteMediaFile(mediaUrl: string): Promise<void> {
+  const fileName = mediaUrl.split("/").pop();
+  if (!fileName) return;
+
+  const config = s3Config();
+  if (config) {
+    try {
+      const client = getS3Client(config);
+      await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: `media/${fileName}` }));
+    } catch (error) {
+      console.error("[media-storage] No se pudo borrar de S3:", error);
+    }
+    return;
+  }
+
+  try {
+    await unlink(path.join(MEDIA_DIR, fileName));
+  } catch {
+    // Ya no existe o nunca se guardó en disco (por ejemplo, si se cambió de
+    // S3 a disco local después de que se subió el archivo) — no es un error.
   }
 }
 

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { audit } from "@/server/services/audit";
+import { deleteMediaFile } from "@/lib/media-storage";
 import type { ActionState } from "./types";
 
 /**
@@ -160,6 +161,74 @@ export async function transferConversationAction(
     before: { assignedToId: access.conversation.assignedToId },
     after: { assignedToId: userId },
   });
+
+  return { error: null };
+}
+
+/**
+ * Borra el chat entero (mensajes, notas y marcas de leído caen en cascada
+ * por la FK). Es irreversible, así que la UI debe pedir doble confirmación
+ * antes de llamar esto.
+ */
+export async function deleteConversationAction(conversationId: string): Promise<ActionState> {
+  const access = await requireConversationAccess(conversationId);
+  if (!access) return { error: "Conversación no encontrada" };
+
+  const mediaUrls = (
+    await prisma.message.findMany({
+      where: { conversationId, mediaUrl: { not: null } },
+      select: { mediaUrl: true },
+    })
+  ).map((m) => m.mediaUrl!);
+
+  await prisma.conversation.delete({ where: { id: conversationId } });
+
+  await audit({
+    entityType: "Conversation",
+    entityId: conversationId,
+    action: "delete",
+    userId: access.session.user.id,
+    organizationId: access.organizationId,
+    before: {
+      customerPhone: access.conversation.customerPhone,
+      customerName: access.conversation.customerName,
+      status: access.conversation.status,
+    },
+  });
+
+  await Promise.allSettled(mediaUrls.map((url) => deleteMediaFile(url)));
+
+  return { error: null };
+}
+
+/** Borra un mensaje suelto (y su archivo adjunto, si tenía). */
+export async function deleteMessageAction(messageId: string): Promise<ActionState> {
+  const session = await requireSession();
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { conversation: { include: { bot: { select: { organizationId: true } } } } },
+  });
+  if (!message || message.conversation.bot.organizationId !== session.user.organizationId) {
+    return { error: "Mensaje no encontrado" };
+  }
+
+  const isAdmin = session.user.role === "OWNER" || session.user.role === "SUPERADMIN";
+  const isMine = !message.conversation.assignedToId || message.conversation.assignedToId === session.user.id;
+  if (!isAdmin && !isMine) return { error: "No puedes borrar mensajes de este chat" };
+
+  await prisma.message.delete({ where: { id: messageId } });
+
+  await audit({
+    entityType: "Message",
+    entityId: messageId,
+    action: "delete",
+    userId: session.user.id,
+    organizationId: session.user.organizationId,
+    before: { role: message.role, content: message.content.slice(0, 200) },
+  });
+
+  if (message.mediaUrl) await deleteMediaFile(message.mediaUrl);
 
   return { error: null };
 }

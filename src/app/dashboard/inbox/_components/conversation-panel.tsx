@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import {
   addConversationNoteAction,
+  deleteConversationAction,
   deleteConversationNoteAction,
   setConversationStatusAction,
   setConversationTagsAction,
@@ -74,16 +75,19 @@ export function ConversationPanel({
   currentUserId,
   onClose,
   onChanged,
+  onDeleted,
 }: {
   conversationId: string;
   currentUserId: string;
   onClose: () => void;
   onChanged: () => void;
+  onDeleted: () => void;
 }) {
   const [data, setData] = useState<PanelData | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [newTag, setNewTag] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Se recarga subiendo el token en vez de llamar a una función que haga
   // setState: así el fetch vive dentro del efecto y se cancela al desmontar.
@@ -122,6 +126,20 @@ export function ConversationPanel({
         reload();
         onChanged();
       }
+    });
+  }
+
+  function handleDeleteConversation() {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteConversationAction(conversationId);
+      if (result.error) setError(result.error);
+      else onDeleted();
     });
   }
 
@@ -361,6 +379,19 @@ export function ConversationPanel({
               <p className="text-[11px] text-ink-faint">Todavía no hay notas.</p>
             )}
           </div>
+        </div>
+
+        {/* Zona peligrosa */}
+        <div className="border-t border-border pt-4">
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={handleDeleteConversation}
+            className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-danger/30 px-3 py-2 text-xs text-danger transition-colors hover:bg-danger-dim disabled:opacity-50"
+          >
+            <Trash2 size={13} />
+            {confirmDelete ? "¿Seguro? Toca de nuevo — se borra todo" : "Eliminar chat"}
+          </button>
         </div>
       </div>
     </aside>

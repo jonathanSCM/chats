@@ -23,6 +23,9 @@ self.addEventListener("push", (event) => {
       // reemplazan la notificación anterior en vez de apilarse.
       tag: payload.conversationId ?? "general",
       renotify: true,
+      // Sin esto, Windows la retira del Action Center a los pocos segundos
+      // si no hay interacción — se queda hasta que alguien la toca o cierra.
+      requireInteraction: true,
       data: { conversationId: payload.conversationId },
     }),
   );

@@ -46,6 +46,16 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
             keys: { p256dh: sub.p256dh, auth: sub.auth },
           },
           JSON.stringify(payload),
+          {
+            // "high" le pide al push service (FCM/etc.) que despierte al
+            // dispositivo y entregue ya, en vez de esperar una ventana de
+            // bajo consumo — es la única palanca real que da el protocolo
+            // para pedir entrega inmediata.
+            urgency: "high",
+            // Un mensaje nuevo sin responder pierde sentido si se entrega
+            // horas después; mejor que expire a que llegue tarde y confunda.
+            TTL: 60 * 30,
+          },
         );
       } catch (error) {
         const statusCode = (error as { statusCode?: number }).statusCode;

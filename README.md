@@ -122,6 +122,21 @@ el campo de texto está vacío). Chrome graba en `audio/webm`, que la Cloud API 
 rechaza, así que el servidor las convierte a ogg/opus con **ffmpeg** — ya viene instalado en
 la imagen de Docker. Para desarrollo local hay que tener `ffmpeg` en el PATH.
 
+## Perfil de negocio de WhatsApp
+
+Desde **Conexión WhatsApp**, el dueño de la organización puede editar el perfil que ve el
+cliente al abrir el chat: foto, estado ("about"), descripción, dirección, correo, hasta dos
+sitios web y la categoría del negocio. Solo aparece si el número ya está conectado y
+verificado — sin eso no hay `phone_number_id`/token contra el cual pedirle el perfil a Meta.
+
+La foto no se sube por el mismo endpoint que los adjuntos de mensajes: usa la Resumable
+Upload API de Meta (dos pasos — abrir sesión contra la App, mandar el archivo, obtener un
+`handle`) antes de fijarla como `profile_picture_handle`. Acepta JPEG/PNG hasta 5 MB.
+
+Si Meta responde con error (token sin el permiso `whatsapp_business_management`, número
+recién conectado, etc.), la página no se cae — se muestra un aviso y el resto sigue
+funcionando normal.
+
 ## Coexistence — usar el número que ya está en el celular
 
 Con Coexistence, un negocio conecta su número al panel **sin dejar de usar la app de WhatsApp

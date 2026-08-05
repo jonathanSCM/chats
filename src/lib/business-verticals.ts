@@ -1,0 +1,21 @@
+/** Categorías que acepta la Graph API de Meta para el campo `vertical` del perfil de negocio. */
+export const BUSINESS_VERTICALS = [
+  { value: "UNDEFINED", label: "Sin definir" },
+  { value: "OTHER", label: "Otro" },
+  { value: "AUTO", label: "Automotriz" },
+  { value: "BEAUTY", label: "Belleza, spa y salón" },
+  { value: "APPAREL", label: "Ropa y accesorios" },
+  { value: "EDU", label: "Educación" },
+  { value: "ENTERTAIN", label: "Entretenimiento" },
+  { value: "EVENT_PLAN", label: "Organización de eventos" },
+  { value: "FINANCE", label: "Finanzas y banca" },
+  { value: "GROCERY", label: "Supermercado" },
+  { value: "GOVT", label: "Gobierno" },
+  { value: "HOTEL", label: "Hotel y alojamiento" },
+  { value: "HEALTH", label: "Salud" },
+  { value: "NONPROFIT", label: "Sin fines de lucro" },
+  { value: "PROF_SERVICES", label: "Servicios profesionales" },
+  { value: "RETAIL", label: "Comercio minorista" },
+  { value: "TRAVEL", label: "Viajes y transporte" },
+  { value: "RESTAURANT", label: "Restaurante" },
+] as const;

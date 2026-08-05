@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
+import { getBusinessProfileForBot } from "@/server/actions/business-profile";
 import { WhatsAppTab } from "./_components/whatsapp-tab";
 import { CopyField } from "./_components/copy-field";
+import { BusinessProfileForm } from "./_components/business-profile-form";
 import { Card, CardTitle } from "@/components/ui/card";
 
 // En esta variante no hay concepto de "bots" a nivel de UI: cada
@@ -41,6 +43,19 @@ export default async function WhatsAppSettingsPage() {
   const webhookUrl = `${process.env.NEXTAUTH_URL ?? ""}/api/webhooks/whatsapp`;
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN ?? "";
 
+  // Se pide aparte (no bloquea el resto de la página si Meta falla o el
+  // token todavía no tiene el permiso whatsapp_business_management).
+  let businessProfile = null;
+  let businessProfileError: string | null = null;
+  if (isOwner && bot?.whatsappConnection?.verified) {
+    try {
+      businessProfile = await getBusinessProfileForBot(bot.id);
+    } catch (error) {
+      console.error("[whatsapp] No se pudo cargar el perfil de negocio:", error);
+      businessProfileError = "No se pudo cargar el perfil de negocio desde Meta.";
+    }
+  }
+
   return (
     <div className="max-w-2xl animate-fade-up">
       <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">
@@ -64,6 +79,15 @@ export default async function WhatsAppSettingsPage() {
         <p className="text-sm text-ink-faint">
           Todavía no hay WhatsApp configurado. Pide al dueño de la cuenta que lo conecte.
         </p>
+      )}
+
+      {businessProfile && bot && (
+        <div className="mt-6">
+          <BusinessProfileForm botId={bot.id} profile={businessProfile} />
+        </div>
+      )}
+      {businessProfileError && (
+        <p className="mt-6 text-sm text-warning">{businessProfileError}</p>
       )}
     </div>
   );

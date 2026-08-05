@@ -680,3 +680,132 @@ export async function subscribeAppToWaba(params: {
     throw new Error(`No se pudo suscribir la app a la WABA (${res.status}): ${errorBody}`);
   }
 }
+
+// ─── Perfil de negocio (foto, descripción, dirección, etc.) ─────
+//
+// Es el perfil que ve el cliente al abrir el chat — distinto del catálogo
+// interno de la app. Meta expone hasta 2 sitios web y una categoría fija
+// (vertical) por WABA.
+
+const BUSINESS_PROFILE_FIELDS =
+  "about,address,description,email,profile_picture_url,websites,vertical";
+
+export interface BusinessProfile {
+  about: string;
+  address: string;
+  description: string;
+  email: string;
+  profilePictureUrl: string | null;
+  websites: string[];
+  vertical: string;
+}
+
+export async function getBusinessProfile(params: {
+  phoneNumberId: string;
+  accessToken: string;
+}): Promise<BusinessProfile> {
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_API_VERSION}/${params.phoneNumberId}/whatsapp_business_profile?fields=${BUSINESS_PROFILE_FIELDS}`,
+    { headers: { Authorization: `Bearer ${params.accessToken}` } },
+  );
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`No se pudo leer el perfil de negocio (${res.status}): ${errorBody}`);
+  }
+
+  const data = (await res.json()) as { data?: Record<string, unknown>[] };
+  const profile = data.data?.[0] ?? {};
+
+  return {
+    about: (profile.about as string) ?? "",
+    address: (profile.address as string) ?? "",
+    description: (profile.description as string) ?? "",
+    email: (profile.email as string) ?? "",
+    profilePictureUrl: (profile.profile_picture_url as string) ?? null,
+    websites: (profile.websites as string[]) ?? [],
+    vertical: (profile.vertical as string) ?? "UNDEFINED",
+  };
+}
+
+export async function updateBusinessProfile(params: {
+  phoneNumberId: string;
+  accessToken: string;
+  data: Partial<{
+    about: string;
+    address: string;
+    description: string;
+    email: string;
+    websites: string[];
+    vertical: string;
+    profilePictureHandle: string;
+  }>;
+}): Promise<void> {
+  const body: Record<string, unknown> = { messaging_product: "whatsapp" };
+  if (params.data.about !== undefined) body.about = params.data.about;
+  if (params.data.address !== undefined) body.address = params.data.address;
+  if (params.data.description !== undefined) body.description = params.data.description;
+  if (params.data.email !== undefined) body.email = params.data.email;
+  if (params.data.websites !== undefined) body.websites = params.data.websites;
+  if (params.data.vertical !== undefined) body.vertical = params.data.vertical;
+  if (params.data.profilePictureHandle !== undefined) {
+    body.profile_picture_handle = params.data.profilePictureHandle;
+  }
+
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_API_VERSION}/${params.phoneNumberId}/whatsapp_business_profile`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${params.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  );
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`No se pudo actualizar el perfil de negocio (${res.status}): ${errorBody}`);
+  }
+}
+
+// La foto de perfil no se sube por /media (eso es para adjuntos de
+// mensajes): usa la Resumable Upload API de Meta, en dos pasos — abrir una
+// sesión de subida contra la App (no el número) y mandar el archivo a esa
+// sesión para obtener el handle que luego se manda en profile_picture_handle.
+export async function uploadBusinessProfilePhoto(params: {
+  accessToken: string;
+  file: Buffer;
+  mimeType: string;
+}): Promise<string> {
+  const appId = process.env.WHATSAPP_APP_ID;
+  if (!appId) throw new Error("Falta WHATSAPP_APP_ID para subir la foto de perfil.");
+
+  const startUrl = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${appId}/uploads`);
+  startUrl.searchParams.set("file_length", String(params.file.length));
+  startUrl.searchParams.set("file_type", params.mimeType);
+  startUrl.searchParams.set("access_token", params.accessToken);
+
+  const startRes = await fetch(startUrl.toString(), { method: "POST" });
+  if (!startRes.ok) {
+    const errorBody = await startRes.text();
+    throw new Error(`No se pudo iniciar la subida de la foto (${startRes.status}): ${errorBody}`);
+  }
+  const { id: uploadSessionId } = (await startRes.json()) as { id: string };
+
+  const uploadRes = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${uploadSessionId}`, {
+    method: "POST",
+    headers: {
+      Authorization: `OAuth ${params.accessToken}`,
+      file_offset: "0",
+    },
+    body: new Uint8Array(params.file),
+  });
+  if (!uploadRes.ok) {
+    const errorBody = await uploadRes.text();
+    throw new Error(`No se pudo subir la foto (${uploadRes.status}): ${errorBody}`);
+  }
+  const { h } = (await uploadRes.json()) as { h: string };
+  return h;
+}

@@ -18,6 +18,28 @@
   --warning-dim: #fdf3e0;
   --danger: #c62828;
   --danger-dim: #fbe3e3;
+
+  /* Paleta solo para la bandeja de chats (src/app/dashboard/inbox): imita
+     los colores de WhatsApp Web para que el equipo reconozca la interfaz al
+     instante. No toca --accent/--surface, que sigue usando el resto del
+     panel (botones, Seguimiento, etc). */
+  --wa-panel-bg: #ffffff;
+  --wa-panel-header: #f0f2f5;
+  --wa-row-hover: #f5f6f6;
+  --wa-row-active: #f0f2f5;
+  --wa-divider: #e9edef;
+  --wa-wallpaper: #efeae2;
+  --wa-wallpaper-dot: rgb(0 0 0 / 4.5%);
+  --wa-bubble-out: #d9fdd3;
+  --wa-bubble-out-ink: #111b21;
+  --wa-bubble-in: #ffffff;
+  --wa-bubble-in-ink: #111b21;
+  --wa-composer-bg: #f0f2f5;
+  --wa-composer-field: #ffffff;
+  --wa-green: #00a884;
+  --wa-green-ink: #ffffff;
+  --wa-badge: #25d366;
+  --wa-badge-ink: #ffffff;
 }
 
 .dark {
@@ -38,6 +60,24 @@
   --warning-dim: #40320f;
   --danger: #ff5d5d;
   --danger-dim: #4a2323;
+
+  --wa-panel-bg: #111b21;
+  --wa-panel-header: #202c33;
+  --wa-row-hover: #202c33;
+  --wa-row-active: #2a3942;
+  --wa-divider: #222d34;
+  --wa-wallpaper: #0b141a;
+  --wa-wallpaper-dot: rgb(255 255 255 / 3.5%);
+  --wa-bubble-out: #005c4b;
+  --wa-bubble-out-ink: #e9edef;
+  --wa-bubble-in: #202c33;
+  --wa-bubble-in-ink: #e9edef;
+  --wa-composer-bg: #202c33;
+  --wa-composer-field: #2a3942;
+  --wa-green: #00a884;
+  --wa-green-ink: #ffffff;
+  --wa-badge: #25d366;
+  --wa-badge-ink: #0b141a;
 }
 
 @theme inline {
@@ -135,6 +175,14 @@ body > *:not([data-portal]) {
 /* La esquina entre las dos barras, que si no queda de un gris plano. */
 ::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* Fondo del hilo de mensajes: un punteado sutil sobre el color base, como
+   el papel tapiz de WhatsApp, sin depender de una imagen. */
+.wa-wallpaper {
+  background-color: var(--wa-wallpaper);
+  background-image: radial-gradient(circle at 1px 1px, var(--wa-wallpaper-dot) 1px, transparent 0);
+  background-size: 22px 22px;
 }
 
 /* Firma visual: esquinas tipo visor/HUD, usadas en tarjetas y estados activos */

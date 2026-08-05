@@ -94,7 +94,7 @@ function linkify(text: string, mine: boolean) {
         href={part}
         target="_blank"
         rel="noopener noreferrer"
-        className={`underline underline-offset-2 ${mine ? "hover:opacity-80" : "text-accent hover:opacity-80"}`}
+        className={`underline underline-offset-2 ${mine ? "hover:opacity-80" : "text-[var(--wa-green)] hover:opacity-80"}`}
       >
         {part}
       </a>
@@ -191,6 +191,27 @@ const RECORDER_MIME_TYPES = [
 function pickRecorderMime(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
   return RECORDER_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type));
+}
+
+function initialsFor(nameOrPhone: string): string {
+  const trimmed = nameOrPhone.trim();
+  if (!trimmed) return "?";
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+// Círculo de color determinístico + iniciales, como el avatar por defecto
+// de un contacto sin foto en WhatsApp.
+function Avatar({ id, label, size = 40 }: { id: string; label: string; size?: number }) {
+  return (
+    <span
+      className="flex shrink-0 select-none items-center justify-center rounded-full font-semibold text-white"
+      style={{ width: size, height: size, backgroundColor: vendorColor(id), fontSize: size * 0.36 }}
+    >
+      {initialsFor(label)}
+    </span>
+  );
 }
 
 export function InboxClient({
@@ -484,18 +505,18 @@ export function InboxClient({
     >
       {/* Lista de conversaciones — pantalla completa en móvil, columna fija en escritorio */}
       <aside
-        className={`w-full shrink-0 flex-col overflow-y-auto border-r border-border bg-surface/60 md:flex md:w-80 ${
+        className={`w-full shrink-0 flex-col overflow-y-auto border-r border-[var(--wa-divider)] bg-[var(--wa-panel-bg)] md:flex md:w-80 ${
           selectedId ? "hidden md:flex" : "flex"
         }`}
       >
-        <div className="sticky top-0 z-10 border-b border-border bg-surface/90 px-4 py-3.5 backdrop-blur">
+        <div className="sticky top-0 z-10 border-b border-[var(--wa-divider)] bg-[var(--wa-panel-header)] px-4 py-3.5">
           <div className="flex items-center justify-between gap-2">
             <h1 className="font-display text-lg font-semibold text-ink">Chats</h1>
             {pushStatus === "prompt" && (
               <button
                 type="button"
                 onClick={subscribePush}
-                className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-ink-muted transition-colors hover:bg-surface-2"
+                className="flex items-center gap-1.5 rounded-full border border-[var(--wa-divider)] px-2.5 py-1 text-[11px] text-ink-muted transition-colors hover:bg-[var(--wa-panel-bg)]"
                 title="Recibir notificaciones de mensajes nuevos"
               >
                 <Bell size={12} /> Activar avisos
@@ -516,52 +537,55 @@ export function InboxClient({
           <button
             key={c.id}
             onClick={() => setSelectedId(c.id)}
-            className={`flex w-full flex-col gap-0.5 border-b border-border/60 px-4 py-3.5 text-left transition-colors hover:bg-surface-2/60 ${
-              selectedId === c.id ? "bg-surface-2" : ""
+            className={`flex w-full items-center gap-3 border-b border-[var(--wa-divider)] px-4 py-3 text-left transition-colors hover:bg-[var(--wa-row-hover)] ${
+              selectedId === c.id ? "bg-[var(--wa-row-active)]" : ""
             }`}
           >
-            <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-sm font-medium text-ink">
-                {c.customerName || c.customerPhone}
-              </span>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {c.unreadCount > 0 && (
-                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-ink">
-                    {c.unreadCount}
-                  </span>
-                )}
-                {c.lastMessage && (
-                  <span className="font-mono text-[11px] text-ink-faint">
-                    {timeFmt(c.lastMessage.createdAt)}
-                  </span>
-                )}
+            <Avatar id={c.id} label={c.customerName || c.customerPhone} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-sm font-medium text-ink">
+                  {c.customerName || c.customerPhone}
+                </span>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {c.unreadCount > 0 && (
+                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--wa-badge)] px-1 text-[10px] font-semibold text-[var(--wa-badge-ink)]">
+                      {c.unreadCount}
+                    </span>
+                  )}
+                  {c.lastMessage && (
+                    <span className="font-mono text-[11px] text-ink-faint">
+                      {timeFmt(c.lastMessage.createdAt)}
+                    </span>
+                  )}
+                </div>
               </div>
+              {c.lastMessage && (
+                <span className="block truncate text-xs text-ink-muted">
+                  {c.lastMessage.role === "STAFF" ? "Tú: " : ""}
+                  {c.lastMessage.mediaType
+                    ? mediaPreviewLabel[c.lastMessage.mediaType]
+                    : c.lastMessage.content}
+                </span>
+              )}
+              <span className="flex items-center gap-1.5 text-[11px]">
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor: c.assignedTo
+                      ? vendorColor(c.assignedTo.id)
+                      : "var(--color-ink-faint)",
+                  }}
+                />
+                <span className="text-ink-faint">
+                  {c.assignedTo
+                    ? c.assignedTo.id === currentUserId
+                      ? "Tú"
+                      : c.assignedTo.name
+                    : "Sin asignar"}
+                </span>
+              </span>
             </div>
-            {c.lastMessage && (
-              <span className="truncate text-xs text-ink-muted">
-                {c.lastMessage.role === "STAFF" ? "Tú: " : ""}
-                {c.lastMessage.mediaType
-                  ? mediaPreviewLabel[c.lastMessage.mediaType]
-                  : c.lastMessage.content}
-              </span>
-            )}
-            <span className="flex items-center gap-1.5 text-[11px]">
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{
-                  backgroundColor: c.assignedTo
-                    ? vendorColor(c.assignedTo.id)
-                    : "var(--color-ink-faint)",
-                }}
-              />
-              <span className="text-ink-faint">
-                {c.assignedTo
-                  ? c.assignedTo.id === currentUserId
-                    ? "Tú"
-                    : c.assignedTo.name
-                  : "Sin asignar"}
-              </span>
-            </span>
           </button>
         ))}
       </aside>
@@ -571,20 +595,21 @@ export function InboxClient({
         className={`min-w-0 flex-1 flex-col overflow-hidden ${selectedId ? "flex" : "hidden md:flex"}`}
       >
         {!selectedId ? (
-          <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-ink-faint">
+          <div className="wa-wallpaper flex flex-1 items-center justify-center px-6 text-center text-sm text-ink-faint">
             Selecciona una conversación para empezar.
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2 border-b border-border bg-surface/60 px-3 py-2.5 md:px-5 md:py-3">
+            <div className="flex items-center gap-2 border-b border-[var(--wa-divider)] bg-[var(--wa-panel-header)] px-3 py-2.5 md:px-5 md:py-3">
               <button
                 type="button"
                 onClick={() => setSelectedId(null)}
                 aria-label="Volver a la lista"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-2 md:hidden"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-[var(--wa-panel-bg)] md:hidden"
               >
                 <ArrowLeft size={18} />
               </button>
+              <Avatar id={selectedId} label={customerName || customerPhone} size={36} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-display text-sm font-semibold text-ink">
                   {customerName || customerPhone}
@@ -606,7 +631,7 @@ export function InboxClient({
                 onClick={() => setPanelOpen((v) => !v)}
                 aria-label="Ficha del contacto"
                 title="Ficha del contacto"
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface-2 ${
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[var(--wa-panel-bg)] ${
                   panelOpen ? "text-accent" : "text-ink-muted"
                 }`}
               >
@@ -616,7 +641,7 @@ export function InboxClient({
 
             <div
               ref={scrollRef}
-              className="flex-1 space-y-2 overflow-y-auto px-3 py-4 md:px-5"
+              className="wa-wallpaper flex-1 space-y-2 overflow-y-auto px-3 py-4 md:px-5"
             >
               {messages.map((m) => {
                 const mine = m.role === "STAFF" || m.role === "BOT";
@@ -639,8 +664,10 @@ export function InboxClient({
                       </button>
                     )}
                     <div
-                      className={`max-w-[85%] rounded-lg px-3 py-2 text-sm md:max-w-[70%] ${
-                        mine ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink"
+                      className={`max-w-[85%] rounded-lg px-3 py-2 text-sm shadow-sm md:max-w-[70%] ${
+                        mine
+                          ? "bg-[var(--wa-bubble-out)] text-[var(--wa-bubble-out-ink)]"
+                          : "bg-[var(--wa-bubble-in)] text-[var(--wa-bubble-in-ink)]"
                       }`}
                     >
                       <MessageMedia message={m} />
@@ -686,7 +713,7 @@ export function InboxClient({
             </div>
 
             {/* Compositor fijo abajo, estilo WhatsApp */}
-            <div className="border-t border-border bg-surface/80 px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] md:px-4 md:py-3">
+            <div className="border-t border-[var(--wa-divider)] bg-[var(--wa-composer-bg)] px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] md:px-4 md:py-3">
               {error && (
                 <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-danger-dim px-3 py-1.5 text-xs text-danger">
                   <span className="min-w-0">{error}</span>
@@ -696,7 +723,7 @@ export function InboxClient({
                 </div>
               )}
               {pendingFile && (
-                <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs text-ink-muted">
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-[var(--wa-composer-field)] px-3 py-2 text-xs text-ink-muted">
                   <span className="truncate">📎 {pendingFile.name}</span>
                   <button onClick={() => setPendingFile(null)} className="shrink-0">
                     <X size={14} />
@@ -708,7 +735,7 @@ export function InboxClient({
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => stopRecording(true)}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-2 hover:text-danger"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-[var(--wa-composer-field)] hover:text-danger"
                     title="Cancelar"
                   >
                     <Trash2 size={18} />
@@ -720,7 +747,7 @@ export function InboxClient({
                   </div>
                   <button
                     onClick={() => stopRecording(false)}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wa-green)] text-[var(--wa-green-ink)]"
                     title="Enviar nota de voz"
                   >
                     <Square size={16} fill="currentColor" />
@@ -737,7 +764,7 @@ export function InboxClient({
                   />
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-2"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-[var(--wa-composer-field)]"
                     title="Adjuntar archivo"
                   >
                     <Paperclip size={19} />
@@ -754,13 +781,13 @@ export function InboxClient({
                     placeholder={pendingFile ? "Agrega un texto (opcional)…" : "Escribe un mensaje…"}
                     rows={1}
                     // text-base evita que iOS haga zoom automático al enfocar
-                    className="max-h-32 min-w-0 flex-1 resize-none rounded-3xl border border-border bg-surface px-4 py-2.5 text-base text-ink outline-none focus:border-accent-dim md:text-sm"
+                    className="max-h-32 min-w-0 flex-1 resize-none rounded-3xl border-none bg-[var(--wa-composer-field)] px-4 py-2.5 text-base text-ink outline-none md:text-sm"
                   />
                   {draft.trim() || pendingFile ? (
                     <button
                       onClick={handleSend}
                       disabled={sending}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition-opacity disabled:opacity-40"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wa-green)] text-[var(--wa-green-ink)] transition-opacity disabled:opacity-40"
                       title="Enviar"
                     >
                       <Send size={18} />
@@ -769,7 +796,7 @@ export function InboxClient({
                     <button
                       onClick={startRecording}
                       disabled={sending}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition-opacity disabled:opacity-40"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--wa-green)] text-[var(--wa-green-ink)] transition-opacity disabled:opacity-40"
                       title="Grabar nota de voz"
                     >
                       <Mic size={19} />

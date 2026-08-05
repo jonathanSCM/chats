@@ -5,9 +5,14 @@ const GRAPH_API_VERSION = "v21.0";
 
 // ─── Verificación de firma (Meta firma el body crudo con el App Secret) ────
 
-export function isValidWebhookSignature(rawBody: string, signatureHeader: string | null): boolean {
-  const appSecret = process.env.WHATSAPP_APP_SECRET;
-
+// `appSecret` lo resuelve el caller (getPlatformSettings(), con fallback a
+// WHATSAPP_APP_SECRET) — esta función no toca process.env directamente para
+// poder configurarse desde /admin/settings sin redesplegar.
+export function isValidWebhookSignature(
+  rawBody: string,
+  signatureHeader: string | null,
+  appSecret: string | null,
+): boolean {
   if (!appSecret) {
     // En producción esto es un error de configuración, no un modo válido:
     // sin secret, cualquiera podría mandar webhooks falsos haciéndose pasar
@@ -642,16 +647,12 @@ export async function verifyPhoneNumber(params: {
 // de Meta tenga configurado el Embedded Signup con Coexistence habilitado.
 export async function exchangeEmbeddedSignupCode(params: {
   code: string;
+  appId: string;
+  appSecret: string;
 }): Promise<{ accessToken: string }> {
-  const appId = process.env.WHATSAPP_APP_ID;
-  const appSecret = process.env.WHATSAPP_APP_SECRET;
-  if (!appId || !appSecret) {
-    throw new Error("Faltan WHATSAPP_APP_ID/WHATSAPP_APP_SECRET para el Embedded Signup.");
-  }
-
   const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/oauth/access_token`);
-  url.searchParams.set("client_id", appId);
-  url.searchParams.set("client_secret", appSecret);
+  url.searchParams.set("client_id", params.appId);
+  url.searchParams.set("client_secret", params.appSecret);
   url.searchParams.set("code", params.code);
 
   const res = await fetch(url.toString());
@@ -775,14 +776,12 @@ export async function updateBusinessProfile(params: {
 // sesión de subida contra la App (no el número) y mandar el archivo a esa
 // sesión para obtener el handle que luego se manda en profile_picture_handle.
 export async function uploadBusinessProfilePhoto(params: {
+  appId: string;
   accessToken: string;
   file: Buffer;
   mimeType: string;
 }): Promise<string> {
-  const appId = process.env.WHATSAPP_APP_ID;
-  if (!appId) throw new Error("Falta WHATSAPP_APP_ID para subir la foto de perfil.");
-
-  const startUrl = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${appId}/uploads`);
+  const startUrl = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${params.appId}/uploads`);
   startUrl.searchParams.set("file_length", String(params.file.length));
   startUrl.searchParams.set("file_type", params.mimeType);
   startUrl.searchParams.set("access_token", params.accessToken);

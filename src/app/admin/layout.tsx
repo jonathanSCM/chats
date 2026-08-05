@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, LogOut } from "lucide-react";
+import { Building2, LogOut, Settings } from "lucide-react";
 import { auth } from "@/server/auth";
 import { logoutAction } from "@/server/actions/logout";
 import { NavLink } from "@/components/layout/nav-link";
@@ -19,6 +19,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <nav className="flex flex-1 flex-col gap-0.5">
           <NavLink href="/admin" exact>
             <Building2 size={16} /> Organizaciones
+          </NavLink>
+          <NavLink href="/admin/settings">
+            <Settings size={16} /> Configuración
           </NavLink>
         </nav>
 

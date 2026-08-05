@@ -150,18 +150,19 @@ sincronizan (incluye historial de conversaciones previas). Esto requiere el fluj
    → **Configuración de la API embebida (Embedded Signup)**.
 2. Crea una configuración nueva (`Configuration`) y **activa la opción de Coexistence**
    ("permitir vincular números que ya usan la app de WhatsApp Business"). Guarda el
-   `config_id` que te da — es el que va en `WHATSAPP_CONFIG_ID`.
-3. Copia el **App ID** de tu app de Meta (arriba a la izquierda del dashboard) →
-   `WHATSAPP_APP_ID`.
-4. En **Configuración básica** de la app, copia el **App Secret** → `WHATSAPP_APP_SECRET`
-   (esta es la misma que ya usa el webhook, no hay que sacarla dos veces).
+   `config_id` que te da.
+3. Copia el **App ID** de tu app de Meta (arriba a la izquierda del dashboard).
+4. En **Configuración básica** de la app, copia el **App Secret** (es la misma que firma el
+   webhook, no hay que sacarla dos veces).
 5. Agrega el dominio de tu panel (`https://tu-dominio`) a **Dominios permitidos de la app** y a
    los orígenes válidos de OAuth, si Meta te lo pide.
-6. `WHATSAPP_APP_ID` y `WHATSAPP_CONFIG_ID` no son secretas (el navegador las necesita para
-   inicializar el SDK de Facebook), pero se sirven en runtime desde el servidor
-   (`/api/whatsapp/embedded-signup-config`, solo a usuarios con sesión) — son variables de
-   entorno normales, **no hace falta marcarlas como "Available at Buildtime" ni rehacer el
-   build** cuando las cambies, solo reiniciar el servicio en Coolify.
+6. Carga esos tres valores (App ID, App Secret, Config ID) más el **verify token** del webhook
+   en **Admin → Configuración** (`/admin/settings`, solo el superadmin la ve). Se guardan
+   cifrados en la base de datos y aplican al instante — sin variables de entorno ni redeploy.
+
+Si no configuras nada ahí, la app cae de vuelta a las variables de entorno
+`WHATSAPP_APP_ID`/`WHATSAPP_APP_SECRET`/`WHATSAPP_CONFIG_ID`/`WHATSAPP_VERIFY_TOKEN` (útil para
+el primer arranque o si prefieres manejarlo así) — lo que esté cargado en la web siempre gana.
 
 ### Uso desde el panel
 

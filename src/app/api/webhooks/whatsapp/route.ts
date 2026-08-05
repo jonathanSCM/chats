@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getPlatformSettings } from "@/server/services/platform-settings";
 import {
   isValidWebhookSignature,
   parseInboundPayload,
@@ -23,7 +24,8 @@ export async function GET(req: NextRequest) {
   const token = params.get("hub.verify_token");
   const challenge = params.get("hub.challenge");
 
-  if (mode === "subscribe" && token === process.env.WHATSAPP_VERIFY_TOKEN && challenge) {
+  const settings = await getPlatformSettings();
+  if (mode === "subscribe" && challenge && token && token === settings.whatsappVerifyToken) {
     return new NextResponse(challenge, { status: 200 });
   }
 
@@ -42,8 +44,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const signature = req.headers.get("x-hub-signature-256");
+  const settings = await getPlatformSettings();
 
-  if (!isValidWebhookSignature(rawBody, signature)) {
+  if (!isValidWebhookSignature(rawBody, signature, settings.whatsappAppSecret)) {
     return new NextResponse("Invalid signature", { status: 401 });
   }
 

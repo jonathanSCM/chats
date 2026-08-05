@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireBotOwnerAccess } from "@/server/auth/guards";
 import { decrypt } from "@/lib/crypto";
+import { getPlatformSettings } from "@/server/services/platform-settings";
 import {
   getBusinessProfile,
   updateBusinessProfile,
@@ -116,9 +117,15 @@ export async function updateBusinessPhotoAction(
     return { error: "La imagen no puede pesar más de 5 MB." };
   }
 
+  const settings = await getPlatformSettings();
+  if (!settings.whatsappAppId) {
+    return { error: "Falta WHATSAPP_APP_ID. Configúralo en Configuración (admin)." };
+  }
+
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
     const handle = await uploadBusinessProfilePhoto({
+      appId: settings.whatsappAppId,
       accessToken: connection.accessToken,
       file: buffer,
       mimeType: file.type,

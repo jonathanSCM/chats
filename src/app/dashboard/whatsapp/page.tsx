@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { getBusinessProfileForBot } from "@/server/actions/business-profile";
+import { getPlatformSettings } from "@/server/services/platform-settings";
 import { WhatsAppTab } from "./_components/whatsapp-tab";
 import { CopyField } from "./_components/copy-field";
 import { BusinessProfileForm } from "./_components/business-profile-form";
@@ -41,7 +42,8 @@ export default async function WhatsAppSettingsPage() {
   }
 
   const webhookUrl = `${process.env.NEXTAUTH_URL ?? ""}/api/webhooks/whatsapp`;
-  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN ?? "";
+  const platformSettings = await getPlatformSettings();
+  const verifyToken = platformSettings.whatsappVerifyToken ?? "";
 
   // Se pide aparte (no bloquea el resto de la página si Meta falla o el
   // token todavía no tiene el permiso whatsapp_business_management).

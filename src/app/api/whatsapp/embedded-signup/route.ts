@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireBotOwnerAccess } from "@/server/auth/guards";
 import { encrypt } from "@/lib/crypto";
+import { getPlatformSettings } from "@/server/services/platform-settings";
 import {
   exchangeEmbeddedSignupCode,
   subscribeAppToWaba,
@@ -35,7 +36,19 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { accessToken } = await exchangeEmbeddedSignupCode({ code: body.code });
+    const settings = await getPlatformSettings();
+    if (!settings.whatsappAppId || !settings.whatsappAppSecret) {
+      return NextResponse.json(
+        { error: "Faltan WHATSAPP_APP_ID/WHATSAPP_APP_SECRET. Configúralos en Configuración (admin)." },
+        { status: 500 },
+      );
+    }
+
+    const { accessToken } = await exchangeEmbeddedSignupCode({
+      code: body.code,
+      appId: settings.whatsappAppId,
+      appSecret: settings.whatsappAppSecret,
+    });
 
     const [{ displayNumber }] = await Promise.all([
       verifyPhoneNumber({ phoneNumberId: body.phoneNumberId, accessToken }),

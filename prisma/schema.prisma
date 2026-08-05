@@ -650,3 +650,22 @@ model AiAnalysis {
   @@index([entityType, entityId])
   @@map("ai_analyses")
 }
+
+// ─── Configuración de plataforma ─────────────────────────────────
+//
+// Credenciales de la app de Meta que usa TODA la plataforma para
+// Coexistence/Embedded Signup (no son por organización — es una sola app
+// de Meta detrás de todos los negocios). Fila única (id fijo "singleton")
+// para poder editarla desde /admin/settings sin tocar variables de entorno
+// ni redesplegar. Si está vacía, el código cae a las variables de entorno
+// (WHATSAPP_APP_ID, etc.) — así no rompe despliegues que ya las tenían ahí.
+model PlatformSetting {
+  id                  String   @id @default("singleton")
+  whatsappAppId       String?
+  whatsappAppSecret   String?  @db.Text // cifrado, igual que WhatsAppConnection.accessToken
+  whatsappConfigId    String?
+  whatsappVerifyToken String?
+  updatedAt           DateTime @updatedAt
+
+  @@map("platform_settings")
+}

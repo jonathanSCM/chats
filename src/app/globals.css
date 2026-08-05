@@ -95,6 +95,48 @@ body > *:not([data-portal]) {
   color: var(--accent-ink);
 }
 
+/* ── Barras de desplazamiento ──────────────────────────────────────
+   Las nativas de Windows son anchas y de color fijo: cortan el diseño y
+   en modo oscuro se ven como una franja clara. Estas siguen los tokens
+   del tema y se aclaran al pasar el cursor. */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+:root {
+  --scrollbar-thumb: color-mix(in srgb, var(--ink) 22%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--ink) 38%, transparent);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 999px;
+  /* El borde transparente deja aire alrededor del pulgar sin necesidad de
+     pintar el riel. */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+/* La esquina entre las dos barras, que si no queda de un gris plano. */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* Firma visual: esquinas tipo visor/HUD, usadas en tarjetas y estados activos */
 .corner-brackets {
   position: relative;

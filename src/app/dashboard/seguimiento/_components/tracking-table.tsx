@@ -225,7 +225,7 @@ function Th({ children, ai }: { children?: React.ReactNode; ai?: boolean }) {
 
 function Td({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
   return (
-    <td className={`border-b border-border/50 px-3 py-3 align-top ${className}`}>{children}</td>
+    <td className={`border-b border-border/50 px-3 py-4 align-top ${className}`}>{children}</td>
   );
 }
 
@@ -294,7 +294,7 @@ function TableRow({
       </Td>
 
       <Td className="max-w-[14rem]">
-        <p className="line-clamp-2 w-56 text-sm leading-snug text-ink">{row.need || "—"}</p>
+        <p className="line-clamp-3 w-56 text-sm leading-relaxed text-ink">{row.need || "—"}</p>
       </Td>
 
       <Td>
@@ -314,7 +314,7 @@ function TableRow({
       </Td>
 
       <Td className="max-w-[14rem]">
-        <p className="line-clamp-2 w-56 text-sm leading-snug text-ink-muted">{row.lastUpdate || "—"}</p>
+        <p className="line-clamp-3 w-56 text-sm leading-relaxed text-ink-muted">{row.lastUpdate || "—"}</p>
       </Td>
 
       {/* ── Columnas del asesor IA ── */}
@@ -359,7 +359,7 @@ function TableRow({
       </Td>
 
       <Td className="max-w-[14rem]">
-        <p className="line-clamp-2 w-56 text-sm leading-snug text-ink">{row.aiRecommendation || "—"}</p>
+        <p className="line-clamp-3 w-56 text-sm leading-relaxed text-ink">{row.aiRecommendation || "—"}</p>
       </Td>
 
       <Td className="max-w-[14rem]">
@@ -430,7 +430,7 @@ function CopyableMessage({ text }: { text: string }) {
 
   return (
     <div className="flex items-start gap-1.5">
-      <p className="line-clamp-2 w-48 text-sm leading-snug text-ink">{text}</p>
+      <p className="line-clamp-3 w-48 text-sm leading-relaxed text-ink">{text}</p>
       <button
         type="button"
         onClick={() => {

@@ -115,6 +115,45 @@ function durationFmt(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// Sonido de aviso generado con Web Audio (sin archivo de audio que
+// mantener): suena mientras la pestaña esté abierta, sin depender de que
+// el push del navegador llegue a tiempo — que es justo lo que puede fallar
+// (ver notas sobre hibernación de pestañas en Windows/Chrome).
+let notificationAudioCtx: AudioContext | null = null;
+
+function playNotificationSound() {
+  try {
+    const AudioCtxClass = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtxClass) return;
+
+    notificationAudioCtx ??= new AudioCtxClass();
+    const ctx = notificationAudioCtx;
+    if (ctx.state === "suspended") ctx.resume();
+
+    const now = ctx.currentTime;
+    // Dos tonos cortos ("ding-dong"), no un pitido plano.
+    [
+      { freq: 880, start: 0, duration: 0.16 },
+      { freq: 1175, start: 0.11, duration: 0.2 },
+    ].forEach(({ freq, start, duration }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now + start);
+      gain.gain.linearRampToValueAtTime(0.18, now + start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + start + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + start);
+      osc.stop(now + start + duration + 0.05);
+    });
+  } catch {
+    // Web Audio bloqueado (autoplay) o no disponible: se pierde el sonido,
+    // no es razón para romper el polling de conversaciones.
+  }
+}
+
 function MessageMedia({ message }: { message: Message }) {
   if (!message.mediaType) return null;
 
@@ -246,6 +285,7 @@ export function InboxClient({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedIdRef = useRef<string | null>(null);
   const prevUnreadRef = useRef<Map<string, number>>(new Map());
+  const isFirstFetchRef = useRef(true);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const cancelRecordRef = useRef(false);
@@ -303,12 +343,26 @@ export function InboxClient({
     if (!res.ok) return;
     const list: ConversationSummary[] = await res.json();
 
-    // Notificación en primer plano (la app abierta). Con la app cerrada,
-    // el service worker recibe el push del servidor.
+    // El primer fetch (al montar) no debe sonar ni notificar: todo lo que
+    // ya estaba sin leer parecería "nuevo" al no haber un `prevUnread` con
+    // qué compararlo.
+    const isFirstFetch = isFirstFetchRef.current;
+    isFirstFetchRef.current = false;
+
+    // Sonido: suena para cualquier mensaje nuevo mientras la pestaña esté
+    // abierta, sin depender de permisos ni de que el push llegue a tiempo.
+    // Notificación del sistema: solo si además el chat no es el que está
+    // abierto (si no, sería redundante con lo que ya se ve en pantalla) y
+    // hay permiso concedido — con la app cerrada, el service worker recibe
+    // el push del servidor en su lugar.
+    let hasNewMessage = false;
     for (const c of list) {
       const prevUnread = prevUnreadRef.current.get(c.id) ?? 0;
+      if (isFirstFetch || c.unreadCount <= prevUnread) continue;
+
+      hasNewMessage = true;
+
       if (
-        c.unreadCount > prevUnread &&
         c.id !== selectedIdRef.current &&
         typeof Notification !== "undefined" &&
         Notification.permission === "granted" &&
@@ -321,6 +375,8 @@ export function InboxClient({
         });
       }
     }
+    if (hasNewMessage) playNotificationSound();
+
     prevUnreadRef.current = new Map(list.map((c) => [c.id, c.unreadCount]));
 
     const totalUnread = list.reduce((sum, c) => sum + c.unreadCount, 0);

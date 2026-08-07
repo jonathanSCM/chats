@@ -53,7 +53,7 @@ let fbInitialized = false;
 function loadFacebookSdk(appId: string): Promise<void> {
   return new Promise((resolve, reject) => {
     function initNow() {
-      window.FB!.init({ appId, cookie: true, xfbml: false, version: "v21.0" });
+      window.FB!.init({ appId, cookie: true, xfbml: false, version: "v23.0" });
       fbInitialized = true;
       resolve();
     }

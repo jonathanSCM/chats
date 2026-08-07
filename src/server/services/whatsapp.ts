@@ -1,7 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
-const GRAPH_API_VERSION = "v21.0";
+// Meta jubila versiones ~2 años después de su salida (v19/v20 ya
+// expiraron a mediados de 2026) — hay que subir esto de vez en cuando.
+const GRAPH_API_VERSION = "v23.0";
 
 // ─── Verificación de firma (Meta firma el body crudo con el App Secret) ────
 

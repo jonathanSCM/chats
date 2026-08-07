@@ -109,6 +109,35 @@ function timeFmt(iso: string) {
   return new Date(iso).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 }
 
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  );
+}
+
+// "Hoy" / "Ayer" / fecha corta — la fecha lleva año solo si no es el actual,
+// como en WhatsApp.
+function dayLabel(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+
+  if (isSameDay(date, now)) return "Hoy";
+  if (isSameDay(date, yesterday)) return "Ayer";
+  return date.toLocaleDateString("es", {
+    day: "2-digit",
+    month: "short",
+    year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+  });
+}
+
+// En la lista de chats: hora si es de hoy, si no la fecha — igual que
+// WhatsApp, para no confundir "3:45" de hace tres días con la de hace rato.
+function listTimeFmt(iso: string): string {
+  return isSameDay(new Date(iso), new Date()) ? timeFmt(iso) : dayLabel(iso);
+}
+
 function durationFmt(seconds: number) {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -612,7 +641,7 @@ export function InboxClient({
                   )}
                   {c.lastMessage && (
                     <span className="font-mono text-[11px] text-ink-faint">
-                      {timeFmt(c.lastMessage.createdAt)}
+                      {listTimeFmt(c.lastMessage.createdAt)}
                     </span>
                   )}
                 </div>
@@ -700,14 +729,24 @@ export function InboxClient({
               ref={scrollRef}
               className="wa-wallpaper flex-1 space-y-2 overflow-y-auto px-3 py-4 md:px-5"
             >
-              {messages.map((m) => {
+              {messages.map((m, i) => {
                 const mine = m.role === "STAFF" || m.role === "BOT";
                 const confirming = confirmDeleteMessageId === m.id;
+                const prev = messages[i - 1];
+                const showDateDivider =
+                  !prev || !isSameDay(new Date(prev.createdAt), new Date(m.createdAt));
                 return (
-                  <div
-                    key={m.id}
-                    className={`group flex items-center gap-1.5 ${mine ? "justify-end" : "justify-start"}`}
-                  >
+                  <div key={m.id}>
+                    {showDateDivider && (
+                      <div className="my-3 flex justify-center">
+                        <span className="rounded-full bg-surface px-3 py-1 text-[11px] font-medium text-ink-muted shadow-sm">
+                          {dayLabel(m.createdAt)}
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      className={`group flex items-center gap-1.5 ${mine ? "justify-end" : "justify-start"}`}
+                    >
                     {mine && (
                       <button
                         type="button"
@@ -752,18 +791,19 @@ export function InboxClient({
                         {m.role === "STAFF" && !m.viaPhoneApp && <StatusTicks status={m.status} />}
                       </div>
                     </div>
-                    {!mine && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteMessage(m.id)}
-                        title={confirming ? "¿Seguro? Toca de nuevo" : "Borrar mensaje"}
-                        className={`shrink-0 rounded-full p-1 opacity-0 transition-opacity group-hover:opacity-100 active:opacity-100 ${
-                          confirming ? "opacity-100 text-danger" : "text-ink-faint hover:text-danger"
-                        }`}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    )}
+                      {!mine && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMessage(m.id)}
+                          title={confirming ? "¿Seguro? Toca de nuevo" : "Borrar mensaje"}
+                          className={`shrink-0 rounded-full p-1 opacity-0 transition-opacity group-hover:opacity-100 active:opacity-100 ${
+                            confirming ? "opacity-100 text-danger" : "text-ink-faint hover:text-danger"
+                          }`}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}

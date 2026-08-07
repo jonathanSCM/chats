@@ -18,8 +18,27 @@ let cache: PlatformSettings | null = null;
 let cacheAt = 0;
 const CACHE_TTL_MS = 30_000;
 
+function fromEnv(): PlatformSettings {
+  return {
+    whatsappAppId: process.env.WHATSAPP_APP_ID || null,
+    whatsappAppSecret: process.env.WHATSAPP_APP_SECRET || null,
+    whatsappConfigId: process.env.WHATSAPP_CONFIG_ID || null,
+    whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN || null,
+  };
+}
+
 async function loadFromDb(): Promise<PlatformSettings> {
-  const row = await prisma.platformSetting.findUnique({ where: { id: SINGLETON_ID } });
+  // Esto corre en cada webhook de WhatsApp y en /dashboard/whatsapp — si la
+  // tabla no existe todavía (falta la migración) o la base está caída, un
+  // error acá no debe tumbar el webhook ni la página: se cae a las
+  // variables de entorno como si la fila no existiera.
+  let row;
+  try {
+    row = await prisma.platformSetting.findUnique({ where: { id: SINGLETON_ID } });
+  } catch (error) {
+    console.error("[platform-settings] No se pudo leer de la base, usando variables de entorno:", error);
+    return fromEnv();
+  }
 
   // La web gana si está configurada; si no, se cae a las variables de
   // entorno — así los despliegues que ya las tenían ahí no se rompen.

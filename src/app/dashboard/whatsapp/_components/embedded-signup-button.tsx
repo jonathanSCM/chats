@@ -12,6 +12,7 @@ declare global {
         appId: string;
         cookie?: boolean;
         xfbml?: boolean;
+        autoLogAppEvents?: boolean;
         version: string;
       }) => void;
       login: (
@@ -36,64 +37,54 @@ declare global {
 }
 
 const SDK_SRC = "https://connect.facebook.net/es_LA/sdk.js";
-
-// Sin timeout ni onerror, un bloqueador de anuncios/rastreadores (uBlock,
-// Brave Shields, etc. — muy común que bloqueen justo connect.facebook.net)
-// dejaba la promesa colgada para siempre: el botón se quedaba en "Cargando…"
-// sin ningún error ni forma de reintentar sin recargar la página entera.
 const SDK_LOAD_TIMEOUT_MS = 12_000;
 
-// `window.FB` puede existir (el script ya cargó, de este intento o de uno
-// anterior) sin que FB.init() se haya llamado todavía — y llamar FB.login()
-// antes de init() falla en seco ("FB.login() called before FB.init()."). Por
-// eso este flag, no la sola presencia de window.FB, es lo que dice si ya se
-// puede loguear.
-let fbInitialized = false;
+// connect.facebook.net/.../sdk.js NO es el SDK real: es un stub de ~20
+// líneas que crea `window.FB` al instante, con métodos falsos que solo
+// encolan las llamadas para más tarde. El SDK de verdad llega después, en
+// un segundo archivo aparte, y recién ahí reemplaza `window.FB`. Por eso
+// "si window.FB existe, ya se puede usar" es falso — puede ser el stub, no
+// el SDK real — y tratarlo como listo hacía que FB.init() se llamara dos
+// veces (una en el stub, otra cuando llega el SDK de verdad) y que
+// FB.login() cayera en medio de esa carrera con "FB.login() called before
+// FB.init().". La única forma correcta de evitarlo: una sola promesa
+// compartida, un solo <script>, un solo init() — nunca más de uno, nunca
+// más de una vez, sin atajos basados en si `window.FB` "ya existe".
+let sdkPromise: Promise<void> | null = null;
 
 function loadFacebookSdk(appId: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    function initNow() {
-      window.FB!.init({ appId, cookie: true, xfbml: false, version: "v23.0" });
-      fbInitialized = true;
-      resolve();
-    }
+  if (!sdkPromise) {
+    sdkPromise = new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("No se pudo cargar el SDK de Facebook a tiempo."));
+      }, SDK_LOAD_TIMEOUT_MS);
 
-    if (fbInitialized) {
-      resolve();
-      return;
-    }
+      window.fbAsyncInit = () => {
+        clearTimeout(timeout);
+        window.FB!.init({ appId, cookie: true, xfbml: true, autoLogAppEvents: true, version: "v23.0" });
+        resolve();
+      };
 
-    if (window.FB) {
-      // El script ya está cargado (de un intento anterior) — solo falta
-      // llamar init() en este.
-      initNow();
-      return;
-    }
+      const script = document.createElement("script");
+      script.id = "facebook-jssdk";
+      script.src = SDK_SRC;
+      script.async = true;
+      script.onerror = () => {
+        clearTimeout(timeout);
+        reject(new Error("No se pudo descargar el SDK de Facebook."));
+      };
+      document.body.appendChild(script);
+    });
 
-    const timeout = setTimeout(() => {
-      reject(new Error("No se pudo cargar el SDK de Facebook a tiempo."));
-    }, SDK_LOAD_TIMEOUT_MS);
+    // Si falló (timeout, red, script bloqueado), no se deja la promesa
+    // rechazada cacheada para siempre — un reintento debe poder volver a
+    // pedir el script en vez de recibir el mismo fallo eternamente.
+    sdkPromise.catch(() => {
+      sdkPromise = null;
+    });
+  }
 
-    window.fbAsyncInit = () => {
-      clearTimeout(timeout);
-      initNow();
-    };
-
-    // Si ya hay una etiqueta de un intento anterior que nunca terminó de
-    // cargar, se reemplaza — así un reintento vuelve a pedir el script en
-    // vez de esperar por una carga que ya sabemos que no va a llegar.
-    document.getElementById("facebook-jssdk")?.remove();
-
-    const script = document.createElement("script");
-    script.id = "facebook-jssdk";
-    script.src = SDK_SRC;
-    script.async = true;
-    script.onerror = () => {
-      clearTimeout(timeout);
-      reject(new Error("No se pudo descargar el SDK de Facebook."));
-    };
-    document.body.appendChild(script);
-  });
+  return sdkPromise;
 }
 
 export function EmbeddedSignupButton({ botId }: { botId: string }) {
@@ -112,12 +103,10 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
       .catch(() => setConfig({ appId: null, configId: null }));
   }, []);
 
-  // El SDK se carga apenas se conoce el App ID — no al hacer clic. Cargarlo
-  // e iniciar sesión casi en el mismo instante (ambos disparados por un
-  // solo clic) hacía que FB.login() corriera antes de que el SDK
-  // terminara de asentar su estado interno tras FB.init(), y tiraba "FB.login()
-  // called before FB.init()." aunque init() ya se hubiera llamado. Dándole
-  // el tiempo normal de carga de página de por medio, ese caso no se da.
+  // El SDK se precarga apenas se conoce el App ID, en vez de esperar al
+  // clic — así, para cuando alguien realmente toca el botón, la promesa
+  // compartida ya está resuelta (o resolviéndose) y handleClick solo
+  // reutiliza esa misma promesa, sin disparar una segunda carga.
   useEffect(() => {
     if (!config?.appId) return;
     loadFacebookSdk(config.appId).catch((err) => {

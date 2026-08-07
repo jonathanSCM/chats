@@ -112,6 +112,19 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
       .catch(() => setConfig({ appId: null, configId: null }));
   }, []);
 
+  // El SDK se carga apenas se conoce el App ID — no al hacer clic. Cargarlo
+  // e iniciar sesión casi en el mismo instante (ambos disparados por un
+  // solo clic) hacía que FB.login() corriera antes de que el SDK
+  // terminara de asentar su estado interno tras FB.init(), y tiraba "FB.login()
+  // called before FB.init()." aunque init() ya se hubiera llamado. Dándole
+  // el tiempo normal de carga de página de por medio, ese caso no se da.
+  useEffect(() => {
+    if (!config?.appId) return;
+    loadFacebookSdk(config.appId).catch((err) => {
+      console.error("[embedded-signup] No se pudo precargar el SDK de Facebook:", err);
+    });
+  }, [config?.appId]);
+
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (!event.origin.endsWith("facebook.com")) return;

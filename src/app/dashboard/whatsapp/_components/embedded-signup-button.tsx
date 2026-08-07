@@ -113,6 +113,46 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
+  async function handleLoginResponse(response: {
+    authResponse?: { code?: string };
+    status?: string;
+  }) {
+    const code = response.authResponse?.code;
+    if (!code) {
+      setStatus("idle");
+      return;
+    }
+
+    const { wabaId, phoneNumberId } = sessionRef.current;
+    if (!wabaId || !phoneNumberId) {
+      setError(
+        "Meta no mandó el waba_id/phone_number_id esperado. Intenta de nuevo — si persiste, revisa la configuración de Embedded Signup en tu app de Meta.",
+      );
+      setStatus("error");
+      return;
+    }
+
+    setStatus("connecting");
+    try {
+      const res = await fetch("/api/whatsapp/embedded-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, wabaId, phoneNumberId, botId }),
+      });
+      const data = (await res.json()) as { error: string | null };
+      if (!res.ok || data.error) {
+        setError(data.error ?? "No se pudo completar la conexión.");
+        setStatus("error");
+        return;
+      }
+      router.refresh();
+      setStatus("idle");
+    } catch {
+      setError("No se pudo completar la conexión con el servidor.");
+      setStatus("error");
+    }
+  }
+
   async function handleClick() {
     const appId = config?.appId;
     const configId = config?.configId;
@@ -136,42 +176,14 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
       return;
     }
 
+    // El callback de FB.login() tiene que ser una función normal, no async:
+    // el SDK de Facebook valida el tipo y rechaza una que devuelva una
+    // Promise ("Expression is of type asyncfunction, not function"), sin
+    // abrir el diálogo y sin ningún error visible más que en la consola.
+    // Por eso la lógica async vive aparte, en handleLoginResponse.
     window.FB!.login(
-      async (response) => {
-        const code = response.authResponse?.code;
-        if (!code) {
-          setStatus("idle");
-          return;
-        }
-
-        const { wabaId, phoneNumberId } = sessionRef.current;
-        if (!wabaId || !phoneNumberId) {
-          setError(
-            "Meta no mandó el waba_id/phone_number_id esperado. Intenta de nuevo — si persiste, revisa la configuración de Embedded Signup en tu app de Meta.",
-          );
-          setStatus("error");
-          return;
-        }
-
-        setStatus("connecting");
-        try {
-          const res = await fetch("/api/whatsapp/embedded-signup", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code, wabaId, phoneNumberId, botId }),
-          });
-          const data = (await res.json()) as { error: string | null };
-          if (!res.ok || data.error) {
-            setError(data.error ?? "No se pudo completar la conexión.");
-            setStatus("error");
-            return;
-          }
-          router.refresh();
-          setStatus("idle");
-        } catch {
-          setError("No se pudo completar la conexión con el servidor.");
-          setStatus("error");
-        }
+      (response) => {
+        void handleLoginResponse(response);
       },
       {
         config_id: configId,

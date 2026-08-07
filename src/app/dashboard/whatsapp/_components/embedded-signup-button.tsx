@@ -43,10 +43,30 @@ const SDK_SRC = "https://connect.facebook.net/es_LA/sdk.js";
 // sin ningún error ni forma de reintentar sin recargar la página entera.
 const SDK_LOAD_TIMEOUT_MS = 12_000;
 
+// `window.FB` puede existir (el script ya cargó, de este intento o de uno
+// anterior) sin que FB.init() se haya llamado todavía — y llamar FB.login()
+// antes de init() falla en seco ("FB.login() called before FB.init()."). Por
+// eso este flag, no la sola presencia de window.FB, es lo que dice si ya se
+// puede loguear.
+let fbInitialized = false;
+
 function loadFacebookSdk(appId: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (window.FB) {
+    function initNow() {
+      window.FB!.init({ appId, cookie: true, xfbml: false, version: "v21.0" });
+      fbInitialized = true;
       resolve();
+    }
+
+    if (fbInitialized) {
+      resolve();
+      return;
+    }
+
+    if (window.FB) {
+      // El script ya está cargado (de un intento anterior) — solo falta
+      // llamar init() en este.
+      initNow();
       return;
     }
 
@@ -56,8 +76,7 @@ function loadFacebookSdk(appId: string): Promise<void> {
 
     window.fbAsyncInit = () => {
       clearTimeout(timeout);
-      window.FB!.init({ appId, cookie: true, xfbml: false, version: "v21.0" });
-      resolve();
+      initNow();
     };
 
     // Si ya hay una etiqueta de un intento anterior que nunca terminó de
@@ -69,7 +88,6 @@ function loadFacebookSdk(appId: string): Promise<void> {
     script.id = "facebook-jssdk";
     script.src = SDK_SRC;
     script.async = true;
-    script.defer = true;
     script.onerror = () => {
       clearTimeout(timeout);
       reject(new Error("No se pudo descargar el SDK de Facebook."));

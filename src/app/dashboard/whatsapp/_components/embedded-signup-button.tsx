@@ -37,22 +37,43 @@ declare global {
 
 const SDK_SRC = "https://connect.facebook.net/es_LA/sdk.js";
 
+// Sin timeout ni onerror, un bloqueador de anuncios/rastreadores (uBlock,
+// Brave Shields, etc. — muy común que bloqueen justo connect.facebook.net)
+// dejaba la promesa colgada para siempre: el botón se quedaba en "Cargando…"
+// sin ningún error ni forma de reintentar sin recargar la página entera.
+const SDK_LOAD_TIMEOUT_MS = 12_000;
+
 function loadFacebookSdk(appId: string): Promise<void> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (window.FB) {
       resolve();
       return;
     }
+
+    const timeout = setTimeout(() => {
+      reject(new Error("No se pudo cargar el SDK de Facebook a tiempo."));
+    }, SDK_LOAD_TIMEOUT_MS);
+
     window.fbAsyncInit = () => {
+      clearTimeout(timeout);
       window.FB!.init({ appId, cookie: true, xfbml: false, version: "v21.0" });
       resolve();
     };
-    if (document.getElementById("facebook-jssdk")) return;
+
+    // Si ya hay una etiqueta de un intento anterior que nunca terminó de
+    // cargar, se reemplaza — así un reintento vuelve a pedir el script en
+    // vez de esperar por una carga que ya sabemos que no va a llegar.
+    document.getElementById("facebook-jssdk")?.remove();
+
     const script = document.createElement("script");
     script.id = "facebook-jssdk";
     script.src = SDK_SRC;
     script.async = true;
     script.defer = true;
+    script.onerror = () => {
+      clearTimeout(timeout);
+      reject(new Error("No se pudo descargar el SDK de Facebook."));
+    };
     document.body.appendChild(script);
   });
 }
@@ -103,7 +124,17 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
 
     setStatus("loading");
     setError(null);
-    await loadFacebookSdk(appId);
+    try {
+      await loadFacebookSdk(appId);
+    } catch {
+      setError(
+        "No se pudo cargar el SDK de Facebook. Si tienes un bloqueador de anuncios o de " +
+          "rastreadores (uBlock Origin, Brave Shields, extensiones de privacidad), desactívalo " +
+          "para este sitio e intenta de nuevo.",
+      );
+      setStatus("error");
+      return;
+    }
 
     window.FB!.login(
       async (response) => {

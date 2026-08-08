@@ -120,24 +120,43 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
-      if (!event.origin.endsWith("facebook.com")) return;
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type !== "WA_EMBEDDED_SIGNUP") return;
+      // Antes se descartaba en silencio cualquier mensaje que no viniera de
+      // un origen terminado en "facebook.com" Y que no fuera JSON parseable
+      // como texto — pero si Meta manda el evento desde otro subdominio, o
+      // manda `event.data` ya como objeto (no como string), ese filtro tira
+      // el mensaje a la basura sin dejar rastro. Por eso ahora, mientras se
+      // depura esto, se registra TODO lo que llega con origen relacionado a
+      // facebook/whatsapp, sin filtrar por forma ni por tipo.
+      const originLooksRelevant = /facebook\.com|whatsapp\.com|fb\.com/.test(event.origin);
+      if (!originLooksRelevant) return;
 
-        console.log("[embedded-signup] evento recibido:", data);
-        setDebugEvents((prev) =>
-          [...prev, `${data.event ?? "(sin event)"}: ${JSON.stringify(data.data ?? {})}`].slice(-10),
-        );
+      let data: unknown = event.data;
+      if (typeof event.data === "string") {
+        try {
+          data = JSON.parse(event.data);
+        } catch {
+          // no era JSON — se deja tal cual (string cruda) para verla igual
+        }
+      }
 
-        if (data.event === "FINISH") {
+      console.log("[embedded-signup] mensaje recibido de", event.origin, ":", data);
+      setDebugEvents((prev) =>
+        [...prev, `origin=${event.origin} :: ${JSON.stringify(data).slice(0, 300)}`].slice(-10),
+      );
+
+      if (
+        data != null &&
+        typeof data === "object" &&
+        "type" in data &&
+        (data as { type?: unknown }).type === "WA_EMBEDDED_SIGNUP"
+      ) {
+        const payload = data as { event?: string; data?: { waba_id?: string; phone_number_id?: string } };
+        if (payload.event === "FINISH") {
           sessionRef.current = {
-            wabaId: data.data?.waba_id,
-            phoneNumberId: data.data?.phone_number_id,
+            wabaId: payload.data?.waba_id,
+            phoneNumberId: payload.data?.phone_number_id,
           };
         }
-      } catch {
-        // mensajes que no son JSON (otros widgets de FB) — se ignoran
       }
     }
     window.addEventListener("message", onMessage);

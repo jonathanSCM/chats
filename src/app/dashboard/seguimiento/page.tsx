@@ -12,12 +12,12 @@ export default async function SeguimientoPage() {
   const organizationId = session.user.organizationId;
   const isAdmin = session.user.role === "OWNER" || session.user.role === "SUPERADMIN";
 
-  // El vendedor ve su cartera; el admin ve todo, igual que en la bandeja.
-  const scope = isAdmin ? {} : { assignedToId: session.user.id };
-
-  const [opportunities, contacts, ai] = await Promise.all([
+  // Todo el equipo ve la misma cartera — lo que carga el admin lo puede
+  // tomar cualquier vendedor. La edición queda restringida en el servidor
+  // (canEditOpportunity) a quien la tiene asignada, o al admin.
+  const [opportunities, contacts, members, ai] = await Promise.all([
     prisma.opportunity.findMany({
-      where: { organizationId, ...scope },
+      where: { organizationId },
       include: {
         contact: { select: { id: true, fullName: true, phone: true, city: true } },
         assignedTo: { select: { id: true, name: true, email: true, color: true } },
@@ -29,6 +29,11 @@ export default async function SeguimientoPage() {
       select: { id: true, fullName: true, phone: true },
       orderBy: { lastContactAt: "desc" },
       take: 300,
+    }),
+    prisma.user.findMany({
+      where: { organizationId },
+      select: { id: true, name: true, email: true, color: true },
+      orderBy: { createdAt: "asc" },
     }),
     getAiSpendToday(organizationId),
   ]);
@@ -48,6 +53,7 @@ export default async function SeguimientoPage() {
     probability: o.probability,
     aiRecommendation: o.aiRecommendation ?? "",
     aiSuggestedMessage: o.aiSuggestedMessage ?? "",
+    aiMemory: o.aiMemory ?? "",
     assignedTo: o.assignedTo
       ? { id: o.assignedTo.id, name: o.assignedTo.name || o.assignedTo.email, color: o.assignedTo.color }
       : null,
@@ -70,7 +76,9 @@ export default async function SeguimientoPage() {
       <TrackingTable
         rows={rows}
         contacts={contacts.map((c) => ({ id: c.id, label: c.fullName || c.phone }))}
+        members={members.map((m) => ({ id: m.id, name: m.name || m.email, color: m.color }))}
         currentUserId={session.user.id}
+        isAdmin={isAdmin}
         ai={ai}
         summary={{
           inFollowUp: open.length,

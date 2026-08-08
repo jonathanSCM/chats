@@ -38,13 +38,22 @@ export interface Row {
   probability: number | null;
   aiRecommendation: string;
   aiSuggestedMessage: string;
+  aiMemory: string;
   assignedTo: { id: string; name: string; color: string | null } | null;
+}
+
+interface Member {
+  id: string;
+  name: string;
+  color: string | null;
 }
 
 interface Props {
   rows: Row[];
   contacts: { id: string; label: string }[];
+  members: Member[];
   currentUserId: string;
+  isAdmin: boolean;
   summary: {
     inFollowUp: number;
     quotesSent: number;
@@ -52,6 +61,11 @@ interface Props {
     nextContact: string | null;
   };
   ai: { spent: number; budget: number; enabled: boolean };
+}
+
+/** El admin puede todo; un vendedor solo lo que tiene asignado (o nadie lo tiene). */
+function canEdit(row: Row, currentUserId: string, isAdmin: boolean): boolean {
+  return isAdmin || row.assignedTo?.id === currentUserId;
 }
 
 function dateFmt(iso: string | null): string {
@@ -77,7 +91,15 @@ function dateInputValue(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
 }
 
-export function TrackingTable({ rows, contacts, currentUserId, summary, ai }: Props) {
+export function TrackingTable({
+  rows,
+  contacts,
+  members,
+  currentUserId,
+  isAdmin,
+  summary,
+  ai,
+}: Props) {
   const [creating, setCreating] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
   const [query, setQuery] = useState("");
@@ -178,7 +200,13 @@ export function TrackingTable({ rows, contacts, currentUserId, summary, ai }: Pr
               </thead>
               <tbody>
                 {filtered.map((row) => (
-                  <TableRow key={row.id} row={row} aiEnabled={ai.enabled} onOpen={() => setDetail(row)} />
+                  <TableRow
+                    key={row.id}
+                    row={row}
+                    aiEnabled={ai.enabled}
+                    editable={canEdit(row, currentUserId, isAdmin)}
+                    onOpen={() => setDetail(row)}
+                  />
                 ))}
               </tbody>
             </table>
@@ -205,7 +233,14 @@ export function TrackingTable({ rows, contacts, currentUserId, summary, ai }: Pr
       )}
 
       {detail && (
-        <DetailPanel row={detail} currentUserId={currentUserId} onClose={closeDetail} />
+        <DetailPanel
+          row={detail}
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          members={members}
+          editable={canEdit(detail, currentUserId, isAdmin)}
+          onClose={closeDetail}
+        />
       )}
     </div>
   );
@@ -232,13 +267,16 @@ function Td({ children, className = "" }: { children?: React.ReactNode; classNam
 function TableRow({
   row,
   aiEnabled,
+  editable,
   onOpen,
 }: {
   row: Row;
   aiEnabled: boolean;
+  editable: boolean;
   onOpen: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  const locked = !editable || isPending;
 
   function save(field: string, value: string) {
     startTransition(async () => {
@@ -260,7 +298,7 @@ function TableRow({
         >
           {row.client || "—"}
         </button>
-        {row.assignedTo && (
+        {row.assignedTo ? (
           <span className="mt-1 flex items-center gap-1.5 text-[11px] text-ink-faint">
             <span
               className="h-1.5 w-1.5 rounded-full"
@@ -268,6 +306,8 @@ function TableRow({
             />
             {row.assignedTo.name}
           </span>
+        ) : (
+          <span className="mt-1 block text-[11px] italic text-ink-faint">Sin asignar</span>
         )}
       </Td>
 
@@ -277,7 +317,7 @@ function TableRow({
       <Td>
         <Select
           value={row.service}
-          disabled={isPending}
+          disabled={locked}
           onChange={(e) => save("serviceInterest", e.target.value)}
           className="w-28 py-1.5 text-sm"
         >
@@ -300,7 +340,7 @@ function TableRow({
       <Td>
         <Select
           value={row.stage}
-          disabled={isPending}
+          disabled={locked}
           onChange={(e) => save("stage", e.target.value)}
           className="w-32 py-1.5 text-sm font-semibold"
           style={{ color: STAGE_COLOR[row.stage] }}
@@ -321,7 +361,7 @@ function TableRow({
       <Td>
         <Select
           value={row.priority ?? ""}
-          disabled={isPending}
+          disabled={locked}
           onChange={(e) => save("priority", e.target.value)}
           className="w-24 py-1.5 text-sm font-semibold"
           style={{ color: row.priority ? PRIORITY_COLOR[row.priority] : undefined }}
@@ -337,7 +377,7 @@ function TableRow({
         <Input
           type="date"
           defaultValue={dateInputValue(row.nextContactAt)}
-          disabled={isPending}
+          disabled={locked}
           onBlur={(e) => save("nextContactAt", e.target.value)}
           className="w-32 py-1.5 text-sm"
         />
@@ -350,7 +390,7 @@ function TableRow({
             min="0"
             max="100"
             defaultValue={row.probability ?? ""}
-            disabled={isPending}
+            disabled={locked}
             onBlur={(e) => e.target.value && save("probability", e.target.value)}
             className="w-16 py-1.5 text-sm"
           />
@@ -371,7 +411,11 @@ function TableRow({
       </Td>
 
       <Td>
-        <AnalyzeButton opportunityId={row.id} disabled={!aiEnabled} />
+        <AnalyzeButton
+          opportunityId={row.id}
+          disabled={!aiEnabled || !editable}
+          title={!editable ? "Solo quien tiene asignado este cliente puede analizarlo" : undefined}
+        />
       </Td>
 
       <Td>
@@ -390,9 +434,11 @@ function TableRow({
 function AnalyzeButton({
   opportunityId,
   disabled,
+  title,
 }: {
   opportunityId: string;
   disabled: boolean;
+  title?: string;
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -402,7 +448,7 @@ function AnalyzeButton({
       <button
         type="button"
         disabled={disabled || isPending}
-        title={disabled ? "Falta configurar OPENAI_API_KEY" : "Pedir análisis al asesor IA"}
+        title={title ?? (disabled ? "Falta configurar OPENAI_API_KEY" : "Pedir análisis al asesor IA")}
         onClick={() =>
           startTransition(async () => {
             setError(null);
@@ -526,14 +572,21 @@ function CreateForm({
 function DetailPanel({
   row,
   currentUserId,
+  isAdmin,
+  members,
+  editable,
   onClose,
 }: {
   row: Row;
   currentUserId: string;
+  isAdmin: boolean;
+  members: Member[];
+  editable: boolean;
   onClose: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const locked = !editable || isPending;
 
   function save(field: string, value: string) {
     startTransition(async () => {
@@ -569,29 +622,43 @@ function DetailPanel({
         </div>
 
         <div className="space-y-4">
+          {!editable && (
+            <p className="rounded-md border border-border bg-surface-2/60 px-3 py-2 text-xs text-ink-faint">
+              Este cliente está asignado a otro vendedor — puedes verlo, pero no editarlo.
+            </p>
+          )}
+
           <Field label="Necesidad / contexto">
-            <EditableText
-              value={row.need}
-              disabled={isPending}
-              onSave={(v) => save("needSummary", v)}
-              placeholder="Qué necesita y en qué contexto"
-            />
+            {editable ? (
+              <EditableText
+                value={row.need}
+                disabled={locked}
+                onSave={(v) => save("needSummary", v)}
+                placeholder="Qué necesita y en qué contexto"
+              />
+            ) : (
+              <p className="text-sm leading-relaxed text-ink">{row.need || "—"}</p>
+            )}
           </Field>
 
           <Field label="Última actualización">
-            <EditableText
-              value={row.lastUpdate}
-              disabled={isPending}
-              onSave={(v) => save("lastUpdate", v)}
-              placeholder="Qué pasó en el último contacto"
-            />
+            {editable ? (
+              <EditableText
+                value={row.lastUpdate}
+                disabled={locked}
+                onSave={(v) => save("lastUpdate", v)}
+                placeholder="Qué pasó en el último contacto"
+              />
+            ) : (
+              <p className="text-sm leading-relaxed text-ink-muted">{row.lastUpdate || "—"}</p>
+            )}
           </Field>
 
-          {row.stage === "PERDIDO" && (
+          {row.stage === "PERDIDO" && editable && (
             <Field label="Motivo de la pérdida">
               <EditableText
                 value=""
-                disabled={isPending}
+                disabled={locked}
                 onSave={(v) => save("lostReason", v)}
                 placeholder="Precio, tiempos, se fue con otro proveedor…"
               />
@@ -618,43 +685,124 @@ function DetailPanel({
                 )}
               </Field>
             </div>
+
+            {row.aiMemory && (
+              <div className="mt-3">
+                <Field label="Lo que sabemos de este cliente">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-muted">
+                    {row.aiMemory}
+                  </p>
+                </Field>
+              </div>
+            )}
           </div>
 
-          {row.assignedTo && (
-            <p className="flex items-center gap-1.5 text-xs text-ink-muted">
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: vendorColor(row.assignedTo.id, row.assignedTo.color) }}
-              />
-              {row.assignedTo.id === currentUserId ? "Tú" : row.assignedTo.name}
-            </p>
+          <AssignmentControl
+            row={row}
+            currentUserId={currentUserId}
+            isAdmin={isAdmin}
+            members={members}
+            disabled={isPending}
+            onAssign={(value) => save("assignedToId", value)}
+          />
+
+          {editable && (
+            <div className="border-t border-border pt-4">
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => {
+                  if (!confirmDelete) {
+                    setConfirmDelete(true);
+                    setTimeout(() => setConfirmDelete(false), 3000);
+                    return;
+                  }
+                  startTransition(async () => {
+                    await deleteOpportunityAction(row.id);
+                    onClose();
+                  });
+                }}
+                className="flex cursor-pointer items-center gap-1.5 text-xs text-ink-faint hover:text-danger"
+              >
+                <Trash2 size={13} />
+                {confirmDelete ? "¿Seguro? Toca de nuevo" : "Quitar del seguimiento"}
+              </button>
+            </div>
           )}
-
-          <div className="border-t border-border pt-4">
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => {
-                if (!confirmDelete) {
-                  setConfirmDelete(true);
-                  setTimeout(() => setConfirmDelete(false), 3000);
-                  return;
-                }
-                startTransition(async () => {
-                  await deleteOpportunityAction(row.id);
-                  onClose();
-                });
-              }}
-              className="flex cursor-pointer items-center gap-1.5 text-xs text-ink-faint hover:text-danger"
-            >
-              <Trash2 size={13} />
-              {confirmDelete ? "¿Seguro? Toca de nuevo" : "Quitar del seguimiento"}
-            </button>
-          </div>
         </div>
       </aside>
     </div>,
     document.body,
+  );
+}
+
+function AssignmentControl({
+  row,
+  currentUserId,
+  isAdmin,
+  members,
+  disabled,
+  onAssign,
+}: {
+  row: Row;
+  currentUserId: string;
+  isAdmin: boolean;
+  members: Member[];
+  disabled: boolean;
+  onAssign: (value: string) => void;
+}) {
+  if (isAdmin) {
+    return (
+      <Field label="Asignado a">
+        <Select
+          value={row.assignedTo?.id ?? ""}
+          disabled={disabled}
+          onChange={(e) => onAssign(e.target.value)}
+          className="w-full py-1.5 text-sm"
+        >
+          <option value="">Sin asignar</option>
+          {members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    );
+  }
+
+  if (!row.assignedTo) {
+    return (
+      <Button type="button" variant="secondary" disabled={disabled} onClick={() => onAssign(currentUserId)}>
+        Tomar este cliente
+      </Button>
+    );
+  }
+
+  if (row.assignedTo.id === currentUserId) {
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <p className="flex items-center gap-1.5 text-xs text-ink-muted">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: vendorColor(row.assignedTo.id, row.assignedTo.color) }} />
+          Tú
+        </p>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onAssign("")}
+          className="cursor-pointer text-xs text-ink-faint hover:text-ink"
+        >
+          Soltarlo (vuelve a quedar libre)
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <p className="flex items-center gap-1.5 text-xs text-ink-muted">
+      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: vendorColor(row.assignedTo.id, row.assignedTo.color) }} />
+      {row.assignedTo.name}
+    </p>
   );
 }
 

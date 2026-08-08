@@ -18,12 +18,21 @@ let cache: PlatformSettings | null = null;
 let cacheAt = 0;
 const CACHE_TTL_MS = 30_000;
 
+// El SDK de Facebook rechaza en silencio (console.warn, sin error) un App ID
+// con espacios de más — nunca guarda el client ID y FB.login() falla después
+// como si FB.init() nunca se hubiera llamado. Se recorta acá también por si
+// las variables de entorno (Coolify) traen espacios de un copy-paste.
+function trimOrNull(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
 function fromEnv(): PlatformSettings {
   return {
-    whatsappAppId: process.env.WHATSAPP_APP_ID || null,
-    whatsappAppSecret: process.env.WHATSAPP_APP_SECRET || null,
-    whatsappConfigId: process.env.WHATSAPP_CONFIG_ID || null,
-    whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN || null,
+    whatsappAppId: trimOrNull(process.env.WHATSAPP_APP_ID),
+    whatsappAppSecret: trimOrNull(process.env.WHATSAPP_APP_SECRET),
+    whatsappConfigId: trimOrNull(process.env.WHATSAPP_CONFIG_ID),
+    whatsappVerifyToken: trimOrNull(process.env.WHATSAPP_VERIFY_TOKEN),
   };
 }
 
@@ -43,12 +52,13 @@ async function loadFromDb(): Promise<PlatformSettings> {
   // La web gana si está configurada; si no, se cae a las variables de
   // entorno — así los despliegues que ya las tenían ahí no se rompen.
   return {
-    whatsappAppId: row?.whatsappAppId || process.env.WHATSAPP_APP_ID || null,
+    whatsappAppId: trimOrNull(row?.whatsappAppId) || trimOrNull(process.env.WHATSAPP_APP_ID),
     whatsappAppSecret: row?.whatsappAppSecret
-      ? decrypt(row.whatsappAppSecret)
-      : process.env.WHATSAPP_APP_SECRET || null,
-    whatsappConfigId: row?.whatsappConfigId || process.env.WHATSAPP_CONFIG_ID || null,
-    whatsappVerifyToken: row?.whatsappVerifyToken || process.env.WHATSAPP_VERIFY_TOKEN || null,
+      ? decrypt(row.whatsappAppSecret).trim()
+      : trimOrNull(process.env.WHATSAPP_APP_SECRET),
+    whatsappConfigId: trimOrNull(row?.whatsappConfigId) || trimOrNull(process.env.WHATSAPP_CONFIG_ID),
+    whatsappVerifyToken:
+      trimOrNull(row?.whatsappVerifyToken) || trimOrNull(process.env.WHATSAPP_VERIFY_TOKEN),
   };
 }
 

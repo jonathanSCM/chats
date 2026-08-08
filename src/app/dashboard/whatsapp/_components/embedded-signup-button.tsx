@@ -95,6 +95,10 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
     null,
   );
   const sessionRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
+  // Diagnóstico temporal: el error "no mandó waba_id/phone_number_id" no dice
+  // en qué evento se cortó el flujo. Se guarda cada evento WA_EMBEDDED_SIGNUP
+  // tal cual llega (consola + en pantalla) para verlo sin abrir DevTools.
+  const [debugEvents, setDebugEvents] = useState<string[]>([]);
 
   useEffect(() => {
     fetch("/api/whatsapp/embedded-signup-config")
@@ -119,7 +123,14 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
       if (!event.origin.endsWith("facebook.com")) return;
       try {
         const data = JSON.parse(event.data);
-        if (data.type === "WA_EMBEDDED_SIGNUP" && data.event === "FINISH") {
+        if (data.type !== "WA_EMBEDDED_SIGNUP") return;
+
+        console.log("[embedded-signup] evento recibido:", data);
+        setDebugEvents((prev) =>
+          [...prev, `${data.event ?? "(sin event)"}: ${JSON.stringify(data.data ?? {})}`].slice(-10),
+        );
+
+        if (data.event === "FINISH") {
           sessionRef.current = {
             wabaId: data.data?.waba_id,
             phoneNumberId: data.data?.phone_number_id,
@@ -234,6 +245,18 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
           "Conectar con Coexistence (mismo número que ya usas en el celular)"}
       </Button>
       {error && <p className="text-xs text-danger">{error}</p>}
+      {debugEvents.length > 0 && (
+        <div className="rounded-md border border-border/60 bg-surface-2/50 p-2">
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-ink-faint">
+            Diagnóstico (temporal) — eventos de Facebook
+          </p>
+          {debugEvents.map((line, i) => (
+            <p key={i} className="break-all font-mono text-[10px] text-ink-muted">
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

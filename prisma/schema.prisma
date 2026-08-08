@@ -23,6 +23,10 @@ model Organization {
   name      String
   slug      String   @unique
   suspended Boolean  @default(false) // desactivada por el superadmin (ej. impago, abuso)
+  // Cuántos mensajes recientes de WhatsApp se le mandan al asesor IA por
+  // análisis (ajustable por el dueño en /dashboard/organization). Más
+  // mensajes = más contexto pero más costo por análisis.
+  aiMessageLimit Int      @default(25)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -538,6 +542,11 @@ model Opportunity {
   aiRecommendation    String?   @db.Text
   aiSuggestedMessage  String?   @db.Text
   aiReviewedAt        DateTime?
+  // Resumen vivo que la propia IA mantiene y reescribe en cada análisis: lo
+  // importante que aprendió del cliente a lo largo de toda la conversación,
+  // no solo de la ventana de mensajes recientes que se le manda cada vez.
+  aiMemory            String?   @db.Text
+  aiMemoryUpdatedAt   DateTime?
 
   proposalSentAt DateTime?
   wonAt          DateTime?

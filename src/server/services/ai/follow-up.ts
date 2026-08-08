@@ -86,12 +86,30 @@ interface OpportunityContext {
   contact: { fullName: string | null; phone: string; city: string | null };
 }
 
+// Tope duro independiente de lo que configure el admin: por más que suba el
+// número, no tiene sentido mandar miles de mensajes en cada análisis — el
+// costo se dispara y el modelo igual no lee bien contextos gigantes.
+const MAX_MESSAGE_LIMIT = 100;
+const MIN_MESSAGE_LIMIT = 5;
+const DEFAULT_MESSAGE_LIMIT = 25;
+
+function clampMessageLimit(value: number | null | undefined): number {
+  if (!value || !Number.isFinite(value)) return DEFAULT_MESSAGE_LIMIT;
+  return Math.min(MAX_MESSAGE_LIMIT, Math.max(MIN_MESSAGE_LIMIT, Math.round(value)));
+}
+
 /**
  * Arma el contexto que se le manda al modelo. No se envía toda la base:
- * solo la ficha del cliente, su historial reciente y el conocimiento
- * autorizado de la empresa (manual §25).
+ * solo la ficha del cliente, su historial reciente (ajustable por el admin
+ * de la organización) y el conocimiento autorizado de la empresa (manual §25).
  */
 async function buildInput(opportunity: OpportunityContext): Promise<string> {
+  const org = await prisma.organization.findUnique({
+    where: { id: opportunity.organizationId },
+    select: { aiMessageLimit: true },
+  });
+  const messageLimit = clampMessageLimit(org?.aiMessageLimit);
+
   const [knowledge, recentMessages, notes] = await Promise.all([
     prisma.knowledgeItem.findMany({
       where: { organizationId: opportunity.organizationId, active: true },
@@ -103,7 +121,7 @@ async function buildInput(opportunity: OpportunityContext): Promise<string> {
       where: { conversation: { contact: { phone: opportunity.contact.phone } } },
       select: { role: true, content: true, createdAt: true, mediaType: true },
       orderBy: { createdAt: "desc" },
-      take: 25,
+      take: messageLimit,
     }),
     prisma.conversationNote.findMany({
       where: { conversation: { contact: { phone: opportunity.contact.phone } } },

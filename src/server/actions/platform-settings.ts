@@ -16,13 +16,18 @@ async function requireSuperadmin() {
   return session;
 }
 
+// El SDK de Facebook valida el App ID con una regex anclada (solo dígitos,
+// sin nada más) y si no matchea, se queda callado (console.warn, no error) y
+// jamás guarda el client ID — FB.init() "corre" pero login() falla después
+// como si init() nunca se hubiera llamado. Un espacio invisible al copiar y
+// pegar desde Meta alcanza para romperlo, así que se recorta todo acá.
 const schema = z.object({
-  whatsappAppId: z.string().max(60).optional().default(""),
-  whatsappConfigId: z.string().max(60).optional().default(""),
-  whatsappVerifyToken: z.string().max(120).optional().default(""),
+  whatsappAppId: z.string().trim().max(60).optional().default(""),
+  whatsappConfigId: z.string().trim().max(60).optional().default(""),
+  whatsappVerifyToken: z.string().trim().max(120).optional().default(""),
   // Vacío = no cambiar (no se vuelve a mostrar en claro, igual que el
   // access token de cada conexión de WhatsApp).
-  whatsappAppSecret: z.string().max(200).optional().default(""),
+  whatsappAppSecret: z.string().trim().max(200).optional().default(""),
 });
 
 export async function updatePlatformSettingsAction(

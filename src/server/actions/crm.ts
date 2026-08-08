@@ -15,7 +15,25 @@ const PATH = "/dashboard/seguimiento";
 async function requireOrg() {
   const session = await requireSession();
   if (!session.user.organizationId) throw new Error("Sin organización");
-  return { organizationId: session.user.organizationId, userId: session.user.id };
+  const isAdmin = session.user.role === "OWNER" || session.user.role === "SUPERADMIN";
+  return {
+    organizationId: session.user.organizationId,
+    userId: session.user.id,
+    isAdmin,
+  };
+}
+
+/**
+ * El vendedor solo maneja su propia cartera; lo que el admin ya cargó (o
+ * dejó sin asignar) lo puede editar cualquiera que lo tome. Evita que un
+ * vendedor toque las filas de otro por error o a propósito.
+ */
+function canEditOpportunity(
+  opportunity: { assignedToId: string | null },
+  userId: string,
+  isAdmin: boolean,
+): boolean {
+  return isAdmin || opportunity.assignedToId === userId;
 }
 
 const createSchema = z.object({
@@ -29,7 +47,7 @@ export async function createOpportunityAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { organizationId, userId } = await requireOrg();
+  const { organizationId, userId, isAdmin } = await requireOrg();
 
   const parsed = createSchema.safeParse({
     contactId: formData.get("contactId"),
@@ -53,7 +71,10 @@ export async function createOpportunityAction(
       title: parsed.data.title,
       serviceInterest: parsed.data.serviceInterest ?? null,
       estimatedValue: parsed.data.estimatedValue ?? null,
-      assignedToId: userId,
+      // El admin carga clientes para el equipo: quedan sin asignar y
+      // cualquier vendedor los puede tomar. Un vendedor que agrega uno
+      // propio se lo asigna directo, como ya hacía antes.
+      assignedToId: isAdmin ? null : userId,
     },
   });
 
@@ -83,6 +104,9 @@ const fieldSchema = z.discriminatedUnion("field", [
   z.object({ field: z.literal("nextContactAt"), value: z.string() }),
   z.object({ field: z.literal("probability"), value: z.coerce.number().min(0).max(100) }),
   z.object({ field: z.literal("lostReason"), value: z.string().max(500) }),
+  // "" = sin asignar (lo suelta el vendedor, o el admin lo deja libre para
+  // que cualquiera lo tome). Cualquier otro valor debe ser un userId real.
+  z.object({ field: z.literal("assignedToId"), value: z.string().max(60) }),
 ]);
 
 export async function updateOpportunityFieldAction(
@@ -90,7 +114,7 @@ export async function updateOpportunityFieldAction(
   field: string,
   value: string,
 ): Promise<ActionState> {
-  const { organizationId, userId } = await requireOrg();
+  const { organizationId, userId, isAdmin } = await requireOrg();
 
   const parsed = fieldSchema.safeParse({ field, value });
   if (!parsed.success) return { error: "Valor inválido" };
@@ -98,6 +122,12 @@ export async function updateOpportunityFieldAction(
   const opportunity = await prisma.opportunity.findUnique({ where: { id: opportunityId } });
   if (!opportunity || opportunity.organizationId !== organizationId) {
     return { error: "Cliente no encontrado" };
+  }
+
+  // Reasignar tiene sus propias reglas (ver más abajo); el resto de los
+  // campos solo los toca el dueño de la fila o el admin.
+  if (parsed.data.field !== "assignedToId" && !canEditOpportunity(opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
   }
 
   const now = new Date();
@@ -118,14 +148,40 @@ export async function updateOpportunityFieldAction(
     case "probability":
       data.probability = Math.round(parsed.data.value);
       break;
+    case "assignedToId": {
+      const targetId = parsed.data.value || null;
+      if (isAdmin) {
+        // El admin puede asignar a cualquiera del equipo, o soltarlo.
+        if (targetId) {
+          const target = await prisma.user.findUnique({ where: { id: targetId } });
+          if (!target || target.organizationId !== organizationId) {
+            return { error: "Ese usuario no pertenece a la organización" };
+          }
+        }
+      } else if (targetId === userId) {
+        // Tomar un cliente sin asignar.
+        if (opportunity.assignedToId !== null) {
+          return { error: "Ya lo tomó otro vendedor" };
+        }
+      } else if (targetId === null) {
+        // Soltar un cliente propio, vuelve a quedar libre para el equipo.
+        if (opportunity.assignedToId !== userId) {
+          return { error: "No puedes soltar un cliente que no es tuyo" };
+        }
+      } else {
+        return { error: "Solo el admin puede reasignar a otro vendedor" };
+      }
+      data.assignedToId = targetId;
+      break;
+    }
     default:
       data[parsed.data.field] = parsed.data.value || null;
   }
 
   await prisma.opportunity.update({ where: { id: opportunityId }, data });
 
-  // Solo se auditan los cambios de estado: son los que después explican el
-  // embudo. Auditar cada tecleo de una nota solo generaría ruido.
+  // Solo se auditan los cambios de estado y de dueño: son los que después
+  // explican el embudo. Auditar cada tecleo de una nota solo generaría ruido.
   if (parsed.data.field === "stage") {
     await audit({
       entityType: "Opportunity",
@@ -136,6 +192,16 @@ export async function updateOpportunityFieldAction(
       before: { stage: opportunity.stage },
       after: { stage: parsed.data.value },
     });
+  } else if (parsed.data.field === "assignedToId") {
+    await audit({
+      entityType: "Opportunity",
+      entityId: opportunityId,
+      action: "reassign",
+      userId,
+      organizationId,
+      before: { assignedToId: opportunity.assignedToId },
+      after: { assignedToId: data.assignedToId },
+    });
   }
 
   revalidatePath(PATH);
@@ -143,11 +209,14 @@ export async function updateOpportunityFieldAction(
 }
 
 export async function deleteOpportunityAction(opportunityId: string): Promise<ActionState> {
-  const { organizationId, userId } = await requireOrg();
+  const { organizationId, userId, isAdmin } = await requireOrg();
 
   const opportunity = await prisma.opportunity.findUnique({ where: { id: opportunityId } });
   if (!opportunity || opportunity.organizationId !== organizationId) {
     return { error: "Cliente no encontrado" };
+  }
+  if (!canEditOpportunity(opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
   }
 
   await prisma.opportunity.delete({ where: { id: opportunityId } });
@@ -208,14 +277,17 @@ export async function countWithoutNextContact(organizationId: string): Promise<n
 export async function analyzeOpportunityAction(
   opportunityId: string,
 ): Promise<ActionState> {
-  const { organizationId } = await requireOrg();
+  const { organizationId, userId, isAdmin } = await requireOrg();
 
   const opportunity = await prisma.opportunity.findUnique({
     where: { id: opportunityId },
-    select: { organizationId: true },
+    select: { organizationId: true, assignedToId: true },
   });
   if (!opportunity || opportunity.organizationId !== organizationId) {
     return { error: "Cliente no encontrado" };
+  }
+  if (!canEditOpportunity(opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
   }
 
   if (!isAiEnabled()) {

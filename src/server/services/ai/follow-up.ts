@@ -6,7 +6,7 @@ import { MODELS, runStructured } from "./client";
 
 export const PROMPT_VERSION = "seguimiento-v1";
 
-/** Lo que el modelo debe devolver: las cinco columnas de IA de la planilla. */
+/** Lo que el modelo debe devolver: las cinco columnas de IA de la planilla, más la memoria. */
 const resultSchema = z.object({
   prioridad: z.enum(["ALTA", "MEDIA", "BAJA"]),
   proximo_contacto: z.string(), // ISO yyyy-mm-dd, o "" si no corresponde
@@ -14,6 +14,7 @@ const resultSchema = z.object({
   recomendacion: z.string().min(1),
   mensaje_sugerido: z.string().min(1),
   razon: z.string().min(1),
+  memoria: z.string().min(1),
 });
 
 export type FollowUpResult = z.infer<typeof resultSchema>;
@@ -28,6 +29,7 @@ const jsonSchema = {
     "recomendacion",
     "mensaje_sugerido",
     "razon",
+    "memoria",
   ],
   properties: {
     prioridad: {
@@ -58,6 +60,15 @@ const jsonSchema = {
       type: "string",
       description: "Por qué se asignó esa prioridad y probabilidad. Una o dos frases.",
     },
+    memoria: {
+      type: "string",
+      description:
+        "Resumen actualizado de todo lo importante que se sabe de este cliente hasta ahora " +
+        "(intereses, objeciones, presupuesto mencionado, promesas hechas, próximos pasos acordados). " +
+        "Parte de la MEMORIA ANTERIOR si existe y agrégale o corrige con lo nuevo de esta conversación " +
+        "— no la repitas igual si no cambió nada relevante. Texto libre, breve (máximo ~6 líneas), sin " +
+        "inventar datos que no estén en la conversación o notas.",
+    },
   },
 } as const;
 
@@ -70,6 +81,9 @@ Reglas:
 - El mensaje sugerido es un borrador para que el vendedor lo revise: breve, claro, en español neutro y sin presionar al cliente.
 - Si el cliente no responde hace tiempo, es preferible un último mensaje corto y pausar, en vez de insistir.
 - La probabilidad debe ser realista: si no hay respuesta ni presupuesto confirmado, es baja.
+- La "memoria" es un resumen que se reutiliza en cada análisis futuro de este mismo cliente: mantenla
+  corta y factual, actualizándola en vez de repetirla — es la forma en que recuerdas la conversación
+  completa aunque solo veas los mensajes más recientes.
 - Devuelve exclusivamente el JSON del esquema pedido.`;
 
 interface OpportunityContext {
@@ -83,6 +97,7 @@ interface OpportunityContext {
   estimatedValue: unknown;
   nextContactAt: Date | null;
   createdAt: Date;
+  aiMemory: string | null;
   contact: { fullName: string | null; phone: string; city: string | null };
 }
 
@@ -169,10 +184,13 @@ Valor estimado: ${opportunity.estimatedValue ? String(opportunity.estimatedValue
 Última actualización del vendedor: ${opportunity.lastUpdate ?? "(sin registrar)"}
 Próximo contacto agendado: ${opportunity.nextContactAt?.toISOString().slice(0, 10) ?? "(ninguno)"}
 
+MEMORIA ANTERIOR DEL ASESOR IA (resumen acumulado de análisis previos — actualízala, no la ignores)
+${opportunity.aiMemory ?? "(Todavía no hay memoria — es el primer análisis de este cliente.)"}
+
 NOTAS INTERNAS DEL EQUIPO
 ${notesText}
 
-CONVERSACIÓN DE WHATSAPP (más reciente al final)
+CONVERSACIÓN DE WHATSAPP, ventana de los últimos ${messageLimit} mensajes (más reciente al final)
 ${conversationText}
 
 INFORMACIÓN AUTORIZADA DE LA EMPRESA
@@ -217,6 +235,8 @@ export async function analyzeFollowUp(opportunityId: string): Promise<FollowUpRe
       aiRecommendation: result.recomendacion,
       aiSuggestedMessage: result.mensaje_sugerido,
       aiReviewedAt: new Date(),
+      aiMemory: result.memoria,
+      aiMemoryUpdatedAt: new Date(),
       // Solo se propone fecha si no había una puesta por una persona.
       ...(nextContactAt && !opportunity.nextContactAt ? { nextContactAt } : {}),
     },

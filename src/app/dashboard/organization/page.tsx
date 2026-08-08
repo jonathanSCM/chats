@@ -5,6 +5,7 @@ import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { RenameOrgForm } from "./_components/rename-org-form";
 import { MembersList } from "./_components/members-list";
 import { InvitePanel } from "./_components/invite-panel";
+import { AiSettingsForm } from "./_components/ai-settings-form";
 
 export default async function OrganizationSettingsPage() {
   const session = await auth();
@@ -32,6 +33,14 @@ export default async function OrganizationSettingsPage() {
       <Card className="mb-6">
         <CardTitle className="mb-4">Nombre</CardTitle>
         <RenameOrgForm currentName={org.name} />
+      </Card>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Asesor IA</CardTitle>
+        <CardDescription className="mb-4">
+          Cuánto contexto de la conversación recibe el asesor al analizar un cliente.
+        </CardDescription>
+        <AiSettingsForm currentLimit={org.aiMessageLimit} />
       </Card>
 
       <Card className="mb-6">

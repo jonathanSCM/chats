@@ -4,6 +4,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Badge, StatusDot } from "@/components/ui/badge";
 import { Table, Thead, Th, Td, Tr } from "@/components/ui/table";
 import { SuspendToggle } from "./_components/suspend-toggle";
+import { DisconnectWhatsAppButton } from "./_components/disconnect-whatsapp-button";
 import type { BotStatus } from "@/generated/prisma/enums";
 
 const botStatusTone: Record<BotStatus, "accent" | "warning" | "neutral"> = {
@@ -54,6 +55,7 @@ export default async function AdminOrganizationDetailPage({
                 <Th>Estado</Th>
                 <Th>WhatsApp</Th>
                 <Th>Conversaciones</Th>
+                <Th />
               </tr>
             </Thead>
             <tbody>
@@ -70,6 +72,9 @@ export default async function AdminOrganizationDetailPage({
                     {bot.whatsappConnection?.verified ? "Conectado" : "Sin conectar"}
                   </Td>
                   <Td className="font-mono">{bot._count.conversations}</Td>
+                  <Td>
+                    {bot.whatsappConnection && <DisconnectWhatsAppButton botId={bot.id} />}
+                  </Td>
                 </Tr>
               ))}
             </tbody>

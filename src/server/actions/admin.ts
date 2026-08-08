@@ -25,3 +25,20 @@ export async function toggleOrgSuspensionAction(
   revalidatePath("/admin");
   return { error: null };
 }
+
+/**
+ * Borra solo la conexión de WhatsApp de un bot (token, phone_number_id,
+ * waba_id) para poder volver a intentar Embedded Signup desde cero. No
+ * toca la organización, el bot, sus conversaciones ni ningún otro dato.
+ */
+export async function disconnectWhatsAppAction(botId: string): Promise<ActionState> {
+  await requireSuperadmin();
+
+  const bot = await prisma.bot.findUnique({ where: { id: botId }, select: { organizationId: true } });
+  if (!bot) return { error: "Bot no encontrado" };
+
+  await prisma.whatsAppConnection.deleteMany({ where: { botId } });
+
+  revalidatePath(`/admin/organizations/${bot.organizationId}`);
+  return { error: null, message: "Conexión de WhatsApp eliminada." };
+}

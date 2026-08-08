@@ -120,6 +120,15 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
+      // TEMPORAL: log crudo de absolutamente todo mensaje que llega a la
+      // página, sin filtrar por origen ni por forma — para ver si hay algo
+      // que ni siquiera pasa el chequeo de origen `endsWith("facebook.com")`.
+      console.log("[raw-facebook-message]", {
+        origin: event.origin,
+        dataType: typeof event.data,
+        data: event.data,
+      });
+
       // Antes se descartaba en silencio cualquier mensaje que no viniera de
       // un origen terminado en "facebook.com" Y que no fuera JSON parseable
       // como texto — pero si Meta manda el evento desde otro subdominio, o

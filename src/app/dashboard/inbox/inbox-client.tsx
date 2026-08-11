@@ -403,10 +403,15 @@ export function InboxClient({
       const prevUnread = prevUnreadRef.current.get(c.id) ?? 0;
       if (isFirstFetch || c.unreadCount <= prevUnread) continue;
 
+      // El chat que ya tienes abierto no debe sonar ni notificar: lo estás
+      // viendo llegar en tiempo real, y encima su unreadCount todavía puede
+      // aparecer "subido" un instante mientras el servidor procesa la marca
+      // de leído — sonaría al simple hecho de cambiar de chat.
+      if (c.id === selectedIdRef.current) continue;
+
       hasNewMessage = true;
 
       if (
-        c.id !== selectedIdRef.current &&
         typeof Notification !== "undefined" &&
         Notification.permission === "granted" &&
         document.visibilityState === "visible"

@@ -6,13 +6,14 @@ import { RenameOrgForm } from "./_components/rename-org-form";
 import { MembersList } from "./_components/members-list";
 import { InvitePanel } from "./_components/invite-panel";
 import { AiSettingsForm } from "./_components/ai-settings-form";
+import { BotAccessMatrix } from "./_components/bot-access-matrix";
 
 export default async function OrganizationSettingsPage() {
   const session = await auth();
   if (!session?.user.organizationId) redirect("/dashboard");
   if (session.user.role !== "OWNER") redirect("/dashboard");
 
-  const [org, members, invites] = await Promise.all([
+  const [org, members, invites, bots, botMembers] = await Promise.all([
     prisma.organization.findUniqueOrThrow({ where: { id: session.user.organizationId } }),
     prisma.user.findMany({
       where: { organizationId: session.user.organizationId },
@@ -23,7 +24,18 @@ export default async function OrganizationSettingsPage() {
       where: { organizationId: session.user.organizationId, acceptedAt: null },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.bot.findMany({
+      where: { organizationId: session.user.organizationId },
+      select: { id: true, name: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.botMember.findMany({
+      where: { bot: { organizationId: session.user.organizationId } },
+      select: { botId: true, userId: true },
+    }),
   ]);
+
+  const vendedores = members.filter((m) => m.role === "MEMBER");
 
   return (
     <div className="max-w-2xl animate-fade-up">
@@ -49,6 +61,18 @@ export default async function OrganizationSettingsPage() {
           Todos los que tienen acceso a tus bots y conversaciones.
         </CardDescription>
         <MembersList members={members} currentUserId={session.user.id} />
+      </Card>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Accesos por cuenta de WhatsApp</CardTitle>
+        <CardDescription className="mb-4">
+          Marca a qué cuentas puede entrar cada vendedor — sin marcar, no ve esos chats.
+        </CardDescription>
+        <BotAccessMatrix
+          bots={bots}
+          members={vendedores.map((v) => ({ id: v.id, name: v.name ?? "", email: v.email, color: v.color }))}
+          initialAccess={new Set(botMembers.map((bm) => `${bm.botId}:${bm.userId}`))}
+        />
       </Card>
 
       <Card>

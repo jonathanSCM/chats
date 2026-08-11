@@ -75,6 +75,7 @@ model User {
   ownedContacts           Contact[]                @relation("ContactOwner")
   ownedOpportunities      Opportunity[]            @relation("OpportunityOwner")
   ownedActivities         Activity[]               @relation("ActivityOwner")
+  botAccess               BotMember[]
 
   @@index([organizationId])
   @@map("users")
@@ -138,6 +139,7 @@ model Bot {
 
   whatsappConnection WhatsAppConnection?
   conversations      Conversation[]
+  members            BotMember[]
 
   @@index([organizationId])
   @@map("bots")
@@ -147,6 +149,23 @@ enum BotStatus {
   DRAFT
   ACTIVE
   PAUSED
+}
+
+// Qué vendedores (MEMBER) pueden ver/atender cada cuenta de WhatsApp. Sin
+// fila acá, un MEMBER no ve los chats de ese bot — es la restricción real
+// de acceso por cuenta. OWNER y SUPERADMIN no necesitan estar acá: siempre
+// ven todas las cuentas de su organización, igual que en el resto del panel.
+model BotMember {
+  id        String   @id @default(cuid())
+  botId     String
+  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([botId, userId])
+  @@index([userId])
+  @@map("bot_members")
 }
 
 model WhatsAppConnection {

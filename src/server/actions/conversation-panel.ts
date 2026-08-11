@@ -26,6 +26,15 @@ async function requireConversationAccess(conversationId: string) {
   const isMine = !conversation.assignedToId || conversation.assignedToId === session.user.id;
   if (!isAdmin && !isMine) return null;
 
+  // Además de ser suya (o libre), la cuenta de WhatsApp a la que pertenece
+  // debe estar entre las que el vendedor tiene asignadas (BotMember).
+  if (!isAdmin) {
+    const hasBotAccess = await prisma.botMember.findUnique({
+      where: { botId_userId: { botId: conversation.botId, userId: session.user.id } },
+    });
+    if (!hasBotAccess) return null;
+  }
+
   return { session, conversation, organizationId: conversation.bot.organizationId };
 }
 

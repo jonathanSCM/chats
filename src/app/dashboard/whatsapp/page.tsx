@@ -3,60 +3,57 @@ import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { getBusinessProfileForBot } from "@/server/actions/business-profile";
 import { getPlatformSettings } from "@/server/services/platform-settings";
-import { WhatsAppTab } from "./_components/whatsapp-tab";
 import { CopyField } from "./_components/copy-field";
-import { BusinessProfileForm } from "./_components/business-profile-form";
+import { BotAccountCard } from "./_components/bot-account-card";
+import { CreateBotForm } from "./_components/create-bot-form";
 import { Card, CardTitle } from "@/components/ui/card";
 
-// En esta variante no hay concepto de "bots" a nivel de UI: cada
-// organización tiene un único número de WhatsApp conectado por debajo.
+// Cada organización puede tener varias cuentas de WhatsApp (varios "bots",
+// uno por número/país). El dueño ve y administra todas; un vendedor (MEMBER)
+// solo ve las que tiene asignadas en BotMember — misma restricción real que
+// aplica en el inbox.
 export default async function WhatsAppSettingsPage() {
   const session = await requireSession();
   if (!session.user.organizationId) redirect("/dashboard");
 
+  const organizationId = session.user.organizationId;
   const isOwner = session.user.role === "OWNER" || session.user.role === "SUPERADMIN";
 
-  let bot = await prisma.bot.findFirst({
-    where: { organizationId: session.user.organizationId },
+  const allBots = await prisma.bot.findMany({
+    where: { organizationId },
     include: { whatsappConnection: true },
+    orderBy: { createdAt: "asc" },
   });
 
-  // Crear/activar el bot contenedor es un detalle de infraestructura — solo
-  // lo hace el dueño; un MEMBER solo puede ver el estado, nunca tocarlo.
-  if (isOwner) {
-    if (!bot) {
-      const org = await prisma.organization.findUniqueOrThrow({
-        where: { id: session.user.organizationId },
-      });
-      bot = await prisma.bot.create({
-        data: { organizationId: org.id, name: org.name, status: "ACTIVE" },
-        include: { whatsappConnection: true },
-      });
-    } else if (bot.status !== "ACTIVE") {
-      bot = await prisma.bot.update({
-        where: { id: bot.id },
-        data: { status: "ACTIVE" },
-        include: { whatsappConnection: true },
-      });
-    }
+  let bots = allBots;
+  if (!isOwner) {
+    const memberships = await prisma.botMember.findMany({
+      where: { userId: session.user.id },
+      select: { botId: true },
+    });
+    const allowed = new Set(memberships.map((m) => m.botId));
+    bots = allBots.filter((b) => allowed.has(b.id));
   }
 
   const webhookUrl = `${process.env.NEXTAUTH_URL ?? ""}/api/webhooks/whatsapp`;
   const platformSettings = await getPlatformSettings();
   const verifyToken = platformSettings.whatsappVerifyToken ?? "";
 
-  // Se pide aparte (no bloquea el resto de la página si Meta falla o el
-  // token todavía no tiene el permiso whatsapp_business_management).
-  let businessProfile = null;
-  let businessProfileError: string | null = null;
-  if (isOwner && bot?.whatsappConnection?.verified) {
-    try {
-      businessProfile = await getBusinessProfileForBot(bot.id);
-    } catch (error) {
-      console.error("[whatsapp] No se pudo cargar el perfil de negocio:", error);
-      businessProfileError = "No se pudo cargar el perfil de negocio desde Meta.";
-    }
-  }
+  // Se pide aparte por cada bot conectado — si Meta falla para uno, no debe
+  // tumbar la página entera ni el resto de las cuentas.
+  const profiles = await Promise.all(
+    bots.map(async (bot) => {
+      if (!isOwner || !bot.whatsappConnection?.verified) {
+        return { profile: null, error: false };
+      }
+      try {
+        return { profile: await getBusinessProfileForBot(bot.id), error: false };
+      } catch (error) {
+        console.error(`[whatsapp] No se pudo cargar el perfil de negocio del bot ${bot.id}:`, error);
+        return { profile: null, error: true };
+      }
+    }),
+  );
 
   return (
     <div className="max-w-2xl animate-fade-up">
@@ -65,8 +62,8 @@ export default async function WhatsAppSettingsPage() {
       </h1>
       <p className="mb-8 text-sm text-ink-muted">
         {isOwner
-          ? "Conecta el número de WhatsApp Business de tu organización."
-          : "Solo el dueño de la organización puede conectar o cambiar el número de WhatsApp."}
+          ? "Conecta los números de WhatsApp Business de tu organización — puedes tener varios."
+          : "Cuentas de WhatsApp que tienes asignadas."}
       </p>
 
       <Card className="mb-6 space-y-4">
@@ -75,21 +72,33 @@ export default async function WhatsAppSettingsPage() {
         <CopyField label="Identificador de verificación (verify token)" value={verifyToken} />
       </Card>
 
-      {bot ? (
-        <WhatsAppTab botId={bot.id} connection={bot.whatsappConnection} readOnly={!isOwner} />
-      ) : (
-        <p className="text-sm text-ink-faint">
-          Todavía no hay WhatsApp configurado. Pide al dueño de la cuenta que lo conecte.
+      {bots.length > 0 && (
+        <div className="mb-6 space-y-4">
+          {bots.map((bot, i) => (
+            <BotAccountCard
+              key={bot.id}
+              bot={{ id: bot.id, name: bot.name }}
+              connection={bot.whatsappConnection}
+              isOwner={isOwner}
+              businessProfile={profiles[i].profile}
+              businessProfileError={profiles[i].error}
+            />
+          ))}
+        </div>
+      )}
+
+      {bots.length === 0 && (
+        <p className="mb-6 text-sm text-ink-faint">
+          {isOwner
+            ? "Todavía no hay cuentas de WhatsApp. Agrega la primera abajo."
+            : "No tienes ninguna cuenta de WhatsApp asignada — pide al dueño de la organización que te dé acceso."}
         </p>
       )}
 
-      {businessProfile && bot && (
-        <div className="mt-6">
-          <BusinessProfileForm botId={bot.id} profile={businessProfile} />
-        </div>
-      )}
-      {businessProfileError && (
-        <p className="mt-6 text-sm text-warning">{businessProfileError}</p>
+      {isOwner && (
+        <Card>
+          <CreateBotForm />
+        </Card>
       )}
     </div>
   );

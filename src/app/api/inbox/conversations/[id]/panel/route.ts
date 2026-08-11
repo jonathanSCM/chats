@@ -53,6 +53,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Sin acceso" }, { status: 403 });
   }
 
+  if (!isAdmin) {
+    const hasBotAccess = await prisma.botMember.findUnique({
+      where: { botId_userId: { botId: conversation.botId, userId: session.user.id } },
+    });
+    if (!hasBotAccess) {
+      return NextResponse.json({ error: "No tienes acceso a esta cuenta de WhatsApp" }, { status: 403 });
+    }
+  }
+
   const team = await prisma.user.findMany({
     where: { organizationId },
     select: { id: true, name: true, email: true },

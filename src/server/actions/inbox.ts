@@ -19,6 +19,15 @@ async function getOwnedConversation(conversationId: string) {
   if (!conversation || conversation.bot.organizationId !== session.user.organizationId) {
     return null;
   }
+
+  const isAdmin = session.user.role === "OWNER" || session.user.role === "SUPERADMIN";
+  if (!isAdmin) {
+    const hasBotAccess = await prisma.botMember.findUnique({
+      where: { botId_userId: { botId: conversation.botId, userId: session.user.id } },
+    });
+    if (!hasBotAccess) return null;
+  }
+
   return conversation;
 }
 

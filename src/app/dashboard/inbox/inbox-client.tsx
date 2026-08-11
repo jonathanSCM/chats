@@ -30,11 +30,17 @@ interface Vendor {
   color: string | null;
 }
 
+interface BotAccount {
+  id: string;
+  name: string;
+}
+
 interface ConversationSummary {
   id: string;
   customerPhone: string;
   customerName: string | null;
   lastMessageAt: string;
+  bot: BotAccount;
   assignedTo: Vendor | null;
   unreadCount: number;
   lastMessage: {
@@ -286,11 +292,15 @@ function Avatar({ id, label, size = 40 }: { id: string; label: string; size?: nu
 export function InboxClient({
   currentUserId,
   isAdmin,
+  bots,
 }: {
   currentUserId: string;
   isAdmin: boolean;
+  /** Cuentas de WhatsApp que este usuario puede ver — para el selector del lateral. */
+  bots: BotAccount[];
 }) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [customerPhone, setCustomerPhone] = useState("");
@@ -368,7 +378,11 @@ export function InboxClient({
   }, []);
 
   const fetchConversations = useCallback(async () => {
-    const res = await fetch("/api/inbox/conversations");
+    const res = await fetch(
+      selectedBotId
+        ? `/api/inbox/conversations?botId=${selectedBotId}`
+        : "/api/inbox/conversations",
+    );
     if (!res.ok) return;
     const list: ConversationSummary[] = await res.json();
 
@@ -412,7 +426,7 @@ export function InboxClient({
     document.title = totalUnread > 0 ? `(${totalUnread}) WhatsApp ProShop` : "WhatsApp ProShop";
 
     setConversations(list);
-  }, []);
+  }, [selectedBotId]);
 
   const fetchMessages = useCallback(async (id: string) => {
     const res = await fetch(`/api/inbox/conversations/${id}/messages`);
@@ -616,8 +630,42 @@ export function InboxClient({
           )}
         </div>
 
+        {bots.length > 1 && (
+          <div className="flex gap-1.5 overflow-x-auto border-b border-border bg-surface px-3 py-2">
+            <button
+              type="button"
+              onClick={() => setSelectedBotId(null)}
+              className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                selectedBotId === null
+                  ? "bg-accent text-accent-ink"
+                  : "bg-surface-2 text-ink-muted hover:text-ink"
+              }`}
+            >
+              Todas
+            </button>
+            {bots.map((bot) => (
+              <button
+                key={bot.id}
+                type="button"
+                onClick={() => setSelectedBotId(bot.id)}
+                className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  selectedBotId === bot.id
+                    ? "bg-accent text-accent-ink"
+                    : "bg-surface-2 text-ink-muted hover:text-ink"
+                }`}
+              >
+                {bot.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         {conversations.length === 0 && (
-          <p className="px-4 py-6 text-sm text-ink-faint">No hay conversaciones todavía.</p>
+          <p className="px-4 py-6 text-sm text-ink-faint">
+            {!isAdmin && bots.length === 0
+              ? "No tienes ninguna cuenta de WhatsApp asignada — pide al dueño de la organización que te dé acceso."
+              : "No hay conversaciones todavía."}
+          </p>
         )}
         {conversations.map((c) => (
           <button
@@ -670,6 +718,12 @@ export function InboxClient({
                       : c.assignedTo.name
                     : "Sin asignar"}
                 </span>
+                {bots.length > 1 && !selectedBotId && (
+                  <>
+                    <span className="text-ink-faint">·</span>
+                    <span className="truncate text-ink-faint">{c.bot.name}</span>
+                  </>
+                )}
               </span>
             </div>
           </button>

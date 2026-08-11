@@ -157,8 +157,6 @@ function durationFmt(seconds: number) {
 let notificationAudioCtx: AudioContext | null = null;
 
 function playNotificationSound() {
-  // TEMPORAL: para ver quién/qué dispara el sonido y en qué momento exacto.
-  console.trace("[sonido] playNotificationSound() llamado");
   try {
     const AudioCtxClass = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioCtxClass) return;
@@ -411,14 +409,6 @@ export function InboxClient({
       // de leído — sonaría al simple hecho de cambiar de chat.
       if (c.id === selectedIdRef.current) continue;
 
-      // TEMPORAL: contexto de por qué este chat cuenta como "nuevo".
-      console.log("[sonido] chat marcado como nuevo:", {
-        conversationId: c.id,
-        prevUnread,
-        newUnread: c.unreadCount,
-        selectedId: selectedIdRef.current,
-      });
-
       hasNewMessage = true;
 
       if (
@@ -435,7 +425,13 @@ export function InboxClient({
     }
     if (hasNewMessage) playNotificationSound();
 
-    prevUnreadRef.current = new Map(list.map((c) => [c.id, c.unreadCount]));
+    // Se actualiza sin reemplazar el mapa entero: un chat que quede
+    // momentáneamente fuera de esta respuesta (filtro de cuenta, etc.) no
+    // debe perder su último conteo conocido — si no, al reaparecer se
+    // compararía contra 0 y sonaría como si fuera nuevo otra vez.
+    for (const c of list) {
+      prevUnreadRef.current.set(c.id, c.unreadCount);
+    }
 
     const totalUnread = list.reduce((sum, c) => sum + c.unreadCount, 0);
     document.title = totalUnread > 0 ? `(${totalUnread}) WhatsApp ProShop` : "WhatsApp ProShop";
@@ -685,10 +681,7 @@ export function InboxClient({
         {conversations.map((c) => (
           <button
             key={c.id}
-            onClick={() => {
-              console.log("[sonido] clic en chat:", c.id, "hora:", new Date().toISOString());
-              setSelectedId(c.id);
-            }}
+            onClick={() => setSelectedId(c.id)}
             className={`flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-surface-2 ${
               selectedId === c.id ? "bg-surface-2" : ""
             }`}

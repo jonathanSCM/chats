@@ -157,6 +157,8 @@ function durationFmt(seconds: number) {
 let notificationAudioCtx: AudioContext | null = null;
 
 function playNotificationSound() {
+  // TEMPORAL: para ver quién/qué dispara el sonido y en qué momento exacto.
+  console.trace("[sonido] playNotificationSound() llamado");
   try {
     const AudioCtxClass = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioCtxClass) return;
@@ -408,6 +410,14 @@ export function InboxClient({
       // aparecer "subido" un instante mientras el servidor procesa la marca
       // de leído — sonaría al simple hecho de cambiar de chat.
       if (c.id === selectedIdRef.current) continue;
+
+      // TEMPORAL: contexto de por qué este chat cuenta como "nuevo".
+      console.log("[sonido] chat marcado como nuevo:", {
+        conversationId: c.id,
+        prevUnread,
+        newUnread: c.unreadCount,
+        selectedId: selectedIdRef.current,
+      });
 
       hasNewMessage = true;
 
@@ -675,7 +685,10 @@ export function InboxClient({
         {conversations.map((c) => (
           <button
             key={c.id}
-            onClick={() => setSelectedId(c.id)}
+            onClick={() => {
+              console.log("[sonido] clic en chat:", c.id, "hora:", new Date().toISOString());
+              setSelectedId(c.id);
+            }}
             className={`flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-surface-2 ${
               selectedId === c.id ? "bg-surface-2" : ""
             }`}

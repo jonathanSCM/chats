@@ -1,20 +1,17 @@
 import { cn } from "@/lib/utils";
 
-// Ícono de marca: las mismas esquinas HUD del motivo `.corner-brackets`,
-// llevadas a un isotipo — un visor enfocando un punto.
+// Ícono de marca: el rayo de la app, como tile cuadrado redondeado.
 export function LogoMark({ className, size = 22 }: { className?: string; size?: number }) {
   return (
-    <svg
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/logo-mark.png"
+      alt=""
       width={size}
       height={size}
-      viewBox="0 0 22 22"
-      fill="none"
-      className={cn("text-accent", className)}
-    >
-      <path d="M1 6.5V1H6.5" stroke="currentColor" strokeWidth="2" />
-      <path d="M21 15.5V21H15.5" stroke="currentColor" strokeWidth="2" />
-      <circle cx="11" cy="11" r="3" fill="currentColor" />
-    </svg>
+      className={cn("shrink-0 rounded-md", className)}
+      style={{ width: size, height: size }}
+    />
   );
 }
 

@@ -10,12 +10,6 @@ export default function TermsPage() {
         <Logo />
       </Link>
 
-      <div className="mb-8 rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-ink">
-        <strong>Borrador.</strong> Este texto es una base razonable para un SaaS de este tipo,
-        pero no reemplaza asesoría legal. Que un abogado lo revise antes de publicarlo o de
-        cobrarle a un solo cliente real.
-      </div>
-
       <h1 className="mb-2 font-display text-3xl font-bold tracking-tight text-ink">
         Términos de servicio
       </h1>

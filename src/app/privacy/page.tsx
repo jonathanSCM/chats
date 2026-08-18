@@ -10,12 +10,6 @@ export default function PrivacyPage() {
         <Logo />
       </Link>
 
-      <div className="mb-8 rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-ink">
-        <strong>Borrador.</strong> Base razonable para un SaaS de este tipo, pero no reemplaza
-        asesoría legal — revísalo con un abogado antes de publicarlo, especialmente si operas
-        en jurisdicciones con leyes de protección de datos específicas (GDPR, LGPD, etc.).
-      </div>
-
       <h1 className="mb-2 font-display text-3xl font-bold tracking-tight text-ink">
         Política de privacidad
       </h1>

@@ -13,6 +13,7 @@ import {
 } from "@/server/services/whatsapp";
 import { saveMediaFile } from "@/lib/media-storage";
 import { isWhatsAppAudioType, transcodeToOpus } from "@/lib/audio-transcode";
+import { convertWebpToPng } from "@/lib/image-convert";
 
 const messageSchema = z.object({ content: z.string().min(1).max(4000) });
 
@@ -153,6 +154,19 @@ export async function sendInboxAttachmentAction(
     } catch (error) {
       console.error("[inbox] No se pudo convertir el audio:", error);
       return { error: "No se pudo procesar el audio. Intenta de nuevo." };
+    }
+  }
+
+  // WhatsApp rechaza WebP como imagen normal (solo lo acepta para
+  // stickers, por otro flujo) — se convierte a PNG antes de subirla.
+  if (outboundType === "image" && mimeType.split(";")[0].trim().toLowerCase() === "image/webp") {
+    try {
+      buffer = await convertWebpToPng(buffer);
+      mimeType = "image/png";
+      fileName = fileName.replace(/\.[^.]+$/, "") + ".png";
+    } catch (error) {
+      console.error("[inbox] No se pudo convertir la imagen WebP:", error);
+      return { error: "No se pudo procesar esta imagen. Intenta con otro formato (JPG o PNG)." };
     }
   }
 

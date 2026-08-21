@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { signIn } from "@/server/auth";
 import { slugify } from "@/lib/slugify";
+import { getClientIp, rateLimit, rateLimitMessage } from "@/lib/rate-limit";
 import type { ActionState } from "./types";
 
 const signupSchema = z.object({
@@ -35,6 +36,10 @@ export async function signupAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const ip = await getClientIp();
+  const byIp = rateLimit(`signup:ip:${ip}`, { limit: 5, windowMs: 60 * 60 * 1000 });
+  if (!byIp.allowed) return { error: rateLimitMessage(byIp.retryAfterSec) };
+
   const parsed = signupSchema.safeParse({
     name: formData.get("name"),
     companyName: formData.get("companyName"),

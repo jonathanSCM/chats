@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { generateToken, hashToken } from "@/lib/tokens";
 import { sendMail } from "@/server/services/mailer";
+import { getClientIp, rateLimit, rateLimitMessage } from "@/lib/rate-limit";
 import type { ActionState } from "./types";
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
@@ -21,6 +22,17 @@ export async function requestPasswordResetAction(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   }
+
+  const ip = await getClientIp();
+  const byIp = rateLimit(`pwreset-req:ip:${ip}`, { limit: 8, windowMs: 60 * 60 * 1000 });
+  if (!byIp.allowed) return { error: rateLimitMessage(byIp.retryAfterSec) };
+
+  const byEmail = rateLimit(`pwreset-req:email:${parsed.data.email.toLowerCase()}`, {
+    limit: 3,
+    windowMs: 60 * 60 * 1000,
+  });
+  // Mismo mensaje "genérico" que el éxito real, para no revelar si el correo existe.
+  if (!byEmail.allowed) return { error: null, message: GENERIC_SUCCESS };
 
   const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
 
@@ -58,6 +70,10 @@ export async function resetPasswordAction(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   }
+
+  const ip = await getClientIp();
+  const byIp = rateLimit(`pwreset-confirm:ip:${ip}`, { limit: 15, windowMs: 60 * 60 * 1000 });
+  if (!byIp.allowed) return { error: rateLimitMessage(byIp.retryAfterSec) };
 
   const tokenHash = hashToken(parsed.data.token);
   const resetToken = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });

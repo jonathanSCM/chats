@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { generateToken, hashToken } from "@/lib/tokens";
 import { sendMail } from "@/server/services/mailer";
+import { passwordResetEmail } from "@/server/services/email-templates";
 import { getClientIp, rateLimit, rateLimitMessage } from "@/lib/rate-limit";
 import type { ActionState } from "./types";
 
@@ -44,11 +45,8 @@ export async function requestPasswordResetAction(
     });
 
     const resetUrl = `${process.env.NEXTAUTH_URL}/reset-password?token=${token}`;
-    await sendMail({
-      to: user.email,
-      subject: "Restablece tu contraseña de WhatsApp ProShop",
-      text: `Entra a este enlace para elegir una nueva contraseña (vence en 1 hora):\n\n${resetUrl}\n\nSi no pediste esto, ignora el mensaje.`,
-    });
+    const { subject, text, html } = passwordResetEmail({ resetUrl });
+    await sendMail({ to: user.email, subject, text, html });
   }
 
   return { error: null, message: GENERIC_SUCCESS };

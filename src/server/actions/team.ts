@@ -9,6 +9,7 @@ import { requireSession } from "@/server/auth/guards";
 import { signIn } from "@/server/auth";
 import { generateToken, hashToken } from "@/lib/tokens";
 import { sendMail } from "@/server/services/mailer";
+import { inviteEmail } from "@/server/services/email-templates";
 import type { ActionState } from "./types";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 días
@@ -56,11 +57,8 @@ export async function createInviteAction(
 
   if (parsed.data.email) {
     const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId } });
-    await sendMail({
-      to: parsed.data.email,
-      subject: `Te invitaron a unirte a ${org.name} en WhatsApp ProShop`,
-      text: `Entra a este enlace para crear tu cuenta (vence en 7 días):\n\n${inviteUrl}`,
-    });
+    const { subject, text, html } = inviteEmail({ orgName: org.name, inviteUrl });
+    await sendMail({ to: parsed.data.email, subject, text, html });
   }
 
   revalidatePath("/dashboard/organization");

@@ -9,6 +9,7 @@ interface SendMailParams {
   to: string;
   subject: string;
   text: string;
+  html?: string;
 }
 
 const globalForResend = globalThis as unknown as { resendClient: Resend | undefined };
@@ -22,7 +23,7 @@ function getClient(): Resend | null {
   return globalForResend.resendClient;
 }
 
-export async function sendMail({ to, subject, text }: SendMailParams): Promise<void> {
+export async function sendMail({ to, subject, text, html }: SendMailParams): Promise<void> {
   const client = getClient();
 
   if (!client) {
@@ -50,6 +51,7 @@ export async function sendMail({ to, subject, text }: SendMailParams): Promise<v
     to,
     subject,
     text,
+    ...(html ? { html } : {}),
   });
 
   if (error) {

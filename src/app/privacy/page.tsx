@@ -13,8 +13,11 @@ export default function PrivacyPage() {
       <h1 className="mb-2 font-display text-3xl font-bold tracking-tight text-ink">
         Política de privacidad
       </h1>
-      <p className="mb-10 text-sm text-ink-faint">
+      <p className="mb-4 text-sm text-ink-faint">
         Última actualización: {new Date().toLocaleDateString("es")}
+      </p>
+      <p className="mb-10 rounded-md border border-border bg-surface-2/60 px-4 py-3 text-sm text-ink-muted">
+        CRM PROSHOP es una solución tecnológica operada por <strong className="text-ink">Grafi</strong>.
       </p>
 
       <div className="space-y-8 text-sm leading-relaxed text-ink-muted">

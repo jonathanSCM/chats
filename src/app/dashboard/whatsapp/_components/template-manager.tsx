@@ -114,6 +114,16 @@ export function TemplateManager({ botId }: { botId: string }) {
             </p>
           </div>
 
+          <div className="space-y-1.5">
+            <Label htmlFor="bodyExample">Ejemplo de esos valores (si usaste variables)</Label>
+            <Input id="bodyExample" name="bodyExample" placeholder="Jonathan, 20, 31 de agosto" />
+            <p className="text-[11px] text-ink-faint">
+              Un valor por cada <code className="font-mono">{"{{n}}"}</code>, separados por coma, en
+              orden. Meta lo exige para revisar la plantilla — si tiene variables y no das
+              ejemplos, la rechaza automáticamente sin revisarla.
+            </p>
+          </div>
+
           {state.error && <p className="text-sm text-danger">{state.error}</p>}
 
           <Button type="submit" disabled={isPending}>

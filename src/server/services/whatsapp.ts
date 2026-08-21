@@ -845,7 +845,13 @@ export async function createMessageTemplate(params: {
   category: TemplateCategory;
   languageCode: string; // código BCP-47, ej. "es", "es_MX", "en_US"
   bodyText: string; // puede llevar variables {{1}}, {{2}}...
+  bodyExample?: string[]; // valores de ejemplo para cada {{n}} — obligatorio si hay variables, si no Meta rechaza automáticamente
 }): Promise<{ id: string; status: string; category: string }> {
+  const bodyComponent: Record<string, unknown> = { type: "BODY", text: params.bodyText };
+  if (params.bodyExample && params.bodyExample.length > 0) {
+    bodyComponent.example = { body_text: [params.bodyExample] };
+  }
+
   const res = await fetch(
     `https://graph.facebook.com/${GRAPH_API_VERSION}/${params.wabaId}/message_templates`,
     {
@@ -858,7 +864,7 @@ export async function createMessageTemplate(params: {
         name: params.name,
         category: params.category,
         language: params.languageCode,
-        components: [{ type: "BODY", text: params.bodyText }],
+        components: [bodyComponent],
       }),
     },
   );

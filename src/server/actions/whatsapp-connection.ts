@@ -176,7 +176,15 @@ const createTemplateSchema = z.object({
   category: z.enum(["MARKETING", "UTILITY", "AUTHENTICATION"]),
   languageCode: z.string().min(2).max(10),
   bodyText: z.string().min(1).max(1024),
+  bodyExample: z.string().max(1024).optional(),
 });
+
+/** Cuenta cuántas variables {{1}}, {{2}}... distintas hay en el texto. */
+function countTemplateVariables(text: string): number {
+  const matches = [...text.matchAll(/\{\{\s*(\d+)\s*\}\}/g)];
+  if (matches.length === 0) return 0;
+  return Math.max(...matches.map((m) => Number(m[1])));
+}
 
 /**
  * Crea una plantilla de WhatsApp de verdad contra la API de Meta (no una
@@ -195,9 +203,21 @@ export async function createMessageTemplateAction(
     category: formData.get("category"),
     languageCode: formData.get("languageCode"),
     bodyText: formData.get("bodyText"),
+    bodyExample: formData.get("bodyExample") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  const variableCount = countTemplateVariables(parsed.data.bodyText);
+  const bodyExample = (parsed.data.bodyExample ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  if (variableCount > 0 && bodyExample.length !== variableCount) {
+    return {
+      error: `El texto usa ${variableCount} variable(s) ({{1}}...{{${variableCount}}}) — debes dar exactamente ${variableCount} valor(es) de ejemplo, separados por coma.`,
+    };
   }
 
   const connection = await prisma.whatsAppConnection.findUnique({ where: { botId: bot.id } });
@@ -216,6 +236,7 @@ export async function createMessageTemplateAction(
       category: parsed.data.category as TemplateCategory,
       languageCode: parsed.data.languageCode,
       bodyText: parsed.data.bodyText,
+      bodyExample: variableCount > 0 ? bodyExample : undefined,
     });
     revalidatePath("/dashboard/whatsapp");
     return {

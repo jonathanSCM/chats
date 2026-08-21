@@ -834,6 +834,7 @@ export interface MessageTemplate {
   category: string;
   language: string;
   components: MessageTemplateComponent[];
+  rejected_reason?: string; // NONE | ABUSIVE_CONTENT | INVALID_FORMAT | TAG_CONTENT_MISMATCH | ...
 }
 
 export type TemplateCategory = "MARKETING" | "UTILITY" | "AUTHENTICATION";
@@ -882,7 +883,7 @@ export async function listMessageTemplates(params: {
   accessToken: string;
 }): Promise<MessageTemplate[]> {
   const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${params.wabaId}/message_templates`);
-  url.searchParams.set("fields", "name,status,category,language,components");
+  url.searchParams.set("fields", "name,status,category,language,components,rejected_reason");
   url.searchParams.set("limit", "100");
 
   const res = await fetch(url.toString(), {

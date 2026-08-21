@@ -14,6 +14,7 @@ interface Template {
   status: string;
   category: string;
   language: string;
+  rejected_reason?: string;
 }
 
 const STATUS_TONE: Record<string, "accent" | "warning" | "danger" | "neutral"> = {
@@ -21,6 +22,15 @@ const STATUS_TONE: Record<string, "accent" | "warning" | "danger" | "neutral"> =
   PENDING: "warning",
   REJECTED: "danger",
   PENDING_DELETION: "danger",
+};
+
+const REJECTED_REASON_LABEL: Record<string, string> = {
+  ABUSIVE_CONTENT: "Contenido considerado abusivo/spam por Meta.",
+  INVALID_FORMAT: "El formato del mensaje no es válido (revisa variables y estructura).",
+  TAG_CONTENT_MISMATCH: "La categoría elegida (MARKETING/UTILITY/AUTHENTICATION) no coincide con el contenido del mensaje.",
+  INCORRECT_CATEGORY: "La categoría elegida no coincide con el contenido — Meta espera que la cambies.",
+  SCAM: "Meta detectó el mensaje como posible estafa.",
+  PROMOTIONAL: "Contenido demasiado promocional para la categoría elegida.",
 };
 
 export function TemplateManager({ botId }: { botId: string }) {
@@ -143,20 +153,24 @@ export function TemplateManager({ botId }: { botId: string }) {
           <p className="text-sm text-ink-muted">Todavía no hay plantillas creadas.</p>
         )}
         {templates?.map((t) => (
-          <div
-            key={t.id}
-            className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <FileText size={14} className="shrink-0 text-ink-faint" />
-              <div className="min-w-0">
-                <p className="truncate text-sm text-ink">{t.name}</p>
-                <p className="text-xs text-ink-faint">
-                  {t.category} · {t.language}
-                </p>
+          <div key={t.id} className="rounded-md border border-border px-3 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <FileText size={14} className="shrink-0 text-ink-faint" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-ink">{t.name}</p>
+                  <p className="text-xs text-ink-faint">
+                    {t.category} · {t.language}
+                  </p>
+                </div>
               </div>
+              <Badge tone={STATUS_TONE[t.status] ?? "neutral"}>{t.status}</Badge>
             </div>
-            <Badge tone={STATUS_TONE[t.status] ?? "neutral"}>{t.status}</Badge>
+            {t.status === "REJECTED" && t.rejected_reason && t.rejected_reason !== "NONE" && (
+              <p className="mt-1.5 text-xs text-danger">
+                Motivo: {REJECTED_REASON_LABEL[t.rejected_reason] ?? t.rejected_reason}
+              </p>
+            )}
           </div>
         ))}
       </div>

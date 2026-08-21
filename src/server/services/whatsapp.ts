@@ -878,6 +878,24 @@ export async function createMessageTemplate(params: {
   return (await res.json()) as { id: string; status: string; category: string };
 }
 
+export async function deleteMessageTemplate(params: {
+  wabaId: string;
+  accessToken: string;
+  name: string;
+}): Promise<void> {
+  const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${params.wabaId}/message_templates`);
+  url.searchParams.set("name", params.name);
+
+  const res = await fetch(url.toString(), {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${params.accessToken}` },
+  });
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`No se pudo borrar la plantilla (${res.status}): ${errorBody}`);
+  }
+}
+
 export async function listMessageTemplates(params: {
   wabaId: string;
   accessToken: string;

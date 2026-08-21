@@ -8,6 +8,7 @@ import { encrypt, decrypt } from "@/lib/crypto";
 import {
   verifyPhoneNumber,
   createMessageTemplate,
+  deleteMessageTemplate,
   type TemplateCategory,
 } from "@/server/services/whatsapp";
 import type { ActionState } from "./types";
@@ -247,5 +248,32 @@ export async function createMessageTemplateAction(
     console.error("[whatsapp] No se pudo crear la plantilla:", error);
     const message = error instanceof Error ? error.message : "Error desconocido";
     return { error: `No se pudo crear la plantilla en Meta: ${message}` };
+  }
+}
+
+/** Borra una plantilla (todas sus variantes de idioma) de la cuenta de WhatsApp. */
+export async function deleteMessageTemplateAction(
+  botId: string,
+  templateName: string,
+): Promise<ActionState> {
+  const { bot } = await requireBotOwnerAccess(botId);
+
+  const connection = await prisma.whatsAppConnection.findUnique({ where: { botId: bot.id } });
+  if (!connection?.verified || !connection.wabaId) {
+    return { error: "WhatsApp no está conectado." };
+  }
+
+  try {
+    await deleteMessageTemplate({
+      wabaId: connection.wabaId,
+      accessToken: decrypt(connection.accessToken),
+      name: templateName,
+    });
+    revalidatePath("/dashboard/whatsapp");
+    return { error: null, message: `Plantilla "${templateName}" borrada.` };
+  } catch (error) {
+    console.error("[whatsapp] No se pudo borrar la plantilla:", error);
+    const message = error instanceof Error ? error.message : "Error desconocido";
+    return { error: `No se pudo borrar la plantilla en Meta: ${message}` };
   }
 }

@@ -1,8 +1,11 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { FileText, Plus } from "lucide-react";
-import { createMessageTemplateAction } from "@/server/actions/whatsapp-connection";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { FileText, Plus, Trash2 } from "lucide-react";
+import {
+  createMessageTemplateAction,
+  deleteMessageTemplateAction,
+} from "@/server/actions/whatsapp-connection";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
@@ -37,6 +40,9 @@ export function TemplateManager({ botId }: { botId: string }) {
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [confirmDeleteName, setConfirmDeleteName] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, startDelete] = useTransition();
 
   const action = createMessageTemplateAction.bind(null, botId);
   const [state, formAction, isPending] = useActionState(action, { error: null });
@@ -55,6 +61,21 @@ export function TemplateManager({ botId }: { botId: string }) {
   }
 
   useEffect(load, [botId]);
+
+  function handleDelete(name: string) {
+    if (confirmDeleteName !== name) {
+      setConfirmDeleteName(name);
+      setTimeout(() => setConfirmDeleteName((cur) => (cur === name ? null : cur)), 3000);
+      return;
+    }
+    setConfirmDeleteName(null);
+    setDeleteError(null);
+    startDelete(async () => {
+      const result = await deleteMessageTemplateAction(botId, name);
+      if (result.error) setDeleteError(result.error);
+      else load();
+    });
+  }
 
   const [handledMessage, setHandledMessage] = useState<string | undefined>(undefined);
   if (state.message && state.message !== handledMessage) {
@@ -146,6 +167,7 @@ export function TemplateManager({ botId }: { botId: string }) {
 
       <div className="space-y-2">
         {loadError && <p className="text-sm text-warning">{loadError}</p>}
+        {deleteError && <p className="text-sm text-danger">{deleteError}</p>}
         {!loadError && templates === null && (
           <p className="text-sm text-ink-muted">Cargando plantillas…</p>
         )}
@@ -164,8 +186,24 @@ export function TemplateManager({ botId }: { botId: string }) {
                   </p>
                 </div>
               </div>
-              <Badge tone={STATUS_TONE[t.status] ?? "neutral"}>{t.status}</Badge>
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge tone={STATUS_TONE[t.status] ?? "neutral"}>{t.status}</Badge>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => handleDelete(t.name)}
+                  title="Borrar plantilla"
+                  className="cursor-pointer text-ink-faint hover:text-danger disabled:opacity-40"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
+            {confirmDeleteName === t.name && (
+              <p className="mt-1.5 text-xs text-warning">
+                ¿Seguro que quieres borrarla? Toca el ícono de nuevo para confirmar.
+              </p>
+            )}
             {t.status === "REJECTED" && t.rejected_reason && t.rejected_reason !== "NONE" && (
               <p className="mt-1.5 text-xs text-danger">
                 Motivo: {REJECTED_REASON_LABEL[t.rejected_reason] ?? t.rejected_reason}

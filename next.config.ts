@@ -26,5 +26,13 @@ export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,
-  silent: true,
+  // Sube más archivos del cliente para que los stack traces del navegador
+  // se lean mejor (no solo los que Next.js cree que hacen falta).
+  widenClientFileUpload: true,
+  // Crea /monitoring como proxy propio para mandar los reportes — evita
+  // que un ad-blocker del vendedor/cliente los bloquee por ir directo a
+  // un dominio de sentry.io. El middleware (src/proxy.ts) ya solo aplica
+  // a /admin y /dashboard, así que /monitoring no necesita excluirse ahí.
+  tunnelRoute: "/monitoring",
+  silent: !process.env.CI,
 });

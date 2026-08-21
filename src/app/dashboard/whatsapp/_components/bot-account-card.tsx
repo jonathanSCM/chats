@@ -6,6 +6,7 @@ import { renameBotAction, disconnectBotWhatsAppAction } from "@/server/actions/w
 import { Input } from "@/components/ui/input";
 import { WhatsAppTab } from "./whatsapp-tab";
 import { BusinessProfileForm, type BusinessProfileData } from "./business-profile-form";
+import { TemplateManager } from "./template-manager";
 
 interface Connection {
   phoneNumberId: string;
@@ -134,6 +135,12 @@ export function BotAccountCard({
       )}
       {businessProfileError && (
         <p className="text-sm text-warning">No se pudo cargar el perfil de negocio desde Meta.</p>
+      )}
+
+      {isOwner && connection?.verified && (
+        <div className="pt-2">
+          <TemplateManager botId={bot.id} />
+        </div>
       )}
     </div>
   );

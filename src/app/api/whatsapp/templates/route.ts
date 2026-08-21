@@ -5,7 +5,9 @@ import { decrypt } from "@/lib/crypto";
 import { listMessageTemplates } from "@/server/services/whatsapp";
 
 export async function GET(request: Request) {
-  const botId = new URL(request.url).searchParams.get("botId");
+  const url = new URL(request.url);
+  const botId = url.searchParams.get("botId");
+  const all = url.searchParams.get("all") === "1";
   if (!botId) return NextResponse.json({ error: "Falta botId" }, { status: 400 });
 
   let bot;
@@ -35,7 +37,7 @@ export async function GET(request: Request) {
       accessToken: decrypt(connection.accessToken),
     });
     return NextResponse.json({
-      templates: templates.filter((t) => t.status === "APPROVED"),
+      templates: all ? templates : templates.filter((t) => t.status === "APPROVED"),
     });
   } catch (error) {
     console.error("[whatsapp] No se pudieron leer las plantillas:", error);

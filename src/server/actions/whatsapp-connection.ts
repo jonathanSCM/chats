@@ -4,8 +4,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireBotOwnerAccess, requireSession, HttpError } from "@/server/auth/guards";
-import { encrypt } from "@/lib/crypto";
-import { verifyPhoneNumber } from "@/server/services/whatsapp";
+import { encrypt, decrypt } from "@/lib/crypto";
+import {
+  verifyPhoneNumber,
+  createMessageTemplate,
+  type TemplateCategory,
+} from "@/server/services/whatsapp";
 import type { ActionState } from "./types";
 
 async function requireOrgOwner() {
@@ -159,4 +163,68 @@ export async function toggleBotAccessAction(
 
   revalidatePath("/dashboard/organization");
   return { error: null };
+}
+
+const templateNameSchema = z
+  .string()
+  .min(3)
+  .max(512)
+  .regex(/^[a-z0-9_]+$/, "Solo minúsculas, números y guion bajo (_), sin espacios");
+
+const createTemplateSchema = z.object({
+  name: templateNameSchema,
+  category: z.enum(["MARKETING", "UTILITY", "AUTHENTICATION"]),
+  languageCode: z.string().min(2).max(10),
+  bodyText: z.string().min(1).max(1024),
+});
+
+/**
+ * Crea una plantilla de WhatsApp de verdad contra la API de Meta (no una
+ * simulación) — queda "PENDING" hasta que Meta la revisa y aprueba, tal
+ * como pide la revisión de la app para el permiso whatsapp_business_management.
+ */
+export async function createMessageTemplateAction(
+  botId: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const { bot } = await requireBotOwnerAccess(botId);
+
+  const parsed = createTemplateSchema.safeParse({
+    name: formData.get("name"),
+    category: formData.get("category"),
+    languageCode: formData.get("languageCode"),
+    bodyText: formData.get("bodyText"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  const connection = await prisma.whatsAppConnection.findUnique({ where: { botId: bot.id } });
+  if (!connection?.verified) {
+    return { error: "WhatsApp no está conectado." };
+  }
+  if (!connection.wabaId) {
+    return { error: "Esta conexión no tiene un WABA ID guardado — no se pueden crear plantillas." };
+  }
+
+  try {
+    const result = await createMessageTemplate({
+      wabaId: connection.wabaId,
+      accessToken: decrypt(connection.accessToken),
+      name: parsed.data.name,
+      category: parsed.data.category as TemplateCategory,
+      languageCode: parsed.data.languageCode,
+      bodyText: parsed.data.bodyText,
+    });
+    revalidatePath("/dashboard/whatsapp");
+    return {
+      error: null,
+      message: `Plantilla "${parsed.data.name}" enviada a revisión de Meta (estado: ${result.status}).`,
+    };
+  } catch (error) {
+    console.error("[whatsapp] No se pudo crear la plantilla:", error);
+    const message = error instanceof Error ? error.message : "Error desconocido";
+    return { error: `No se pudo crear la plantilla en Meta: ${message}` };
+  }
 }

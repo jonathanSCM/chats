@@ -816,8 +816,9 @@ export async function uploadBusinessProfilePhoto(params: {
 // WhatsApp solo deja mandar texto libre dentro de las 24h desde el último
 // mensaje del cliente (error 131047 "Re-engagement message" si no). Pasado
 // ese plazo, la única forma de escribirle primero es con una plantilla ya
-// aprobada por Meta — de ahí estas dos funciones: listar las aprobadas
-// (se administran/crean en el Business Manager de Meta, no acá) y mandarlas.
+// aprobada por Meta — de ahí estas funciones: crear una plantilla nueva
+// (queda "PENDING" hasta que Meta la revisa, normalmente en minutos u
+// horas), listar las que ya están aprobadas, y mandarlas.
 
 export interface MessageTemplateComponent {
   type: string; // HEADER | BODY | FOOTER | BUTTONS
@@ -833,6 +834,41 @@ export interface MessageTemplate {
   category: string;
   language: string;
   components: MessageTemplateComponent[];
+}
+
+export type TemplateCategory = "MARKETING" | "UTILITY" | "AUTHENTICATION";
+
+export async function createMessageTemplate(params: {
+  wabaId: string;
+  accessToken: string;
+  name: string; // solo minúsculas, números y guion bajo — lo exige Meta
+  category: TemplateCategory;
+  languageCode: string; // código BCP-47, ej. "es", "es_MX", "en_US"
+  bodyText: string; // puede llevar variables {{1}}, {{2}}...
+}): Promise<{ id: string; status: string; category: string }> {
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_API_VERSION}/${params.wabaId}/message_templates`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${params.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: params.name,
+        category: params.category,
+        language: params.languageCode,
+        components: [{ type: "BODY", text: params.bodyText }],
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`No se pudo crear la plantilla (${res.status}): ${errorBody}`);
+  }
+
+  return (await res.json()) as { id: string; status: string; category: string };
 }
 
 export async function listMessageTemplates(params: {

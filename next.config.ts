@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 // Sin "output: standalone" a propósito: el contenedor de producción lleva
 // node_modules completo (no el bundle recortado de standalone) para poder
@@ -17,4 +18,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// La subida de source maps a Sentry es opcional: sin SENTRY_AUTH_TOKEN
+// configurado, el plugin simplemente la salta (con un aviso), no rompe el
+// build — así el proyecto sigue compilando en cualquier entorno que todavía
+// no tenga Sentry conectado.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: true,
+});

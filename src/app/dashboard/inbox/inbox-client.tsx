@@ -22,7 +22,9 @@ import { sendInboxMessageAction, sendInboxAttachmentAction } from "@/server/acti
 import { deleteMessageAction } from "@/server/actions/conversation-panel";
 import { vendorColor } from "@/lib/vendor-color";
 import { usePushNotifications } from "@/lib/use-push-notifications";
+import { Button } from "@/components/ui/button";
 import { ConversationPanel } from "./_components/conversation-panel";
+import { TemplatePickerModal } from "./_components/template-picker-modal";
 
 interface Vendor {
   id: string;
@@ -306,6 +308,11 @@ export function InboxClient({
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [assignedTo, setAssignedTo] = useState<Vendor | null>(null);
+  // Pasadas las 24h desde el último mensaje del cliente, WhatsApp ya no
+  // deja mandar texto libre — solo una plantilla aprobada por Meta.
+  const [outsideWindow, setOutsideWindow] = useState(false);
+  const [conversationBotId, setConversationBotId] = useState<string | null>(null);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -447,6 +454,8 @@ export function InboxClient({
     setCustomerPhone(data.conversation.customerPhone);
     setCustomerName(data.conversation.customerName ?? null);
     setAssignedTo(data.conversation.assignedTo ?? null);
+    setOutsideWindow(Boolean(data.conversation.outsideWindow));
+    setConversationBotId(data.conversation.botId ?? null);
   }, []);
 
   // Polling de la lista de conversaciones cada 3s — tiempo real sin websockets.
@@ -893,7 +902,22 @@ export function InboxClient({
                 </div>
               )}
 
-              {recording ? (
+              {outsideWindow ? (
+                <div className="flex items-center justify-between gap-3 rounded-md bg-surface px-3 py-2.5 text-sm text-ink-muted">
+                  <span>
+                    Pasaron más de 24h desde el último mensaje del cliente — solo puedes escribirle
+                    con una plantilla aprobada.
+                  </span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="shrink-0"
+                    onClick={() => setTemplatePickerOpen(true)}
+                  >
+                    Enviar plantilla
+                  </Button>
+                </div>
+              ) : recording ? (
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => stopRecording(true)}
@@ -984,6 +1008,19 @@ export function InboxClient({
             onDeleted={handleConversationDeleted}
           />
         </div>
+      )}
+
+      {templatePickerOpen && selectedId && conversationBotId && (
+        <TemplatePickerModal
+          botId={conversationBotId}
+          conversationId={selectedId}
+          onClose={() => setTemplatePickerOpen(false)}
+          onSent={() => {
+            setTemplatePickerOpen(false);
+            fetchMessages(selectedId);
+            fetchConversations();
+          }}
+        />
       )}
     </div>
   );

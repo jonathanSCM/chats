@@ -46,11 +46,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     update: { lastReadAt: new Date() },
   });
 
+  // WhatsApp solo deja mandar texto libre dentro de las 24h desde el
+  // último mensaje del cliente — pasado ese plazo, hace falta una
+  // plantilla aprobada (ver services/whatsapp.ts). Se calcula acá, con los
+  // mensajes que ya se trajeron, para no hacer otra consulta.
+  const WINDOW_MS = 24 * 60 * 60 * 1000;
+  const lastCustomerMessageAt = [...messages].reverse().find((m) => m.role === "CUSTOMER")?.createdAt;
+  const outsideWindow = !lastCustomerMessageAt || Date.now() - lastCustomerMessageAt.getTime() > WINDOW_MS;
+
   return NextResponse.json({
     conversation: {
       id: conversation.id,
+      botId: conversation.botId,
       customerPhone: conversation.customerPhone,
       customerName: conversation.customerName,
+      outsideWindow,
       assignedTo: conversation.assignedTo
         ? {
             id: conversation.assignedTo.id,

@@ -810,3 +810,96 @@ export async function uploadBusinessProfilePhoto(params: {
   const { h } = (await uploadRes.json()) as { h: string };
   return h;
 }
+
+// ─── Plantillas de mensaje (para responder fuera de la ventana de 24h) ────
+//
+// WhatsApp solo deja mandar texto libre dentro de las 24h desde el último
+// mensaje del cliente (error 131047 "Re-engagement message" si no). Pasado
+// ese plazo, la única forma de escribirle primero es con una plantilla ya
+// aprobada por Meta — de ahí estas dos funciones: listar las aprobadas
+// (se administran/crean en el Business Manager de Meta, no acá) y mandarlas.
+
+export interface MessageTemplateComponent {
+  type: string; // HEADER | BODY | FOOTER | BUTTONS
+  format?: string; // TEXT | IMAGE | VIDEO | DOCUMENT (solo en HEADER)
+  text?: string;
+  buttons?: { type: string; text: string }[];
+}
+
+export interface MessageTemplate {
+  id: string;
+  name: string;
+  status: string; // APPROVED | PENDING | REJECTED | ...
+  category: string;
+  language: string;
+  components: MessageTemplateComponent[];
+}
+
+export async function listMessageTemplates(params: {
+  wabaId: string;
+  accessToken: string;
+}): Promise<MessageTemplate[]> {
+  const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${params.wabaId}/message_templates`);
+  url.searchParams.set("fields", "name,status,category,language,components");
+  url.searchParams.set("limit", "100");
+
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${params.accessToken}` },
+  });
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`No se pudieron leer las plantillas (${res.status}): ${errorBody}`);
+  }
+  const data = (await res.json()) as { data: MessageTemplate[] };
+  return data.data;
+}
+
+export async function sendTemplateMessage(params: {
+  phoneNumberId: string;
+  accessToken: string;
+  to: string;
+  templateName: string;
+  languageCode: string;
+  // Solo variables {{1}}, {{2}}... del componente BODY — es lo único que
+  // este panel deja rellenar; encabezado/botones se mandan tal cual están
+  // en la plantilla aprobada.
+  bodyParams: string[];
+}): Promise<{ messageId: string | null }> {
+  const { phoneNumberId, accessToken, to, templateName, languageCode, bodyParams } = params;
+
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components: bodyParams.length
+            ? [
+                {
+                  type: "body",
+                  parameters: bodyParams.map((text) => ({ type: "text", text })),
+                },
+              ]
+            : undefined,
+        },
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`No se pudo enviar la plantilla (${res.status}): ${errorBody}`);
+  }
+
+  const data = (await res.json()) as SendMessageResponse;
+  return { messageId: data.messages?.[0]?.id ?? null };
+}

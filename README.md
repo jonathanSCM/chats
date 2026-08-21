@@ -176,6 +176,30 @@ Si no quieres usar Coexistence (por ejemplo, un número dedicado solo para el pa
 celular), la opción "conectar a mano con credenciales de la Cloud API" sigue disponible debajo,
 sin necesidad de configurar estas variables.
 
+## Plantillas de WhatsApp (fuera de la ventana de 24h)
+
+WhatsApp solo deja mandar texto libre dentro de las 24h desde el último mensaje del cliente
+(pasado ese plazo, Meta rechaza el envío con el error 131047 "Re-engagement message"). Cuando el
+inbox detecta que una conversación está fuera de esa ventana, reemplaza el compositor por un
+botón "Enviar plantilla": lista las plantillas ya **aprobadas por Meta** para esa cuenta (se
+crean y aprueban en el Administrador comercial de Meta, no desde este panel), deja rellenar las
+variables `{{1}}`, `{{2}}`... del cuerpo, y la manda.
+
+## Monitoreo de errores (Sentry)
+
+Configura `SENTRY_DSN` (servidor) y `NEXT_PUBLIC_SENTRY_DSN` (navegador) — ver
+[`.env.example`](.env.example) — para que los errores de producción lleguen a un proyecto de
+Sentry en vez de perderse en los logs de Coolify. Sin esas variables, el SDK queda desactivado
+sin romper nada (útil en local). `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN` son opcionales,
+solo para que el build suba source maps legibles.
+
+## Exportar datos / eliminar la organización
+
+En **Organización → Zona de peligro** (solo el dueño la ve): "Exportar" descarga un JSON con
+todo lo de la organización (contactos, oportunidades, conversaciones, base de conocimiento);
+"Eliminar organización" la borra por completo — bots, conexiones de WhatsApp, conversaciones y
+el equipo entero — de forma irreversible, pidiendo escribir el nombre exacto para confirmar.
+
 ## Variables de entorno
 
 Ver [`.env.example`](.env.example) — cada variable tiene un comentario explicando para qué

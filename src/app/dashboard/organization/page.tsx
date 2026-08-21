@@ -7,6 +7,7 @@ import { MembersList } from "./_components/members-list";
 import { InvitePanel } from "./_components/invite-panel";
 import { AiSettingsForm } from "./_components/ai-settings-form";
 import { BotAccessMatrix } from "./_components/bot-access-matrix";
+import { DangerZone } from "./_components/danger-zone";
 
 export default async function OrganizationSettingsPage() {
   const session = await auth();
@@ -75,7 +76,7 @@ export default async function OrganizationSettingsPage() {
         />
       </Card>
 
-      <Card>
+      <Card className="mb-6">
         <CardTitle className="mb-1">Invitar a alguien</CardTitle>
         <CardDescription className="mb-4">
           Genera un enlace y compártelo — quien lo abra se une como miembro.
@@ -87,6 +88,14 @@ export default async function OrganizationSettingsPage() {
             expiresAt: i.expiresAt.toISOString(),
           }))}
         />
+      </Card>
+
+      <Card className="border-danger/30">
+        <CardTitle className="mb-1 text-danger">Zona de peligro</CardTitle>
+        <CardDescription className="mb-4">
+          Exportar tus datos o eliminar la organización por completo.
+        </CardDescription>
+        <DangerZone orgName={org.name} />
       </Card>
     </div>
   );

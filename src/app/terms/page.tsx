@@ -14,9 +14,13 @@ export default function TermsPage() {
         Términos de servicio
       </h1>
       <p className="mb-4 text-sm text-ink-faint">Última actualización: {new Date().toLocaleDateString("es")}</p>
-      <p className="mb-10 rounded-md border border-border bg-surface-2/60 px-4 py-3 text-sm text-ink-muted">
-        CRM PROSHOP es una solución tecnológica operada por <strong className="text-ink">Grafi</strong>.
-      </p>
+      <div className="mb-10 flex items-center gap-3 rounded-md border border-border bg-surface-2/60 px-4 py-3 text-sm text-ink-muted">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/grafi-logo.webp" alt="Grafi" width={28} height={28} className="shrink-0 rounded-md" />
+        <p>
+          CRM PROSHOP es una solución tecnológica operada por <strong className="text-ink">Grafi</strong>.
+        </p>
+      </div>
 
       <div className="space-y-8 text-sm leading-relaxed text-ink-muted">
         <Section title="1. Qué es WhatsApp ProShop">

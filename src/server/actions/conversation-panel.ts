@@ -149,6 +149,13 @@ export async function transferConversationAction(
   const access = await requireConversationAccess(conversationId);
   if (!access) return { error: "Conversación no encontrada" };
 
+  // Un vendedor puede tomar una conversación libre o soltar la suya, pero no
+  // pasársela a otro compañero — eso es cosa del dueño de la organización.
+  const isAdmin = access.session.user.role === "OWNER" || access.session.user.role === "SUPERADMIN";
+  if (!isAdmin && userId !== null && userId !== access.session.user.id) {
+    return { error: "Solo el dueño de la organización puede reasignar conversaciones a otra persona" };
+  }
+
   if (userId) {
     const target = await prisma.user.findUnique({ where: { id: userId } });
     if (!target || target.organizationId !== access.organizationId) {

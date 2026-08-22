@@ -73,12 +73,14 @@ const money = new Intl.NumberFormat("es", {
 export function ConversationPanel({
   conversationId,
   currentUserId,
+  isAdmin,
   onClose,
   onChanged,
   onDeleted,
 }: {
   conversationId: string;
   currentUserId: string;
+  isAdmin: boolean;
   onClose: () => void;
   onChanged: () => void;
   onDeleted: () => void;
@@ -208,12 +210,18 @@ export function ConversationPanel({
               }
             >
               <option value="">Sin asignar</option>
-              {data.team.map((u) => (
+              {(isAdmin ? data.team : data.team.filter((u) => u.id === currentUserId)).map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.id === currentUserId ? `${u.name} (tú)` : u.name}
                 </option>
               ))}
             </Select>
+            {!isAdmin && (
+              <p className="text-[11px] text-ink-faint">
+                Puedes tomar o soltar esta conversación. Para pasarla a otro compañero, pídeselo al
+                dueño de la organización.
+              </p>
+            )}
           </div>
         </div>
 

@@ -1003,6 +1003,7 @@ export function InboxClient({
             key={selectedId}
             conversationId={selectedId}
             currentUserId={currentUserId}
+            isAdmin={isAdmin}
             onClose={() => setPanelOpen(false)}
             onChanged={fetchConversations}
             onDeleted={handleConversationDeleted}

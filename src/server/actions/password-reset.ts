@@ -46,7 +46,14 @@ export async function requestPasswordResetAction(
 
     const resetUrl = `${process.env.NEXTAUTH_URL}/reset-password?token=${token}`;
     const { subject, text, html } = passwordResetEmail({ resetUrl });
-    await sendMail({ to: user.email, subject, text, html });
+    try {
+      await sendMail({ to: user.email, subject, text, html });
+    } catch (error) {
+      // No revelamos el fallo al usuario (mismo mensaje genérico de siempre)
+      // pero sí lo dejamos registrado — sin esto, un correo caído tumbaba
+      // toda la página de "olvidé mi contraseña".
+      console.error("[password-reset] No se pudo mandar el correo:", error);
+    }
   }
 
   return { error: null, message: GENERIC_SUCCESS };

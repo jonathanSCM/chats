@@ -56,9 +56,16 @@ export async function createInviteAction(
   const inviteUrl = `${process.env.NEXTAUTH_URL}/invite?token=${token}`;
 
   if (parsed.data.email) {
-    const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId } });
-    const { subject, text, html } = inviteEmail({ orgName: org.name, inviteUrl });
-    await sendMail({ to: parsed.data.email, subject, text, html });
+    try {
+      const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId } });
+      const { subject, text, html } = inviteEmail({ orgName: org.name, inviteUrl });
+      await sendMail({ to: parsed.data.email, subject, text, html });
+    } catch (error) {
+      // No dejamos que un correo caído (dominio sin verificar en Resend,
+      // etc.) tumbe la creación de la invitación — igual devolvemos el link
+      // para compartirlo a mano mientras se arregla el envío.
+      console.error("[team] No se pudo mandar el correo de invitación:", error);
+    }
   }
 
   revalidatePath("/dashboard/organization");

@@ -192,28 +192,44 @@ export async function acceptInviteAction(
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return { error: "Ese correo ya tiene una cuenta en WhatsApp ProShop. Inicia sesión en su lugar." };
+  if (existing && existing.organizationId) {
+    return { error: "Ese correo ya tiene una cuenta activa en WhatsApp ProShop. Inicia sesión en su lugar." };
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  await prisma.$transaction([
-    prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        name,
-        role: invite.role,
-        organizationId: invite.organizationId,
-        emailVerified: new Date(), // llegó por invitación directa, se toma como verificado
-      },
-    }),
-    prisma.organizationInvite.update({
-      where: { id: invite.id },
-      data: { acceptedAt: new Date() },
-    }),
-  ]);
+  if (existing) {
+    // Cuenta que ya existía pero fue removida de una organización (queda
+    // "huérfana": organizationId null) — la reactivamos en esta en vez de
+    // bloquear la invitación, así se puede volver a invitar a alguien.
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: existing.id },
+        data: { passwordHash, name, role: invite.role, organizationId: invite.organizationId },
+      }),
+      prisma.organizationInvite.update({
+        where: { id: invite.id },
+        data: { acceptedAt: new Date() },
+      }),
+    ]);
+  } else {
+    await prisma.$transaction([
+      prisma.user.create({
+        data: {
+          email,
+          passwordHash,
+          name,
+          role: invite.role,
+          organizationId: invite.organizationId,
+          emailVerified: new Date(), // llegó por invitación directa, se toma como verificado
+        },
+      }),
+      prisma.organizationInvite.update({
+        where: { id: invite.id },
+        data: { acceptedAt: new Date() },
+      }),
+    ]);
+  }
 
   try {
     await signIn("credentials", { email, password, redirectTo: "/dashboard" });

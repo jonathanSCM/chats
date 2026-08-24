@@ -1,14 +1,25 @@
 "use client";
 
-import { useActionState } from "react";
+import { Suspense, useActionState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { loginAction } from "@/server/actions/login";
 import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const [state, formAction, isPending] = useActionState(loginAction, { error: null });
+  const searchParams = useSearchParams();
+  const sinOrganizacion = searchParams.get("sinOrganizacion") === "1";
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
@@ -17,6 +28,13 @@ export default function LoginPage() {
           <Logo size="lg" className="mb-1" />
           <p className="text-sm text-ink-muted">Bandeja de conversaciones de WhatsApp</p>
         </div>
+
+        {sinOrganizacion && (
+          <p className="mb-4 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-center text-sm text-warning">
+            Tu cuenta ya no pertenece a ninguna organización. Si crees que es un error, contacta al
+            dueño de tu equipo.
+          </p>
+        )}
 
         <div className="corner-brackets rounded-lg border border-border bg-surface p-6">
           <form action={formAction} className="space-y-4">

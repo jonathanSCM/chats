@@ -26,6 +26,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/admin");
   }
 
+  // Alguien con sesión activa pero sin organización (lo sacaron del equipo,
+  // por ejemplo) no puede quedarse en el panel: cada página de acá abajo
+  // asume que hay una organización y se traba/rompe si no la hay.
+  if (session?.user.role !== "SUPERADMIN" && !session?.user.organizationId) {
+    redirect("/login?sinOrganizacion=1");
+  }
+
   const org = session?.user.organizationId
     ? await prisma.organization.findUnique({ where: { id: session.user.organizationId } })
     : null;

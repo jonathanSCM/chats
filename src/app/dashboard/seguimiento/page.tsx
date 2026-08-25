@@ -21,6 +21,10 @@ export default async function SeguimientoPage() {
       include: {
         contact: { select: { id: true, fullName: true, phone: true, city: true } },
         assignedTo: { select: { id: true, name: true, email: true, color: true } },
+        meetings: {
+          select: { id: true, scheduledAt: true, status: true, notes: true },
+          orderBy: { scheduledAt: "desc" },
+        },
       },
       orderBy: [{ nextContactAt: "asc" }, { updatedAt: "desc" }],
     }),
@@ -61,6 +65,12 @@ export default async function SeguimientoPage() {
     aiMissingInfo: o.aiMissingInfo ?? "",
     aiNextQuestion: o.aiNextQuestion ?? "",
     aiAlerts: o.aiAlerts ?? "",
+    meetings: o.meetings.map((m) => ({
+      id: m.id,
+      scheduledAt: m.scheduledAt.toISOString(),
+      status: m.status,
+      notes: m.notes ?? "",
+    })),
     assignedTo: o.assignedTo
       ? { id: o.assignedTo.id, name: o.assignedTo.name || o.assignedTo.email, color: o.assignedTo.color }
       : null,

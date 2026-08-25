@@ -2,12 +2,15 @@
 
 import { useActionState, useCallback, useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { Plus, X, Copy, Check, Trash2, Sparkles, Loader2 } from "lucide-react";
+import { Plus, X, Copy, Check, Trash2, Sparkles, Loader2, Video } from "lucide-react";
 import {
   createOpportunityAction,
   updateOpportunityFieldAction,
   deleteOpportunityAction,
   analyzeOpportunityAction,
+  createMeetingAction,
+  updateMeetingNotesAction,
+  deleteMeetingAction,
 } from "@/server/actions/crm";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -46,6 +49,7 @@ export interface Row {
   aiMissingInfo: string;
   aiNextQuestion: string;
   aiAlerts: string;
+  meetings: { id: string; scheduledAt: string; status: string; notes: string }[];
   assignedTo: { id: string; name: string; color: string | null } | null;
 }
 
@@ -719,6 +723,13 @@ function DetailPanel({
             </Field>
           )}
 
+          <MeetingsSection
+            opportunityId={row.id}
+            meetings={row.meetings}
+            editable={editable}
+            disabled={locked}
+          />
+
           <div className="rounded-lg border border-accent-dim/40 bg-accent/5 p-3">
             <p className="mb-2 flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent">
               <Sparkles size={11} /> Asesor IA
@@ -918,6 +929,112 @@ function AssignmentControl({
       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: vendorColor(row.assignedTo.id, row.assignedTo.color) }} />
       {row.assignedTo.name}
     </p>
+  );
+}
+
+function MeetingsSection({
+  opportunityId,
+  meetings,
+  editable,
+  disabled,
+}: {
+  opportunityId: string;
+  meetings: { id: string; scheduledAt: string; status: string; notes: string }[];
+  editable: boolean;
+  disabled: boolean;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [state, formAction] = useActionState(createMeetingAction, { error: null });
+  const [handledMessage, setHandledMessage] = useState<string | undefined>(undefined);
+  if (state.message && state.message !== handledMessage) {
+    setHandledMessage(state.message);
+    setAdding(false);
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-surface-2/40 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+          <Video size={11} /> Reuniones
+        </p>
+        {editable && (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setAdding((v) => !v)}
+            className="cursor-pointer text-xs text-accent hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {adding ? "Cancelar" : "+ Registrar reunión"}
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <form action={formAction} className="mb-3 space-y-2 rounded-md border border-border p-2.5">
+          <input type="hidden" name="opportunityId" value={opportunityId} />
+          <div className="flex gap-2">
+            <Input type="date" name="scheduledAt" required className="py-1.5 text-xs" />
+            <Input
+              type="number"
+              name="durationMinutes"
+              placeholder="min"
+              min={1}
+              className="w-20 py-1.5 text-xs"
+            />
+          </div>
+          <textarea
+            name="notes"
+            rows={5}
+            placeholder="Pega acá la transcripción o el resumen de la reunión…"
+            className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-xs leading-relaxed text-ink outline-none focus:border-accent-dim"
+          />
+          {state.error && <p className="text-xs text-danger">{state.error}</p>}
+          <Button type="submit" size="sm" className="text-xs">
+            Guardar reunión
+          </Button>
+        </form>
+      )}
+
+      {meetings.length === 0 ? (
+        <p className="text-xs text-ink-faint">Todavía no hay reuniones registradas.</p>
+      ) : (
+        <ul className="space-y-2">
+          {meetings.map((m) => (
+            <li key={m.id} className="rounded-md border border-border p-2.5">
+              <div className="mb-1 flex items-center justify-between">
+                <p className="font-mono text-xs text-ink-muted">
+                  {new Date(m.scheduledAt).toLocaleDateString("es")} · {m.status}
+                </p>
+                {editable && (
+                  <button
+                    type="button"
+                    disabled={disabled || isPending}
+                    onClick={() => startTransition(async () => { await deleteMeetingAction(m.id); })}
+                    className="cursor-pointer text-ink-faint hover:text-danger disabled:cursor-not-allowed"
+                    title="Borrar reunión"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+              {editable ? (
+                <EditableText
+                  value={m.notes}
+                  disabled={disabled}
+                  placeholder="Transcripción o resumen de la reunión"
+                  onSave={(v) => startTransition(async () => { await updateMeetingNotesAction(m.id, v); })}
+                />
+              ) : (
+                <p className="whitespace-pre-wrap text-xs leading-relaxed text-ink-muted">
+                  {m.notes || "(sin transcripción cargada)"}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

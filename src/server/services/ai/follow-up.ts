@@ -184,7 +184,10 @@ Sobre "calidad_lead" (0-100, desglose de 7 criterios) y "probabilidad_cierre" (0
   Nunca trates una afirmación del propio chatbot/vendedor como si el cliente la hubiera confirmado.
   DESCONOCIDO no es lo mismo que NEGATIVO: si nunca se habló de presupuesto, es "desconocido", no "no tiene".
 - Sé conservador con probabilidad_cierre: entusiasmo, respuestas rápidas o aceptar una reunión no bastan
-  para una probabilidad alta.`;
+  para una probabilidad alta.
+- Las TRANSCRIPCIONES/RESÚMENES DE REUNIONES son la fuente más confiable de todas: son declaraciones
+  directas del lead, cargadas por el vendedor después de una llamada real. Dales más peso que a mensajes
+  de WhatsApp cortos o notas genéricas del equipo al justificar "evidencia" en la razón y en el desglose.`;
 
 interface OpportunityContext {
   id: string;
@@ -225,7 +228,7 @@ async function buildInput(opportunity: OpportunityContext): Promise<string> {
   });
   const messageLimit = clampMessageLimit(org?.aiMessageLimit);
 
-  const [knowledge, recentMessages, notes] = await Promise.all([
+  const [knowledge, recentMessages, notes, meetings] = await Promise.all([
     prisma.knowledgeItem.findMany({
       where: { organizationId: opportunity.organizationId, active: true },
       select: { category: true, title: true, content: true },
@@ -243,6 +246,12 @@ async function buildInput(opportunity: OpportunityContext): Promise<string> {
       select: { body: true, createdAt: true },
       orderBy: { createdAt: "desc" },
       take: 10,
+    }),
+    prisma.meeting.findMany({
+      where: { opportunityId: opportunity.id, notes: { not: null } },
+      select: { scheduledAt: true, status: true, notes: true },
+      orderBy: { scheduledAt: "desc" },
+      take: 5,
     }),
   ]);
 
@@ -279,6 +288,17 @@ async function buildInput(opportunity: OpportunityContext): Promise<string> {
     ? notes.map((n) => `- ${n.createdAt.toISOString().slice(0, 10)}: ${n.body}`).join("\n")
     : "(Sin notas.)";
 
+  // Fuente de mayor confianza: declaraciones directas del lead en una
+  // reunión, cargadas a mano por el vendedor (transcripción o resumen).
+  const meetingsText = meetings.length
+    ? meetings
+        .map(
+          (m) =>
+            `--- Reunión del ${m.scheduledAt.toISOString().slice(0, 10)} (${m.status}) ---\n${m.notes}`,
+        )
+        .join("\n\n")
+    : null;
+
   return `FECHA DE HOY: ${today}
 
 CLIENTE
@@ -297,6 +317,9 @@ Próximo contacto agendado: ${opportunity.nextContactAt?.toISOString().slice(0, 
 
 MEMORIA ANTERIOR DEL ASESOR IA (resumen acumulado de análisis previos — actualízala, no la ignores)
 ${opportunity.aiMemory ?? "(Todavía no hay memoria — es el primer análisis de este cliente.)"}
+
+TRANSCRIPCIONES/RESÚMENES DE REUNIONES (fuente de mayor confianza — declaraciones directas del lead)
+${meetingsText ?? "(No hay reuniones con transcripción cargada.)"}
 
 NOTAS INTERNAS DEL EQUIPO
 ${notesText}

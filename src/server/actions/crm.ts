@@ -234,6 +234,126 @@ export async function deleteOpportunityAction(opportunityId: string): Promise<Ac
   return { error: null };
 }
 
+// ── Reuniones ───────────────────────────────────────────────────────────
+// Registro manual de reuniones (fecha + transcripción/notas) mientras no
+// haya integración automática con Meet. El asesor IA las lee como fuente
+// prioritaria — declaraciones directas del lead — al calificar el lead.
+
+const createMeetingSchema = z.object({
+  opportunityId: z.string().min(1),
+  scheduledAt: z.string().min(1, "Poné la fecha"),
+  durationMinutes: z.coerce.number().int().positive().max(600).optional(),
+  meetingUrl: z.string().max(500).optional(),
+  notes: z.string().max(20000).optional(), // transcripción o resumen de la reunión
+});
+
+export async function createMeetingAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const parsed = createMeetingSchema.safeParse({
+    opportunityId: formData.get("opportunityId"),
+    scheduledAt: formData.get("scheduledAt"),
+    durationMinutes: formData.get("durationMinutes") || undefined,
+    meetingUrl: formData.get("meetingUrl") || undefined,
+    notes: formData.get("notes") || undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  const opportunity = await prisma.opportunity.findUnique({
+    where: { id: parsed.data.opportunityId },
+    select: { organizationId: true, assignedToId: true },
+  });
+  if (!opportunity || opportunity.organizationId !== organizationId) {
+    return { error: "Cliente no encontrado" };
+  }
+  if (!canEditOpportunity(opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  const scheduledAt = new Date(parsed.data.scheduledAt);
+  if (Number.isNaN(scheduledAt.getTime())) {
+    return { error: "Fecha inválida" };
+  }
+
+  await prisma.meeting.create({
+    data: {
+      organizationId,
+      opportunityId: parsed.data.opportunityId,
+      scheduledAt,
+      durationMinutes: parsed.data.durationMinutes ?? 30,
+      meetingUrl: parsed.data.meetingUrl || null,
+      notes: parsed.data.notes || null,
+      status: parsed.data.notes ? "DONE" : "SCHEDULED",
+    },
+  });
+
+  revalidatePath(PATH);
+  return { error: null, message: "Reunión registrada." };
+}
+
+const updateMeetingNotesSchema = z.object({
+  notes: z.string().max(20000),
+});
+
+/** Carga o edita la transcripción/resumen de una reunión ya registrada. */
+export async function updateMeetingNotesAction(
+  meetingId: string,
+  notes: string,
+): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    include: { opportunity: { select: { assignedToId: true } } },
+  });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+  if (meeting.opportunity && !canEditOpportunity(meeting.opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  const parsed = updateMeetingNotesSchema.safeParse({ notes });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  await prisma.meeting.update({
+    where: { id: meetingId },
+    data: {
+      notes: parsed.data.notes || null,
+      status: parsed.data.notes && meeting.status === "SCHEDULED" ? "DONE" : meeting.status,
+    },
+  });
+
+  revalidatePath(PATH);
+  return { error: null };
+}
+
+export async function deleteMeetingAction(meetingId: string): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    include: { opportunity: { select: { assignedToId: true } } },
+  });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+  if (meeting.opportunity && !canEditOpportunity(meeting.opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  await prisma.meeting.delete({ where: { id: meetingId } });
+  revalidatePath(PATH);
+  return { error: null };
+}
+
 export async function completeActivityAction(activityId: string): Promise<ActionState> {
   const { organizationId, userId } = await requireOrg();
 

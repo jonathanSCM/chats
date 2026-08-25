@@ -39,7 +39,38 @@ export interface Row {
   aiRecommendation: string;
   aiSuggestedMessage: string;
   aiMemory: string;
+  leadScore: number | null;
+  leadScoreBreakdown: Record<string, number> | null;
+  leadScoreCoverage: number | null;
+  aiPainPoint: string;
+  aiMissingInfo: string;
+  aiNextQuestion: string;
+  aiAlerts: string;
   assignedTo: { id: string; name: string; color: string | null } | null;
+}
+
+const LEAD_SCORE_BREAKDOWN_LABEL: Record<string, [string, number]> = {
+  empresa_en_marcha: ["Empresa en marcha", 20],
+  dolor_concreto: ["Dolor concreto", 20],
+  impacto: ["Impacto", 15],
+  decisor: ["Decisor", 15],
+  capacidad_inversion: ["Capacidad de inversión", 15],
+  encaje_proshop: ["Encaje", 10],
+  urgencia: ["Urgencia", 5],
+};
+
+function leadScoreColor(score: number): string {
+  if (score >= 80) return "#22c55e";
+  if (score >= 60) return "#3b82f6";
+  if (score >= 40) return "#eab308";
+  return "#71717a";
+}
+
+function leadScoreLabel(score: number): string {
+  if (score >= 80) return "Oportunidad alta";
+  if (score >= 60) return "Lead calificado";
+  if (score >= 40) return "En exploración";
+  return "Baja prioridad";
 }
 
 interface Member {
@@ -187,13 +218,18 @@ export function TrackingTable({
                     <Th key={h}>{h}</Th>
                   ))}
                   {/* De aquí en adelante lo llena el asesor IA */}
-                  {["Prioridad", "Próximo contacto", "Prob. de cierre", "Recomendación para cerrar", "Mensaje sugerido"].map(
-                    (h) => (
-                      <Th key={h} ai>
-                        {h}
-                      </Th>
-                    ),
-                  )}
+                  {[
+                    "Calidad del lead",
+                    "Prioridad",
+                    "Próximo contacto",
+                    "Prob. de cierre",
+                    "Recomendación para cerrar",
+                    "Mensaje sugerido",
+                  ].map((h) => (
+                    <Th key={h} ai>
+                      {h}
+                    </Th>
+                  ))}
                   <Th ai>Analizar</Th>
                   <Th />
                 </tr>
@@ -358,6 +394,24 @@ function TableRow({
       </Td>
 
       {/* ── Columnas del asesor IA ── */}
+      <Td>
+        {row.leadScore !== null ? (
+          <div
+            title={leadScoreLabel(row.leadScore)}
+            className="flex items-center gap-1.5 whitespace-nowrap font-mono text-xs font-semibold"
+            style={{ color: leadScoreColor(row.leadScore) }}
+          >
+            <span
+              className="inline-block h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: leadScoreColor(row.leadScore) }}
+            />
+            {row.leadScore}/100
+          </div>
+        ) : (
+          <span className="text-xs text-ink-faint">—</span>
+        )}
+      </Td>
+
       <Td>
         <Select
           value={row.priority ?? ""}
@@ -669,6 +723,67 @@ function DetailPanel({
             <p className="mb-2 flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent">
               <Sparkles size={11} /> Asesor IA
             </p>
+
+            {row.leadScore !== null && (
+              <div className="mb-3 rounded-md border border-border bg-surface p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <p
+                      className="font-mono text-2xl font-bold leading-none"
+                      style={{ color: leadScoreColor(row.leadScore) }}
+                    >
+                      {row.leadScore}
+                      <span className="text-sm font-normal text-ink-faint">/100</span>
+                    </p>
+                    <p className="text-xs text-ink-muted">Calidad del lead — {leadScoreLabel(row.leadScore)}</p>
+                  </div>
+                  {row.leadScoreCoverage !== null && (
+                    <p className="text-xs text-ink-faint">
+                      Cobertura de información: <span className="text-ink">{row.leadScoreCoverage}%</span>
+                    </p>
+                  )}
+                </div>
+
+                {row.leadScoreBreakdown && (
+                  <div className="mb-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                    {Object.entries(row.leadScoreBreakdown).map(([key, value]) => {
+                      const meta = LEAD_SCORE_BREAKDOWN_LABEL[key];
+                      if (!meta) return null;
+                      const [label, max] = meta;
+                      return (
+                        <p key={key} className="flex justify-between text-xs text-ink-muted">
+                          <span>{label}</span>
+                          <span className="font-mono text-ink">
+                            {value}/{max}
+                          </span>
+                        </p>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {row.aiPainPoint && (
+                  <p className="mb-1.5 text-sm leading-relaxed text-ink">
+                    <span className="font-medium">Dolor principal:</span> {row.aiPainPoint}
+                  </p>
+                )}
+                {row.aiMissingInfo && (
+                  <p className="mb-1.5 whitespace-pre-wrap text-xs leading-relaxed text-ink-muted">
+                    <span className="font-medium text-ink">Falta saber:</span>
+                    {"\n"}
+                    {row.aiMissingInfo}
+                  </p>
+                )}
+                {row.aiNextQuestion && (
+                  <p className="mb-1.5 text-xs leading-relaxed text-ink-muted">
+                    <span className="font-medium text-ink">Siguiente pregunta:</span> {row.aiNextQuestion}
+                  </p>
+                )}
+                {row.aiAlerts && row.aiAlerts !== "Sin alertas relevantes." && (
+                  <p className="text-xs leading-relaxed text-warning">⚠ {row.aiAlerts}</p>
+                )}
+              </div>
+            )}
 
             <Field label="Recomendación para cerrar">
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">

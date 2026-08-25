@@ -4,9 +4,19 @@ import { STAGE_LABEL, type Stage } from "@/lib/pipeline";
 import { audit } from "@/server/services/audit";
 import { MODELS, runStructured } from "./client";
 
-export const PROMPT_VERSION = "seguimiento-v1";
+export const PROMPT_VERSION = "seguimiento-v2";
 
-/** Lo que el modelo debe devolver: las cinco columnas de IA de la planilla, más la memoria. */
+const desgloseSchema = z.object({
+  empresa_en_marcha: z.number().min(0).max(20),
+  dolor_concreto: z.number().min(0).max(20),
+  impacto: z.number().min(0).max(15),
+  decisor: z.number().min(0).max(15),
+  capacidad_inversion: z.number().min(0).max(15),
+  encaje_proshop: z.number().min(0).max(10),
+  urgencia: z.number().min(0).max(5),
+});
+
+/** Lo que el modelo debe devolver: las columnas de IA de la planilla, la calificación del lead y la memoria. */
 const resultSchema = z.object({
   prioridad: z.enum(["ALTA", "MEDIA", "BAJA"]),
   proximo_contacto: z.string(), // ISO yyyy-mm-dd, o "" si no corresponde
@@ -15,9 +25,41 @@ const resultSchema = z.object({
   mensaje_sugerido: z.string().min(1),
   razon: z.string().min(1),
   memoria: z.string().min(1),
+  // Calidad del lead (0-100): indicador DISTINTO de probabilidad_cierre —
+  // ver reglas en el SYSTEM prompt.
+  calidad_lead: z.number().min(0).max(100),
+  desglose: desgloseSchema,
+  cobertura_informacion: z.number().min(0).max(100),
+  dolor_principal: z.string().min(1),
+  informacion_faltante: z.array(z.string()).max(3),
+  siguiente_pregunta: z.string().min(1),
+  alertas: z.string().min(1),
 });
 
 export type FollowUpResult = z.infer<typeof resultSchema>;
+
+const desgloseJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "empresa_en_marcha",
+    "dolor_concreto",
+    "impacto",
+    "decisor",
+    "capacidad_inversion",
+    "encaje_proshop",
+    "urgencia",
+  ],
+  properties: {
+    empresa_en_marcha: { type: "number", description: "0 a 20." },
+    dolor_concreto: { type: "number", description: "0 a 20." },
+    impacto: { type: "number", description: "0 a 15." },
+    decisor: { type: "number", description: "0 a 15." },
+    capacidad_inversion: { type: "number", description: "0 a 15." },
+    encaje_proshop: { type: "number", description: "0 a 10." },
+    urgencia: { type: "number", description: "0 a 5." },
+  },
+} as const;
 
 const jsonSchema = {
   type: "object",
@@ -30,6 +72,13 @@ const jsonSchema = {
     "mensaje_sugerido",
     "razon",
     "memoria",
+    "calidad_lead",
+    "desglose",
+    "cobertura_informacion",
+    "dolor_principal",
+    "informacion_faltante",
+    "siguiente_pregunta",
+    "alertas",
   ],
   properties: {
     prioridad: {
@@ -69,6 +118,42 @@ const jsonSchema = {
         "— no la repitas igual si no cambió nada relevante. Texto libre, breve (máximo ~6 líneas), sin " +
         "inventar datos que no estén en la conversación o notas.",
     },
+    calidad_lead: {
+      type: "number",
+      description:
+        "Calidad del lead, 0 a 100 — qué tan buena oportunidad comercial es (encaje, tamaño, dolor real). " +
+        "NO es lo mismo que probabilidad_cierre: un lead puede tener calidad alta pero probabilidad baja " +
+        "si todavía falta reunión, presupuesto o decisión. Es la suma exacta de los 7 campos de 'desglose'.",
+    },
+    desglose: desgloseJsonSchema,
+    cobertura_informacion: {
+      type: "number",
+      description:
+        "Qué porcentaje (0-100) de la información necesaria para calificar bien a este lead ya se conoce. " +
+        "Un lead con poca información no debe parecer artificialmente malo — usa este campo para mostrarlo.",
+    },
+    dolor_principal: {
+      type: "string",
+      description:
+        "El problema principal del cliente, desde el punto de vista del negocio, en una frase concreta " +
+        "(no 'necesita IA', sino algo como 'dos personas gestionan manualmente los leads de WhatsApp y " +
+        "pierden ventas por no alcanzar a atenderlos todos').",
+    },
+    informacion_faltante: {
+      type: "array",
+      items: { type: "string" },
+      description: "Hasta 3 datos concretos que más cambiarían la decisión comercial si se conocieran.",
+    },
+    siguiente_pregunta: {
+      type: "string",
+      description: "Una sola pregunta, sencilla y natural, que el vendedor debería hacer a continuación.",
+    },
+    alertas: {
+      type: "string",
+      description:
+        "Contradicciones, datos poco confiables, o cosas que el vendedor debería revisar antes de confiar " +
+        "en este análisis. Si no hay ninguna, responde exactamente 'Sin alertas relevantes.'.",
+    },
   },
 } as const;
 
@@ -84,7 +169,22 @@ Reglas:
 - La "memoria" es un resumen que se reutiliza en cada análisis futuro de este mismo cliente: mantenla
   corta y factual, actualizándola en vez de repetirla — es la forma en que recuerdas la conversación
   completa aunque solo veas los mensajes más recientes.
-- Devuelve exclusivamente el JSON del esquema pedido.`;
+- Devuelve exclusivamente el JSON del esquema pedido.
+
+Sobre "calidad_lead" (0-100, desglose de 7 criterios) y "probabilidad_cierre" (0-100%):
+- Son DOS indicadores distintos, nunca los confundas ni conviertas uno en el otro automáticamente.
+  calidad_lead mide qué tan buena oportunidad comercial es (encaje, tamaño, dolor real). probabilidad_cierre
+  mide qué tan probable es que compre AHORA. Un lead puede tener calidad_lead 90 y probabilidad_cierre 40
+  a la vez: buen encaje, pero todavía falta reunión, presupuesto o decisión.
+- Usa exactamente los criterios y puntajes de la "GUÍA DE CALIFICACIÓN" que viene en la información de
+  abajo (categoría de la Base de Conocimiento). Si no hay ninguna guía cargada, usa como referencia general:
+  empresa en marcha (0-20), dolor concreto (0-20), impacto del problema (0-15), decisor (0-15), capacidad
+  de inversión (0-15), encaje con la empresa (0-10), urgencia (0-5).
+- Diferencia siempre CONFIRMADO (lo dijo el cliente) de INFERIDO (lo dedujiste) y DESCONOCIDO (no se sabe).
+  Nunca trates una afirmación del propio chatbot/vendedor como si el cliente la hubiera confirmado.
+  DESCONOCIDO no es lo mismo que NEGATIVO: si nunca se habló de presupuesto, es "desconocido", no "no tiene".
+- Sé conservador con probabilidad_cierre: entusiasmo, respuestas rápidas o aceptar una reunión no bastan
+  para una probabilidad alta.`;
 
 interface OpportunityContext {
   id: string;
@@ -148,8 +248,19 @@ async function buildInput(opportunity: OpportunityContext): Promise<string> {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const knowledgeText = knowledge.length
-    ? knowledge.map((k) => `[${k.category}] ${k.title}: ${k.content}`).join("\n")
+  // La guía de calificación (categoría QUALIFICATION) se separa del resto:
+  // es la regla obligatoria para calcular "calidad_lead", no solo contexto
+  // general de la empresa. Se lee directamente de la Base de Conocimiento —
+  // así se puede ajustar sin tocar código.
+  const qualificationItems = knowledge.filter((k) => k.category === "QUALIFICATION");
+  const generalKnowledge = knowledge.filter((k) => k.category !== "QUALIFICATION");
+
+  const qualificationGuideText = qualificationItems.length
+    ? qualificationItems.map((k) => `${k.title}\n${k.content}`).join("\n\n---\n\n")
+    : null;
+
+  const knowledgeText = generalKnowledge.length
+    ? generalKnowledge.map((k) => `[${k.category}] ${k.title}: ${k.content}`).join("\n")
     : "(Sin información cargada. No inventes servicios ni precios.)";
 
   const conversationText = recentMessages.length
@@ -194,7 +305,10 @@ CONVERSACIÓN DE WHATSAPP, ventana de los últimos ${messageLimit} mensajes (má
 ${conversationText}
 
 INFORMACIÓN AUTORIZADA DE LA EMPRESA
-${knowledgeText}`;
+${knowledgeText}
+
+GUÍA DE CALIFICACIÓN (obligatoria — usa exactamente estos criterios y puntajes para "calidad_lead" y "desglose")
+${qualificationGuideText ?? "(No hay ninguna guía cargada en la Base de Conocimiento, categoría 'Guía de calificación'. Usa la referencia general del SYSTEM.)"}`;
 }
 
 /**
@@ -235,6 +349,14 @@ export async function analyzeFollowUp(opportunityId: string): Promise<FollowUpRe
       aiRecommendation: result.recomendacion,
       aiSuggestedMessage: result.mensaje_sugerido,
       aiReviewedAt: new Date(),
+      leadScore: Math.round(result.calidad_lead),
+      leadScoreBreakdown: result.desglose,
+      leadScoreCoverage: Math.round(result.cobertura_informacion),
+      leadScoreUpdatedAt: new Date(),
+      aiPainPoint: result.dolor_principal,
+      aiMissingInfo: result.informacion_faltante.join("\n"),
+      aiNextQuestion: result.siguiente_pregunta,
+      aiAlerts: result.alertas,
       aiMemory: result.memoria,
       aiMemoryUpdatedAt: new Date(),
       // Solo se propone fecha si no había una puesta por una persona.

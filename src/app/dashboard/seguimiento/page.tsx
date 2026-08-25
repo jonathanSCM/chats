@@ -54,6 +54,13 @@ export default async function SeguimientoPage() {
     aiRecommendation: o.aiRecommendation ?? "",
     aiSuggestedMessage: o.aiSuggestedMessage ?? "",
     aiMemory: o.aiMemory ?? "",
+    leadScore: o.leadScore,
+    leadScoreBreakdown: (o.leadScoreBreakdown as Record<string, number> | null) ?? null,
+    leadScoreCoverage: o.leadScoreCoverage,
+    aiPainPoint: o.aiPainPoint ?? "",
+    aiMissingInfo: o.aiMissingInfo ?? "",
+    aiNextQuestion: o.aiNextQuestion ?? "",
+    aiAlerts: o.aiAlerts ?? "",
     assignedTo: o.assignedTo
       ? { id: o.assignedTo.id, name: o.assignedTo.name || o.assignedTo.email, color: o.assignedTo.color }
       : null,

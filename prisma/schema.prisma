@@ -537,7 +537,17 @@ model Opportunity {
   expectedCloseDate DateTime?
 
   // Calificación (manual §9): score 0-100 con el desglose que lo justifica.
-  leadScore      Int?
+  // Es un indicador DISTINTO de `probability` (probabilidad de cierre) — un
+  // lead puede tener leadScore 90 y probability 40 a la vez (buen encaje
+  // comercial, pero todavía sin reunión/presupuesto/decisión).
+  leadScore          Int?
+  leadScoreBreakdown Json? // { empresaEnMarcha, dolorConcreto, impacto, decisor, capacidadInversion, encajeProshop, urgencia }
+  leadScoreCoverage  Int? // % de la información necesaria que ya se conoce
+  leadScoreUpdatedAt DateTime?
+  aiPainPoint        String?   @db.Text // dolor principal, una frase
+  aiMissingInfo      String?   @db.Text // qué falta saber, hasta 3 puntos
+  aiNextQuestion     String?   @db.Text // la siguiente pregunta que debería hacer el vendedor
+  aiAlerts           String?   @db.Text // contradicciones o datos poco confiables a revisar
   priority       Priority?
   needSummary    String?    @db.Text
   // Texto libre que el equipo mantiene por cliente ("no contesta hace una

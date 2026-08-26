@@ -328,6 +328,10 @@ export function InboxClient({
 
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Si el usuario se desplazó hacia arriba a leer mensajes viejos, el
+  // refresco cada 2s no debe arrancarlo de ahí — solo se sigue bajando
+  // sola si ya estaba cerca del final.
+  const isNearBottomRef = useRef(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedIdRef = useRef<string | null>(null);
   const prevUnreadRef = useRef<Map<string, number>>(new Map());
@@ -476,8 +480,22 @@ export function InboxClient({
   }, [selectedId, fetchMessages]);
 
   useEffect(() => {
+    if (!isNearBottomRef.current) return;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
+
+  // Se resetea a "cerca del final" cada vez que se abre un chat distinto —
+  // siempre debe arrancar mostrando lo último, sin importar dónde había
+  // quedado el scroll del chat anterior.
+  useEffect(() => {
+    isNearBottomRef.current = true;
+  }, [selectedId]);
+
+  function handleMessagesScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isNearBottomRef.current = distanceFromBottom < 150;
+  }
 
   const sendFile = useCallback(
     async (file: File, caption: string) => {
@@ -801,6 +819,7 @@ export function InboxClient({
 
             <div
               ref={scrollRef}
+              onScroll={handleMessagesScroll}
               className="wa-wallpaper flex-1 space-y-2 overflow-y-auto px-3 py-4 md:px-5"
             >
               {messages.map((m, i) => {

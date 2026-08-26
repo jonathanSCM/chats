@@ -647,7 +647,7 @@ export function InboxClient({
           selectedId ? "hidden md:flex" : "flex"
         }`}
       >
-        <div className="sticky top-0 z-10 border-b border-border bg-surface-2 px-4 py-3.5">
+        <div className="sticky top-0 z-10 shrink-0 border-b border-border bg-surface-2 px-4 py-3.5">
           <div className="flex items-center justify-between gap-2">
             <h1 className="font-display text-lg font-semibold text-ink">Chats</h1>
             {pushStatus === "prompt" && (
@@ -669,7 +669,7 @@ export function InboxClient({
         </div>
 
         {bots.length > 1 && (
-          <div className="flex gap-1.5 overflow-x-auto border-b border-border bg-surface px-3 py-2">
+          <div className="flex min-h-[42px] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-border bg-surface px-3 py-2">
             <button
               type="button"
               onClick={() => setSelectedBotId(null)}

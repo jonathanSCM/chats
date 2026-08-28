@@ -5,9 +5,16 @@ import { isOpenStage, type Stage, type Priority } from "@/lib/pipeline";
 import { getAiSpendToday } from "@/server/actions/crm";
 import { TrackingTable } from "./_components/tracking-table";
 
-export default async function SeguimientoPage() {
+export default async function SeguimientoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ archived?: string }>;
+}) {
   const session = await auth();
   if (!session?.user.organizationId) redirect("/dashboard");
+
+  const { archived } = await searchParams;
+  const viewingArchived = archived === "1";
 
   const organizationId = session.user.organizationId;
   const isAdmin = session.user.role === "OWNER" || session.user.role === "SUPERADMIN";
@@ -17,7 +24,7 @@ export default async function SeguimientoPage() {
   // (canEditOpportunity) a quien la tiene asignada, o al admin.
   const [opportunities, contacts, members, ai] = await Promise.all([
     prisma.opportunity.findMany({
-      where: { organizationId },
+      where: { organizationId, archivedAt: viewingArchived ? { not: null } : null },
       include: {
         contact: { select: { id: true, fullName: true, phone: true, city: true } },
         assignedTo: { select: { id: true, name: true, email: true, color: true } },
@@ -26,7 +33,7 @@ export default async function SeguimientoPage() {
           orderBy: { scheduledAt: "desc" },
         },
       },
-      orderBy: [{ nextContactAt: "asc" }, { updatedAt: "desc" }],
+      orderBy: viewingArchived ? { updatedAt: "desc" } : { sortOrder: "asc" },
     }),
     prisma.contact.findMany({
       where: { organizationId },
@@ -65,6 +72,8 @@ export default async function SeguimientoPage() {
     aiMissingInfo: o.aiMissingInfo ?? "",
     aiNextQuestion: o.aiNextQuestion ?? "",
     aiAlerts: o.aiAlerts ?? "",
+    archived: o.archivedAt !== null,
+    sortOrder: o.sortOrder,
     meetings: o.meetings.map((m) => ({
       id: m.id,
       scheduledAt: m.scheduledAt.toISOString(),
@@ -96,6 +105,7 @@ export default async function SeguimientoPage() {
         members={members.map((m) => ({ id: m.id, name: m.name || m.email, color: m.color }))}
         currentUserId={session.user.id}
         isAdmin={isAdmin}
+        viewingArchived={viewingArchived}
         ai={ai}
         summary={{
           inFollowUp: open.length,

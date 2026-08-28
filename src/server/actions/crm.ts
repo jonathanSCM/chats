@@ -234,6 +234,68 @@ export async function deleteOpportunityAction(opportunityId: string): Promise<Ac
   return { error: null };
 }
 
+/**
+ * Archivar oculta al cliente de la vista principal sin borrar nada (a
+ * diferencia de "Quitar del seguimiento", que sí elimina) — para leads
+ * viejos/perdidos que ya no quieres ver pero podrías necesitar consultar.
+ */
+export async function archiveOpportunityAction(opportunityId: string): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const opportunity = await prisma.opportunity.findUnique({ where: { id: opportunityId } });
+  if (!opportunity || opportunity.organizationId !== organizationId) {
+    return { error: "Cliente no encontrado" };
+  }
+  if (!canEditOpportunity(opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  await prisma.opportunity.update({ where: { id: opportunityId }, data: { archivedAt: new Date() } });
+  revalidatePath(PATH);
+  return { error: null };
+}
+
+export async function unarchiveOpportunityAction(opportunityId: string): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const opportunity = await prisma.opportunity.findUnique({ where: { id: opportunityId } });
+  if (!opportunity || opportunity.organizationId !== organizationId) {
+    return { error: "Cliente no encontrado" };
+  }
+  if (!canEditOpportunity(opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  await prisma.opportunity.update({ where: { id: opportunityId }, data: { archivedAt: null } });
+  revalidatePath(PATH);
+  return { error: null };
+}
+
+/**
+ * Guarda el orden manual (arrastrar y soltar) de la cartera completa —
+ * es compartida por todo el equipo, como el resto de la planilla.
+ */
+export async function reorderOpportunitiesAction(orderedIds: string[]): Promise<ActionState> {
+  const { organizationId } = await requireOrg();
+
+  const owned = await prisma.opportunity.findMany({
+    where: { id: { in: orderedIds }, organizationId },
+    select: { id: true },
+  });
+  if (owned.length !== orderedIds.length) {
+    return { error: "Alguno de estos clientes ya no existe. Recarga la página." };
+  }
+
+  await prisma.$transaction(
+    orderedIds.map((id, index) =>
+      prisma.opportunity.update({ where: { id }, data: { sortOrder: index } }),
+    ),
+  );
+
+  revalidatePath(PATH);
+  return { error: null };
+}
+
 // ── Reuniones ───────────────────────────────────────────────────────────
 // Registro manual de reuniones (fecha + transcripción/notas) mientras no
 // haya integración automática con Meet. El asesor IA las lee como fuente

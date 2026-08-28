@@ -1,13 +1,31 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { Plus, X, Copy, Check, Trash2, Sparkles, Loader2, Video } from "lucide-react";
+import Link from "next/link";
+import {
+  Plus,
+  X,
+  Copy,
+  Check,
+  Trash2,
+  Sparkles,
+  Loader2,
+  Video,
+  Archive,
+  ArchiveRestore,
+  GripVertical,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 import {
   createOpportunityAction,
   updateOpportunityFieldAction,
   deleteOpportunityAction,
   analyzeOpportunityAction,
+  archiveOpportunityAction,
+  unarchiveOpportunityAction,
+  reorderOpportunitiesAction,
   createMeetingAction,
   updateMeetingNotesAction,
   deleteMeetingAction,
@@ -50,6 +68,8 @@ export interface Row {
   aiNextQuestion: string;
   aiAlerts: string;
   meetings: { id: string; scheduledAt: string; status: string; notes: string }[];
+  archived: boolean;
+  sortOrder: number;
   assignedTo: { id: string; name: string; color: string | null } | null;
 }
 
@@ -89,6 +109,7 @@ interface Props {
   members: Member[];
   currentUserId: string;
   isAdmin: boolean;
+  viewingArchived: boolean;
   summary: {
     inFollowUp: number;
     quotesSent: number;
@@ -96,6 +117,36 @@ interface Props {
     nextContact: string | null;
   };
   ai: { spent: number; budget: number; enabled: boolean };
+}
+
+type SortField =
+  | "registeredAt"
+  | "client"
+  | "stage"
+  | "leadScore"
+  | "priority"
+  | "nextContactAt"
+  | "probability";
+
+const PRIORITY_RANK: Record<string, number> = { ALTA: 3, MEDIA: 2, BAJA: 1 };
+
+function sortValue(row: Row, field: SortField): number | string {
+  switch (field) {
+    case "registeredAt":
+      return row.registeredAt;
+    case "client":
+      return row.client.toLowerCase();
+    case "stage":
+      return row.stage;
+    case "leadScore":
+      return row.leadScore ?? -1;
+    case "priority":
+      return row.priority ? PRIORITY_RANK[row.priority] : -1;
+    case "nextContactAt":
+      return row.nextContactAt ?? "";
+    case "probability":
+      return row.probability ?? -1;
+  }
 }
 
 /** El admin puede todo; un vendedor solo lo que tiene asignado (o nadie lo tiene). */
@@ -132,6 +183,7 @@ export function TrackingTable({
   members,
   currentUserId,
   isAdmin,
+  viewingArchived,
   summary,
   ai,
 }: Props) {
@@ -139,22 +191,74 @@ export function TrackingTable({
   const [detail, setDetail] = useState<Row | null>(null);
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<Stage | "">("");
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  // Orden manual (arrastrar y soltar): copia local para poder mover filas
+  // al instante, sin esperar la vuelta del servidor. Se resincroniza cuando
+  // cambian las filas de verdad (otro cambio, u otra persona reordenó).
+  const [orderedRows, setOrderedRows] = useState(rows);
+  const [syncedRows, setSyncedRows] = useState(rows);
+  if (rows !== syncedRows) {
+    setSyncedRows(rows);
+    setOrderedRows(rows);
+  }
+  const dragIdRef = useRef<string | null>(null);
 
   const closeCreate = useCallback(() => setCreating(false), []);
   const closeDetail = useCallback(() => setDetail(null), []);
 
-  const filtered = rows.filter((r) => {
-    if (stageFilter && r.stage !== stageFilter) return false;
-    if (!query.trim()) return true;
-    const q = query.toLowerCase();
-    return (
-      r.client.toLowerCase().includes(q) ||
-      r.phone.includes(q) ||
-      r.city.toLowerCase().includes(q) ||
-      r.service.toLowerCase().includes(q) ||
-      r.need.toLowerCase().includes(q)
-    );
-  });
+  function toggleSort(field: SortField) {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  }
+
+  function clearSort() {
+    setSortField(null);
+  }
+
+  function handleDrop(targetId: string) {
+    const draggedId = dragIdRef.current;
+    dragIdRef.current = null;
+    if (!draggedId || draggedId === targetId) return;
+
+    const next = orderedRows.slice();
+    const from = next.findIndex((r) => r.id === draggedId);
+    const to = next.findIndex((r) => r.id === targetId);
+    if (from === -1 || to === -1) return;
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+
+    setOrderedRows(next);
+    reorderOpportunitiesAction(next.map((r) => r.id));
+  }
+
+  const canDrag = !sortField && !query.trim() && !stageFilter && !viewingArchived;
+
+  const filtered = orderedRows
+    .filter((r) => {
+      if (stageFilter && r.stage !== stageFilter) return false;
+      if (!query.trim()) return true;
+      const q = query.toLowerCase();
+      return (
+        r.client.toLowerCase().includes(q) ||
+        r.phone.includes(q) ||
+        r.city.toLowerCase().includes(q) ||
+        r.service.toLowerCase().includes(q) ||
+        r.need.toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      if (!sortField) return 0;
+      const va = sortValue(a, sortField);
+      const vb = sortValue(b, sortField);
+      const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+      return sortDir === "asc" ? cmp : -cmp;
+    });
 
   return (
     <div className="space-y-4">
@@ -185,10 +289,43 @@ export function TrackingTable({
             </option>
           ))}
         </Select>
-        <Button type="button" onClick={() => setCreating(true)} className="ml-auto">
-          <Plus size={16} /> Agregar cliente
-        </Button>
+        {sortField && (
+          <button
+            type="button"
+            onClick={clearSort}
+            className="cursor-pointer whitespace-nowrap text-xs text-ink-faint hover:text-accent"
+          >
+            Quitar orden por columna
+          </button>
+        )}
+        <Link
+          href={viewingArchived ? "/dashboard/seguimiento" : "/dashboard/seguimiento?archived=1"}
+          className="flex items-center gap-1 whitespace-nowrap text-xs text-ink-muted hover:text-accent"
+        >
+          {viewingArchived ? (
+            <>
+              <ArchiveRestore size={13} /> Ver activos
+            </>
+          ) : (
+            <>
+              <Archive size={13} /> Ver archivados
+            </>
+          )}
+        </Link>
+        {!viewingArchived && (
+          <Button type="button" onClick={() => setCreating(true)} className="ml-auto">
+            <Plus size={16} /> Agregar cliente
+          </Button>
+        )}
       </div>
+
+      {!viewingArchived && !sortField && (
+        <p className="text-xs text-ink-faint">
+          {canDrag
+            ? "Arrastra una fila desde el ícono ⠿ para reordenarla a mano."
+            : "Quita la búsqueda y los filtros para poder reordenar filas a mano."}
+        </p>
+      )}
 
       {creating && (
         <Card>
@@ -198,8 +335,9 @@ export function TrackingTable({
 
       {rows.length === 0 && !creating && (
         <Card className="text-sm text-ink-muted">
-          Todavía no hay clientes en seguimiento. Agrega uno desde un contacto que ya escribió
-          por WhatsApp.
+          {viewingArchived
+            ? "No hay clientes archivados."
+            : "Todavía no hay clientes en seguimiento. Agrega uno desde un contacto que ya escribió por WhatsApp."}
         </Card>
       )}
 
@@ -209,31 +347,42 @@ export function TrackingTable({
             <table className="w-full border-separate border-spacing-0 text-sm">
               <thead>
                 <tr>
-                  {[
-                    "Fecha registro",
-                    "Cliente",
-                    "Teléfono",
-                    "Ciudad",
-                    "Servicio",
-                    "Necesidad / contexto",
-                    "Estado",
-                    "Última actualización",
-                  ].map((h) => (
-                    <Th key={h}>{h}</Th>
-                  ))}
+                  {canDrag && <Th />}
+                  <SortableTh field="registeredAt" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>
+                    Fecha registro
+                  </SortableTh>
+                  <SortableTh field="client" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>
+                    Cliente
+                  </SortableTh>
+                  <Th>Teléfono</Th>
+                  <Th>Ciudad</Th>
+                  <Th>Servicio</Th>
+                  <Th>Necesidad / contexto</Th>
+                  <SortableTh field="stage" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>
+                    Estado
+                  </SortableTh>
+                  <Th>Última actualización</Th>
                   {/* De aquí en adelante lo llena el asesor IA */}
-                  {[
-                    "Calidad del lead",
-                    "Prioridad",
-                    "Próximo contacto",
-                    "Prob. de cierre",
-                    "Recomendación para cerrar",
-                    "Mensaje sugerido",
-                  ].map((h) => (
-                    <Th key={h} ai>
-                      {h}
-                    </Th>
-                  ))}
+                  <SortableTh field="leadScore" sortField={sortField} sortDir={sortDir} onSort={toggleSort} ai>
+                    Calidad del lead
+                  </SortableTh>
+                  <SortableTh field="priority" sortField={sortField} sortDir={sortDir} onSort={toggleSort} ai>
+                    Prioridad
+                  </SortableTh>
+                  <SortableTh
+                    field="nextContactAt"
+                    sortField={sortField}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    ai
+                  >
+                    Próximo contacto
+                  </SortableTh>
+                  <SortableTh field="probability" sortField={sortField} sortDir={sortDir} onSort={toggleSort} ai>
+                    Prob. de cierre
+                  </SortableTh>
+                  <Th ai>Recomendación para cerrar</Th>
+                  <Th ai>Mensaje sugerido</Th>
                   <Th ai>Analizar</Th>
                   <Th />
                 </tr>
@@ -246,6 +395,11 @@ export function TrackingTable({
                     aiEnabled={ai.enabled}
                     editable={canEdit(row, currentUserId, isAdmin)}
                     onOpen={() => setDetail(row)}
+                    draggable={canDrag}
+                    onDragStart={() => {
+                      dragIdRef.current = row.id;
+                    }}
+                    onDropRow={() => handleDrop(row.id)}
                   />
                 ))}
               </tbody>
@@ -304,16 +458,59 @@ function Td({ children, className = "" }: { children?: React.ReactNode; classNam
   );
 }
 
+function SortableTh({
+  field,
+  sortField,
+  sortDir,
+  onSort,
+  ai,
+  children,
+}: {
+  field: SortField;
+  sortField: SortField | null;
+  sortDir: "asc" | "desc";
+  onSort: (field: SortField) => void;
+  ai?: boolean;
+  children: React.ReactNode;
+}) {
+  const active = sortField === field;
+  return (
+    <th
+      className={`sticky top-0 z-20 whitespace-nowrap border-b border-border bg-surface px-1 py-1 text-left font-mono text-[11px] font-semibold uppercase tracking-wide ${
+        ai ? "text-accent" : "text-ink-muted"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(field)}
+        className={`flex cursor-pointer items-center gap-1 rounded px-2 py-1.5 hover:bg-surface-2 ${
+          active ? "text-ink" : ""
+        }`}
+      >
+        {children}
+        {active &&
+          (sortDir === "asc" ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
+      </button>
+    </th>
+  );
+}
+
 function TableRow({
   row,
   aiEnabled,
   editable,
   onOpen,
+  draggable,
+  onDragStart,
+  onDropRow,
 }: {
   row: Row;
   aiEnabled: boolean;
   editable: boolean;
   onOpen: () => void;
+  draggable: boolean;
+  onDragStart: () => void;
+  onDropRow: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const locked = !editable || isPending;
@@ -325,7 +522,20 @@ function TableRow({
   }
 
   return (
-    <tr className={`transition-colors hover:bg-surface-2/40 ${isPending ? "opacity-60" : ""}`}>
+    <tr
+      draggable={draggable}
+      onDragStart={draggable ? onDragStart : undefined}
+      onDragOver={draggable ? (e) => e.preventDefault() : undefined}
+      onDrop={draggable ? onDropRow : undefined}
+      className={`transition-colors hover:bg-surface-2/40 ${isPending ? "opacity-60" : ""} ${
+        draggable ? "cursor-grab active:cursor-grabbing" : ""
+      }`}
+    >
+      {draggable && (
+        <Td className="w-6 px-1 text-ink-faint">
+          <GripVertical size={14} />
+        </Td>
+      )}
       <Td className="whitespace-nowrap font-mono text-[13px] text-ink-muted">
         {dateShort(row.registeredAt)}
       </Td>
@@ -833,7 +1043,33 @@ function DetailPanel({
           />
 
           {editable && (
-            <div className="border-t border-border pt-4">
+            <div className="flex flex-wrap items-center gap-4 border-t border-border pt-4">
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() =>
+                  startTransition(async () => {
+                    if (row.archived) {
+                      await unarchiveOpportunityAction(row.id);
+                    } else {
+                      await archiveOpportunityAction(row.id);
+                      onClose();
+                    }
+                  })
+                }
+                className="flex cursor-pointer items-center gap-1.5 text-xs text-ink-faint hover:text-accent"
+              >
+                {row.archived ? (
+                  <>
+                    <ArchiveRestore size={13} /> Desarchivar
+                  </>
+                ) : (
+                  <>
+                    <Archive size={13} /> Archivar
+                  </>
+                )}
+              </button>
+
               <button
                 type="button"
                 disabled={isPending}

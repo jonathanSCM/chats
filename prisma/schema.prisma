@@ -534,6 +534,13 @@ model Opportunity {
   estimatedValue    Decimal?         @db.Decimal(12, 2)
   currency          String           @default("USD")
   probability       Int? // 0-100
+
+  // Archivar saca al cliente de la vista principal sin borrar nada (a
+  // diferencia de "Quitar del seguimiento", que sí elimina). sortOrder es
+  // el orden manual que el equipo arma arrastrando filas; se usa como orden
+  // por defecto cuando no hay ninguna columna ordenada.
+  archivedAt DateTime?
+  sortOrder  Int       @default(0)
   expectedCloseDate DateTime?
 
   // Calificación (manual §9): score 0-100 con el desglose que lo justifica.

@@ -52,7 +52,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   // mensajes que ya se trajeron, para no hacer otra consulta.
   const WINDOW_MS = 24 * 60 * 60 * 1000;
   const lastCustomerMessageAt = [...messages].reverse().find((m) => m.role === "CUSTOMER")?.createdAt;
-  const outsideWindow = !lastCustomerMessageAt || Date.now() - lastCustomerMessageAt.getTime() > WINDOW_MS;
+  const normalWindowOpen =
+    Boolean(lastCustomerMessageAt) && Date.now() - lastCustomerMessageAt!.getTime() <= WINDOW_MS;
+  // Leads que llegaron por un anuncio "Click to WhatsApp": si respondimos a
+  // tiempo, Meta da 72h extra sin necesitar plantilla (ver
+  // services/conversation.ts, maybeActivateFreeEntryPoint).
+  const freeEntryPointOpen =
+    Boolean(conversation.freeEntryPointUntil) && Date.now() <= conversation.freeEntryPointUntil!.getTime();
+  const outsideWindow = !normalWindowOpen && !freeEntryPointOpen;
 
   return NextResponse.json({
     conversation: {
@@ -63,6 +70,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       outsideWindow,
       status: conversation.status,
       blocked: conversation.blocked,
+      adReferral: conversation.adReferral,
+      freeEntryPointUntil: conversation.freeEntryPointUntil,
       assignedTo: conversation.assignedTo
         ? {
             id: conversation.assignedTo.id,

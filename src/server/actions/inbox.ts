@@ -14,6 +14,7 @@ import {
 import { saveMediaFile } from "@/lib/media-storage";
 import { isWhatsAppAudioType, transcodeToOpus } from "@/lib/audio-transcode";
 import { convertWebpToPng } from "@/lib/image-convert";
+import { maybeActivateFreeEntryPoint } from "@/server/services/conversation";
 
 const messageSchema = z.object({ content: z.string().min(1).max(4000) });
 
@@ -93,6 +94,7 @@ export async function sendInboxMessageAction(
       data: { assignedToId: session.user.id },
     }),
   ]);
+  await maybeActivateFreeEntryPoint(conversationId);
 
   return { error: null };
 }
@@ -231,6 +233,7 @@ export async function sendInboxAttachmentAction(
       data: { assignedToId: session.user.id },
     }),
   ]);
+  await maybeActivateFreeEntryPoint(conversationId);
 
   return { error: null };
 }
@@ -304,6 +307,7 @@ export async function sendTemplateMessageAction(
       data: { assignedToId: session.user.id },
     }),
   ]);
+  await maybeActivateFreeEntryPoint(conversationId);
 
   return { error: null };
 }

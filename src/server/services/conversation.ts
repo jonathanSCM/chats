@@ -11,6 +11,28 @@ import { notifyNewMessage } from "@/server/services/push";
 import { enqueue } from "@/server/jobs";
 
 const CONVERSATION_WINDOW_MS = 24 * 60 * 60 * 1000; // ventana de conversación de WhatsApp
+const FREE_ENTRY_POINT_MS = 72 * 60 * 60 * 1000; // gracia extra de Meta para leads de anuncios
+
+/**
+ * Si esta conversación vino de un anuncio "Click to WhatsApp" y todavía no
+ * se activó la ventana extendida, y estamos respondiendo dentro de las 24h
+ * normales desde ese primer mensaje, se activan 72h de gracia sin plantilla
+ * (Meta: "free entry point conversation"). Se llama cada vez que el equipo
+ * manda un mensaje — no hace nada si ya se activó o no aplica.
+ */
+export async function maybeActivateFreeEntryPoint(conversationId: string): Promise<void> {
+  const conv = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { adReferral: true, adReferralAt: true, freeEntryPointUntil: true },
+  });
+  if (!conv || !conv.adReferral || !conv.adReferralAt || conv.freeEntryPointUntil) return;
+  if (Date.now() - conv.adReferralAt.getTime() > CONVERSATION_WINDOW_MS) return;
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { freeEntryPointUntil: new Date(Date.now() + FREE_ENTRY_POINT_MS) },
+  });
+}
 
 const MEDIA_TYPE_MAP = {
   image: "IMAGE",
@@ -42,6 +64,7 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
     connection.bot.id,
     inbound.from,
     inbound.customerName,
+    inbound.fromAd,
   );
 
   // El mensaje se guarda de inmediato para que aparezca en la bandeja al
@@ -157,6 +180,7 @@ async function findOrCreateConversation(
   botId: string,
   customerPhone: string,
   customerName?: string | null,
+  fromAd?: boolean,
 ): Promise<string> {
   const existing = await prisma.conversation.findFirst({
     where: { botId, customerPhone },
@@ -168,10 +192,18 @@ async function findOrCreateConversation(
 
   if (withinWindow) {
     // El perfil de WhatsApp puede cambiar de nombre; se refresca si vino uno nuevo.
-    if (customerName && customerName !== existing.customerName) {
+    // Si todavía no se había marcado como venida de un anuncio y este
+    // mensaje sí trae el "referral", se marca ahora (mismo hilo de 24h).
+    if (
+      (customerName && customerName !== existing.customerName) ||
+      (fromAd && !existing.adReferral)
+    ) {
       await prisma.conversation.update({
         where: { id: existing.id },
-        data: { customerName },
+        data: {
+          ...(customerName && customerName !== existing.customerName ? { customerName } : {}),
+          ...(fromAd && !existing.adReferral ? { adReferral: true, adReferralAt: new Date() } : {}),
+        },
       });
     }
     return existing.id;
@@ -195,6 +227,7 @@ async function findOrCreateConversation(
       contactId,
       billed: true,
       botPaused: true,
+      ...(fromAd ? { adReferral: true, adReferralAt: new Date() } : {}),
     },
   });
   return created.id;
@@ -260,6 +293,7 @@ export async function handlePhoneAppEcho(echo: ParsedEcho): Promise<void> {
     where: { id: conversationId },
     data: { lastMessageAt: new Date(), botPaused: true },
   });
+  await maybeActivateFreeEntryPoint(conversationId);
 }
 
 // ─── Coexistence: import del historial previo a conectar ───────────────

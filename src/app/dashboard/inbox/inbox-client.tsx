@@ -324,6 +324,7 @@ export function InboxClient({
   const [outsideWindow, setOutsideWindow] = useState(false);
   const [conversationStatus, setConversationStatus] = useState<"OPEN" | "ON_HOLD" | "CLOSED">("OPEN");
   const [conversationBlocked, setConversationBlocked] = useState(false);
+  const [conversationFromAd, setConversationFromAd] = useState(false);
   const [conversationBotId, setConversationBotId] = useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -475,6 +476,7 @@ export function InboxClient({
     setConversationBotId(data.conversation.botId ?? null);
     setConversationStatus(data.conversation.status ?? "OPEN");
     setConversationBlocked(Boolean(data.conversation.blocked));
+    setConversationFromAd(Boolean(data.conversation.adReferral));
   }, []);
 
   // Polling de la lista de conversaciones cada 3s — tiempo real sin websockets.
@@ -853,8 +855,16 @@ export function InboxClient({
               </button>
               <Avatar id={selectedId} label={customerName || customerPhone} size={36} />
               <div className="min-w-0 flex-1">
-                <p className="truncate font-display text-sm font-semibold text-ink">
+                <p className="flex items-center gap-1.5 truncate font-display text-sm font-semibold text-ink">
                   {customerName || customerPhone}
+                  {conversationFromAd && (
+                    <span
+                      title="Este lead llegó por un anuncio de Meta (Click to WhatsApp) — si le respondiste a tiempo, tenés 72h de gracia sin necesitar plantilla."
+                      className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-accent"
+                    >
+                      Anuncio
+                    </span>
+                  )}
                 </p>
                 {customerName && (
                   <p className="truncate font-mono text-xs text-ink-faint">{customerPhone}</p>

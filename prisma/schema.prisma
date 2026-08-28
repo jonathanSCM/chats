@@ -243,6 +243,14 @@ model Conversation {
   // (status CLOSED), que solo la saca de la bandeja del día a día.
   blocked       Boolean  @default(false)
 
+  // Ventana extendida de Meta para leads que llegan por un anuncio "Click to
+  // WhatsApp": si el primer mensaje trae un objeto "referral" y alguien del
+  // equipo responde dentro de las 24h normales, se activan 72h de gracia sin
+  // necesitar plantilla. Ver services/whatsapp.ts y services/conversation.ts.
+  adReferral          Boolean   @default(false)
+  adReferralAt        DateTime?
+  freeEntryPointUntil DateTime?
+
   // Vendedor dueño de esta conversación — se asigna automáticamente al
   // primer vendedor que responde. Mientras sea null, cualquier vendedor la
   // ve en su bandeja como "sin asignar"; una vez asignada, solo ese

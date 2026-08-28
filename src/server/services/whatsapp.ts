@@ -83,6 +83,16 @@ const inboundSchema = z.object({
                   video: mediaObjectSchema.optional(),
                   audio: mediaObjectSchema.optional(),
                   document: mediaObjectSchema.optional(),
+                  // Presente solo si el mensaje vino de un anuncio "Click to
+                  // WhatsApp" o del botón de WhatsApp de una página de
+                  // Facebook (requiere atribución activada en el WABA).
+                  referral: z
+                    .object({
+                      source_type: z.string().optional(),
+                      source_id: z.string().optional(),
+                      ctwa_clid: z.string().optional(),
+                    })
+                    .optional(),
                 }),
               )
               .optional(),
@@ -116,6 +126,9 @@ export interface ParsedInboundMessage {
     mimeType?: string;
     fileName?: string;
   } | null;
+  // true si el mensaje trajo un objeto "referral" — vino de un anuncio
+  // Click-to-WhatsApp o del botón de WhatsApp de una página de Facebook.
+  fromAd: boolean;
 }
 
 const MEDIA_TYPES: InboundMediaType[] = ["image", "video", "audio", "document"];
@@ -150,6 +163,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
 
       for (const message of change.value.messages ?? []) {
         const customerName = namesByWaId.get(message.from) ?? null;
+        const fromAd = Boolean(message.referral);
 
         if (message.type === "text" && message.text?.body) {
           results.push({
@@ -159,6 +173,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
             messageId: message.id,
             text: message.text.body,
             media: null,
+            fromAd,
           });
           continue;
         }
@@ -179,6 +194,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
                 mimeType: mediaObj.mime_type,
                 fileName: mediaObj.filename,
               },
+              fromAd,
             });
           }
         }

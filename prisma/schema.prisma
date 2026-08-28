@@ -238,6 +238,10 @@ model Conversation {
   lastMessageAt DateTime @default(now())
   billed        Boolean  @default(false) // ya contabilizada contra el plan/uso
   botPaused     Boolean  @default(false) // un humano tomó la conversación; el bot no responde solo
+  // Bloquear impide seguir mandándole mensajes desde el panel (cliente
+  // abusivo, spam, etc.) sin borrar el historial. Distinto de "archivar"
+  // (status CLOSED), que solo la saca de la bandeja del día a día.
+  blocked       Boolean  @default(false)
 
   // Vendedor dueño de esta conversación — se asigna automáticamente al
   // primer vendedor que responde. Mientras sea null, cualquier vendedor la

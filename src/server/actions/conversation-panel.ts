@@ -114,6 +114,35 @@ export async function setConversationStatusAction(
   return { error: null };
 }
 
+/**
+ * Bloquear impide seguir mandándole mensajes desde el panel (cliente
+ * abusivo, spam, etc.) sin borrar nada del historial.
+ */
+export async function setConversationBlockedAction(
+  conversationId: string,
+  blocked: boolean,
+): Promise<ActionState> {
+  const access = await requireConversationAccess(conversationId);
+  if (!access) return { error: "Conversación no encontrada" };
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { blocked },
+  });
+
+  await audit({
+    entityType: "Conversation",
+    entityId: conversationId,
+    action: blocked ? "block" : "unblock",
+    userId: access.session.user.id,
+    organizationId: access.organizationId,
+    before: { blocked: access.conversation.blocked },
+    after: { blocked },
+  });
+
+  return { error: null };
+}
+
 const tagsSchema = z.array(z.string().min(1).max(40)).max(10);
 
 export async function setConversationTagsAction(

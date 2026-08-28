@@ -61,6 +61,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       customerPhone: conversation.customerPhone,
       customerName: conversation.customerName,
       outsideWindow,
+      status: conversation.status,
+      blocked: conversation.blocked,
       assignedTo: conversation.assignedTo
         ? {
             id: conversation.assignedTo.id,

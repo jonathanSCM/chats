@@ -17,9 +17,17 @@ import {
   Loader2,
   AlertTriangle,
   PanelRight,
+  Archive,
+  ArchiveRestore,
+  Ban,
+  ShieldCheck,
 } from "lucide-react";
 import { sendInboxMessageAction, sendInboxAttachmentAction } from "@/server/actions/inbox";
-import { deleteMessageAction } from "@/server/actions/conversation-panel";
+import {
+  deleteMessageAction,
+  setConversationStatusAction,
+  setConversationBlockedAction,
+} from "@/server/actions/conversation-panel";
 import { vendorColor } from "@/lib/vendor-color";
 import { usePushNotifications } from "@/lib/use-push-notifications";
 import { Button } from "@/components/ui/button";
@@ -42,6 +50,8 @@ interface ConversationSummary {
   customerPhone: string;
   customerName: string | null;
   lastMessageAt: string;
+  status: "OPEN" | "ON_HOLD" | "CLOSED";
+  blocked: boolean;
   bot: BotAccount;
   assignedTo: Vendor | null;
   unreadCount: number;
@@ -303,6 +313,7 @@ export function InboxClient({
 }) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
+  const [view, setView] = useState<"active" | "archived" | "blocked">("active");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [customerPhone, setCustomerPhone] = useState("");
@@ -311,6 +322,8 @@ export function InboxClient({
   // Pasadas las 24h desde el último mensaje del cliente, WhatsApp ya no
   // deja mandar texto libre — solo una plantilla aprobada por Meta.
   const [outsideWindow, setOutsideWindow] = useState(false);
+  const [conversationStatus, setConversationStatus] = useState<"OPEN" | "ON_HOLD" | "CLOSED">("OPEN");
+  const [conversationBlocked, setConversationBlocked] = useState(false);
   const [conversationBotId, setConversationBotId] = useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -389,11 +402,11 @@ export function InboxClient({
   }, []);
 
   const fetchConversations = useCallback(async () => {
-    const res = await fetch(
-      selectedBotId
-        ? `/api/inbox/conversations?botId=${selectedBotId}`
-        : "/api/inbox/conversations",
-    );
+    const params = new URLSearchParams();
+    if (selectedBotId) params.set("botId", selectedBotId);
+    if (view !== "active") params.set("view", view);
+    const qs = params.toString();
+    const res = await fetch(`/api/inbox/conversations${qs ? `?${qs}` : ""}`);
     if (!res.ok) return;
     const list: ConversationSummary[] = await res.json();
 
@@ -448,7 +461,7 @@ export function InboxClient({
     document.title = totalUnread > 0 ? `(${totalUnread}) WhatsApp ProShop` : "WhatsApp ProShop";
 
     setConversations(list);
-  }, [selectedBotId]);
+  }, [selectedBotId, view]);
 
   const fetchMessages = useCallback(async (id: string) => {
     const res = await fetch(`/api/inbox/conversations/${id}/messages`);
@@ -460,6 +473,8 @@ export function InboxClient({
     setAssignedTo(data.conversation.assignedTo ?? null);
     setOutsideWindow(Boolean(data.conversation.outsideWindow));
     setConversationBotId(data.conversation.botId ?? null);
+    setConversationStatus(data.conversation.status ?? "OPEN");
+    setConversationBlocked(Boolean(data.conversation.blocked));
   }, []);
 
   // Polling de la lista de conversaciones cada 3s — tiempo real sin websockets.
@@ -635,6 +650,31 @@ export function InboxClient({
     fetchConversations();
   }
 
+  // Archivar/bloquear puede sacar la conversación de la vista actual (si
+  // estabas en "Chats" y archivas, o viceversa) — se cierra el chat abierto
+  // y se refresca la lista para no dejarla mostrando algo que ya no calza.
+  function toggleArchive() {
+    const id = selectedIdRef.current;
+    if (!id) return;
+    const nextStatus = conversationStatus === "CLOSED" ? "OPEN" : "CLOSED";
+    setConversationStatus(nextStatus);
+    setConversationStatusAction(id, nextStatus).then(() => {
+      setSelectedId(null);
+      fetchConversations();
+    });
+  }
+
+  function toggleBlock() {
+    const id = selectedIdRef.current;
+    if (!id) return;
+    const next = !conversationBlocked;
+    setConversationBlocked(next);
+    setConversationBlockedAction(id, next).then(() => {
+      setSelectedId(null);
+      fetchConversations();
+    });
+  }
+
   return (
     <div
       ref={rootRef}
@@ -666,6 +706,30 @@ export function InboxClient({
               Vista de administrador — todas las conversaciones
             </p>
           )}
+        </div>
+
+        <div className="flex min-h-[36px] shrink-0 items-center gap-1 border-b border-border bg-surface px-3 py-1.5">
+          {(
+            [
+              ["active", "Chats"],
+              ["archived", "Archivados"],
+              ["blocked", "Bloqueados"],
+            ] as const
+          ).map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => {
+                setView(v);
+                setSelectedId(null);
+              }}
+              className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                view === v ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {bots.length > 1 && (
@@ -806,6 +870,28 @@ export function InboxClient({
               )}
               <button
                 type="button"
+                onClick={toggleBlock}
+                aria-label={conversationBlocked ? "Desbloquear" : "Bloquear"}
+                title={conversationBlocked ? "Desbloquear" : "Bloquear"}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface ${
+                  conversationBlocked ? "text-danger" : "text-ink-muted"
+                }`}
+              >
+                {conversationBlocked ? <ShieldCheck size={18} /> : <Ban size={18} />}
+              </button>
+              <button
+                type="button"
+                onClick={toggleArchive}
+                aria-label={conversationStatus === "CLOSED" ? "Desarchivar" : "Archivar"}
+                title={conversationStatus === "CLOSED" ? "Desarchivar" : "Archivar"}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface ${
+                  conversationStatus === "CLOSED" ? "text-accent" : "text-ink-muted"
+                }`}
+              >
+                {conversationStatus === "CLOSED" ? <ArchiveRestore size={18} /> : <Archive size={18} />}
+              </button>
+              <button
+                type="button"
                 onClick={() => setPanelOpen((v) => !v)}
                 aria-label="Ficha del contacto"
                 title="Ficha del contacto"
@@ -816,6 +902,13 @@ export function InboxClient({
                 <PanelRight size={18} />
               </button>
             </div>
+
+            {conversationBlocked && (
+              <div className="flex items-center gap-2 border-b border-danger/30 bg-danger-dim px-4 py-2 text-xs text-danger">
+                <Ban size={13} />
+                Esta conversación está bloqueada — no se pueden mandar mensajes hasta desbloquearla.
+              </div>
+            )}
 
             <div
               ref={scrollRef}
@@ -921,7 +1014,14 @@ export function InboxClient({
                 </div>
               )}
 
-              {outsideWindow ? (
+              {conversationBlocked ? (
+                <div className="flex items-center justify-between gap-3 rounded-md bg-surface px-3 py-2.5 text-sm text-ink-muted">
+                  <span>Esta conversación está bloqueada.</span>
+                  <Button type="button" variant="secondary" className="shrink-0" onClick={toggleBlock}>
+                    Desbloquear
+                  </Button>
+                </div>
+              ) : outsideWindow ? (
                 <div className="flex items-center justify-between gap-3 rounded-md bg-surface px-3 py-2.5 text-sm text-ink-muted">
                   <span>
                     Pasaron más de 24h desde el último mensaje del cliente — solo puedes escribirle

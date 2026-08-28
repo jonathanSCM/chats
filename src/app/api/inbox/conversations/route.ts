@@ -14,7 +14,12 @@ export async function GET(request: Request) {
   // navegación por cuenta en el lateral) sin saltarse esa restricción.
   const isAdmin = session.user.role === "OWNER" || session.user.role === "SUPERADMIN";
   const userId = session.user.id;
-  const requestedBotId = new URL(request.url).searchParams.get("botId");
+  const url = new URL(request.url);
+  const requestedBotId = url.searchParams.get("botId");
+  // "active" (default): ni archivada (status CLOSED) ni bloqueada.
+  const view = url.searchParams.get("view") === "archived" || url.searchParams.get("view") === "blocked"
+    ? (url.searchParams.get("view") as "archived" | "blocked")
+    : "active";
 
   let botIds: string[] | undefined;
   if (!isAdmin) {
@@ -35,6 +40,11 @@ export async function GET(request: Request) {
         ...(botIds ? { id: { in: botIds } } : {}),
       },
       ...(isAdmin ? {} : { OR: [{ assignedToId: null }, { assignedToId: userId }] }),
+      ...(view === "archived"
+        ? { status: "CLOSED" }
+        : view === "blocked"
+          ? { blocked: true }
+          : { status: { not: "CLOSED" }, blocked: false }),
     },
     orderBy: { lastMessageAt: "desc" },
     include: {
@@ -52,6 +62,8 @@ export async function GET(request: Request) {
         customerPhone: c.customerPhone,
         customerName: c.customerName,
         lastMessageAt: c.lastMessageAt,
+        status: c.status,
+        blocked: c.blocked,
         bot: { id: c.bot.id, name: c.bot.name },
         assignedTo: c.assignedTo
           ? {

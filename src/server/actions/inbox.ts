@@ -49,6 +49,9 @@ export async function sendInboxMessageAction(
 
   const conversation = await getOwnedConversation(conversationId);
   if (!conversation) return { error: "Conversación no encontrada" };
+  if (conversation.blocked) {
+    return { error: "Esta conversación está bloqueada. Desbloquéala para poder responder." };
+  }
 
   const connection = conversation.bot.whatsappConnection;
   if (!connection?.verified) {
@@ -122,6 +125,9 @@ export async function sendInboxAttachmentAction(
 ): Promise<{ error: string | null }> {
   const conversation = await getOwnedConversation(conversationId);
   if (!conversation) return { error: "Conversación no encontrada" };
+  if (conversation.blocked) {
+    return { error: "Esta conversación está bloqueada. Desbloquéala para poder responder." };
+  }
 
   const connection = conversation.bot.whatsappConnection;
   if (!connection?.verified) {
@@ -253,6 +259,9 @@ export async function sendTemplateMessageAction(
 
   const conversation = await getOwnedConversation(conversationId);
   if (!conversation) return { error: "Conversación no encontrada" };
+  if (conversation.blocked) {
+    return { error: "Esta conversación está bloqueada. Desbloquéala para poder responder." };
+  }
 
   const connection = conversation.bot.whatsappConnection;
   if (!connection?.verified) {

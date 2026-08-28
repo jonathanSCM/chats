@@ -358,6 +358,7 @@ model Message {
   sentById       String? // vendedor que mandó este mensaje desde el panel (solo para role STAFF enviado aquí, no vía phone app)
   sentBy         User?         @relation("MessageSender", fields: [sentById], references: [id], onDelete: SetNull)
   status         MessageStatus @default(SENT) // solo relevante para mensajes salientes (STAFF): confirmación de entrega/lectura de Meta
+  errorDetail    String? // motivo legible cuando status es FAILED (ver services/whatsapp.ts describeMessageError)
   createdAt      DateTime      @default(now())
 
   @@index([conversationId])

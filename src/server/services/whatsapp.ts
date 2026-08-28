@@ -102,6 +102,15 @@ const inboundSchema = z.object({
                   id: z.string(),
                   status: z.string(), // "sent" | "delivered" | "read" | "failed"
                   timestamp: z.string(),
+                  errors: z
+                    .array(
+                      z.object({
+                        code: z.number().optional(),
+                        title: z.string().optional(),
+                        error_data: z.object({ details: z.string().optional() }).optional(),
+                      }),
+                    )
+                    .optional(),
                 }),
               )
               .optional(),
@@ -204,9 +213,29 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
   return results;
 }
 
+// Traduce los códigos de error más comunes de la Cloud API a algo que el
+// vendedor entienda sin ir a buscar la documentación.
+function describeMessageError(code: number | undefined, fallback: string | undefined): string {
+  switch (code) {
+    case 131047:
+      return "Pasaron más de 24h desde que el cliente escribió — hace falta una plantilla aprobada.";
+    case 131026:
+      return "El cliente no tiene WhatsApp activo o bloqueó el número.";
+    case 131053:
+      return "Formato de imagen no soportado (por ejemplo WebP fuera de stickers).";
+    case 131031:
+      return "La cuenta de WhatsApp está restringida por Meta.";
+    case 470:
+      return "Fuera de la ventana de 24h para mensajes normales.";
+    default:
+      return fallback || "No se pudo entregar el mensaje.";
+  }
+}
+
 export interface ParsedStatusUpdate {
   messageId: string;
   status: "sent" | "delivered" | "read" | "failed";
+  errorDetail: string | null;
 }
 
 // Confirmaciones de entrega/lectura de los mensajes que mandamos nosotros
@@ -223,9 +252,11 @@ export function parseStatusUpdates(payload: unknown): ParsedStatusUpdate[] {
       if (!isFieldMatch(change.field, "messages")) continue;
       for (const status of change.value.statuses ?? []) {
         if (["sent", "delivered", "read", "failed"].includes(status.status)) {
+          const err = status.errors?.[0];
           results.push({
             messageId: status.id,
             status: status.status as ParsedStatusUpdate["status"],
+            errorDetail: err ? describeMessageError(err.code, err.error_data?.details ?? err.title) : null,
           });
         }
       }

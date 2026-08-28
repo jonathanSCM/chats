@@ -80,6 +80,7 @@ interface Message {
   isHistorical: boolean;
   sentBy: Vendor | null;
   status: "SENT" | "DELIVERED" | "READ" | "FAILED";
+  errorDetail: string | null;
 }
 
 function StatusTicks({ status }: { status: Message["status"] }) {
@@ -605,6 +606,7 @@ export function InboxClient({
         isHistorical: false,
         sentBy: null,
         status: "SENT",
+        errorDetail: null,
       };
       setMessages((prev) => [...prev, optimistic]);
 
@@ -876,7 +878,7 @@ export function InboxClient({
                     <button
                       type="button"
                       onClick={markFromAd}
-                      title="Marcar a mano que este chat vino de un anuncio — activa 72h de gracia desde ahora"
+                      title="Marcar a mano que este chat vino de un anuncio. Ojo: esto solo cambia lo que ve el panel — si Meta no tiene realmente activa la ventana extendida, el mensaje igual puede rebotar."
                       className="shrink-0 cursor-pointer rounded-full border border-border px-1.5 py-0.5 font-mono text-[10px] font-medium text-ink-faint hover:border-accent-dim hover:text-accent"
                     >
                       Marcar anuncio
@@ -1003,6 +1005,11 @@ export function InboxClient({
                         <span>{timeFmt(m.createdAt)}</span>
                         {m.role === "STAFF" && !m.viaPhoneApp && <StatusTicks status={m.status} />}
                       </div>
+                      {m.status === "FAILED" && m.errorDetail && (
+                        <p className="mt-1 text-[11px] leading-snug text-danger opacity-90">
+                          ⚠️ No se entregó: {m.errorDetail}
+                        </p>
+                      )}
                     </div>
                       {!mine && (
                         <button

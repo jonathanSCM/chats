@@ -96,6 +96,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         ? { id: m.sentBy.id, name: m.sentBy.name || m.sentBy.email, color: m.sentBy.color }
         : null,
       status: m.status,
+      errorDetail: m.errorDetail,
     })),
   });
 }

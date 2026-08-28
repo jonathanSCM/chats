@@ -356,7 +356,13 @@ export async function handleStatusUpdate(update: ParsedStatusUpdate): Promise<vo
 
   if (STATUS_RANK[newStatus] <= STATUS_RANK[message.status]) return;
 
-  await prisma.message.update({ where: { id: message.id }, data: { status: newStatus } });
+  await prisma.message.update({
+    where: { id: message.id },
+    data: {
+      status: newStatus,
+      ...(newStatus === "FAILED" ? { errorDetail: update.errorDetail } : {}),
+    },
+  });
 }
 
 // ─── Coexistence: sincronización de contactos del negocio ───────────────

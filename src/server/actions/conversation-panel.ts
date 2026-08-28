@@ -114,6 +114,33 @@ export async function setConversationStatusAction(
   return { error: null };
 }
 
+const FREE_ENTRY_POINT_MS = 72 * 60 * 60 * 1000;
+
+/**
+ * Marca a mano una conversación como venida de un anuncio y activa de una
+ * las 72h de gracia — para chats que llegaron por un anuncio real pero que
+ * el sistema no pudo detectar solo (conversaciones de antes de que se
+ * armara esta detección, o el mensaje puntual no trajo el "referral" de
+ * Meta). A diferencia de la detección automática, acá no hace falta
+ * esperar una respuesta: marcar ya activa la ventana desde ahora.
+ */
+export async function markConversationFromAdAction(conversationId: string): Promise<ActionState> {
+  const access = await requireConversationAccess(conversationId);
+  if (!access) return { error: "Conversación no encontrada" };
+
+  const now = new Date();
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: {
+      adReferral: true,
+      adReferralAt: now,
+      freeEntryPointUntil: new Date(now.getTime() + FREE_ENTRY_POINT_MS),
+    },
+  });
+
+  return { error: null, message: "Marcado como venido de un anuncio — 72h de gracia activas." };
+}
+
 /**
  * Bloquear impide seguir mandándole mensajes desde el panel (cliente
  * abusivo, spam, etc.) sin borrar nada del historial.

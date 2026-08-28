@@ -27,6 +27,7 @@ import {
   deleteMessageAction,
   setConversationStatusAction,
   setConversationBlockedAction,
+  markConversationFromAdAction,
 } from "@/server/actions/conversation-panel";
 import { vendorColor } from "@/lib/vendor-color";
 import { usePushNotifications } from "@/lib/use-push-notifications";
@@ -677,6 +678,13 @@ export function InboxClient({
     });
   }
 
+  function markFromAd() {
+    const id = selectedIdRef.current;
+    if (!id) return;
+    setConversationFromAd(true);
+    markConversationFromAdAction(id);
+  }
+
   return (
     <div
       ref={rootRef}
@@ -857,13 +865,22 @@ export function InboxClient({
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 truncate font-display text-sm font-semibold text-ink">
                   {customerName || customerPhone}
-                  {conversationFromAd && (
+                  {conversationFromAd ? (
                     <span
-                      title="Este lead llegó por un anuncio de Meta (Click to WhatsApp) — si le respondiste a tiempo, tenés 72h de gracia sin necesitar plantilla."
+                      title="Este lead llegó por un anuncio de Meta (Click to WhatsApp) — tiene 72h de gracia sin necesitar plantilla."
                       className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-accent"
                     >
                       Anuncio
                     </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={markFromAd}
+                      title="Marcar a mano que este chat vino de un anuncio — activa 72h de gracia desde ahora"
+                      className="shrink-0 cursor-pointer rounded-full border border-border px-1.5 py-0.5 font-mono text-[10px] font-medium text-ink-faint hover:border-accent-dim hover:text-accent"
+                    >
+                      Marcar anuncio
+                    </button>
                   )}
                 </p>
                 {customerName && (

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user?.organizationId) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
@@ -38,9 +38,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   // lento (y cada vez más lento) en conversaciones largas — se trae solo lo
   // reciente, que es lo que importa para responder y para calcular la
   // ventana de 24h/72h (el último mensaje del cliente casi siempre cae acá).
+  // Con ?before=<ISO date> se pide la tanda anterior a ese mensaje (scroll
+  // hacia arriba, "cargar más antiguos").
   const MESSAGE_LIMIT = 100;
+  const before = req.nextUrl.searchParams.get("before");
+  const beforeDate = before ? new Date(before) : null;
   const recentDesc = await prisma.message.findMany({
-    where: { conversationId: id },
+    where: {
+      conversationId: id,
+      ...(beforeDate && !Number.isNaN(beforeDate.getTime()) ? { createdAt: { lt: beforeDate } } : {}),
+    },
     orderBy: { createdAt: "desc" },
     take: MESSAGE_LIMIT,
     include: { sentBy: { select: { id: true, name: true, email: true, color: true } } },
@@ -48,11 +55,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const messages = recentDesc.slice().reverse();
   const hasMoreHistory = recentDesc.length === MESSAGE_LIMIT;
 
-  await prisma.conversationRead.upsert({
-    where: { conversationId_userId: { conversationId: id, userId: session.user.id } },
-    create: { conversationId: id, userId: session.user.id },
-    update: { lastReadAt: new Date() },
-  });
+  // Pedir mensajes viejos no cuenta como "abrir" la conversación de nuevo —
+  // solo se marca como leída en la carga inicial.
+  if (!beforeDate) {
+    await prisma.conversationRead.upsert({
+      where: { conversationId_userId: { conversationId: id, userId: session.user.id } },
+      create: { conversationId: id, userId: session.user.id },
+      update: { lastReadAt: new Date() },
+    });
+  }
 
   // WhatsApp solo deja mandar texto libre dentro de las 24h desde el
   // último mensaje del cliente — pasado ese plazo, hace falta una

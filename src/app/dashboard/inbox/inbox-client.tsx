@@ -90,6 +90,17 @@ function StatusTicks({ status }: { status: Message["status"] }) {
   return <Check size={13} />;
 }
 
+// Combina dos tandas de mensajes por id (sin duplicar) y las deja ordenadas
+// por fecha — se usa tanto para el poll cada 2s (que solo trae lo último,
+// sin pisar mensajes viejos ya cargados) como para "cargar más antiguos".
+function mergeMessages(current: Message[], incoming: Message[]): Message[] {
+  const byId = new Map(current.map((m) => [m.id, m]));
+  for (const m of incoming) byId.set(m.id, m);
+  return [...byId.values()].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+}
+
 const roleLabel: Record<Message["role"], string> = {
   CUSTOMER: "Cliente",
   BOT: "Bot",
@@ -319,6 +330,14 @@ export function InboxClient({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const hasMoreHistoryRef = useRef(false);
+  const loadingOlderRef = useRef(false);
+  function updateHasMoreHistory(value: boolean) {
+    hasMoreHistoryRef.current = value;
+    setHasMoreHistory(value);
+  }
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [assignedTo, setAssignedTo] = useState<Vendor | null>(null);
@@ -475,7 +494,11 @@ export function InboxClient({
     // esta respuesta es de un chat que ya no está seleccionado — aplicarla
     // igual pisaría los mensajes del chat nuevo con los del viejo.
     if (selectedIdRef.current !== id) return;
-    setMessages(data.messages);
+    // El poll cada 2s solo trae los últimos 100 — si ya se cargaron mensajes
+    // más viejos (scroll hacia arriba), no hay que perderlos: se combinan
+    // por id en vez de reemplazar todo el arreglo.
+    setMessages((prev) => mergeMessages(prev, data.messages));
+    updateHasMoreHistory(Boolean(data.hasMoreHistory));
     setMessagesLoading(false);
     setCustomerPhone(data.conversation.customerPhone);
     setCustomerName(data.conversation.customerName ?? null);
@@ -486,6 +509,38 @@ export function InboxClient({
     setConversationBlocked(Boolean(data.conversation.blocked));
     setConversationFromAd(Boolean(data.conversation.adReferral));
   }, []);
+
+  const loadOlderMessages = useCallback(async () => {
+    const id = selectedIdRef.current;
+    const oldest = messages[0]?.createdAt;
+    if (!id || !oldest || loadingOlderRef.current || !hasMoreHistoryRef.current) return;
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
+
+    const container = scrollRef.current;
+    const prevScrollHeight = container?.scrollHeight ?? 0;
+    const prevScrollTop = container?.scrollTop ?? 0;
+
+    try {
+      const res = await fetch(
+        `/api/inbox/conversations/${id}/messages?before=${encodeURIComponent(oldest)}`,
+      );
+      if (!res.ok || selectedIdRef.current !== id) return;
+      const data = await res.json();
+      setMessages((prev) => mergeMessages(prev, data.messages));
+      updateHasMoreHistory(Boolean(data.hasMoreHistory));
+
+      // Mantener la posición visual: sin esto, agregar contenido arriba
+      // empuja todo hacia abajo y el usuario pierde de vista dónde estaba.
+      requestAnimationFrame(() => {
+        if (!container) return;
+        container.scrollTop = container.scrollHeight - prevScrollHeight + prevScrollTop;
+      });
+    } finally {
+      loadingOlderRef.current = false;
+      setLoadingOlder(false);
+    }
+  }, [messages]);
 
   // Polling de la lista de conversaciones cada 3s — tiempo real sin websockets.
   useEffect(() => {
@@ -504,6 +559,7 @@ export function InboxClient({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch inicial + polling es intencional
     setMessages([]);
     setMessagesLoading(true);
+    updateHasMoreHistory(false);
     fetchMessages(selectedId);
     const interval = setInterval(() => fetchMessages(selectedId), 2000);
     return () => clearInterval(interval);
@@ -525,6 +581,8 @@ export function InboxClient({
     const el = e.currentTarget;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     isNearBottomRef.current = distanceFromBottom < 150;
+
+    if (el.scrollTop < 200 && hasMoreHistory) loadOlderMessages();
   }
 
   const sendFile = useCallback(
@@ -958,6 +1016,11 @@ export function InboxClient({
               {messagesLoading && messages.length === 0 && (
                 <div className="flex h-full items-center justify-center">
                   <Loader2 size={20} className="animate-spin text-ink-faint" />
+                </div>
+              )}
+              {loadingOlder && (
+                <div className="flex items-center justify-center py-2">
+                  <Loader2 size={16} className="animate-spin text-ink-faint" />
                 </div>
               )}
               {messages.map((m, i) => {

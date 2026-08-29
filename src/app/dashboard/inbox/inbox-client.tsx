@@ -318,6 +318,7 @@ export function InboxClient({
   const [view, setView] = useState<"active" | "archived" | "blocked">("active");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [assignedTo, setAssignedTo] = useState<Vendor | null>(null);
@@ -470,7 +471,12 @@ export function InboxClient({
     const res = await fetch(`/api/inbox/conversations/${id}/messages`);
     if (!res.ok) return;
     const data = await res.json();
+    // Si mientras esperábamos la respuesta el usuario ya abrió otro chat,
+    // esta respuesta es de un chat que ya no está seleccionado — aplicarla
+    // igual pisaría los mensajes del chat nuevo con los del viejo.
+    if (selectedIdRef.current !== id) return;
     setMessages(data.messages);
+    setMessagesLoading(false);
     setCustomerPhone(data.conversation.customerPhone);
     setCustomerName(data.conversation.customerName ?? null);
     setAssignedTo(data.conversation.assignedTo ?? null);
@@ -492,7 +498,12 @@ export function InboxClient({
   // Polling de los mensajes del chat abierto cada 2s.
   useEffect(() => {
     if (!selectedId) return;
+    // Se limpia lo del chat anterior antes de pedir lo nuevo: si no, mientras
+    // llega la respuesta se ve la conversación de otra persona un instante,
+    // que es justo lo que se sentía "lento"/confuso al cambiar de chat.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch inicial + polling es intencional
+    setMessages([]);
+    setMessagesLoading(true);
     fetchMessages(selectedId);
     const interval = setInterval(() => fetchMessages(selectedId), 2000);
     return () => clearInterval(interval);
@@ -944,6 +955,11 @@ export function InboxClient({
               onScroll={handleMessagesScroll}
               className="wa-wallpaper flex-1 space-y-2 overflow-y-auto px-3 py-4 md:px-5"
             >
+              {messagesLoading && messages.length === 0 && (
+                <div className="flex h-full items-center justify-center">
+                  <Loader2 size={20} className="animate-spin text-ink-faint" />
+                </div>
+              )}
               {messages.map((m, i) => {
                 const mine = m.role === "STAFF" || m.role === "BOT";
                 const confirming = confirmDeleteMessageId === m.id;

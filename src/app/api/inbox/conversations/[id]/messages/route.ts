@@ -69,16 +69,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // último mensaje del cliente — pasado ese plazo, hace falta una
   // plantilla aprobada (ver services/whatsapp.ts). Se calcula acá, con los
   // mensajes que ya se trajeron, para no hacer otra consulta.
+  //
+  // Ojo: el "free entry point" de 72h de Meta para leads de anuncios NO
+  // extiende este plazo — es solo una categoría de facturación (esa
+  // conversación no se cobra durante 72h), pero WhatsApp igual rechaza el
+  // mensaje si pasaron más de 24h sin que el cliente escriba, venga o no de
+  // un anuncio (confirmado en producción: un mensaje fue rechazado con el
+  // error 24h estando "dentro" del free entry point calculado). Por eso acá
+  // NO se usa freeEntryPointUntil para esto — solo queda para mostrar el
+  // origen del lead.
   const WINDOW_MS = 24 * 60 * 60 * 1000;
   const lastCustomerMessageAt = [...messages].reverse().find((m) => m.role === "CUSTOMER")?.createdAt;
-  const normalWindowOpen =
-    Boolean(lastCustomerMessageAt) && Date.now() - lastCustomerMessageAt!.getTime() <= WINDOW_MS;
-  // Leads que llegaron por un anuncio "Click to WhatsApp": si respondimos a
-  // tiempo, Meta da 72h extra sin necesitar plantilla (ver
-  // services/conversation.ts, maybeActivateFreeEntryPoint).
-  const freeEntryPointOpen =
-    Boolean(conversation.freeEntryPointUntil) && Date.now() <= conversation.freeEntryPointUntil!.getTime();
-  const outsideWindow = !normalWindowOpen && !freeEntryPointOpen;
+  const outsideWindow =
+    !lastCustomerMessageAt || Date.now() - lastCustomerMessageAt.getTime() > WINDOW_MS;
 
   return NextResponse.json({
     conversation: {

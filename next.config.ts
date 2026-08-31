@@ -6,6 +6,13 @@ import { withSentryConfig } from "@sentry/nextjs";
 // correr scripts administrativos (prisma migrate deploy, seed) directo en
 // el contenedor desplegado. Ver Dockerfile.
 const nextConfig: NextConfig = {
+  // pdf-parse (vía pdfjs-dist) resuelve su worker como un archivo aparte en
+  // disco en vez de un import estático — si Next lo empaqueta igual que el
+  // resto del server, ese archivo no termina en .next/server y falla en
+  // runtime ("Cannot find module .../pdf.worker.mjs"). Excluirlo del bundle
+  // hace que se cargue directo desde node_modules (el Dockerfile copia
+  // node_modules completo, así que siempre está disponible).
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
   experimental: {
     serverActions: {
       // El límite de Next.js por defecto es 1MB — muy por debajo de una

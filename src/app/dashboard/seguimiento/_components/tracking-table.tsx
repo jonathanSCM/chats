@@ -213,6 +213,29 @@ export function TrackingTable({
 }: Props) {
   const [creating, setCreating] = useState(false);
   const [boardView, setBoardView] = useState<"table" | "kanban">("table");
+
+  // Barra de scroll horizontal "espejo", pegada abajo de la pantalla: la
+  // tabla puede tener muchas filas, y la barra nativa del navegador queda
+  // al final de todo ese contenido — lejos de la vista si hay que bajar
+  // mucho. Esta barra angosta sincroniza su scrollLeft con la tabla real.
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const mirrorScrollRef = useRef<HTMLDivElement>(null);
+  const [contentWidth, setContentWidth] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const syncingRef = useRef<"table" | "mirror" | null>(null);
+
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el || boardView !== "table") return;
+    const measure = () => {
+      setContentWidth(el.scrollWidth);
+      setContainerWidth(el.clientWidth);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [boardView]);
   const [detail, setDetail] = useState<Row | null>(null);
   const [openedFromLink, setOpenedFromLink] = useState(false);
   if (openId && !openedFromLink) {
@@ -257,6 +280,26 @@ export function TrackingTable({
 
   function clearSort() {
     setSortField(null);
+  }
+
+  function handleTableScroll() {
+    if (syncingRef.current === "mirror") {
+      syncingRef.current = null;
+      return;
+    }
+    if (!tableScrollRef.current || !mirrorScrollRef.current) return;
+    syncingRef.current = "table";
+    mirrorScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+  }
+
+  function handleMirrorScroll() {
+    if (syncingRef.current === "table") {
+      syncingRef.current = null;
+      return;
+    }
+    if (!tableScrollRef.current || !mirrorScrollRef.current) return;
+    syncingRef.current = "mirror";
+    tableScrollRef.current.scrollLeft = mirrorScrollRef.current.scrollLeft;
   }
 
   function handleDrop(targetId: string) {
@@ -458,7 +501,8 @@ export function TrackingTable({
       )}
 
       {rows.length > 0 && boardView === "table" && (
-        <div className="-mx-4 overflow-x-auto md:-mx-8">
+        <>
+        <div ref={tableScrollRef} onScroll={handleTableScroll} className="-mx-4 overflow-x-auto md:-mx-8">
           <div className="min-w-max px-4 md:px-8">
             <table className="w-full border-separate border-spacing-0 text-sm">
               <thead>
@@ -540,6 +584,22 @@ export function TrackingTable({
             </p>
           </div>
         </div>
+
+        {/* Barra de scroll horizontal "espejo": pegada abajo de la
+            pantalla, no del final de la tabla — visible sin importar
+            cuántas filas haya que bajar. Solo si de verdad hay que
+            scrollear (si entra todo, no tiene sentido mostrarla). */}
+        {contentWidth > containerWidth && (
+          <div
+            ref={mirrorScrollRef}
+            onScroll={handleMirrorScroll}
+            className="sticky bottom-0 z-20 -mx-4 overflow-x-auto overflow-y-hidden border-t border-border bg-surface md:-mx-8"
+            style={{ height: 16 }}
+          >
+            <div style={{ width: contentWidth, height: 1 }} />
+          </div>
+        )}
+        </>
       )}
 
       {detail && (

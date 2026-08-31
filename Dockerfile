@@ -37,9 +37,10 @@ RUN npm run build
 # Nota: no usamos el output "standalone" de Next (que solo empaqueta lo
 # mínimo para el servidor web), y copiamos TODO el directorio del builder
 # (código fuente, tsconfig.json, prisma.config.ts, node_modules completo)
-# en vez de listar archivo por archivo — a propósito, para poder correr
-# `npx prisma migrate deploy` o `npx tsx prisma/seed.ts` directamente en
-# el contenedor desplegado sin descubrir a los golpes qué archivo faltó.
+# en vez de listar archivo por archivo — a propósito, para que el CMD de
+# abajo pueda correr `npx prisma migrate deploy` sin descubrir a los golpes
+# qué archivo faltó, y para poder entrar a mano a correr
+# `npx tsx prisma/seed.ts` u otra cosa puntual si hace falta.
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -64,4 +65,9 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["npm", "run", "start"]
+# Aplica las migraciones pendientes antes de arrancar — así un deploy que
+# agrega columnas/tablas nuevas no deja el sitio roto hasta que alguien se
+# acuerde de correr `prisma migrate deploy` a mano. Si la migración falla
+# (ej. la base no está alcanzable todavía), el contenedor no arranca en vez
+# de servir tráfico contra un esquema desactualizado.
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]

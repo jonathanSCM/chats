@@ -214,10 +214,11 @@ sirve y qué pasa si falta.
    (el `Dockerfile` del repo ya está listo), puerto `3000`.
 4. Configura todas las variables de `.env.example` en el servicio de la app (todas son de
    runtime — ninguna necesita marcarse como "Available at Buildtime").
-5. Corre las migraciones una vez desplegado:
-   ```bash
-   npx prisma migrate deploy
-   ```
+5. Las migraciones corren solas: el `CMD` del `Dockerfile` hace
+   `npx prisma migrate deploy` antes de arrancar el servidor en cada deploy —
+   no hace falta entrar a mano a correrlas. Si una migración falla, el
+   contenedor no arranca (mejor eso que servir con el esquema desactualizado);
+   revisa los logs del deploy en Coolify para ver el error.
 6. Configura el webhook en Meta apuntando a
    `https://tu-dominio/api/webhooks/whatsapp`, con el mismo token de
    `WHATSAPP_VERIFY_TOKEN`.

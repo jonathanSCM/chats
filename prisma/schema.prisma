@@ -678,8 +678,27 @@ model Meeting {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  attachments MeetingAttachment[]
+
   @@index([organizationId, scheduledAt])
   @@map("meetings")
+}
+
+// Varios archivos por reunión (audio, transcripción en PDF, capturas, etc.)
+// — reusa el mismo almacenamiento (S3 o disco local) que los adjuntos del
+// inbox, ver lib/media-storage.ts.
+model MeetingAttachment {
+  id        String   @id @default(cuid())
+  meetingId String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  url       String
+  fileName  String
+  mimeType  String
+  fileSize  Int
+  createdAt DateTime @default(now())
+
+  @@index([meetingId])
+  @@map("meeting_attachments")
 }
 
 // ─── Asesor IA ──────────────────────────────────────────────────

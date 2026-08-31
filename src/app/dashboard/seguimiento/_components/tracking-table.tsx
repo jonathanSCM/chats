@@ -19,6 +19,8 @@ import {
   ArrowDown,
   LayoutGrid,
   Table2,
+  Paperclip,
+  FileText,
 } from "lucide-react";
 import {
   createOpportunityAction,
@@ -31,6 +33,8 @@ import {
   createMeetingAction,
   updateMeetingNotesAction,
   deleteMeetingAction,
+  addMeetingAttachmentAction,
+  deleteMeetingAttachmentAction,
 } from "@/server/actions/crm";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -46,6 +50,14 @@ import {
 } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 import { KanbanBoard } from "./kanban-board";
+
+export interface MeetingAttachmentInfo {
+  id: string;
+  url: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+}
 
 export interface Row {
   id: string;
@@ -70,7 +82,13 @@ export interface Row {
   aiMissingInfo: string;
   aiNextQuestion: string;
   aiAlerts: string;
-  meetings: { id: string; scheduledAt: string; status: string; notes: string }[];
+  meetings: {
+    id: string;
+    scheduledAt: string;
+    status: string;
+    notes: string;
+    attachments: MeetingAttachmentInfo[];
+  }[];
   archived: boolean;
   sortOrder: number;
   assignedTo: { id: string; name: string; color: string | null } | null;
@@ -1277,7 +1295,7 @@ function MeetingsSection({
   disabled,
 }: {
   opportunityId: string;
-  meetings: { id: string; scheduledAt: string; status: string; notes: string }[];
+  meetings: Row["meetings"];
   editable: boolean;
   disabled: boolean;
 }) {
@@ -1368,10 +1386,113 @@ function MeetingsSection({
                   {m.notes || "(sin transcripción cargada)"}
                 </p>
               )}
+
+              <MeetingAttachments
+                meetingId={m.id}
+                attachments={m.attachments}
+                editable={editable}
+                disabled={disabled}
+              />
             </li>
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function MeetingAttachments({
+  meetingId,
+  attachments,
+  editable,
+  disabled,
+}: {
+  meetingId: string;
+  attachments: MeetingAttachmentInfo[];
+  editable: boolean;
+  disabled: boolean;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploadError(null);
+    startTransition(async () => {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const result = await addMeetingAttachmentAction(meetingId, formData);
+        if (result.error) {
+          setUploadError(result.error);
+          break;
+        }
+      }
+    });
+    e.target.value = "";
+  }
+
+  return (
+    <div className="mt-2 border-t border-border/60 pt-2">
+      {attachments.length > 0 && (
+        <ul className="mb-1.5 space-y-1">
+          {attachments.map((a) => (
+            <li key={a.id} className="flex items-center gap-1.5 text-[11px]">
+              <FileText size={11} className="shrink-0 text-ink-faint" />
+              <a
+                href={a.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="truncate text-accent hover:underline"
+                title={a.fileName}
+              >
+                {a.fileName}
+              </a>
+              <span className="shrink-0 text-ink-faint">({formatFileSize(a.fileSize)})</span>
+              {editable && (
+                <button
+                  type="button"
+                  disabled={disabled || isPending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      await deleteMeetingAttachmentAction(a.id);
+                    })
+                  }
+                  className="ml-auto shrink-0 cursor-pointer text-ink-faint hover:text-danger disabled:cursor-not-allowed"
+                  title="Borrar archivo"
+                >
+                  <Trash2 size={11} />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {editable && (
+        <label
+          className={`flex w-fit items-center gap-1 text-[11px] ${
+            disabled || isPending ? "cursor-not-allowed text-ink-faint" : "cursor-pointer text-accent hover:opacity-80"
+          }`}
+        >
+          <Paperclip size={11} />
+          {isPending ? "Subiendo…" : "Adjuntar archivo"}
+          <input
+            type="file"
+            multiple
+            disabled={disabled || isPending}
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </label>
+      )}
+      {uploadError && <p className="mt-1 text-[11px] text-danger">{uploadError}</p>}
     </div>
   );
 }

@@ -29,7 +29,16 @@ export default async function SeguimientoPage({
         contact: { select: { id: true, fullName: true, phone: true, city: true } },
         assignedTo: { select: { id: true, name: true, email: true, color: true } },
         meetings: {
-          select: { id: true, scheduledAt: true, status: true, notes: true },
+          select: {
+            id: true,
+            scheduledAt: true,
+            status: true,
+            notes: true,
+            attachments: {
+              select: { id: true, url: true, fileName: true, mimeType: true, fileSize: true },
+              orderBy: { createdAt: "asc" },
+            },
+          },
           orderBy: { scheduledAt: "desc" },
         },
       },
@@ -79,6 +88,13 @@ export default async function SeguimientoPage({
       scheduledAt: m.scheduledAt.toISOString(),
       status: m.status,
       notes: m.notes ?? "",
+      attachments: m.attachments.map((a) => ({
+        id: a.id,
+        url: a.url,
+        fileName: a.fileName,
+        mimeType: a.mimeType,
+        fileSize: a.fileSize,
+      })),
     })),
     assignedTo: o.assignedTo
       ? { id: o.assignedTo.id, name: o.assignedTo.name || o.assignedTo.email, color: o.assignedTo.color }

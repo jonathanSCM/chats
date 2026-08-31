@@ -8,6 +8,7 @@ import { audit } from "@/server/services/audit";
 import { ALL_STAGES, OPEN_STAGES, type Stage } from "@/lib/pipeline";
 import { analyzeFollowUp } from "@/server/services/ai/follow-up";
 import { isAiEnabled, isWithinBudget, spentToday } from "@/server/services/ai/client";
+import { saveMediaFile, deleteMediaFile } from "@/lib/media-storage";
 import type { ActionState } from "./types";
 
 const PATH = "/dashboard/seguimiento";
@@ -301,12 +302,20 @@ export async function reorderOpportunitiesAction(orderedIds: string[]): Promise<
 // haya integración automática con Meet. El asesor IA las lee como fuente
 // prioritaria — declaraciones directas del lead — al calificar el lead.
 
+// 100k caracteres ≈ 60-70 páginas de texto — de sobra para la transcripción
+// literal de una reunión larga, con mensaje de error en español (antes
+// caían en el texto en inglés por defecto de Zod).
+const MEETING_NOTES_MAX = 100_000;
+const meetingNotesField = z
+  .string()
+  .max(MEETING_NOTES_MAX, `Máximo ${MEETING_NOTES_MAX.toLocaleString("es")} caracteres.`);
+
 const createMeetingSchema = z.object({
   opportunityId: z.string().min(1),
   scheduledAt: z.string().min(1, "Poné la fecha"),
   durationMinutes: z.coerce.number().int().positive().max(600).optional(),
   meetingUrl: z.string().max(500).optional(),
-  notes: z.string().max(20000).optional(), // transcripción o resumen de la reunión
+  notes: meetingNotesField.optional(), // transcripción o resumen de la reunión
 });
 
 export async function createMeetingAction(
@@ -359,7 +368,7 @@ export async function createMeetingAction(
 }
 
 const updateMeetingNotesSchema = z.object({
-  notes: z.string().max(20000),
+  notes: meetingNotesField,
 });
 
 /** Carga o edita la transcripción/resumen de una reunión ya registrada. */
@@ -402,7 +411,7 @@ export async function deleteMeetingAction(meetingId: string): Promise<ActionStat
 
   const meeting = await prisma.meeting.findUnique({
     where: { id: meetingId },
-    include: { opportunity: { select: { assignedToId: true } } },
+    include: { opportunity: { select: { assignedToId: true } }, attachments: true },
   });
   if (!meeting || meeting.organizationId !== organizationId) {
     return { error: "Reunión no encontrada" };
@@ -412,6 +421,74 @@ export async function deleteMeetingAction(meetingId: string): Promise<ActionStat
   }
 
   await prisma.meeting.delete({ where: { id: meetingId } });
+  await Promise.all(meeting.attachments.map((a) => deleteMediaFile(a.url)));
+  revalidatePath(PATH);
+  return { error: null };
+}
+
+// Mismos límites que ya usa el inbox para adjuntos salientes — ver
+// MAX_SIZE_BY_TYPE en server/actions/inbox.ts.
+const MEETING_ATTACHMENT_MAX_BYTES = 100 * 1024 * 1024;
+const MEETING_ATTACHMENTS_PER_MEETING = 20;
+
+/** Sube uno o más archivos (audio, PDF, capturas) ligados a una reunión. */
+export async function addMeetingAttachmentAction(
+  meetingId: string,
+  formData: FormData,
+): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    include: { opportunity: { select: { assignedToId: true } }, _count: { select: { attachments: true } } },
+  });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+  if (meeting.opportunity && !canEditOpportunity(meeting.opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+  if (meeting._count.attachments >= MEETING_ATTACHMENTS_PER_MEETING) {
+    return { error: `Máximo ${MEETING_ATTACHMENTS_PER_MEETING} archivos por reunión.` };
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return { error: "Archivo inválido" };
+  }
+  if (file.size > MEETING_ATTACHMENT_MAX_BYTES) {
+    return { error: "El archivo supera el límite de 100MB." };
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const mimeType = file.type || "application/octet-stream";
+  const url = await saveMediaFile(buffer, mimeType);
+
+  await prisma.meetingAttachment.create({
+    data: { meetingId, url, fileName: file.name, mimeType, fileSize: file.size },
+  });
+
+  revalidatePath(PATH);
+  return { error: null };
+}
+
+export async function deleteMeetingAttachmentAction(attachmentId: string): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const attachment = await prisma.meetingAttachment.findUnique({
+    where: { id: attachmentId },
+    include: { meeting: { include: { opportunity: { select: { assignedToId: true } } } } },
+  });
+  if (!attachment || attachment.meeting.organizationId !== organizationId) {
+    return { error: "Archivo no encontrado" };
+  }
+  if (attachment.meeting.opportunity && !canEditOpportunity(attachment.meeting.opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  await prisma.meetingAttachment.delete({ where: { id: attachmentId } });
+  await deleteMediaFile(attachment.url);
+
   revalidatePath(PATH);
   return { error: null };
 }

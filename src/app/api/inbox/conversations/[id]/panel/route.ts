@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const conversation = await prisma.conversation.findUnique({
     where: { id },
     include: {
-      bot: { select: { organizationId: true } },
+      bot: { select: { organizationId: true, aiQualificationEnabled: true } },
       contact: {
         include: {
           company: { select: { id: true, name: true } },
@@ -72,6 +72,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     status: conversation.status,
     tags: conversation.tags,
     assignedToId: conversation.assignedToId,
+    botPaused: conversation.botPaused,
+    aiQualificationEnabled: conversation.bot.aiQualificationEnabled,
     contact: conversation.contact
       ? {
           id: conversation.contact.id,

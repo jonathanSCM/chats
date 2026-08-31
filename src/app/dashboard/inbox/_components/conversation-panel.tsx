@@ -11,11 +11,13 @@ import {
   Briefcase,
   AlertTriangle,
   Plus,
+  Bot as BotIcon,
 } from "lucide-react";
 import {
   addConversationNoteAction,
   deleteConversationAction,
   deleteConversationNoteAction,
+  resumeBotAction,
   setConversationStatusAction,
   setConversationTagsAction,
   transferConversationAction,
@@ -31,6 +33,8 @@ interface PanelData {
   status: "OPEN" | "ON_HOLD" | "CLOSED";
   tags: string[];
   assignedToId: string | null;
+  botPaused: boolean;
+  aiQualificationEnabled: boolean;
   contact: {
     id: string;
     fullName: string | null;
@@ -229,6 +233,23 @@ export function ConversationPanel({
             )}
           </div>
         </div>
+
+        {data.aiQualificationEnabled && data.botPaused && (
+          <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-surface-2/40 px-3 py-2">
+            <div className="flex items-center gap-1.5 text-xs text-ink-muted">
+              <BotIcon size={13} />
+              Bot pausado en esta conversación
+            </div>
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => run(() => resumeBotAction(conversationId))}
+              className="cursor-pointer whitespace-nowrap text-xs font-medium text-accent hover:underline"
+            >
+              Reactivar bot
+            </button>
+          </div>
+        )}
 
         {/* Etiquetas */}
         <div className="space-y-2 border-t border-border pt-4">

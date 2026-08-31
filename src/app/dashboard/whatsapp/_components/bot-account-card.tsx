@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Pencil, Trash2, Check, X } from "lucide-react";
-import { renameBotAction, disconnectBotWhatsAppAction } from "@/server/actions/whatsapp-connection";
+import { Pencil, Trash2, Check, X, Bot as BotIcon } from "lucide-react";
+import {
+  renameBotAction,
+  disconnectBotWhatsAppAction,
+  setAiQualificationEnabledAction,
+} from "@/server/actions/whatsapp-connection";
 import { Input } from "@/components/ui/input";
 import { WhatsAppTab } from "./whatsapp-tab";
 import { BusinessProfileForm, type BusinessProfileData } from "./business-profile-form";
@@ -24,7 +28,7 @@ export function BotAccountCard({
   businessProfile,
   businessProfileError,
 }: {
-  bot: { id: string; name: string };
+  bot: { id: string; name: string; aiQualificationEnabled: boolean };
   connection: Connection | null;
   isOwner: boolean;
   businessProfile: BusinessProfileData | null;
@@ -33,7 +37,17 @@ export function BotAccountCard({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(bot.name);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(bot.aiQualificationEnabled);
   const [isPending, startTransition] = useTransition();
+
+  function toggleAi() {
+    const next = !aiEnabled;
+    setAiEnabled(next);
+    startTransition(async () => {
+      const result = await setAiQualificationEnabledAction(bot.id, next);
+      if (result.error) setAiEnabled(!next);
+    });
+  }
 
   function saveName() {
     const trimmed = name.trim();
@@ -127,6 +141,32 @@ export function BotAccountCard({
       </div>
 
       <WhatsAppTab botId={bot.id} connection={connection} readOnly={!isOwner} />
+
+      {isOwner && connection?.verified && (
+        <div className="flex items-start justify-between gap-3 rounded-md border border-border/60 p-3">
+          <div className="flex gap-2">
+            <BotIcon size={16} className="mt-0.5 shrink-0 text-ink-faint" />
+            <div>
+              <p className="text-sm font-medium text-ink">Bot de calificación por IA</p>
+              <p className="text-xs text-ink-faint">
+                Contesta solo los primeros mensajes de un lead nuevo (rubro, qué quiere mejorar,
+                problema) y avisa al equipo cuando ya calificó. Se apaga solo apenas alguien del equipo
+                responde a mano.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={toggleAi}
+            className={`shrink-0 cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              aiEnabled ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink-muted hover:text-ink"
+            }`}
+          >
+            {aiEnabled ? "Activado" : "Apagado"}
+          </button>
+        </div>
+      )}
 
       {businessProfile && (
         <div className="pt-2">

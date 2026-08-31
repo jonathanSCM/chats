@@ -170,6 +170,23 @@ export async function setConversationBlockedAction(
   return { error: null };
 }
 
+/**
+ * Único lugar de todo el repo que vuelve a poner botPaused en false: el
+ * bot solo se pausa solo (mensaje manual, escalamiento), nunca se
+ * reactiva solo — hace falta que alguien del equipo lo decida a propósito.
+ */
+export async function resumeBotAction(conversationId: string): Promise<ActionState> {
+  const access = await requireConversationAccess(conversationId);
+  if (!access) return { error: "Conversación no encontrada" };
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { botPaused: false },
+  });
+
+  return { error: null, message: "Bot reactivado — vuelve a contestar solo." };
+}
+
 const tagsSchema = z.array(z.string().min(1).max(40)).max(10);
 
 export async function setConversationTagsAction(

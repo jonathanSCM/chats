@@ -77,7 +77,7 @@ export default async function WhatsAppSettingsPage() {
           {bots.map((bot, i) => (
             <BotAccountCard
               key={bot.id}
-              bot={{ id: bot.id, name: bot.name }}
+              bot={{ id: bot.id, name: bot.name, aiQualificationEnabled: bot.aiQualificationEnabled }}
               connection={bot.whatsappConnection}
               isOwner={isOwner}
               businessProfile={profiles[i].profile}

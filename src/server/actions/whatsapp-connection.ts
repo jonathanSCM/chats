@@ -122,6 +122,25 @@ export async function renameBotAction(botId: string, name: string): Promise<Acti
 }
 
 /**
+ * Prende o apaga el bot de calificación por IA para esta cuenta. Apagado
+ * es el valor por defecto: hay que activarlo a propósito por número.
+ */
+export async function setAiQualificationEnabledAction(
+  botId: string,
+  enabled: boolean,
+): Promise<ActionState> {
+  const { bot } = await requireBotOwnerAccess(botId);
+
+  await prisma.bot.update({ where: { id: bot.id }, data: { aiQualificationEnabled: enabled } });
+
+  revalidatePath("/dashboard/whatsapp");
+  return {
+    error: null,
+    message: enabled ? "Bot de calificación activado." : "Bot de calificación desactivado.",
+  };
+}
+
+/**
  * Borra solo la conexión de WhatsApp de esta cuenta (token, phone_number_id,
  * waba_id) para poder reconectarla desde cero — no borra el bot ni sus
  * conversaciones. Versión para el propio dueño de la organización, aparte

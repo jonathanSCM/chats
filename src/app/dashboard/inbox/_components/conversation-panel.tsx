@@ -17,6 +17,7 @@ import {
   addConversationNoteAction,
   deleteConversationAction,
   deleteConversationNoteAction,
+  pauseBotAction,
   resumeBotAction,
   setConversationStatusAction,
   setConversationTagsAction,
@@ -234,19 +235,23 @@ export function ConversationPanel({
           </div>
         </div>
 
-        {data.aiQualificationEnabled && data.botPaused && (
+        {data.aiQualificationEnabled && (
           <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-surface-2/40 px-3 py-2">
             <div className="flex items-center gap-1.5 text-xs text-ink-muted">
               <BotIcon size={13} />
-              Bot pausado en esta conversación
+              {data.botPaused ? "Bot pausado en esta conversación" : "Bot respondiendo solo"}
             </div>
             <button
               type="button"
               disabled={isPending}
-              onClick={() => run(() => resumeBotAction(conversationId))}
+              onClick={() =>
+                run(() =>
+                  data.botPaused ? resumeBotAction(conversationId) : pauseBotAction(conversationId),
+                )
+              }
               className="cursor-pointer whitespace-nowrap text-xs font-medium text-accent hover:underline"
             >
-              Reactivar bot
+              {data.botPaused ? "Reactivar bot" : "Tomar control"}
             </button>
           </div>
         )}

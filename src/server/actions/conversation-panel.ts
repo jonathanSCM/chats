@@ -171,9 +171,27 @@ export async function setConversationBlockedAction(
 }
 
 /**
+ * Pausa el bot en esta conversación puntual sin mandar ningún mensaje —
+ * para tomar control en silencio antes de escribir (a diferencia de mandar
+ * un mensaje manual, que también pausa el bot pero de paso).
+ */
+export async function pauseBotAction(conversationId: string): Promise<ActionState> {
+  const access = await requireConversationAccess(conversationId);
+  if (!access) return { error: "Conversación no encontrada" };
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { botPaused: true },
+  });
+
+  return { error: null, message: "Tomaste control del chat." };
+}
+
+/**
  * Único lugar de todo el repo que vuelve a poner botPaused en false: el
- * bot solo se pausa solo (mensaje manual, escalamiento), nunca se
- * reactiva solo — hace falta que alguien del equipo lo decida a propósito.
+ * bot solo se pausa solo (mensaje manual, escalamiento, o a propósito con
+ * pauseBotAction), nunca se reactiva solo — hace falta que alguien del
+ * equipo lo decida a propósito.
  */
 export async function resumeBotAction(conversationId: string): Promise<ActionState> {
   const access = await requireConversationAccess(conversationId);

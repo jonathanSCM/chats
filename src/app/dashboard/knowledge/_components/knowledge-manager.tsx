@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, X, Eye, EyeOff } from "lucide-react";
+import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { Plus, Pencil, Trash2, X, Eye, EyeOff, FileUp } from "lucide-react";
 import {
   createKnowledgeItemAction,
   updateKnowledgeItemAction,
   toggleKnowledgeItemAction,
   deleteKnowledgeItemAction,
+  extractPdfTextAction,
 } from "@/server/actions/knowledge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -196,6 +197,24 @@ function ItemForm({ item, onDone }: { item?: Item; onDone: () => void }) {
     : createKnowledgeItemAction;
   const [state, formAction, isPending] = useActionState(action, { error: null });
   const [category, setCategory] = useState<Category>(item?.category ?? "SERVICE");
+  const [content, setContent] = useState(item?.content ?? "");
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handlePdfChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setExtracting(true);
+    setExtractError(null);
+    const fd = new FormData();
+    fd.set("file", file);
+    const result = await extractPdfTextAction(fd);
+    setExtracting(false);
+    if (result.error) setExtractError(result.error);
+    else setContent(result.text ?? "");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   // Al guardar con éxito el server action devuelve `message`; ahí se cierra
   // el formulario. En efecto, no durante el render.
@@ -248,15 +267,34 @@ function ItemForm({ item, onDone }: { item?: Item; onDone: () => void }) {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="content">Contenido</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="content">Contenido</Label>
+          <label className="flex cursor-pointer items-center gap-1 text-xs text-accent hover:underline">
+            <FileUp size={12} />
+            {extracting ? "Leyendo PDF…" : "Subir PDF"}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              onChange={handlePdfChange}
+              disabled={extracting}
+              className="hidden"
+            />
+          </label>
+        </div>
         <Textarea
           id="content"
           name="content"
-          defaultValue={item?.content}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
           rows={6}
-          placeholder="Escribe con detalle. Esto es lo que la IA va a usar como verdad."
+          placeholder="Escribe con detalle, o subí un PDF para precargarlo. Esto es lo que la IA va a usar como verdad."
           required
         />
+        {extractError && <p className="text-xs text-danger">{extractError}</p>}
+        <p className="text-xs text-ink-faint">
+          Al subir un PDF se reemplaza todo el contenido de acá arriba — revisalo antes de guardar.
+        </p>
       </div>
 
       {state.error && <p className="text-sm text-danger">{state.error}</p>}

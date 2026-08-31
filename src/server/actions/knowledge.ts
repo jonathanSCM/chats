@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { PDFParse } from "pdf-parse";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import type { ActionState } from "./types";
@@ -33,6 +34,47 @@ async function requireKnowledgeEditor() {
     throw new Error("Solo el administrador puede editar la base de conocimiento");
   }
   return { organizationId: session.user.organizationId, userId: session.user.id };
+}
+
+const MAX_PDF_SIZE = 15 * 1024 * 1024;
+
+/**
+ * Extrae el texto de un PDF para precargar el campo "Contenido" — así se
+ * puede subir el PDF directo en vez de copiar y pegar a mano (que rompe
+ * emojis y otros caracteres especiales cuando el visor de PDF no los copia
+ * bien).
+ */
+export async function extractPdfTextAction(
+  formData: FormData,
+): Promise<ActionState & { text?: string }> {
+  await requireKnowledgeEditor();
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return { error: "Subí un archivo PDF" };
+  }
+  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+    return { error: "Solo se aceptan archivos PDF" };
+  }
+  if (file.size > MAX_PDF_SIZE) {
+    return { error: "El PDF pesa más de 15MB" };
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const parser = new PDFParse({ data: buffer });
+  try {
+    const result = await parser.getText();
+    const text = result.text.trim();
+    if (!text) {
+      return { error: "No se pudo extraer texto de este PDF (¿es una imagen escaneada?)" };
+    }
+    return { error: null, text: text.slice(0, 20000) };
+  } catch (error) {
+    console.error("[knowledge] Error extrayendo texto del PDF:", error);
+    return { error: "No se pudo leer este PDF" };
+  } finally {
+    await parser.destroy();
+  }
 }
 
 export async function createKnowledgeItemAction(

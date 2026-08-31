@@ -8,7 +8,7 @@ import type {
   ParsedStatusUpdate,
 } from "@/server/services/whatsapp";
 import { notifyNewMessage } from "@/server/services/push";
-import { enqueue } from "@/server/jobs";
+import { enqueue, enqueueOrReschedule } from "@/server/jobs";
 
 const CONVERSATION_WINDOW_MS = 24 * 60 * 60 * 1000; // ventana de conversación de WhatsApp
 const FREE_ENTRY_POINT_MS = 72 * 60 * 60 * 1000; // gracia extra de Meta para leads de anuncios
@@ -113,7 +113,7 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
   const conversation = await prisma.conversation.update({
     where: { id: conversationId },
     data: { lastMessageAt: new Date() },
-    select: { assignedToId: true, customerName: true, customerPhone: true },
+    select: { assignedToId: true, customerName: true, customerPhone: true, botPaused: true },
   });
 
   const preview = inbound.text ?? (inbound.media ? MEDIA_PREVIEW[inbound.media.type] : "");
@@ -124,6 +124,19 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
     customerLabel: conversation.customerName || conversation.customerPhone,
     preview,
   }).catch((error) => console.error("[conversation] Error notificando por push:", error));
+
+  // El bot de calificación contesta solo si está habilitado para esta
+  // cuenta y ningún humano tomó ya la conversación. Se reprograma (no se
+  // duplica) por conversación: si el cliente manda varios mensajes
+  // seguidos, el bot responde una sola vez a todos juntos.
+  if (connection.bot.aiQualificationEnabled && !conversation.botPaused) {
+    await enqueueOrReschedule({
+      type: "bot_reply",
+      uniqueKey: `bot_reply:${conversationId}`,
+      payload: { conversationId },
+      runAfter: new Date(Date.now() + 8000),
+    });
+  }
 }
 
 const MEDIA_PREVIEW: Record<string, string> = {
@@ -211,7 +224,7 @@ async function findOrCreateConversation(
 
   const bot = await prisma.bot.findUniqueOrThrow({
     where: { id: botId },
-    select: { organizationId: true },
+    select: { organizationId: true, aiQualificationEnabled: true },
   });
   const contactId = await findOrCreateContact({
     organizationId: bot.organizationId,
@@ -226,7 +239,10 @@ async function findOrCreateConversation(
       customerName: customerName ?? null,
       contactId,
       billed: true,
-      botPaused: true,
+      // Si el bot de calificación está habilitado para esta cuenta, la
+      // conversación arranca sin pausar para que pueda contestar el primer
+      // mensaje. Si no, sigue naciendo pausada (bandeja 100% humana).
+      botPaused: !bot.aiQualificationEnabled,
       ...(fromAd ? { adReferral: true, adReferralAt: new Date() } : {}),
     },
   });

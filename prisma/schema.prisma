@@ -134,8 +134,13 @@ model Bot {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   status         BotStatus    @default(DRAFT)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  // Independiente de `status` (que solo indica si el número está
+  // conectado): habilita que el bot de IA conteste solo los primeros
+  // mensajes de un lead siguiendo la guía de calificación de la Base de
+  // Conocimiento. Apagado por defecto — opt-in explícito por cuenta.
+  aiQualificationEnabled Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   whatsappConnection WhatsAppConnection?
   conversations      Conversation[]
@@ -238,6 +243,12 @@ model Conversation {
   lastMessageAt DateTime @default(now())
   billed        Boolean  @default(false) // ya contabilizada contra el plan/uso
   botPaused     Boolean  @default(false) // un humano tomó la conversación; el bot no responde solo
+  // Resumen acumulado de lo que el bot de calificación fue aprendiendo en
+  // esta conversación (rubro, qué quiere mejorar, problema, rol del
+  // contacto...). Mismo patrón que Opportunity.aiMemory, pero vive acá
+  // porque antes de calificar todavía no existe ninguna Opportunity donde
+  // guardarlo.
+  botMemory     String?  @db.Text
   // Bloquear impide seguir mandándole mensajes desde el panel (cliente
   // abusivo, spam, etc.) sin borrar el historial. Distinto de "archivar"
   // (status CLOSED), que solo la saca de la bandeja del día a día.

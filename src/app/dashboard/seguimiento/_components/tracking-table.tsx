@@ -17,6 +17,8 @@ import {
   GripVertical,
   ArrowUp,
   ArrowDown,
+  LayoutGrid,
+  Table2,
 } from "lucide-react";
 import {
   createOpportunityAction,
@@ -43,6 +45,7 @@ import {
   type Priority,
 } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
+import { KanbanBoard } from "./kanban-board";
 
 export interface Row {
   id: string;
@@ -191,6 +194,7 @@ export function TrackingTable({
   ai,
 }: Props) {
   const [creating, setCreating] = useState(false);
+  const [boardView, setBoardView] = useState<"table" | "kanban">("table");
   const [detail, setDetail] = useState<Row | null>(null);
   const [openedFromLink, setOpenedFromLink] = useState(false);
   if (openId && !openedFromLink) {
@@ -378,14 +382,38 @@ export function TrackingTable({
             </>
           )}
         </Link>
-        {!viewingArchived && (
-          <Button type="button" onClick={() => setCreating(true)} className="ml-auto">
-            <Plus size={16} /> Agregar cliente
-          </Button>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center rounded-md border border-border p-0.5">
+            <button
+              type="button"
+              onClick={() => setBoardView("table")}
+              title="Vista de tabla"
+              className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                boardView === "table" ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              <Table2 size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setBoardView("kanban")}
+              title="Vista de tablero"
+              className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                boardView === "kanban" ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              <LayoutGrid size={13} />
+            </button>
+          </div>
+          {!viewingArchived && (
+            <Button type="button" onClick={() => setCreating(true)}>
+              <Plus size={16} /> Agregar cliente
+            </Button>
+          )}
+        </div>
       </div>
 
-      {!viewingArchived && !sortField && (
+      {boardView === "table" && !viewingArchived && !sortField && (
         <p className="text-xs text-ink-faint">
           {canDrag
             ? "Arrastra una fila desde el ícono ⠿ para reordenarla a mano."
@@ -407,7 +435,11 @@ export function TrackingTable({
         </Card>
       )}
 
-      {rows.length > 0 && (
+      {rows.length > 0 && boardView === "kanban" && (
+        <KanbanBoard rows={filtered} currentUserId={currentUserId} isAdmin={isAdmin} onOpen={setDetail} />
+      )}
+
+      {rows.length > 0 && boardView === "table" && (
         <div className="-mx-4 overflow-x-auto md:-mx-8">
           <div className="min-w-max px-4 md:px-8">
             <table className="w-full border-separate border-spacing-0 text-sm">

@@ -139,6 +139,11 @@ model Bot {
   // mensajes de un lead siguiendo la guía de calificación de la Base de
   // Conocimiento. Apagado por defecto — opt-in explícito por cuenta.
   aiQualificationEnabled Boolean  @default(false)
+  // Modo de prueba: si tiene valor, el bot SOLO contesta conversaciones con
+  // este teléfono exacto (aunque aiQualificationEnabled esté activo) — para
+  // probar en producción sin arriesgar leads reales. Vacío/null = responde
+  // a todos.
+  aiTestPhone            String?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 

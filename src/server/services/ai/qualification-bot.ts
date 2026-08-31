@@ -145,6 +145,7 @@ interface ConversationForBot {
   phoneNumberId: string;
   accessToken: string;
   aiQualificationEnabled: boolean;
+  aiTestPhone: string | null;
   contact: { id: string; fullName: string | null; phone: string; jobTitle: string | null } | null;
 }
 
@@ -169,6 +170,7 @@ async function loadConversation(conversationId: string): Promise<ConversationFor
     phoneNumberId: conversation.bot.whatsappConnection.phoneNumberId,
     accessToken: conversation.bot.whatsappConnection.accessToken,
     aiQualificationEnabled: conversation.bot.aiQualificationEnabled,
+    aiTestPhone: conversation.bot.aiTestPhone,
     contact: conversation.contact,
   };
 }
@@ -366,8 +368,12 @@ async function escalate(conversation: ConversationForBot, motivo: string): Promi
 export async function runQualificationTurn(conversationId: string): Promise<void> {
   const conversation = await loadConversation(conversationId);
   // Puede no existir más, o un vendedor pudo haber tomado la conversación
-  // (o desactivado el bot) entre que se encoló el job y que corrió.
-  if (!conversation || conversation.botPaused || !conversation.aiQualificationEnabled) return;
+  // (o desactivado el bot, o cambiado el teléfono de prueba) entre que se
+  // encoló el job y que corrió.
+  const botActiveForThisPhone =
+    conversation?.aiQualificationEnabled &&
+    (!conversation.aiTestPhone || conversation.aiTestPhone === conversation.customerPhone);
+  if (!conversation || conversation.botPaused || !botActiveForThisPhone) return;
 
   const botMessageCount = await prisma.message.count({
     where: { conversationId, role: "BOT" },

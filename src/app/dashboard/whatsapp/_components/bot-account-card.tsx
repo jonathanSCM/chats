@@ -6,6 +6,7 @@ import {
   renameBotAction,
   disconnectBotWhatsAppAction,
   setAiQualificationEnabledAction,
+  setAiTestPhoneAction,
 } from "@/server/actions/whatsapp-connection";
 import { Input } from "@/components/ui/input";
 import { WhatsAppTab } from "./whatsapp-tab";
@@ -28,7 +29,7 @@ export function BotAccountCard({
   businessProfile,
   businessProfileError,
 }: {
-  bot: { id: string; name: string; aiQualificationEnabled: boolean };
+  bot: { id: string; name: string; aiQualificationEnabled: boolean; aiTestPhone: string | null };
   connection: Connection | null;
   isOwner: boolean;
   businessProfile: BusinessProfileData | null;
@@ -38,6 +39,9 @@ export function BotAccountCard({
   const [name, setName] = useState(bot.name);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(bot.aiQualificationEnabled);
+  const [testPhone, setTestPhone] = useState(bot.aiTestPhone ?? "");
+  const [testPhoneSaved, setTestPhoneSaved] = useState(bot.aiTestPhone ?? "");
+  const [testPhoneError, setTestPhoneError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function toggleAi() {
@@ -46,6 +50,15 @@ export function BotAccountCard({
     startTransition(async () => {
       const result = await setAiQualificationEnabledAction(bot.id, next);
       if (result.error) setAiEnabled(!next);
+    });
+  }
+
+  function saveTestPhone() {
+    setTestPhoneError(null);
+    startTransition(async () => {
+      const result = await setAiTestPhoneAction(bot.id, testPhone.trim());
+      if (result.error) setTestPhoneError(result.error);
+      else setTestPhoneSaved(testPhone.trim());
     });
   }
 
@@ -165,6 +178,37 @@ export function BotAccountCard({
           >
             {aiEnabled ? "Activado" : "Apagado"}
           </button>
+        </div>
+      )}
+
+      {isOwner && connection?.verified && aiEnabled && (
+        <div className="space-y-1.5 rounded-md border border-border/60 p-3">
+          <p className="text-sm font-medium text-ink">Modo de prueba</p>
+          <p className="text-xs text-ink-faint">
+            Con un teléfono cargado acá, el bot SOLO le contesta a ese número — todos los demás leads
+            siguen siendo 100% manuales aunque el bot esté activado. Dejalo vacío para que responda a
+            todo el mundo.
+          </p>
+          <div className="flex items-center gap-2 pt-1">
+            <Input
+              value={testPhone}
+              onChange={(e) => setTestPhone(e.target.value)}
+              placeholder="Ej. 59178795415 (sin +)"
+              className="py-1.5 text-sm"
+            />
+            <button
+              type="button"
+              disabled={isPending || testPhone.trim() === testPhoneSaved}
+              onClick={saveTestPhone}
+              className="shrink-0 cursor-pointer rounded-md bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink-muted hover:text-ink disabled:opacity-50"
+            >
+              Guardar
+            </button>
+          </div>
+          {testPhoneError && <p className="text-xs text-danger">{testPhoneError}</p>}
+          {!testPhoneError && testPhoneSaved && (
+            <p className="text-xs text-accent">Modo de prueba activo — solo contesta a {testPhoneSaved}.</p>
+          )}
         </div>
       )}
 

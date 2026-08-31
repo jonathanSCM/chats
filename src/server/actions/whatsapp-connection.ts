@@ -140,6 +140,40 @@ export async function setAiQualificationEnabledAction(
   };
 }
 
+const testPhoneSchema = z.object({
+  phone: z
+    .string()
+    .trim()
+    .regex(/^\d{6,15}$/, "Solo dígitos, sin +, espacios ni guiones (ej. 59178795415)")
+    .optional()
+    .or(z.literal("")),
+});
+
+/**
+ * Carga o quita el teléfono de prueba: mientras esté cargado, el bot de
+ * calificación solo contesta ese número aunque esté activado para toda la
+ * cuenta — para poder probar en producción sin arriesgar leads reales.
+ */
+export async function setAiTestPhoneAction(botId: string, phone: string): Promise<ActionState> {
+  const { bot } = await requireBotOwnerAccess(botId);
+
+  const parsed = testPhoneSchema.safeParse({ phone });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Teléfono inválido" };
+  }
+
+  await prisma.bot.update({
+    where: { id: bot.id },
+    data: { aiTestPhone: parsed.data.phone || null },
+  });
+
+  revalidatePath("/dashboard/whatsapp");
+  return {
+    error: null,
+    message: parsed.data.phone ? "Modo de prueba activado." : "Modo de prueba desactivado.",
+  };
+}
+
 /**
  * Borra solo la conexión de WhatsApp de esta cuenta (token, phone_number_id,
  * waba_id) para poder reconectarla desde cero — no borra el bot ni sus

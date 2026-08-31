@@ -126,10 +126,14 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
   }).catch((error) => console.error("[conversation] Error notificando por push:", error));
 
   // El bot de calificación contesta solo si está habilitado para esta
-  // cuenta y ningún humano tomó ya la conversación. Se reprograma (no se
+  // cuenta, ningún humano tomó ya la conversación, y (si hay un teléfono de
+  // prueba cargado) el mensaje viene de ese número. Se reprograma (no se
   // duplica) por conversación: si el cliente manda varios mensajes
   // seguidos, el bot responde una sola vez a todos juntos.
-  if (connection.bot.aiQualificationEnabled && !conversation.botPaused) {
+  const botActiveForThisPhone =
+    connection.bot.aiQualificationEnabled &&
+    (!connection.bot.aiTestPhone || connection.bot.aiTestPhone === conversation.customerPhone);
+  if (botActiveForThisPhone && !conversation.botPaused) {
     await enqueueOrReschedule({
       type: "bot_reply",
       uniqueKey: `bot_reply:${conversationId}`,
@@ -224,13 +228,22 @@ async function findOrCreateConversation(
 
   const bot = await prisma.bot.findUniqueOrThrow({
     where: { id: botId },
-    select: { organizationId: true, aiQualificationEnabled: true },
+    select: { organizationId: true, aiQualificationEnabled: true, aiTestPhone: true },
   });
   const contactId = await findOrCreateContact({
     organizationId: bot.organizationId,
     phone: customerPhone,
     name: customerName,
   });
+
+  // Si el bot de calificación está habilitado para esta cuenta, la
+  // conversación arranca sin pausar para que pueda contestar el primer
+  // mensaje. Si no, sigue naciendo pausada (bandeja 100% humana). Con un
+  // teléfono de prueba cargado, solo arranca sin pausar para ESE número —
+  // para todos los demás, aunque el bot esté activo, sigue siendo 100%
+  // manual mientras se prueba.
+  const botActiveForThisPhone =
+    bot.aiQualificationEnabled && (!bot.aiTestPhone || bot.aiTestPhone === customerPhone);
 
   const created = await prisma.conversation.create({
     data: {
@@ -239,10 +252,7 @@ async function findOrCreateConversation(
       customerName: customerName ?? null,
       contactId,
       billed: true,
-      // Si el bot de calificación está habilitado para esta cuenta, la
-      // conversación arranca sin pausar para que pueda contestar el primer
-      // mensaje. Si no, sigue naciendo pausada (bandeja 100% humana).
-      botPaused: !bot.aiQualificationEnabled,
+      botPaused: !botActiveForThisPhone,
       ...(fromAd ? { adReferral: true, adReferralAt: new Date() } : {}),
     },
   });

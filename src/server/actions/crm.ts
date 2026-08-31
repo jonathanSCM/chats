@@ -37,12 +37,18 @@ function canEditOpportunity(
   return isAdmin || opportunity.assignedToId === userId;
 }
 
-const createSchema = z.object({
-  contactId: z.string().min(1),
-  title: z.string().min(2, "Ponle un título").max(160),
-  serviceInterest: z.string().max(160).optional(),
-  estimatedValue: z.coerce.number().nonnegative().optional(),
-});
+const createSchema = z
+  .object({
+    contactId: z.string().optional(),
+    newContactName: z.string().max(160).optional(),
+    newContactPhone: z.string().max(32).optional(),
+    title: z.string().min(2, "Ponle un título").max(160),
+    serviceInterest: z.string().max(160).optional(),
+    estimatedValue: z.coerce.number().nonnegative().optional(),
+  })
+  .refine((d) => d.contactId || d.newContactPhone, {
+    message: "Elegí un contacto o cargá el teléfono de uno nuevo",
+  });
 
 export async function createOpportunityAction(
   _prevState: ActionState,
@@ -51,7 +57,9 @@ export async function createOpportunityAction(
   const { organizationId, userId, isAdmin } = await requireOrg();
 
   const parsed = createSchema.safeParse({
-    contactId: formData.get("contactId"),
+    contactId: formData.get("contactId") || undefined,
+    newContactName: formData.get("newContactName") || undefined,
+    newContactPhone: formData.get("newContactPhone") || undefined,
     title: formData.get("title"),
     serviceInterest: formData.get("serviceInterest") || undefined,
     estimatedValue: formData.get("estimatedValue") || undefined,
@@ -60,15 +68,36 @@ export async function createOpportunityAction(
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   }
 
-  const contact = await prisma.contact.findUnique({ where: { id: parsed.data.contactId } });
-  if (!contact || contact.organizationId !== organizationId) {
-    return { error: "Contacto no encontrado" };
+  let contactId: string;
+  if (parsed.data.newContactPhone) {
+    // Lead que todavía no escribió por WhatsApp: se crea el contacto acá
+    // mismo. El teléfono es la misma llave que usa el webhook, así que si
+    // el cliente después escribe, se engancha solo a este mismo contacto
+    // en vez de duplicarse.
+    const phone = parsed.data.newContactPhone.trim();
+    const contact = await prisma.contact.upsert({
+      where: { organizationId_phone: { organizationId, phone } },
+      create: {
+        organizationId,
+        phone,
+        fullName: parsed.data.newContactName?.trim() || null,
+        source: "Manual",
+      },
+      update: {},
+    });
+    contactId = contact.id;
+  } else {
+    const contact = await prisma.contact.findUnique({ where: { id: parsed.data.contactId! } });
+    if (!contact || contact.organizationId !== organizationId) {
+      return { error: "Contacto no encontrado" };
+    }
+    contactId = contact.id;
   }
 
   const created = await prisma.opportunity.create({
     data: {
       organizationId,
-      contactId: parsed.data.contactId,
+      contactId,
       title: parsed.data.title,
       serviceInterest: parsed.data.serviceInterest ?? null,
       estimatedValue: parsed.data.estimatedValue ?? null,

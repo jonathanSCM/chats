@@ -961,6 +961,7 @@ function CreateForm({
 }) {
   const [state, formAction, isPending] = useActionState(createOpportunityAction, { error: null });
   const saved = Boolean(state.message) && !isPending;
+  const [isNewContact, setIsNewContact] = useState(contacts.length === 0);
 
   useEffect(() => {
     if (saved) onDone();
@@ -976,15 +977,33 @@ function CreateForm({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="contactId">Contacto</Label>
-          <Select id="contactId" name="contactId" required>
-            {contacts.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </Select>
+        <div className="space-y-1.5 sm:col-span-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor={isNewContact ? "newContactPhone" : "contactId"}>Contacto</Label>
+            {contacts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsNewContact((v) => !v)}
+                className="cursor-pointer text-xs text-accent hover:underline"
+              >
+                {isNewContact ? "Elegir uno existente" : "Es un lead nuevo (no está en contactos)"}
+              </button>
+            )}
+          </div>
+          {isNewContact ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Input id="newContactPhone" name="newContactPhone" placeholder="Teléfono (ej. 59178795415)" required />
+              <Input id="newContactName" name="newContactName" placeholder="Nombre (opcional)" />
+            </div>
+          ) : (
+            <Select id="contactId" name="contactId" required>
+              {contacts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </Select>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="serviceInterest">Servicio</Label>

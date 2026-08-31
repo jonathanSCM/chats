@@ -46,7 +46,7 @@ const createSchema = z.object({
 export async function createOpportunityAction(
   _prevState: ActionState,
   formData: FormData,
-): Promise<ActionState> {
+): Promise<ActionState & { opportunityId?: string }> {
   const { organizationId, userId, isAdmin } = await requireOrg();
 
   const parsed = createSchema.safeParse({
@@ -88,7 +88,7 @@ export async function createOpportunityAction(
   });
 
   revalidatePath(PATH);
-  return { error: null, message: "Cliente agregado." };
+  return { error: null, message: "Cliente agregado.", opportunityId: created.id };
 }
 
 /**

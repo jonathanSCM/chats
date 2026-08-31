@@ -110,6 +110,8 @@ interface Props {
   currentUserId: string;
   isAdmin: boolean;
   viewingArchived: boolean;
+  /** Si viene de `?open=<id>` (ej. desde el botón del inbox), abre ese cliente ni bien carga. */
+  openId?: string;
   summary: {
     inFollowUp: number;
     quotesSent: number;
@@ -184,13 +186,27 @@ export function TrackingTable({
   currentUserId,
   isAdmin,
   viewingArchived,
+  openId,
   summary,
   ai,
 }: Props) {
   const [creating, setCreating] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
+  const [openedFromLink, setOpenedFromLink] = useState(false);
+  if (openId && !openedFromLink) {
+    const match = rows.find((r) => r.id === openId);
+    if (match) {
+      setOpenedFromLink(true);
+      setDetail(match);
+    }
+  }
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<Stage | "">("");
+  const [priorityFilter, setPriorityFilter] = useState<Priority | "">("");
+  // Filtra por "Próximo contacto" — es el campo de fecha que de verdad usa
+  // el equipo para planear el día, más que la fecha de registro.
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -237,11 +253,20 @@ export function TrackingTable({
     reorderOpportunitiesAction(next.map((r) => r.id));
   }
 
-  const canDrag = !sortField && !query.trim() && !stageFilter && !viewingArchived;
+  const hasActiveFilter =
+    Boolean(stageFilter) || Boolean(priorityFilter) || Boolean(dateFrom) || Boolean(dateTo);
+  const canDrag = !sortField && !query.trim() && !hasActiveFilter && !viewingArchived;
 
   const filtered = orderedRows
     .filter((r) => {
       if (stageFilter && r.stage !== stageFilter) return false;
+      if (priorityFilter && r.priority !== priorityFilter) return false;
+      if (dateFrom || dateTo) {
+        if (!r.nextContactAt) return false;
+        const d = r.nextContactAt.slice(0, 10);
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo && d > dateTo) return false;
+      }
       if (!query.trim()) return true;
       const q = query.toLowerCase();
       return (
@@ -289,6 +314,47 @@ export function TrackingTable({
             </option>
           ))}
         </Select>
+        <Select
+          value={priorityFilter}
+          onChange={(e) => setPriorityFilter(e.target.value as Priority | "")}
+          className="w-full py-1.5 text-sm sm:w-36"
+        >
+          <option value="">Toda prioridad</option>
+          <option value="ALTA">ALTA</option>
+          <option value="MEDIA">MEDIA</option>
+          <option value="BAJA">BAJA</option>
+        </Select>
+        <div className="flex items-center gap-1.5">
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            title="Próximo contacto desde"
+            className="w-full py-1.5 text-sm sm:w-36"
+          />
+          <span className="text-xs text-ink-faint">–</span>
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            title="Próximo contacto hasta"
+            className="w-full py-1.5 text-sm sm:w-36"
+          />
+        </div>
+        {hasActiveFilter && (
+          <button
+            type="button"
+            onClick={() => {
+              setStageFilter("");
+              setPriorityFilter("");
+              setDateFrom("");
+              setDateTo("");
+            }}
+            className="cursor-pointer whitespace-nowrap text-xs text-ink-faint hover:text-accent"
+          >
+            Quitar filtros
+          </button>
+        )}
         {sortField && (
           <button
             type="button"
@@ -351,7 +417,7 @@ export function TrackingTable({
                   <SortableTh field="registeredAt" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>
                     Fecha registro
                   </SortableTh>
-                  <SortableTh field="client" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>
+                  <SortableTh field="client" sortField={sortField} sortDir={sortDir} onSort={toggleSort} frozen>
                     Cliente
                   </SortableTh>
                   <Th>Teléfono</Th>
@@ -464,6 +530,7 @@ function SortableTh({
   sortDir,
   onSort,
   ai,
+  frozen,
   children,
 }: {
   field: SortField;
@@ -471,14 +538,17 @@ function SortableTh({
   sortDir: "asc" | "desc";
   onSort: (field: SortField) => void;
   ai?: boolean;
+  /** Congela esta columna al hacer scroll horizontal — debe coincidir con
+   * la celda del cuerpo que usa `sticky left-0` para la misma columna. */
+  frozen?: boolean;
   children: React.ReactNode;
 }) {
   const active = sortField === field;
   return (
     <th
-      className={`sticky top-0 z-20 whitespace-nowrap border-b border-border bg-surface px-1 py-1 text-left font-mono text-[11px] font-semibold uppercase tracking-wide ${
-        ai ? "text-accent" : "text-ink-muted"
-      }`}
+      className={`sticky top-0 whitespace-nowrap border-b border-border bg-surface px-1 py-1 text-left font-mono text-[11px] font-semibold uppercase tracking-wide ${
+        frozen ? "left-0 z-30 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]" : "z-20"
+      } ${ai ? "text-accent" : "text-ink-muted"}`}
     >
       <button
         type="button"
@@ -540,7 +610,7 @@ function TableRow({
         {dateShort(row.registeredAt)}
       </Td>
 
-      <Td className="sticky left-0 z-10 max-w-[9rem] bg-surface">
+      <Td className="sticky left-0 z-10 max-w-[9rem] bg-surface shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]">
         <button
           type="button"
           onClick={onOpen}

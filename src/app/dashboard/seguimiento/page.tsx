@@ -8,12 +8,12 @@ import { TrackingTable } from "./_components/tracking-table";
 export default async function SeguimientoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ archived?: string }>;
+  searchParams: Promise<{ archived?: string; open?: string }>;
 }) {
   const session = await auth();
   if (!session?.user.organizationId) redirect("/dashboard");
 
-  const { archived } = await searchParams;
+  const { archived, open: openId } = await searchParams;
   const viewingArchived = archived === "1";
 
   const organizationId = session.user.organizationId;
@@ -106,6 +106,7 @@ export default async function SeguimientoPage({
         currentUserId={session.user.id}
         isAdmin={isAdmin}
         viewingArchived={viewingArchived}
+        openId={openId}
         ai={ai}
         summary={{
           inFollowUp: open.length,

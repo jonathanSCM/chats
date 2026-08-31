@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   X,
   StickyNote,
@@ -9,6 +10,7 @@ import {
   Tag as TagIcon,
   Briefcase,
   AlertTriangle,
+  Plus,
 } from "lucide-react";
 import {
   addConversationNoteAction,
@@ -19,9 +21,10 @@ import {
   transferConversationAction,
   updateContactAction,
 } from "@/server/actions/conversation-panel";
+import { createOpportunityAction } from "@/server/actions/crm";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
-import { STAGE_LABEL, type Stage } from "@/lib/pipeline";
+import { STAGE_LABEL, SERVICES, type Stage } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 
 interface PanelData {
@@ -85,11 +88,13 @@ export function ConversationPanel({
   onChanged: () => void;
   onDeleted: () => void;
 }) {
+  const router = useRouter();
   const [data, setData] = useState<PanelData | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [newTag, setNewTag] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [addingToTracking, setAddingToTracking] = useState(false);
 
   // Se recarga subiendo el token en vez de llamar a una función que haga
   // setState: así el fetch vive dentro del efecto y se cancela al desmontar.
@@ -304,13 +309,34 @@ export function ConversationPanel({
         {/* Oportunidades */}
         {data.contact && (
           <div className="space-y-2 border-t border-border pt-4">
-            <Label>
-              <Briefcase size={11} className="mr-1 inline" /> En seguimiento
-            </Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label>
+                <Briefcase size={11} className="mr-1 inline" /> En seguimiento
+              </Label>
+              {!addingToTracking && (
+                <button
+                  type="button"
+                  onClick={() => setAddingToTracking(true)}
+                  className="flex cursor-pointer items-center gap-1 text-[11px] text-accent hover:opacity-80"
+                >
+                  <Plus size={11} /> Agregar
+                </button>
+              )}
+            </div>
+
+            {addingToTracking && (
+              <AddToTrackingForm
+                contactId={data.contact.id}
+                customerName={data.contact.fullName}
+                onCancel={() => setAddingToTracking(false)}
+                onCreated={(opportunityId) => {
+                  router.push(`/dashboard/seguimiento?open=${opportunityId}`);
+                }}
+              />
+            )}
+
             {data.contact.opportunities.length === 0 ? (
-              <p className="text-[11px] text-ink-faint">
-                Ninguno todavía. Se agregan desde Seguimiento.
-              </p>
+              <p className="text-[11px] text-ink-faint">Ninguno todavía.</p>
             ) : (
               <div className="space-y-1.5">
                 {data.contact.opportunities.map((o) => (
@@ -436,6 +462,61 @@ function NoteForm({
       <Button type="submit" variant="secondary" disabled={isPending} className="w-full py-1.5 text-xs">
         {isPending ? "Guardando…" : "Agregar nota"}
       </Button>
+    </form>
+  );
+}
+
+function AddToTrackingForm({
+  contactId,
+  customerName,
+  onCancel,
+  onCreated,
+}: {
+  contactId: string;
+  customerName: string | null;
+  onCancel: () => void;
+  onCreated: (opportunityId: string) => void;
+}) {
+  const [state, formAction, isPending] = useActionState(createOpportunityAction, { error: null });
+
+  useEffect(() => {
+    if (state.opportunityId) onCreated(state.opportunityId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo debe correr cuando llega el id nuevo
+  }, [state.opportunityId]);
+
+  return (
+    <form action={formAction} className="space-y-2 rounded-md border border-accent-dim/40 bg-accent/5 p-2.5">
+      <input type="hidden" name="contactId" value={contactId} />
+      <div className="space-y-1">
+        <Label>Servicio</Label>
+        <Select name="serviceInterest" defaultValue="" className="py-1.5 text-xs">
+          <option value="">Sin definir</option>
+          {SERVICES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <div className="space-y-1">
+        <Label>Necesidad / contexto</Label>
+        <Input
+          name="title"
+          defaultValue={customerName ? `${customerName} — ` : ""}
+          placeholder="Qué necesita este cliente"
+          className="py-1.5 text-xs"
+          required
+        />
+      </div>
+      {state.error && <p className="text-[11px] text-danger">{state.error}</p>}
+      <div className="flex gap-2">
+        <Button type="submit" disabled={isPending} className="flex-1 py-1.5 text-xs">
+          {isPending ? "Agregando…" : "Agregar y ver"}
+        </Button>
+        <Button type="button" variant="secondary" onClick={onCancel} className="py-1.5 text-xs">
+          Cancelar
+        </Button>
+      </div>
     </form>
   );
 }

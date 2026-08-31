@@ -92,9 +92,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   );
 
   return (
-    <div className="flex min-h-screen">
-      {/* Sidebar fijo: solo escritorio */}
-      <aside className="app-sidebar hidden w-60 shrink-0 flex-col border-r border-border bg-surface/60 px-3 py-5 md:flex">
+    <div className="flex h-screen overflow-hidden">
+      {/* Sidebar fijo: solo escritorio. overflow-y-auto propio por si el
+          menú alguna vez no entra en pantallas bajas. */}
+      <aside className="app-sidebar hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface/60 px-3 py-5 md:flex">
         {navContent}
       </aside>
 

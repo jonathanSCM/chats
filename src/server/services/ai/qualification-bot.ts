@@ -4,6 +4,7 @@ import { decrypt } from "@/lib/crypto";
 import { sendTextMessage } from "@/server/services/whatsapp";
 import { notifyNewMessage } from "@/server/services/push";
 import { isOpenStage } from "@/lib/pipeline";
+import { getMeetingSlots, type MeetingSlot } from "@/lib/meeting-slots";
 import { MODELS, runStructured } from "./client";
 
 export const PROMPT_VERSION = "bot-calificacion-v1";
@@ -25,6 +26,10 @@ const resultSchema = z.object({
   rol_contacto: z.string(),
   empresa_funcionando: z.enum(["SI", "NO", "DESCONOCIDO"]),
   listo_para_agendar: z.boolean(),
+  // Cuál de las franjas ofrecidas en el input (A/B/C) eligió el cliente
+  // este turno. "" si todavía no corresponde ofrecer horarios, o si el
+  // cliente no eligió ninguna.
+  reunion_elegida: z.enum(["", "A", "B", "C"]),
   debe_escalar: z.boolean(),
   motivo_escalar: z.string(), // "" si no aplica
   memoria: z.string(),
@@ -44,6 +49,7 @@ const jsonSchema = {
     "rol_contacto",
     "empresa_funcionando",
     "listo_para_agendar",
+    "reunion_elegida",
     "debe_escalar",
     "motivo_escalar",
     "memoria",
@@ -71,6 +77,14 @@ const jsonSchema = {
       description:
         "true solo cuando ya hay empresa real + problema real + posible mejora con tecnología, y " +
         "corresponde ofrecer o confirmar la reunión de diagnóstico.",
+    },
+    reunion_elegida: {
+      type: "string",
+      enum: ["", "A", "B", "C"],
+      description:
+        "Si en la CONVERSACIÓN el cliente ya eligió una de las FRANJAS DISPONIBLES ofrecidas más abajo, " +
+        "la letra de esa franja (A, B o C). \"\" si todavía no se ofrecieron franjas, o el cliente no " +
+        "eligió ninguna todavía.",
     },
     debe_escalar: {
       type: "boolean",
@@ -108,6 +122,11 @@ Reglas duras, siempre:
 - Si el cliente hace una pregunta directa, respóndela en una frase y vuelve de forma natural al filtro.
 - Si el cliente pide hablar con una persona, se queja, o hace algo que esta guía no cubre, pon
   debe_escalar en true y deja de insistir con preguntas.
+- Primero invita a la reunión de diagnóstico en general (sin mencionar horarios) y espera a que el
+  cliente acepte. Recién cuando el cliente ya dijo que sí quiere agendar, ofrécele las FRANJAS
+  DISPONIBLES de abajo en tu "respuesta" (con palabras naturales, ej. "lunes a las 10 o miércoles a las
+  3pm, ¿cuál te queda mejor?"), y marca en "reunion_elegida" la que el cliente elija apenas la mencione.
+- No inventes ni ofrezcas ningún horario que no esté en FRANJAS DISPONIBLES.
 - El guion exacto de preguntas, cuándo agendar, cuándo no agendar, y el estilo de conversación están en
   la GUÍA DE CALIFICACIÓN y el TONO de la Base de Conocimiento de abajo — síguelos al pie de la letra.
   Si no hay ninguna guía cargada, usa como referencia general: entender a qué se dedica la empresa, qué
@@ -159,7 +178,7 @@ async function loadConversation(conversationId: string): Promise<ConversationFor
  * tono (Base de Conocimiento), la memoria acumulada y la conversación
  * reciente. Mismo patrón que buildInput() en follow-up.ts.
  */
-async function buildInput(conversation: ConversationForBot): Promise<string> {
+async function buildInput(conversation: ConversationForBot, slots: MeetingSlot[]): Promise<string> {
   const [knowledge, recentMessages] = await Promise.all([
     prisma.knowledgeItem.findMany({
       where: { organizationId: conversation.organizationId, active: true },
@@ -194,6 +213,11 @@ async function buildInput(conversation: ConversationForBot): Promise<string> {
         .join("\n")
     : "(Sin mensajes previos — es el primer mensaje de esta conversación.)";
 
+  const letters = ["A", "B", "C"] as const;
+  const slotsText = slots
+    .map((slot, i) => `${letters[i]}) ${slot.label}`)
+    .join("\n");
+
   return `FECHA DE HOY: ${new Date().toISOString().slice(0, 10)}
 
 CLIENTE
@@ -202,6 +226,9 @@ Teléfono: ${conversation.customerPhone}
 
 MEMORIA ANTERIOR (resumen acumulado de esta conversación — actualízala, no la ignores)
 ${conversation.botMemory ?? "(Todavía no hay memoria — es el primer turno.)"}
+
+FRANJAS DISPONIBLES para la reunión de diagnóstico (solo ofrécelas si el cliente ya aceptó agendar)
+${slotsText}
 
 CONVERSACIÓN DE WHATSAPP (más reciente al final)
 ${conversationText}
@@ -222,20 +249,20 @@ ${toneText}`;
 async function ensureOpportunity(
   conversation: ConversationForBot,
   result: QualificationResult,
-): Promise<void> {
-  if (!conversation.contact) return;
+): Promise<string | null> {
+  if (!conversation.contact) return null;
 
   const existingOpen = await prisma.opportunity.findFirst({
     where: { contactId: conversation.contact.id, archivedAt: null },
     select: { id: true, stage: true },
   });
-  if (existingOpen && isOpenStage(existingOpen.stage)) return;
+  if (existingOpen && isOpenStage(existingOpen.stage)) return existingOpen.id;
 
   const needSummary = [result.problema_principal, result.que_quiere_mejorar]
     .filter(Boolean)
     .join(" — ") || result.memoria;
 
-  await prisma.opportunity.create({
+  const created = await prisma.opportunity.create({
     data: {
       organizationId: conversation.organizationId,
       contactId: conversation.contact.id,
@@ -247,7 +274,45 @@ async function ensureOpportunity(
       aiMemoryUpdatedAt: new Date(),
       assignedToId: null,
     },
+    select: { id: true },
   });
+  return created.id;
+}
+
+/**
+ * Si el cliente eligió una franja este turno, crea la Meeting (sin link de
+ * Meet todavía — eso lo manda el vendedor a mano, igual que hoy) y avisa
+ * al equipo para que confirme el horario real.
+ */
+async function maybeScheduleMeeting(
+  conversation: ConversationForBot,
+  result: QualificationResult,
+  slots: MeetingSlot[],
+  opportunityId: string | null,
+): Promise<void> {
+  if (!result.reunion_elegida) return;
+
+  const index = { A: 0, B: 1, C: 2 }[result.reunion_elegida];
+  const slot = slots[index];
+  if (!slot) return;
+
+  await prisma.meeting.create({
+    data: {
+      organizationId: conversation.organizationId,
+      opportunityId,
+      scheduledAt: slot.date,
+      status: "SCHEDULED",
+      notes: "Agendada por el bot de calificación — confirmar horario y mandar el link de Meet al cliente.",
+    },
+  });
+
+  await notifyNewMessage({
+    conversationId: conversation.id,
+    organizationId: conversation.organizationId,
+    assignedToId: conversation.assignedToId,
+    customerLabel: conversation.customerName || conversation.customerPhone,
+    preview: `📅 El bot agendó una reunión para ${slot.label} — confirmá y mandá el link de Meet`,
+  }).catch((error) => console.error("[bot] Error notificando reunión agendada:", error));
 }
 
 async function sendAndSave(conversation: ConversationForBot, text: string): Promise<void> {
@@ -312,7 +377,8 @@ export async function runQualificationTurn(conversationId: string): Promise<void
     return;
   }
 
-  const input = await buildInput(conversation);
+  const slots = getMeetingSlots();
+  const input = await buildInput(conversation, slots);
 
   const result = await runStructured({
     organizationId: conversation.organizationId,
@@ -345,7 +411,8 @@ export async function runQualificationTurn(conversationId: string): Promise<void
     data: { botMemory: result.memoria },
   });
 
-  if (result.listo_para_agendar) {
-    await ensureOpportunity(conversation, result);
+  if (result.listo_para_agendar || result.reunion_elegida) {
+    const opportunityId = await ensureOpportunity(conversation, result);
+    await maybeScheduleMeeting(conversation, result, slots, opportunityId);
   }
 }

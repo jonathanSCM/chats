@@ -8,7 +8,7 @@ import type {
   ParsedStatusUpdate,
 } from "@/server/services/whatsapp";
 import { notifyNewMessage } from "@/server/services/push";
-import { enqueue, enqueueOrReschedule } from "@/server/jobs";
+import { enqueue, enqueueOrReschedule, runJobsSoon } from "@/server/jobs";
 
 const CONVERSATION_WINDOW_MS = 24 * 60 * 60 * 1000; // ventana de conversación de WhatsApp
 const FREE_ENTRY_POINT_MS = 72 * 60 * 60 * 1000; // gracia extra de Meta para leads de anuncios
@@ -134,12 +134,22 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
     connection.bot.aiQualificationEnabled &&
     (!connection.bot.aiTestPhone || connection.bot.aiTestPhone === conversation.customerPhone);
   if (botActiveForThisPhone && !conversation.botPaused) {
+    const BOT_DEBOUNCE_MS = 5000;
     await enqueueOrReschedule({
       type: "bot_reply",
       uniqueKey: `bot_reply:${conversationId}`,
       payload: { conversationId },
-      runAfter: new Date(Date.now() + 8000),
+      runAfter: new Date(Date.now() + BOT_DEBOUNCE_MS),
     });
+    // runJobsSoon() de acá abajo no agarra este job (todavía no está
+    // "runAfter"), y sin nadie más que lo despierte se queda esperando al
+    // cron de cada 1 minuto — el bot tardaría hasta ~1 minuto en responder
+    // en vez de ~5 segundos. Se programa un segundo llamado para después
+    // del debounce; si mientras tanto llega otro mensaje y reprograma el
+    // job más adelante, este timer no encuentra nada listo y no hace nada
+    // (inofensivo) — el timer del último mensaje es el que efectivamente
+    // lo despierta.
+    setTimeout(() => runJobsSoon(), BOT_DEBOUNCE_MS + 500);
   }
 }
 

@@ -796,7 +796,12 @@ export function InboxClient({
     const id = selectedIdRef.current;
     if (!id) return;
     setConversationFromAd(true);
-    markConversationFromAdAction(id);
+    markConversationFromAdAction(id).then((result) => {
+      if (result.error) {
+        setConversationFromAd(false);
+        setError(result.error);
+      }
+    });
   }
 
   return (
@@ -890,7 +895,11 @@ export function InboxClient({
           <p className="px-4 py-6 text-sm text-ink-faint">
             {!isAdmin && bots.length === 0
               ? "No tienes ninguna cuenta de WhatsApp asignada — pide al dueño de la organización que te dé acceso."
-              : "No hay conversaciones todavía."}
+              : view === "archived"
+                ? "No hay conversaciones archivadas."
+                : view === "blocked"
+                  ? "No hay conversaciones bloqueadas."
+                  : "Los mensajes que te escriban por WhatsApp van a aparecer acá."}
           </p>
         )}
         {conversations.map((c) => (
@@ -1311,7 +1320,7 @@ export function InboxClient({
                     placeholder={pendingFile ? "Agrega un texto (opcional)…" : "Escribe un mensaje…"}
                     rows={1}
                     // text-base evita que iOS haga zoom automático al enfocar
-                    className="max-h-32 min-w-0 flex-1 resize-none rounded-3xl border-none bg-surface px-4 py-2.5 text-base text-ink outline-none md:text-sm"
+                    className="max-h-32 min-w-0 flex-1 resize-none rounded-3xl border-none bg-surface px-4 py-2.5 text-base text-ink outline-none transition-shadow focus:ring-1 focus:ring-accent-dim md:text-sm"
                   />
                   {draft.trim() || pendingFile ? (
                     <button

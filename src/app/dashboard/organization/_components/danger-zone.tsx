@@ -10,6 +10,34 @@ export function DangerZone({ orgName }: { orgName: string }) {
   const [state, formAction, isPending] = useActionState(deleteOrganizationAction, { error: null });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmName, setConfirmName] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  // Un <a href> plano no da ningún indicio de progreso — con una org
+  // grande la exportación puede tardar y parece que "no pasó nada",
+  // invitando a clickear varias veces. Se arma el blob a mano para poder
+  // mostrar un estado de carga real.
+  async function handleExport() {
+    setIsExporting(true);
+    setExportError(null);
+    try {
+      const res = await fetch("/api/organization/export");
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = match?.[1] ?? "export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError("No se pudo exportar. Intenta de nuevo.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -19,12 +47,11 @@ export function DangerZone({ orgName }: { orgName: string }) {
           <p className="text-xs text-ink-muted">
             Contactos, oportunidades, conversaciones y base de conocimiento, en un archivo JSON.
           </p>
+          {exportError && <p className="mt-1 text-xs text-danger">{exportError}</p>}
         </div>
-        <a href="/api/organization/export">
-          <Button type="button" variant="secondary">
-            <Download size={14} /> Exportar
-          </Button>
-        </a>
+        <Button type="button" variant="secondary" disabled={isExporting} onClick={handleExport}>
+          <Download size={14} /> {isExporting ? "Exportando…" : "Exportar"}
+        </Button>
       </div>
 
       <div className="border-t border-danger/30 pt-5">

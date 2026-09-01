@@ -43,8 +43,17 @@ export function BotAccountCard({
   const [testPhoneSaved, setTestPhoneSaved] = useState(bot.aiTestPhone ?? "");
   const [testPhoneError, setTestPhoneError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Activar sin teléfono de prueba cargado contesta leads reales de
+  // inmediato — se pide un toque más para confirmar ese caso puntual.
+  const [confirmActivate, setConfirmActivate] = useState(false);
 
   function toggleAi() {
+    if (!aiEnabled && !testPhoneSaved && !confirmActivate) {
+      setConfirmActivate(true);
+      setTimeout(() => setConfirmActivate(false), 4000);
+      return;
+    }
+    setConfirmActivate(false);
     const next = !aiEnabled;
     setAiEnabled(next);
     startTransition(async () => {
@@ -168,20 +177,40 @@ export function BotAccountCard({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={toggleAi}
-            className={`shrink-0 cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              aiEnabled ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink-muted hover:text-ink"
-            }`}
-          >
-            {aiEnabled ? "Activado" : "Apagado"}
-          </button>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={toggleAi}
+              title={
+                confirmActivate
+                  ? "Sin teléfono de prueba, va a contestarle a TODOS los leads nuevos"
+                  : undefined
+              }
+              className={`cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                confirmActivate
+                  ? "bg-warning text-accent-ink"
+                  : aiEnabled
+                    ? "bg-accent text-accent-ink"
+                    : "bg-surface-2 text-ink-muted hover:text-ink"
+              }`}
+            >
+              {confirmActivate ? "¿Seguro? Toca de nuevo" : aiEnabled ? "Activado" : "Apagado"}
+            </button>
+            {confirmActivate && (
+              <p className="max-w-[12rem] text-right text-[10px] text-warning">
+                Sin teléfono de prueba, contesta a todos los leads nuevos ya mismo.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
-      {isOwner && connection?.verified && aiEnabled && (
+      {/* Visible aunque el bot esté apagado: así se puede cargar el
+          teléfono de prueba ANTES de activarlo, en vez de que el único
+          momento en que se ve esta advertencia sea después de haber
+          prendido el bot para todo el mundo. */}
+      {isOwner && connection?.verified && (
         <div className="space-y-1.5 rounded-md border border-border/60 p-3">
           <p className="text-sm font-medium text-ink">Modo de prueba</p>
           <p className="text-xs text-ink-faint">

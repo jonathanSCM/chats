@@ -58,6 +58,14 @@ export function TemplatePickerModal({
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     fetch(`/api/whatsapp/templates?botId=${botId}`)
       .then((res) => res.json())
       .then((data) => {
@@ -142,7 +150,14 @@ export function TemplatePickerModal({
               </div>
             </>
           ) : (
-            <div className="space-y-4">
+            <form
+              id="template-vars-form"
+              className="space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                send();
+              }}
+            >
               <button
                 type="button"
                 onClick={() => setSelected(null)}
@@ -175,7 +190,7 @@ export function TemplatePickerModal({
               </div>
 
               {sendError && <p className="text-sm text-danger">{sendError}</p>}
-            </div>
+            </form>
           )}
         </div>
 
@@ -184,7 +199,11 @@ export function TemplatePickerModal({
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="button" onClick={send} disabled={isPending || values.some((v) => !v.trim())}>
+            <Button
+              type="submit"
+              form="template-vars-form"
+              disabled={isPending || values.some((v) => !v.trim())}
+            >
               {isPending ? "Enviando…" : "Enviar plantilla"}
             </Button>
           </div>

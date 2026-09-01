@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { FileText, Plus, Trash2 } from "lucide-react";
+import { FileText, Plus, Trash2, RefreshCw } from "lucide-react";
 import {
   createMessageTemplateAction,
   deleteMessageTemplateAction,
@@ -43,6 +43,7 @@ export function TemplateManager({ botId }: { botId: string }) {
   const [confirmDeleteName, setConfirmDeleteName] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, startDelete] = useTransition();
+  const [isLoading, setIsLoading] = useState(false);
 
   const action = createMessageTemplateAction.bind(null, botId);
   const [state, formAction, isPending] = useActionState(action, { error: null });
@@ -58,6 +59,26 @@ export function TemplateManager({ botId }: { botId: string }) {
         }
       })
       .catch(() => setLoadError("No se pudieron cargar las plantillas."));
+  }
+
+  // Si Meta aprueba/rechaza una plantilla mientras la pestaña sigue
+  // abierta, el estado no se refresca solo — botón manual para no tener
+  // que salir y volver a entrar a la pantalla. Separado de `load()` (que
+  // dispara el efecto de montaje) para no llamar setState de forma
+  // síncrona dentro de un efecto.
+  function refresh() {
+    setIsLoading(true);
+    fetch(`/api/whatsapp/templates?botId=${botId}&all=1`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) setLoadError(data.error);
+        else {
+          setLoadError(null);
+          setTemplates(data.templates);
+        }
+      })
+      .catch(() => setLoadError("No se pudieron cargar las plantillas."))
+      .finally(() => setIsLoading(false));
   }
 
   useEffect(load, [botId]);
@@ -98,9 +119,20 @@ export function TemplateManager({ botId }: { botId: string }) {
             antes de aprobarlas.
           </CardDescription>
         </div>
-        <Button type="button" variant="secondary" onClick={() => setCreating((v) => !v)}>
-          <Plus size={14} /> Crear plantilla
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={isLoading}
+            title="Actualizar estado de las plantillas"
+            className="cursor-pointer text-ink-faint hover:text-ink disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={15} className={isLoading ? "animate-spin" : ""} />
+          </button>
+          <Button type="button" variant="secondary" onClick={() => setCreating((v) => !v)}>
+            <Plus size={14} /> Crear plantilla
+          </Button>
+        </div>
       </div>
 
       {creating && (

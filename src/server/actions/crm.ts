@@ -45,6 +45,8 @@ const createSchema = z
     title: z.string().min(2, "Ponle un título").max(160),
     serviceInterest: z.string().max(160).optional(),
     estimatedValue: z.coerce.number().nonnegative().optional(),
+    nextAction: z.string().max(300).optional(),
+    nextActionAt: z.string().optional(),
   })
   .refine((d) => d.contactId || d.newContactPhone, {
     message: "Elegí un contacto o cargá el teléfono de uno nuevo",
@@ -63,6 +65,8 @@ export async function createOpportunityAction(
     title: formData.get("title"),
     serviceInterest: formData.get("serviceInterest") || undefined,
     estimatedValue: formData.get("estimatedValue") || undefined,
+    nextAction: formData.get("nextAction") || undefined,
+    nextActionAt: formData.get("nextActionAt") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -101,6 +105,8 @@ export async function createOpportunityAction(
       title: parsed.data.title,
       serviceInterest: parsed.data.serviceInterest ?? null,
       estimatedValue: parsed.data.estimatedValue ?? null,
+      nextAction: parsed.data.nextAction ?? null,
+      nextActionAt: parsed.data.nextActionAt ? new Date(parsed.data.nextActionAt) : null,
       // El admin carga clientes para el equipo: quedan sin asignar y
       // cualquier vendedor los puede tomar. Un vendedor que agrega uno
       // propio se lo asigna directo, como ya hacía antes.

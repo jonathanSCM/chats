@@ -558,29 +558,39 @@ export function TrackingTable({
             Quitar orden por columna
           </button>
         )}
-        <Link
-          href={viewingArchived ? "/dashboard/seguimiento" : "/dashboard/seguimiento?archived=1"}
-          className="flex items-center gap-1 whitespace-nowrap text-xs text-ink-muted hover:text-accent"
-        >
-          {viewingArchived ? (
-            <>
-              <ArchiveRestore size={13} /> Ver activos
-            </>
-          ) : (
-            <>
-              <Archive size={13} /> Ver archivados
-            </>
-          )}
-        </Link>
-        {!viewingArchived && (
+        {/* Dos toggles independientes y de naturaleza distinta: "archivados"
+            cambia la fuente de datos (otra query), "estado=todos" solo suma
+            etapas a la vista activa. Se agrupan con borde + etiqueta para
+            que no parezcan la misma opción. */}
+        <div className="flex items-center gap-2 rounded-md border border-border px-2 py-1">
+          <span className="text-[10px] uppercase tracking-wide text-ink-faint">Vista:</span>
           <Link
-            href={viewingAllStages ? "/dashboard/seguimiento" : "/dashboard/seguimiento?estado=todos"}
-            title="Ganado, Perdido y En pausa/Nutrir quedan ocultos por defecto para no competir con lo activo"
+            href={viewingArchived ? "/dashboard/seguimiento" : "/dashboard/seguimiento?archived=1"}
             className="flex items-center gap-1 whitespace-nowrap text-xs text-ink-muted hover:text-accent"
           >
-            <Eye size={13} /> {viewingAllStages ? "Ocultar cerrados/pausados" : "Ver ganados/perdidos/pausados"}
+            {viewingArchived ? (
+              <>
+                <ArchiveRestore size={13} /> Ver activos
+              </>
+            ) : (
+              <>
+                <Archive size={13} /> Ver archivados
+              </>
+            )}
           </Link>
-        )}
+          {!viewingArchived && (
+            <>
+              <span className="text-border">·</span>
+              <Link
+                href={viewingAllStages ? "/dashboard/seguimiento" : "/dashboard/seguimiento?estado=todos"}
+                title="Ganado, Perdido y En pausa/Nutrir quedan ocultos por defecto para no competir con lo activo"
+                className="flex items-center gap-1 whitespace-nowrap text-xs text-ink-muted hover:text-accent"
+              >
+                <Eye size={13} /> {viewingAllStages ? "Ocultar cerrados/pausados" : "Ver ganados/perdidos/pausados"}
+              </Link>
+            </>
+          )}
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <div className="flex items-center rounded-md border border-border p-0.5">
             <button
@@ -719,9 +729,16 @@ export function TrackingTable({
             </table>
 
             {filtered.length === 0 && (
-              <p className="py-6 text-center text-sm text-ink-faint">
-                Ningún cliente coincide con el filtro.
-              </p>
+              <div className="py-6 text-center text-sm text-ink-faint">
+                <p>Ningún cliente coincide con el filtro.</p>
+                {(dateFrom || dateTo) && quickFilter && (
+                  <p className="mt-1 text-xs">
+                    Tenés dos filtros de fecha activos a la vez: &quot;Próximo contacto&quot; (arriba) y
+                    &quot;{quickFilterChips.find((c) => c.key === quickFilter)?.label}&quot; (chip
+                    rápido) — son campos distintos y se combinan entre sí.
+                  </p>
+                )}
+              </div>
             )}
 
             <p className="mt-4 flex flex-wrap items-center gap-1.5 text-xs text-ink-faint">
@@ -844,22 +861,39 @@ function NextActionCell({
 }) {
   const badge = dueBadge(row.nextActionAt);
   const missing = !row.nextAction || !row.nextActionAt;
+  // Este campo se autoguarda en el blur sin ningún otro indicador visible
+  // — a diferencia de "Necesidad"/"Última actualización" (EditableText, que
+  // exige un clic explícito en "Guardar"), acá es fácil no notar que sí se
+  // guardó. Un "Guardado ✓" momentáneo cierra esa brecha sin cambiar el
+  // patrón de autoguardado, que tiene sentido para un campo de tabla.
+  const [justSaved, setJustSaved] = useState<"action" | "date" | null>(null);
+  function handleBlur(field: "nextAction" | "nextActionAt", key: "action" | "date", value: string) {
+    onSave(field, value);
+    setJustSaved(key);
+    setTimeout(() => setJustSaved((s) => (s === key ? null : s)), 1500);
+  }
   return (
     <div className="space-y-1">
-      <Input
-        defaultValue={row.nextAction}
-        disabled={locked}
-        placeholder="Ej. Llamar para calificar"
-        onBlur={(e) => onSave("nextAction", e.target.value)}
-        className="w-full py-1 text-xs"
-      />
-      <Input
-        type="date"
-        defaultValue={dateInputValue(row.nextActionAt)}
-        disabled={locked}
-        onBlur={(e) => onSave("nextActionAt", e.target.value)}
-        className="w-full py-1 text-xs"
-      />
+      <div className="flex items-center gap-1">
+        <Input
+          defaultValue={row.nextAction}
+          disabled={locked}
+          placeholder="Ej. Llamar para calificar"
+          onBlur={(e) => handleBlur("nextAction", "action", e.target.value)}
+          className="w-full py-1 text-xs"
+        />
+        {justSaved === "action" && <span className="shrink-0 text-[10px] text-accent">Guardado ✓</span>}
+      </div>
+      <div className="flex items-center gap-1">
+        <Input
+          type="date"
+          defaultValue={dateInputValue(row.nextActionAt)}
+          disabled={locked}
+          onBlur={(e) => handleBlur("nextActionAt", "date", e.target.value)}
+          className="w-full py-1 text-xs"
+        />
+        {justSaved === "date" && <span className="shrink-0 text-[10px] text-accent">Guardado ✓</span>}
+      </div>
       {missing ? (
         <p className="flex items-center gap-1 text-[11px] text-warning">
           <AlertTriangle size={10} /> Sin próxima acción
@@ -976,7 +1010,7 @@ function TableRow({
           value={row.stage}
           disabled={locked}
           onChange={(e) => save("stage", e.target.value)}
-          className="w-32 py-1.5 text-sm font-semibold"
+          className="w-40 py-1.5 text-xs font-semibold"
           style={{ color: STAGE_COLOR[row.stage] }}
         >
           {ALL_STAGES.map((s) => (
@@ -1047,7 +1081,12 @@ function TableRow({
             max="100"
             defaultValue={row.probability ?? ""}
             disabled={locked}
-            onBlur={(e) => e.target.value && save("probability", e.target.value)}
+            onBlur={(e) => {
+              if (!e.target.value) return;
+              const clamped = Math.min(100, Math.max(0, Number(e.target.value)));
+              e.target.value = String(clamped);
+              save("probability", String(clamped));
+            }}
             className="w-16 py-1.5 text-sm"
           />
           <span className="text-xs text-ink-faint">%</span>
@@ -1260,6 +1299,20 @@ function CreateForm({
         <Input id="title" name="title" placeholder="Ej. Agente IA de ventas para su tienda" required />
       </div>
 
+      {/* Opcional, pero evita el paso extra de tener que abrir la ficha de
+          nuevo apenas se crea para cargar lo que el pipeline pide como
+          obligatorio — ver el aviso "Sin próxima acción" en la tabla. */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="nextAction">Próxima acción (opcional)</Label>
+          <Input id="nextAction" name="nextAction" placeholder="Ej. Llamar para calificar" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="nextActionAt">Fecha</Label>
+          <Input id="nextActionAt" name="nextActionAt" type="date" />
+        </div>
+      </div>
+
       {state.error && <p className="text-sm text-danger">{state.error}</p>}
 
       <div className="flex gap-2">
@@ -1292,6 +1345,7 @@ function DetailPanel({
   const [isPending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [justSaved, setJustSaved] = useState<"action" | "date" | null>(null);
   const locked = !editable || isPending;
 
   function save(field: string, value: string) {
@@ -1370,21 +1424,32 @@ function DetailPanel({
 
           <Field label="Próxima acción">
             {editable ? (
-              <div className="flex gap-2">
-                <Input
-                  defaultValue={row.nextAction}
-                  disabled={locked}
-                  placeholder="Ej. Llamar para calificar"
-                  onBlur={(e) => save("nextAction", e.target.value)}
-                  className="flex-1 py-1.5 text-sm"
-                />
-                <Input
-                  type="date"
-                  defaultValue={dateInputValue(row.nextActionAt)}
-                  disabled={locked}
-                  onBlur={(e) => save("nextActionAt", e.target.value)}
-                  className="w-36 py-1.5 text-sm"
-                />
+              <div className="space-y-1">
+                <div className="flex gap-2">
+                  <Input
+                    defaultValue={row.nextAction}
+                    disabled={locked}
+                    placeholder="Ej. Llamar para calificar"
+                    onBlur={(e) => {
+                      save("nextAction", e.target.value);
+                      setJustSaved("action");
+                      setTimeout(() => setJustSaved((s) => (s === "action" ? null : s)), 1500);
+                    }}
+                    className="flex-1 py-1.5 text-sm"
+                  />
+                  <Input
+                    type="date"
+                    defaultValue={dateInputValue(row.nextActionAt)}
+                    disabled={locked}
+                    onBlur={(e) => {
+                      save("nextActionAt", e.target.value);
+                      setJustSaved("date");
+                      setTimeout(() => setJustSaved((s) => (s === "date" ? null : s)), 1500);
+                    }}
+                    className="w-36 py-1.5 text-sm"
+                  />
+                </div>
+                {justSaved && <p className="text-[11px] text-accent">Guardado ✓</p>}
               </div>
             ) : (
               <p className="text-sm leading-relaxed text-ink-muted">

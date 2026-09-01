@@ -16,6 +16,7 @@ interface PendingInvite {
 export function InvitePanel({ invites }: { invites: PendingInvite[] }) {
   const [state, formAction, isPending] = useActionState(createInviteAction, { error: null });
   const isInviteUrl = state.message?.startsWith("http");
+  const [role, setRole] = useState<"MEMBER" | "OWNER">("MEMBER");
 
   return (
     <div className="space-y-6">
@@ -26,7 +27,12 @@ export function InvitePanel({ invites }: { invites: PendingInvite[] }) {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="role">Rol</Label>
-          <Select id="role" name="role" defaultValue="MEMBER">
+          <Select
+            id="role"
+            name="role"
+            value={role}
+            onChange={(e) => setRole(e.target.value as "MEMBER" | "OWNER")}
+          >
             <option value="MEMBER">Vendedor</option>
             <option value="OWNER">Admin</option>
           </Select>
@@ -35,6 +41,11 @@ export function InvitePanel({ invites }: { invites: PendingInvite[] }) {
           {isPending ? "Generando…" : "Generar invitación"}
         </Button>
       </form>
+      <p className="-mt-4 text-xs text-ink-faint">
+        {role === "OWNER"
+          ? "Admin: gestiona el equipo, la organización y ve todos los chats y oportunidades."
+          : "Vendedor: solo ve los chats y oportunidades que tiene asignados."}
+      </p>
 
       {state.error && <p className="text-sm text-danger">{state.error}</p>}
       {isInviteUrl && <CopyableLink url={state.message!} />}

@@ -50,6 +50,7 @@ export function KanbanBoard({
   const [localStage, setLocalStage] = useState<Record<string, Stage>>({});
   const dragIdRef = useRef<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Barra de scroll horizontal "espejo", pegada abajo de la pantalla —
   // mismo patrón que la tabla de Seguimiento: con muchas columnas de etapa
@@ -111,14 +112,21 @@ export function KanbanBoard({
     const row = rows.find((r) => r.id === id);
     if (!row || !canEdit(row) || stageOf(row) === stage) return;
 
+    const previousStage = stageOf(row);
     setLocalStage((prev) => ({ ...prev, [id]: stage }));
+    setError(null);
     startTransition(async () => {
-      await updateOpportunityFieldAction(id, "stage", stage);
+      const result = await updateOpportunityFieldAction(id, "stage", stage);
+      if (result.error) {
+        setLocalStage((prev) => ({ ...prev, [id]: previousStage }));
+        setError(result.error);
+      }
     });
   }
 
   return (
     <>
+    {error && <p className="mb-2 text-xs text-danger">{error}</p>}
     <div ref={boardScrollRef} onScroll={handleBoardScroll} className="-mx-4 overflow-x-auto pb-2 md:-mx-8">
       <div className="flex min-w-max gap-3 px-4 md:px-8">
         {ALL_STAGES.map((stage) => {

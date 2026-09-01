@@ -47,6 +47,7 @@ import {
   STAGE_COLOR,
   PRIORITY_COLOR,
   SERVICES,
+  isOpenStage,
   type Stage,
   type Priority,
 } from "@/lib/pipeline";
@@ -96,6 +97,7 @@ export interface Row {
   archived: boolean;
   sortOrder: number;
   assignedTo: { id: string; name: string; color: string | null } | null;
+  lostReason: string;
 }
 
 const LEAD_SCORE_BREAKDOWN_LABEL: Record<string, [string, number]> = {
@@ -375,10 +377,15 @@ export function TrackingTable({
       }
       if (quickFilter) {
         const d = r.nextActionAt?.slice(0, 10) ?? null;
-        if (quickFilter === "alta" && r.priority !== "ALTA") return false;
-        if (quickFilter === "sin_accion" && r.nextAction && r.nextActionAt) return false;
+        // "alta"/"vencidos"/"sin_accion" reflejan los KPIs de la cabecera,
+        // que el servidor calcula solo sobre etapas abiertas — si acá no se
+        // filtra igual, con "Ver ganados/perdidos/pausados" activo el chip
+        // muestra más filas de las que decía la tarjeta.
+        if (quickFilter === "alta" && (!isOpenStage(r.stage) || r.priority !== "ALTA")) return false;
+        if (quickFilter === "sin_accion" && (!isOpenStage(r.stage) || (r.nextAction && r.nextActionAt)))
+          return false;
         if (quickFilter === "hoy" && d !== todayStr) return false;
-        if (quickFilter === "vencidos" && !(d && d < todayStr)) return false;
+        if (quickFilter === "vencidos" && !(isOpenStage(r.stage) && d && d < todayStr)) return false;
         if (quickFilter === "semana" && !(d && d >= todayStr && d <= weekAheadStr)) return false;
       }
       if (!query.trim()) return true;
@@ -886,15 +893,19 @@ function TableRow({
   onDropRow: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const locked = !editable || isPending;
 
   function save(field: string, value: string) {
     startTransition(async () => {
-      await updateOpportunityFieldAction(row.id, field, value);
+      setError(null);
+      const result = await updateOpportunityFieldAction(row.id, field, value);
+      if (result.error) setError(result.error);
     });
   }
 
   return (
+    <>
     <tr
       draggable={draggable}
       onDragStart={draggable ? onDragStart : undefined}
@@ -1073,6 +1084,14 @@ function TableRow({
         </button>
       </Td>
     </tr>
+    {error && (
+      <tr>
+        <td colSpan={16} className="border-b border-border px-3 pb-2 text-xs text-danger">
+          {error}
+        </td>
+      </tr>
+    )}
+    </>
   );
 }
 
@@ -1272,11 +1291,14 @@ function DetailPanel({
 }) {
   const [isPending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const locked = !editable || isPending;
 
   function save(field: string, value: string) {
     startTransition(async () => {
-      await updateOpportunityFieldAction(row.id, field, value);
+      setError(null);
+      const result = await updateOpportunityFieldAction(row.id, field, value);
+      if (result.error) setError(result.error);
     });
   }
 
@@ -1311,6 +1333,12 @@ function DetailPanel({
           {!editable && (
             <p className="rounded-md border border-border bg-surface-2/60 px-3 py-2 text-xs text-ink-faint">
               Este cliente está asignado a otro vendedor — puedes verlo, pero no editarlo.
+            </p>
+          )}
+
+          {error && (
+            <p className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+              {error}
             </p>
           )}
 
@@ -1374,7 +1402,7 @@ function DetailPanel({
           {row.stage === "PERDIDO" && editable && (
             <Field label="Motivo de la pérdida">
               <EditableText
-                value=""
+                value={row.lostReason}
                 disabled={locked}
                 onSave={(v) => save("lostReason", v)}
                 placeholder="Precio, tiempos, se fue con otro proveedor…"

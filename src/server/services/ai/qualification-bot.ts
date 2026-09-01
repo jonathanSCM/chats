@@ -356,6 +356,42 @@ async function sendAndSave(conversation: ConversationForBot, text: string): Prom
   ]);
 }
 
+/**
+ * El job de bot_reply agotó sus reintentos (fallo real de la IA, no falta de
+ * presupuesto — eso se maneja aparte). Sin esto el lead se queda sin
+ * respuesta y nadie se entera salvo que alguien note manualmente que nadie
+ * contestó: se pausa el bot y se deja un aviso SYSTEM, mismo mecanismo que
+ * un escalamiento normal, para que se vea el badge "Necesita atención".
+ */
+export async function markBotReplyFailed(rawPayload: unknown): Promise<void> {
+  const parsed = z.object({ conversationId: z.string() }).safeParse(rawPayload);
+  if (!parsed.success) return;
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: parsed.data.conversationId },
+    select: {
+      id: true,
+      botPaused: true,
+      assignedToId: true,
+      customerName: true,
+      customerPhone: true,
+      bot: { select: { organizationId: true } },
+    },
+  });
+  if (!conversation || conversation.botPaused) return;
+
+  await escalate(
+    {
+      id: conversation.id,
+      organizationId: conversation.bot.organizationId,
+      assignedToId: conversation.assignedToId,
+      customerName: conversation.customerName,
+      customerPhone: conversation.customerPhone,
+    } as ConversationForBot,
+    "la IA no pudo responder después de varios intentos",
+  );
+}
+
 async function escalate(conversation: ConversationForBot, motivo: string): Promise<void> {
   await prisma.$transaction([
     prisma.conversation.update({

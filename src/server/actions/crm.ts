@@ -149,7 +149,7 @@ export async function updateOpportunityFieldAction(
   const { organizationId, userId, isAdmin } = await requireOrg();
 
   const parsed = fieldSchema.safeParse({ field, value });
-  if (!parsed.success) return { error: "Valor inválido" };
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Valor inválido" };
 
   const opportunity = await prisma.opportunity.findUnique({ where: { id: opportunityId } });
   if (!opportunity || opportunity.organizationId !== organizationId) {

@@ -92,6 +92,7 @@ export default async function SeguimientoPage({
     aiMissingInfo: o.aiMissingInfo ?? "",
     aiNextQuestion: o.aiNextQuestion ?? "",
     aiAlerts: o.aiAlerts ?? "",
+    lostReason: o.lostReason ?? "",
     archived: o.archivedAt !== null,
     sortOrder: o.sortOrder,
     meetings: o.meetings.map((m) => ({

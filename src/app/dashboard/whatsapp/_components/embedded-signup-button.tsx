@@ -120,14 +120,18 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
-      // TEMPORAL: log crudo de absolutamente todo mensaje que llega a la
-      // página, sin filtrar por origen ni por forma — para ver si hay algo
-      // que ni siquiera pasa el chequeo de origen `endsWith("facebook.com")`.
-      console.log("[raw-facebook-message]", {
-        origin: event.origin,
-        dataType: typeof event.data,
-        data: event.data,
-      });
+      // TEMPORAL (solo en desarrollo): log crudo de absolutamente todo
+      // mensaje que llega a la página, sin filtrar por origen ni por forma
+      // — para ver si hay algo que ni siquiera pasa el chequeo de origen
+      // `endsWith("facebook.com")`. Nunca en producción: expondría en
+      // pantalla el JSON crudo de la sesión de Embedded Signup.
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[raw-facebook-message]", {
+          origin: event.origin,
+          dataType: typeof event.data,
+          data: event.data,
+        });
+      }
 
       // Antes se descartaba en silencio cualquier mensaje que no viniera de
       // un origen terminado en "facebook.com" Y que no fuera JSON parseable
@@ -148,10 +152,12 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
         }
       }
 
-      console.log("[embedded-signup] mensaje recibido de", event.origin, ":", data);
-      setDebugEvents((prev) =>
-        [...prev, `origin=${event.origin} :: ${JSON.stringify(data).slice(0, 300)}`].slice(-10),
-      );
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[embedded-signup] mensaje recibido de", event.origin, ":", data);
+        setDebugEvents((prev) =>
+          [...prev, `origin=${event.origin} :: ${JSON.stringify(data).slice(0, 300)}`].slice(-10),
+        );
+      }
 
       if (
         data != null &&

@@ -2,6 +2,7 @@ import { claimJobs, completeJob, failJob, requeueStaleJobs } from "./queue";
 import { handleDownloadMedia, markMediaFailed } from "./handlers/download-media";
 import { handleAnalyzeFollowUp } from "./handlers/analyze-follow-up";
 import { handleBotReply } from "./handlers/bot-reply";
+import { markBotReplyFailed } from "@/server/services/ai/qualification-bot";
 
 export { enqueue, enqueueOrReschedule } from "./queue";
 
@@ -18,6 +19,7 @@ const handlers: Record<string, JobHandler> = {
 
 const onExhausted: Record<string, JobExhaustedHandler> = {
   download_media: markMediaFailed,
+  bot_reply: markBotReplyFailed,
 };
 
 const BATCH_SIZE = 10;

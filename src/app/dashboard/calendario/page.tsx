@@ -12,6 +12,16 @@ function startOfWeekMonday(d: Date): Date {
   return out;
 }
 
+// "YYYY-MM-DD" en horario LOCAL — a propósito, no .toISOString() (que es
+// UTC): si el navegador está en un huso distinto al del servidor,
+// serializar como timestamp UTC y releer con getters locales del otro
+// lado corre el día entero para atrás o para adelante. Un string de
+// fecha sin hora no tiene ese problema — ambos lados lo interpretan
+// igual sin importar el huso de cada uno.
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default async function CalendarioPage({
   searchParams,
 }: {
@@ -89,10 +99,10 @@ export default async function CalendarioPage({
 
       <CalendarMonth
         rows={rows}
-        gridStart={gridStart.toISOString()}
-        gridEndInclusive={gridEndInclusive.toISOString()}
-        monthStart={monthStart.toISOString()}
-        monthEnd={monthEnd.toISOString()}
+        gridStart={ymd(gridStart)}
+        gridEndInclusive={ymd(gridEndInclusive)}
+        monthStart={ymd(monthStart)}
+        monthEnd={ymd(monthEnd)}
         monthLabel={monthLabel}
         prevHref={`/dashboard/calendario?mes=${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`}
         nextHref={`/dashboard/calendario?mes=${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, "0")}`}

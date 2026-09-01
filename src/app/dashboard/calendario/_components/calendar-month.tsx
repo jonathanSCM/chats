@@ -9,8 +9,19 @@ import { CalendarList, type MeetingRow } from "./calendar-list";
 
 const WEEKDAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
+// Siempre en horario LOCAL — nunca .toISOString() acá. Mezclar UTC con
+// getters locales (getDate/getMonth) es justo lo que hacía que "hoy"
+// resaltara el día equivocado cuando el navegador está en un huso
+// distinto al servidor.
 function dateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// "YYYY-MM-DD" a Date sin ambigüedad de huso: new Date("2026-09-01") a
+// secas lo interpreta como UTC (spec de ECMAScript) — agregar la hora
+// fuerza a que el motor lo lea en horario local, coherente con dateKey.
+function parseYmd(s: string): Date {
+  return new Date(`${s}T00:00:00`);
 }
 
 function timeLabel(iso: string): string {
@@ -52,15 +63,15 @@ export function CalendarMonth({
 
   const byDay = new Map<string, MeetingRow[]>();
   for (const r of rows) {
-    const key = r.scheduledAt.slice(0, 10);
+    const key = dateKey(new Date(r.scheduledAt));
     const list = byDay.get(key) ?? [];
     list.push(r);
     byDay.set(key, list);
   }
 
   const days: Date[] = [];
-  const cursor = new Date(gridStart);
-  const end = new Date(gridEndInclusive);
+  const cursor = parseYmd(gridStart);
+  const end = parseYmd(gridEndInclusive);
   while (cursor <= end) {
     days.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + 1);
@@ -69,7 +80,7 @@ export function CalendarMonth({
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
 
   const todayKey = dateKey(new Date());
-  const currentMonth = new Date(monthStart).getMonth();
+  const currentMonth = parseYmd(monthStart).getMonth();
   const detailRows = dayDetail ? (byDay.get(dayDetail) ?? []) : [];
 
   return (
@@ -214,7 +225,7 @@ export function CalendarMonth({
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-1.5 font-display text-base font-semibold">
                 <CalendarDays size={15} />
-                {new Date(dayDetail).toLocaleDateString("es", {
+                {parseYmd(dayDetail).toLocaleDateString("es", {
                   weekday: "long",
                   day: "2-digit",
                   month: "long",

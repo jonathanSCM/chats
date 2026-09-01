@@ -48,11 +48,19 @@ function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 }
 
+// Día calendario LOCAL de la reunión — no .slice(0,10) del ISO crudo
+// (eso da el día en UTC, que puede quedar corrido si el navegador está
+// en otro huso horario que el servidor).
+function localDayKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function CalendarList({ rows }: { rows: MeetingRow[] }) {
   // Agrupa por día para que se lea como una agenda, no como una tabla plana.
   const groups = new Map<string, MeetingRow[]>();
   for (const r of rows) {
-    const key = r.scheduledAt.slice(0, 10);
+    const key = localDayKey(r.scheduledAt);
     const list = groups.get(key) ?? [];
     list.push(r);
     groups.set(key, list);

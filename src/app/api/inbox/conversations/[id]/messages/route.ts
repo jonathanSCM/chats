@@ -92,6 +92,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       outsideWindow,
       status: conversation.status,
       blocked: conversation.blocked,
+      botPaused: conversation.botPaused,
+      aiQualificationEnabled: conversation.bot.aiQualificationEnabled,
       adReferral: conversation.adReferral,
       freeEntryPointUntil: conversation.freeEntryPointUntil,
       assignedTo: conversation.assignedTo

@@ -21,6 +21,7 @@ import {
   ArchiveRestore,
   Ban,
   ShieldCheck,
+  Bot as BotIcon,
 } from "lucide-react";
 import { sendInboxMessageAction, sendInboxAttachmentAction } from "@/server/actions/inbox";
 import {
@@ -55,6 +56,8 @@ interface ConversationSummary {
   blocked: boolean;
   bot: BotAccount;
   assignedTo: Vendor | null;
+  botActive: boolean;
+  needsAttention: boolean;
   unreadCount: number;
   lastMessage: {
     content: string;
@@ -347,6 +350,8 @@ export function InboxClient({
   const [conversationStatus, setConversationStatus] = useState<"OPEN" | "ON_HOLD" | "CLOSED">("OPEN");
   const [conversationBlocked, setConversationBlocked] = useState(false);
   const [conversationFromAd, setConversationFromAd] = useState(false);
+  const [conversationBotPaused, setConversationBotPaused] = useState(false);
+  const [conversationAiEnabled, setConversationAiEnabled] = useState(false);
   const [conversationBotId, setConversationBotId] = useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -508,6 +513,8 @@ export function InboxClient({
     setConversationStatus(data.conversation.status ?? "OPEN");
     setConversationBlocked(Boolean(data.conversation.blocked));
     setConversationFromAd(Boolean(data.conversation.adReferral));
+    setConversationBotPaused(Boolean(data.conversation.botPaused));
+    setConversationAiEnabled(Boolean(data.conversation.aiQualificationEnabled));
   }, []);
 
   const loadOlderMessages = useCallback(async () => {
@@ -880,6 +887,8 @@ export function InboxClient({
               {c.lastMessage && (
                 <span className="block truncate text-xs text-ink-muted">
                   {c.lastMessage.role === "STAFF" ? "Tú: " : ""}
+                  {c.lastMessage.role === "BOT" ? "Bot: " : ""}
+                  {c.lastMessage.role === "SYSTEM" ? "⚠ " : ""}
                   {c.lastMessage.mediaType
                     ? mediaPreviewLabel[c.lastMessage.mediaType]
                     : c.lastMessage.content}
@@ -906,6 +915,16 @@ export function InboxClient({
                     <span className="text-ink-faint">·</span>
                     <span className="truncate text-ink-faint">{c.bot.name}</span>
                   </>
+                )}
+                {c.needsAttention && (
+                  <span className="ml-auto flex shrink-0 items-center gap-0.5 rounded-full bg-danger-dim px-1.5 py-0.5 font-medium text-danger">
+                    <AlertTriangle size={10} /> Necesita atención
+                  </span>
+                )}
+                {!c.needsAttention && c.botActive && (
+                  <span className="ml-auto flex shrink-0 items-center gap-0.5 rounded-full bg-accent/10 px-1.5 py-0.5 font-medium text-accent">
+                    <BotIcon size={10} /> Bot
+                  </span>
                 )}
               </span>
             </div>
@@ -958,6 +977,16 @@ export function InboxClient({
                   <p className="truncate font-mono text-xs text-ink-faint">{customerPhone}</p>
                 )}
               </div>
+              {conversationAiEnabled && conversationBotPaused && messages.at(-1)?.role === "SYSTEM" && (
+                <span className="flex shrink-0 items-center gap-1 rounded-full bg-danger-dim px-2.5 py-1 text-xs font-medium text-danger">
+                  <AlertTriangle size={12} /> Necesita atención
+                </span>
+              )}
+              {conversationAiEnabled && !conversationBotPaused && (
+                <span className="flex shrink-0 items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
+                  <BotIcon size={12} /> Bot activo
+                </span>
+              )}
               {assignedTo && (
                 <span
                   className="max-w-[7rem] shrink-0 truncate rounded-full px-2.5 py-1 text-xs font-medium text-white"
@@ -1029,6 +1058,31 @@ export function InboxClient({
                 const prev = messages[i - 1];
                 const showDateDivider =
                   !prev || !isSameDay(new Date(prev.createdAt), new Date(m.createdAt));
+
+                // Los avisos del sistema (ej. "Bot escaló a un humano") no
+                // son de nadie en particular — no tienen sentido como
+                // burbuja de chat de un lado o del otro, van centrados como
+                // un aviso, igual que el separador de fecha.
+                if (m.role === "SYSTEM") {
+                  return (
+                    <div key={m.id}>
+                      {showDateDivider && (
+                        <div className="my-3 flex justify-center">
+                          <span className="rounded-full bg-surface px-3 py-1 text-[11px] font-medium text-ink-muted shadow-sm">
+                            {dayLabel(m.createdAt)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="my-1.5 flex justify-center">
+                        <span className="flex max-w-[85%] items-center gap-1.5 rounded-full bg-danger-dim px-3 py-1.5 text-center text-[11px] font-medium text-danger shadow-sm">
+                          <AlertTriangle size={12} className="shrink-0" />
+                          {m.content}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={m.id}>
                     {showDateDivider && (
@@ -1055,9 +1109,11 @@ export function InboxClient({
                     )}
                     <div
                       className={`max-w-[85%] rounded-lg px-3 py-2 text-sm shadow-sm md:max-w-[70%] ${
-                        mine
-                          ? "bg-[var(--wa-bubble-out)] text-ink"
-                          : "bg-surface text-ink"
+                        m.role === "BOT"
+                          ? "bg-accent/15 text-ink"
+                          : mine
+                            ? "bg-[var(--wa-bubble-out)] text-ink"
+                            : "bg-surface text-ink"
                       }`}
                     >
                       <MessageMedia message={m} />
@@ -1073,6 +1129,7 @@ export function InboxClient({
                             <span>·</span>
                           </>
                         )}
+                        {m.role === "BOT" && <BotIcon size={11} />}
                         <span>
                           {m.sentBy
                             ? m.sentBy.id === currentUserId

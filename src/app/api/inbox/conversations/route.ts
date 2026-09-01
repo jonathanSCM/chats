@@ -51,7 +51,7 @@ export async function GET(request: Request) {
       messages: { orderBy: { createdAt: "desc" }, take: 1 },
       assignedTo: { select: { id: true, name: true, email: true, color: true } },
       reads: { where: { userId }, select: { lastReadAt: true } },
-      bot: { select: { id: true, name: true } },
+      bot: { select: { id: true, name: true, aiQualificationEnabled: true } },
     },
   });
 
@@ -65,6 +65,13 @@ export async function GET(request: Request) {
         status: c.status,
         blocked: c.blocked,
         bot: { id: c.bot.id, name: c.bot.name },
+        // Para mostrar en la lista si el bot está contestando esta
+        // conversación o si escaló y todavía nadie del equipo respondió
+        // (el mensaje más reciente sigue siendo el aviso SYSTEM de
+        // escalamiento — en cuanto alguien manda un mensaje, deja de serlo).
+        botActive: c.bot.aiQualificationEnabled && !c.botPaused,
+        needsAttention:
+          c.bot.aiQualificationEnabled && c.botPaused && c.messages[0]?.role === "SYSTEM",
         assignedTo: c.assignedTo
           ? {
               id: c.assignedTo.id,

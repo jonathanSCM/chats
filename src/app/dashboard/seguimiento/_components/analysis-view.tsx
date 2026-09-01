@@ -35,6 +35,8 @@ interface AnalyticsData {
   ganadoTotal: number;
   ticketPromedio: number;
   forecastPorMes: { mes: string; valor: number }[];
+  valuePerStage: { stage: Stage; valor: number }[];
+  avgDaysPerStage: { stage: Stage; avgDays: number | null; sampleSize: number }[];
   funnel: FunnelEntry[];
   historyStartsAt: string | null;
   vendorComparison: VendorRow[] | null;
@@ -89,6 +91,8 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
 
   const maxForecastMes = Math.max(1, ...data.forecastPorMes.map((m) => m.valor));
   const firstFunnelCount = data.funnel[0]?.count ?? 0;
+  const maxValuePerStage = Math.max(1, ...data.valuePerStage.map((s) => s.valor));
+  const maxAvgDays = Math.max(1, ...data.avgDaysPerStage.map((s) => s.avgDays ?? 0));
 
   return (
     <div className="space-y-6">
@@ -130,6 +134,62 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
             ))}
           </div>
         )}
+      </Card>
+
+      <Card>
+        <CardTitle className="mb-3 text-sm">Monto total por etapa</CardTitle>
+        <div className="space-y-2">
+          {data.valuePerStage.map((s) => (
+            <div key={s.stage} className="flex items-center gap-2 text-xs">
+              <span className="w-36 shrink-0 truncate text-ink-muted">{STAGE_LABEL[s.stage]}</span>
+              <div className="h-4 flex-1 overflow-hidden rounded bg-surface-2">
+                <div
+                  className="h-full rounded"
+                  style={{
+                    width: `${s.valor > 0 ? Math.max(4, (s.valor / maxValuePerStage) * 100) : 0}%`,
+                    backgroundColor: STAGE_COLOR[s.stage],
+                  }}
+                />
+              </div>
+              <span className="w-20 shrink-0 text-right font-mono text-ink-muted">
+                {money.format(s.valor)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle className="mb-1 text-sm">Días promedio por etapa</CardTitle>
+        <p className="mb-3 text-[11px] text-ink-faint">
+          Solo cuenta tramos completos (con salida a otra etapa) — auditados desde la Fase 1, así que
+          el histórico todavía es corto.
+        </p>
+        <div className="space-y-2">
+          {data.avgDaysPerStage.map((s) => (
+            <div key={s.stage} className="flex items-center gap-2 text-xs">
+              <span className="w-36 shrink-0 truncate text-ink-muted">{STAGE_LABEL[s.stage]}</span>
+              {s.avgDays === null ? (
+                <span className="text-ink-faint">Sin datos suficientes todavía</span>
+              ) : (
+                <>
+                  <div className="h-4 flex-1 overflow-hidden rounded bg-surface-2">
+                    <div
+                      className="h-full rounded"
+                      style={{
+                        width: `${Math.max(4, (s.avgDays / maxAvgDays) * 100)}%`,
+                        backgroundColor: STAGE_COLOR[s.stage],
+                      }}
+                    />
+                  </div>
+                  <span className="w-24 shrink-0 text-right font-mono text-ink-muted">
+                    {s.avgDays.toFixed(1)} días ({s.sampleSize})
+                  </span>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
       </Card>
 
       <Card>

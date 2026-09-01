@@ -54,6 +54,46 @@ export function isOpenStage(stage: Stage): boolean {
   return OPEN_STAGES.includes(stage);
 }
 
+/**
+ * Regla dura del scope: toda oportunidad activa debe tener próxima
+ * acción, fecha Y responsable — las tres, no solo las primeras dos. Si
+ * falta cualquiera, se muestra "⚠️ Sin próxima acción" en toda la app —
+ * un único lugar para no repetir la condición.
+ */
+export function hasCompleteNextAction(row: {
+  nextAction: string;
+  nextActionAt: string | null;
+  assignedTo: unknown;
+}): boolean {
+  return Boolean(row.nextAction && row.nextActionAt && row.assignedTo);
+}
+
+/**
+ * Scope §15: al pasar a Propuesta, avisar (no bloquear) si falta
+ * información mínima para que la propuesta tenga sentido. Solo aplica
+ * al entrar a PROPUESTA — el resto de las etapas no piden nada extra
+ * todavía (el PDF solo da este ejemplo puntual).
+ */
+export function missingForStage(
+  stage: Stage,
+  row: {
+    need: string;
+    aiRecommendation: string;
+    authorityLevel: string;
+    nextAction: string;
+    nextActionAt: string | null;
+    assignedTo: unknown;
+  },
+): string[] {
+  if (stage !== "PROPUESTA") return [];
+  const missing: string[] = [];
+  if (!row.need.trim()) missing.push("necesidad identificada");
+  if (!row.aiRecommendation.trim()) missing.push("solución definida");
+  if (!row.authorityLevel.trim()) missing.push("decisor identificado o aclarado");
+  if (!hasCompleteNextAction(row)) missing.push("próxima acción");
+  return missing;
+}
+
 /** Qué significa cada etapa y cuándo corresponde usarla — tooltip por etapa. */
 export const STAGE_CRITERIA: Record<Stage, string> = {
   POR_CALIFICAR: "Lead recién llegado; filtro inicial por WhatsApp o llamada.",

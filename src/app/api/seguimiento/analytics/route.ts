@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
-import { OPEN_STAGES, isOpenStage, type Stage } from "@/lib/pipeline";
+import { ALL_STAGES, OPEN_STAGES, isOpenStage, type Stage } from "@/lib/pipeline";
 
 /**
  * Analítica agregada de toda la cartera de la organización: valor del
@@ -72,6 +72,44 @@ export async function GET() {
     }
   }
   const ticketPromedio = ganadoCount > 0 ? ganadoTotal / ganadoCount : 0;
+
+  // ── Monto total por etapa (todas, no solo abiertas — para ver dónde
+  // se concentra la plata, incluyendo lo ya ganado/perdido) ───────────
+  const valuePerStage = new Map<Stage, number>(ALL_STAGES.map((s) => [s, 0]));
+  for (const o of opportunities) {
+    const stage = o.stage as Stage;
+    valuePerStage.set(stage, (valuePerStage.get(stage) ?? 0) + (o.estimatedValue ? Number(o.estimatedValue) : 0));
+  }
+
+  // ── Días promedio por etapa ──────────────────────────────────────────
+  // Cada tramo entre dos stage_change consecutivos de una misma
+  // oportunidad se le atribuye a la etapa en la que quedó tras el primer
+  // cambio (after.stage). Solo cuenta tramos completos (con salida), no
+  // el tiempo que lleva ahí mismo la etapa actual — eso sesgaría el
+  // promedio hacia las etapas con más oportunidades todavía en curso.
+  const eventsByOpportunity = new Map<string, typeof stageEvents>();
+  for (const ev of stageEvents) {
+    const arr = eventsByOpportunity.get(ev.entityId) ?? [];
+    arr.push(ev);
+    eventsByOpportunity.set(ev.entityId, arr);
+  }
+  const durationsByStage = new Map<Stage, number[]>(ALL_STAGES.map((s) => [s, []]));
+  for (const events of eventsByOpportunity.values()) {
+    for (let i = 0; i < events.length - 1; i++) {
+      const stage = (events[i].after as { stage?: string } | null)?.stage as Stage | undefined;
+      if (!stage) continue;
+      const days = (events[i + 1].createdAt.getTime() - events[i].createdAt.getTime()) / 86_400_000;
+      durationsByStage.get(stage)?.push(days);
+    }
+  }
+  const avgDaysPerStage = ALL_STAGES.map((stage) => {
+    const samples = durationsByStage.get(stage) ?? [];
+    return {
+      stage,
+      avgDays: samples.length > 0 ? samples.reduce((a, b) => a + b, 0) / samples.length : null,
+      sampleSize: samples.length,
+    };
+  });
 
   // ── Embudo de conversión ────────────────────────────────────────────
   // Para cada etapa: cuántas oportunidades llegaron a ella alguna vez —
@@ -155,6 +193,8 @@ export async function GET() {
     forecastPorMes: [...forecastPorMes.entries()]
       .map(([mes, valor]) => ({ mes, valor }))
       .sort((a, b) => a.mes.localeCompare(b.mes)),
+    valuePerStage: ALL_STAGES.map((stage) => ({ stage, valor: valuePerStage.get(stage) ?? 0 })),
+    avgDaysPerStage,
     funnel,
     historyStartsAt,
     vendorComparison,

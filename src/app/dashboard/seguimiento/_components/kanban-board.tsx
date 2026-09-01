@@ -3,9 +3,18 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Sparkles, AlertTriangle, Bell } from "lucide-react";
 import { updateOpportunityFieldAction } from "@/server/actions/crm";
-import { ALL_STAGES, STAGE_LABEL, STAGE_COLOR, PRIORITY_COLOR, type Stage } from "@/lib/pipeline";
+import {
+  ALL_STAGES,
+  STAGE_LABEL,
+  STAGE_COLOR,
+  STAGE_CRITERIA,
+  PRIORITY_COLOR,
+  hasCompleteNextAction,
+  missingForStage,
+  type Stage,
+} from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
-import { deriveAlerts } from "@/lib/opportunity-alerts";
+import { deriveAlerts, urgencyRank } from "@/lib/opportunity-alerts";
 import type { Row } from "./tracking-table";
 
 function dateShort(iso: string | null): string {
@@ -114,6 +123,14 @@ export function KanbanBoard({
     const row = rows.find((r) => r.id === id);
     if (!row || !canEdit(row) || stageOf(row) === stage) return;
 
+    const missing = missingForStage(stage, row);
+    if (
+      missing.length > 0 &&
+      !window.confirm(`Todavía falta ${missing.join(", ")}. ¿Deseas avanzar igualmente?`)
+    ) {
+      return;
+    }
+
     const previousStage = stageOf(row);
     setLocalStage((prev) => ({ ...prev, [id]: stage }));
     setError(null);
@@ -132,7 +149,17 @@ export function KanbanBoard({
     <div ref={boardScrollRef} onScroll={handleBoardScroll} className="-mx-4 overflow-x-auto pb-2 md:-mx-8">
       <div className="flex min-w-max gap-3 px-4 md:px-8">
         {ALL_STAGES.map((stage) => {
-          const cards = rows.filter((r) => stageOf(r) === stage);
+          // Los vencidos suben solos arriba dentro de cada etapa (scope §9).
+          const cards = rows
+            .filter((r) => stageOf(r) === stage)
+            .sort((a, b) => {
+              const ra = urgencyRank(a, todayStr);
+              const rb = urgencyRank(b, todayStr);
+              for (let i = 0; i < ra.length; i++) {
+                if (ra[i] !== rb[i]) return ra[i] - rb[i];
+              }
+              return 0;
+            });
           return (
             <div
               key={stage}
@@ -154,7 +181,10 @@ export function KanbanBoard({
                   className="h-2 w-2 shrink-0 rounded-full"
                   style={{ backgroundColor: STAGE_COLOR[stage] }}
                 />
-                <p className="flex-1 truncate font-mono text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                <p
+                  className="flex-1 truncate font-mono text-[11px] font-semibold uppercase tracking-wide text-ink-muted"
+                  title={STAGE_CRITERIA[stage]}
+                >
                   {STAGE_LABEL[stage]}
                 </p>
                 <span className="font-mono text-[11px] text-ink-faint">{cards.length}</span>
@@ -220,7 +250,7 @@ export function KanbanBoard({
                         )}
                       </div>
 
-                      {row.nextAction && row.nextActionAt ? (
+                      {hasCompleteNextAction(row) ? (
                         <p className="mt-1.5 flex items-center gap-1 truncate text-[10px] text-ink-muted">
                           📅 {row.nextAction}
                           {(() => {
@@ -236,7 +266,8 @@ export function KanbanBoard({
                         </p>
                       ) : (
                         <p className="mt-1.5 flex items-center gap-1 text-[10px] text-warning">
-                          <AlertTriangle size={9} /> Sin próxima acción
+                          <AlertTriangle size={9} />{" "}
+                          {row.nextAction && row.nextActionAt ? "Sin responsable asignado" : "Sin próxima acción"}
                         </p>
                       )}
 

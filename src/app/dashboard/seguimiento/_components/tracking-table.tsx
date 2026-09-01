@@ -47,16 +47,19 @@ import {
   ALL_STAGES,
   STAGE_LABEL,
   STAGE_COLOR,
+  STAGE_CRITERIA,
   PRIORITY_COLOR,
   SERVICES,
   isOpenStage,
+  hasCompleteNextAction,
+  missingForStage,
   type Stage,
   type Priority,
 } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 import { KanbanBoard } from "./kanban-board";
 import { AnalysisView } from "./analysis-view";
-import { deriveAlerts, type DerivedAlert } from "@/lib/opportunity-alerts";
+import { deriveAlerts, urgencyRank, type DerivedAlert } from "@/lib/opportunity-alerts";
 
 export interface MeetingAttachmentInfo {
   id: string;
@@ -72,6 +75,7 @@ export interface Row {
   client: string;
   phone: string;
   city: string;
+  leadSource: string;
   service: string;
   need: string;
   stage: Stage;
@@ -94,6 +98,7 @@ export interface Row {
   aiMissingInfo: string;
   aiNextQuestion: string;
   aiAlerts: string;
+  authorityLevel: string;
   meetings: {
     id: string;
     scheduledAt: string;
@@ -224,6 +229,11 @@ function dateInputValue(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
 }
 
+const LEAD_SOURCE_LABEL: Record<string, string> = {
+  whatsapp: "WhatsApp",
+  Manual: "Manual",
+};
+
 const money = new Intl.NumberFormat("es", {
   style: "currency",
   currency: "USD",
@@ -287,17 +297,25 @@ export function TrackingTable({
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<Stage | "">("");
   const [priorityFilter, setPriorityFilter] = useState<Priority | "">("");
-  // Filtra por "Próximo contacto" — es el campo de fecha que de verdad usa
-  // el equipo para planear el día, más que la fecha de registro.
+  // Filtra por "Fecha de próxima acción" (nextActionAt) — pedido explícito
+  // del scope: es el campo que de verdad usa el equipo para planear el
+  // día, más que la fecha de registro.
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [serviceFilter, setServiceFilter] = useState("");
-  // Chips rápidos sobre la fecha de PRÓXIMA ACCIÓN (nextActionAt) — distinto
-  // del rango de "próximo contacto" de arriba, que es el campo viejo.
+  const [sourceFilter, setSourceFilter] = useState("");
+  // Chips rápidos sobre la fecha de próxima acción — mismo campo
+  // (nextActionAt) que el rango de arriba, solo que como atajos de un
+  // clic para los rangos más comunes.
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  // "Ordenar por: Más urgente" (scope §8): orden compuesto fijo, no una
+  // columna — vencidas primero, después hoy, después alta prioridad,
+  // después mayor calidad, y por último la fecha más cercana. Pisa el
+  // orden por columna mientras está activo.
+  const [urgentSort, setUrgentSort] = useState(false);
 
   // Orden manual (arrastrar y soltar): copia local para poder mover filas
   // al instante, sin esperar la vuelta del servidor. Se resincroniza cuando
@@ -314,6 +332,7 @@ export function TrackingTable({
   const closeDetail = useCallback(() => setDetail(null), []);
 
   function toggleSort(field: SortField) {
+    setUrgentSort(false);
     if (sortField === field) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
@@ -324,6 +343,7 @@ export function TrackingTable({
 
   function clearSort() {
     setSortField(null);
+    setUrgentSort(false);
   }
 
   function handleTableScroll() {
@@ -369,8 +389,9 @@ export function TrackingTable({
     Boolean(dateTo) ||
     Boolean(assigneeFilter) ||
     Boolean(serviceFilter) ||
+    Boolean(sourceFilter) ||
     Boolean(quickFilter);
-  const canDrag = !sortField && !query.trim() && !hasActiveFilter && !viewingArchived;
+  const canDrag = !sortField && !urgentSort && !query.trim() && !hasActiveFilter && !viewingArchived;
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
@@ -383,6 +404,10 @@ export function TrackingTable({
     () => new Map(rows.map((r) => [r.id, deriveAlerts(r, todayStr)])),
     [rows, todayStr],
   );
+  const leadSources = useMemo(
+    () => [...new Set(rows.map((r) => r.leadSource).filter(Boolean))].sort(),
+    [rows],
+  );
 
   const filtered = orderedRows
     .filter((r) => {
@@ -390,9 +415,14 @@ export function TrackingTable({
       if (priorityFilter && r.priority !== priorityFilter) return false;
       if (assigneeFilter && r.assignedTo?.id !== assigneeFilter) return false;
       if (serviceFilter && r.service !== serviceFilter) return false;
+      if (sourceFilter && r.leadSource !== sourceFilter) return false;
       if (dateFrom || dateTo) {
-        if (!r.nextContactAt) return false;
-        const d = r.nextContactAt.slice(0, 10);
+        // Filtra por "Fecha de próxima acción" (nextActionAt) — el scope
+        // pide explícitamente que este rango se entienda como eso, no
+        // como "Próximo contacto" (nextContactAt, columna aparte que
+        // sugiere la IA y queda intacta).
+        if (!r.nextActionAt) return false;
+        const d = r.nextActionAt.slice(0, 10);
         if (dateFrom && d < dateFrom) return false;
         if (dateTo && d > dateTo) return false;
       }
@@ -403,7 +433,7 @@ export function TrackingTable({
         // filtra igual, con "Ver ganados/perdidos/pausados" activo el chip
         // muestra más filas de las que decía la tarjeta.
         if (quickFilter === "alta" && (!isOpenStage(r.stage) || r.priority !== "ALTA")) return false;
-        if (quickFilter === "sin_accion" && (!isOpenStage(r.stage) || (r.nextAction && r.nextActionAt)))
+        if (quickFilter === "sin_accion" && (!isOpenStage(r.stage) || hasCompleteNextAction(r)))
           return false;
         if (quickFilter === "hoy" && d !== todayStr) return false;
         if (quickFilter === "vencidos" && !(isOpenStage(r.stage) && d && d < todayStr)) return false;
@@ -421,6 +451,14 @@ export function TrackingTable({
       );
     })
     .sort((a, b) => {
+      if (urgentSort) {
+        const ra = urgencyRank(a, todayStr);
+        const rb = urgencyRank(b, todayStr);
+        for (let i = 0; i < ra.length; i++) {
+          if (ra[i] !== rb[i]) return ra[i] - rb[i];
+        }
+        return 0;
+      }
       if (!sortField) return 0;
       const va = sortValue(a, sortField);
       const vb = sortValue(b, sortField);
@@ -499,7 +537,7 @@ export function TrackingTable({
         >
           <option value="">Todos los estados</option>
           {ALL_STAGES.map((s) => (
-            <option key={s} value={s}>
+            <option key={s} value={s} title={STAGE_CRITERIA[s]}>
               {STAGE_LABEL[s]}
             </option>
           ))}
@@ -538,12 +576,27 @@ export function TrackingTable({
             </option>
           ))}
         </Select>
+        {leadSources.length > 0 && (
+          <Select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            className="w-full py-1.5 text-sm sm:w-36"
+          >
+            <option value="">Toda fuente</option>
+            {leadSources.map((s) => (
+              <option key={s} value={s}>
+                {LEAD_SOURCE_LABEL[s] ?? s}
+              </option>
+            ))}
+          </Select>
+        )}
         <div className="flex items-center gap-1.5">
+          <span className="whitespace-nowrap text-xs text-ink-faint">Fecha de próxima acción:</span>
           <Input
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            title="Próximo contacto desde"
+            title="Fecha de próxima acción desde"
             className="w-full py-1.5 text-sm sm:w-36"
           />
           <span className="text-xs text-ink-faint">–</span>
@@ -551,9 +604,25 @@ export function TrackingTable({
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            title="Próximo contacto hasta"
+            title="Fecha de próxima acción hasta"
             className="w-full py-1.5 text-sm sm:w-36"
           />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="whitespace-nowrap text-xs text-ink-faint">Ordenar por:</span>
+          <Select
+            value={urgentSort ? "urgente" : "manual"}
+            onChange={(e) => {
+              const urgente = e.target.value === "urgente";
+              setUrgentSort(urgente);
+              if (urgente) setSortField(null);
+            }}
+            title="Vencidas primero, luego hoy, alta prioridad, mayor calidad y fecha más cercana"
+            className="w-full py-1.5 text-sm sm:w-36"
+          >
+            <option value="manual">Manual</option>
+            <option value="urgente">Más urgente</option>
+          </Select>
         </div>
         {hasActiveFilter && (
           <button
@@ -565,6 +634,7 @@ export function TrackingTable({
               setDateTo("");
               setAssigneeFilter("");
               setServiceFilter("");
+              setSourceFilter("");
               setQuickFilter(null);
             }}
             className="cursor-pointer whitespace-nowrap text-xs text-ink-faint hover:text-accent"
@@ -572,13 +642,13 @@ export function TrackingTable({
             Quitar filtros
           </button>
         )}
-        {sortField && (
+        {(sortField || urgentSort) && (
           <button
             type="button"
             onClick={clearSort}
             className="cursor-pointer whitespace-nowrap text-xs text-ink-faint hover:text-accent"
           >
-            Quitar orden por columna
+            Quitar orden {urgentSort ? "por urgencia" : "por columna"}
           </button>
         )}
         {/* Dos toggles independientes y de naturaleza distinta: "archivados"
@@ -770,9 +840,10 @@ export function TrackingTable({
                 <p>Ningún cliente coincide con el filtro.</p>
                 {(dateFrom || dateTo) && quickFilter && (
                   <p className="mt-1 text-xs">
-                    Tenés dos filtros de fecha activos a la vez: &quot;Próximo contacto&quot; (arriba) y
-                    &quot;{quickFilterChips.find((c) => c.key === quickFilter)?.label}&quot; (chip
-                    rápido) — son campos distintos y se combinan entre sí.
+                    El rango de fechas de arriba y el chip &quot;
+                    {quickFilterChips.find((c) => c.key === quickFilter)?.label}&quot; filtran los dos
+                    por fecha de próxima acción y se combinan entre sí — puede que se estén
+                    contradiciendo.
                   </p>
                 )}
               </div>
@@ -897,7 +968,7 @@ function NextActionCell({
   onSave: (field: string, value: string) => void;
 }) {
   const badge = dueBadge(row.nextActionAt);
-  const missing = !row.nextAction || !row.nextActionAt;
+  const missing = !hasCompleteNextAction(row);
   // Este campo se autoguarda en el blur sin ningún otro indicador visible
   // — a diferencia de "Necesidad"/"Última actualización" (EditableText, que
   // exige un clic explícito en "Guardar"), acá es fácil no notar que sí se
@@ -933,7 +1004,8 @@ function NextActionCell({
       </div>
       {missing ? (
         <p className="flex items-center gap-1 text-[11px] text-warning">
-          <AlertTriangle size={10} /> Sin próxima acción
+          <AlertTriangle size={10} />{" "}
+          {row.nextAction && row.nextActionAt ? "Sin responsable asignado" : "Sin próxima acción"}
         </p>
       ) : (
         badge && (
@@ -975,6 +1047,17 @@ function TableRow({
       const result = await updateOpportunityFieldAction(row.id, field, value);
       if (result.error) setError(result.error);
     });
+  }
+
+  function handleStageChange(nextStage: string) {
+    const missing = missingForStage(nextStage as Stage, row);
+    if (
+      missing.length > 0 &&
+      !window.confirm(`Todavía falta ${missing.join(", ")}. ¿Deseas avanzar igualmente?`)
+    ) {
+      return;
+    }
+    save("stage", nextStage);
   }
 
   return (
@@ -1053,12 +1136,13 @@ function TableRow({
         <Select
           value={row.stage}
           disabled={locked}
-          onChange={(e) => save("stage", e.target.value)}
+          onChange={(e) => handleStageChange(e.target.value)}
+          title={STAGE_CRITERIA[row.stage]}
           className="w-40 py-1.5 text-xs font-semibold"
           style={{ color: STAGE_COLOR[row.stage] }}
         >
           {ALL_STAGES.map((s) => (
-            <option key={s} value={s}>
+            <option key={s} value={s} title={STAGE_CRITERIA[s]}>
               {STAGE_LABEL[s]}
             </option>
           ))}
@@ -1525,9 +1609,10 @@ function DetailPanel({
                 {row.nextActionAt && ` · ${dateShort(row.nextActionAt)}`}
               </p>
             )}
-            {(!row.nextAction || !row.nextActionAt) && (
+            {!hasCompleteNextAction(row) && (
               <p className="flex items-center gap-1 text-xs text-warning">
-                <AlertTriangle size={11} /> Sin próxima acción
+                <AlertTriangle size={11} />{" "}
+                {row.nextAction && row.nextActionAt ? "Sin responsable asignado" : "Sin próxima acción"}
               </p>
             )}
           </Field>

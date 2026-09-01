@@ -1,7 +1,13 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
-import { isOpenStage, HIDDEN_BY_DEFAULT_STAGES, type Stage, type Priority } from "@/lib/pipeline";
+import {
+  isOpenStage,
+  hasCompleteNextAction,
+  HIDDEN_BY_DEFAULT_STAGES,
+  type Stage,
+  type Priority,
+} from "@/lib/pipeline";
 import { getAiSpendToday } from "@/server/actions/crm";
 import { TrackingTable } from "./_components/tracking-table";
 
@@ -35,7 +41,7 @@ export default async function SeguimientoPage({
           : { stage: { notIn: HIDDEN_BY_DEFAULT_STAGES } }),
       },
       include: {
-        contact: { select: { id: true, fullName: true, phone: true, city: true } },
+        contact: { select: { id: true, fullName: true, phone: true, city: true, source: true } },
         assignedTo: { select: { id: true, name: true, email: true, color: true } },
         meetings: {
           select: {
@@ -73,6 +79,7 @@ export default async function SeguimientoPage({
     client: o.contact.fullName ?? "",
     phone: o.contact.phone,
     city: o.contact.city ?? "",
+    leadSource: o.contact.source ?? "",
     service: o.serviceInterest ?? "",
     need: o.needSummary ?? o.title,
     stage: o.stage as Stage,
@@ -95,6 +102,7 @@ export default async function SeguimientoPage({
     aiMissingInfo: o.aiMissingInfo ?? "",
     aiNextQuestion: o.aiNextQuestion ?? "",
     aiAlerts: o.aiAlerts ?? "",
+    authorityLevel: o.authorityLevel ?? "",
     lostReason: o.lostReason ?? "",
     archived: o.archivedAt !== null,
     sortOrder: o.sortOrder,
@@ -121,7 +129,7 @@ export default async function SeguimientoPage({
   const open = rows.filter((r) => isOpenStage(r.stage));
   const todayStr = new Date().toISOString().slice(0, 10);
   const overdue = open.filter((r) => r.nextActionAt && r.nextActionAt.slice(0, 10) < todayStr);
-  const withoutNextAction = open.filter((r) => !r.nextAction || !r.nextActionAt);
+  const withoutNextAction = open.filter((r) => !hasCompleteNextAction(r));
 
   return (
     <div className="animate-fade-up">

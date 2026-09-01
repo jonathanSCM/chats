@@ -8,6 +8,8 @@ import {
   Smartphone,
   BookOpen,
   ClipboardList,
+  CalendarDays,
+  LayoutDashboard,
 } from "lucide-react";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
@@ -45,11 +47,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </Link>
 
       <nav className="flex flex-1 flex-col gap-0.5">
+        <NavLink href="/dashboard" exact>
+          <LayoutDashboard size={16} /> Dashboard
+        </NavLink>
         <NavLink href="/dashboard/inbox">
           <MessageCircle size={16} /> Chats
         </NavLink>
         <NavLink href="/dashboard/seguimiento">
           <ClipboardList size={16} /> Seguimiento
+        </NavLink>
+        <NavLink href="/dashboard/calendario">
+          <CalendarDays size={16} /> Calendario
         </NavLink>
         <NavLink href="/dashboard/whatsapp">
           <Smartphone size={16} /> Conexión WhatsApp

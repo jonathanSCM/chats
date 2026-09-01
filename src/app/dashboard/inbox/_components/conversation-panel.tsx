@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Plus,
   Bot as BotIcon,
+  History,
 } from "lucide-react";
 import {
   addConversationNoteAction,
@@ -61,6 +62,7 @@ interface PanelData {
     author: { id: string; name: string; color: string | null } | null;
   }[];
   team: { id: string; name: string }[];
+  history: { label: string; at: string; actor: string }[];
 }
 
 const STATUS_LABEL = {
@@ -451,6 +453,33 @@ export function ConversationPanel({
             {data.notes.length === 0 && (
               <p className="text-[11px] text-ink-faint">Todavía no hay notas.</p>
             )}
+          </div>
+        </div>
+
+        {/* Historial: los movimientos del lead — cuándo entró, a qué etapa
+            pasó, a quién quedó asignado. Consulta, no acción — texto chico
+            y austero, no compite visualmente con el resto del panel. */}
+        <div className="space-y-2 border-t border-border pt-4">
+          <Label>
+            <History size={11} className="mr-1 inline" /> Historial
+          </Label>
+          <div className="space-y-2.5 border-l border-border pl-3">
+            {data.history.map((h, i) => (
+              <div key={i} className="text-[11px]">
+                <p className="text-ink-muted">{h.label}</p>
+                <p className="text-ink-faint">
+                  {new Date(h.at).toLocaleDateString("es", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                  {" · "}
+                  {h.actor}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
 

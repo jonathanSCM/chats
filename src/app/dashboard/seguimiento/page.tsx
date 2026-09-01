@@ -78,6 +78,7 @@ export default async function SeguimientoPage({
     stage: o.stage as Stage,
     estimatedValue: o.estimatedValue ? Number(o.estimatedValue) : null,
     expectedCloseDate: o.expectedCloseDate?.toISOString() ?? null,
+    updatedAt: o.updatedAt.toISOString(),
     lastUpdate: o.lastUpdate ?? "",
     priority: (o.priority as Priority | null) ?? null,
     nextContactAt: o.nextContactAt?.toISOString() ?? null,

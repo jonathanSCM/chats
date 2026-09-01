@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Sparkles, AlertTriangle } from "lucide-react";
+import { Sparkles, AlertTriangle, Bell } from "lucide-react";
 import { updateOpportunityFieldAction } from "@/server/actions/crm";
 import { ALL_STAGES, STAGE_LABEL, STAGE_COLOR, PRIORITY_COLOR, type Stage } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
+import { deriveAlerts } from "@/lib/opportunity-alerts";
 import type { Row } from "./tracking-table";
 
 function dateShort(iso: string | null): string {
@@ -45,6 +46,7 @@ export function KanbanBoard({
   onOpen: (row: Row) => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  const todayStr = new Date().toISOString().slice(0, 10);
   // Copia local para mover la tarjeta al instante al soltarla, sin esperar
   // la vuelta del servidor — mismo patrón que el orden manual de la tabla.
   const [localStage, setLocalStage] = useState<Record<string, Stage>>({});
@@ -175,7 +177,22 @@ export function KanbanBoard({
                         draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                       }`}
                     >
-                      <p className="truncate font-medium text-ink">{row.client || row.phone}</p>
+                      <p className="flex items-center gap-1 truncate font-medium text-ink">
+                        <span className="truncate">{row.client || row.phone}</span>
+                        {(() => {
+                          const alert = deriveAlerts(row, todayStr);
+                          return (
+                            alert.reasons.length > 0 && (
+                              <span title={alert.reasons.join(" · ")} className="shrink-0">
+                                <Bell
+                                  size={10}
+                                  className={alert.severity === "alta" ? "text-danger" : "text-warning"}
+                                />
+                              </span>
+                            )
+                          );
+                        })()}
+                      </p>
                       {row.service && <p className="mt-0.5 truncate text-[11px] text-ink-faint">{row.service}</p>}
 
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">

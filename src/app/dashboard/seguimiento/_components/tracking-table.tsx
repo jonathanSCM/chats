@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   Eye,
   TrendingUp,
+  Bell,
 } from "lucide-react";
 import {
   createOpportunityAction,
@@ -55,6 +56,7 @@ import {
 import { vendorColor } from "@/lib/vendor-color";
 import { KanbanBoard } from "./kanban-board";
 import { AnalysisView } from "./analysis-view";
+import { deriveAlerts, type DerivedAlert } from "@/lib/opportunity-alerts";
 
 export interface MeetingAttachmentInfo {
   id: string;
@@ -75,6 +77,7 @@ export interface Row {
   stage: Stage;
   estimatedValue: number | null;
   expectedCloseDate: string | null;
+  updatedAt: string;
   lastUpdate: string;
   priority: Priority | null;
   nextContactAt: string | null;
@@ -154,7 +157,7 @@ interface Props {
   ai: { spent: number; budget: number; enabled: boolean };
 }
 
-type QuickFilter = "hoy" | "vencidos" | "semana" | "alta" | "sin_accion" | null;
+type QuickFilter = "hoy" | "vencidos" | "semana" | "alta" | "sin_accion" | "atencion" | null;
 
 /** 🔴 vencido / 🟠 hoy / 🔵 mañana / fecha corta — para que el vencimiento salte a la vista. */
 function dueBadge(iso: string | null): { text: string; color: string } | null {
@@ -373,6 +376,14 @@ export function TrackingTable({
   const todayStr = now.toISOString().slice(0, 10);
   const weekAheadStr = new Date(now.getTime() + 7 * 86_400_000).toISOString().slice(0, 10);
 
+  // Alertas derivadas sin gastar presupuesto de IA (§14 del scope): un
+  // solo lugar por oportunidad en vez de tener que mirar sueltos los
+  // indicadores de vencido/sin próxima acción/etc.
+  const alerts = useMemo(
+    () => new Map(rows.map((r) => [r.id, deriveAlerts(r, todayStr)])),
+    [rows, todayStr],
+  );
+
   const filtered = orderedRows
     .filter((r) => {
       if (stageFilter && r.stage !== stageFilter) return false;
@@ -397,6 +408,7 @@ export function TrackingTable({
         if (quickFilter === "hoy" && d !== todayStr) return false;
         if (quickFilter === "vencidos" && !(isOpenStage(r.stage) && d && d < todayStr)) return false;
         if (quickFilter === "semana" && !(d && d >= todayStr && d <= weekAheadStr)) return false;
+        if (quickFilter === "atencion" && !alerts.get(r.id)?.reasons.length) return false;
       }
       if (!query.trim()) return true;
       const q = query.toLowerCase();
@@ -422,6 +434,7 @@ export function TrackingTable({
     { key: "semana", label: "Esta semana" },
     { key: "alta", label: "Alta prioridad" },
     { key: "sin_accion", label: "Sin próxima acción" },
+    { key: "atencion", label: "⚠ Requiere atención" },
   ];
 
   return (
@@ -738,6 +751,7 @@ export function TrackingTable({
                   <TableRow
                     key={row.id}
                     row={row}
+                    alert={alerts.get(row.id) ?? { reasons: [], severity: null }}
                     aiEnabled={ai.enabled}
                     editable={canEdit(row, currentUserId, isAdmin)}
                     onOpen={() => setDetail(row)}
@@ -934,6 +948,7 @@ function NextActionCell({
 
 function TableRow({
   row,
+  alert,
   aiEnabled,
   editable,
   onOpen,
@@ -942,6 +957,7 @@ function TableRow({
   onDropRow,
 }: {
   row: Row;
+  alert: DerivedAlert;
   aiEnabled: boolean;
   editable: boolean;
   onOpen: () => void;
@@ -985,9 +1001,14 @@ function TableRow({
         <button
           type="button"
           onClick={onOpen}
-          className="truncate text-left font-medium text-ink hover:text-accent"
+          className="flex items-center gap-1 truncate text-left font-medium text-ink hover:text-accent"
         >
-          {row.client || "—"}
+          <span className="truncate">{row.client || "—"}</span>
+          {alert.reasons.length > 0 && (
+            <span title={alert.reasons.join(" · ")} className="shrink-0">
+              <Bell size={11} className={alert.severity === "alta" ? "text-danger" : "text-warning"} />
+            </span>
+          )}
         </button>
         {row.assignedTo ? (
           <span className="mt-1 flex items-center gap-1.5 text-[11px] text-ink-faint">
@@ -1393,6 +1414,7 @@ function DetailPanel({
   const [error, setError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState<"action" | "date" | null>(null);
   const locked = !editable || isPending;
+  const alert = deriveAlerts(row, new Date().toISOString().slice(0, 10));
 
   function save(field: string, value: string) {
     startTransition(async () => {
@@ -1509,6 +1531,23 @@ function DetailPanel({
               </p>
             )}
           </Field>
+
+          {alert.reasons.length > 0 && (
+            <Field label="Alertas del sistema">
+              <ul className="space-y-1">
+                {alert.reasons.map((reason) => (
+                  <li
+                    key={reason}
+                    className={`flex items-start gap-1.5 text-xs leading-relaxed ${
+                      alert.severity === "alta" ? "text-danger" : "text-warning"
+                    }`}
+                  >
+                    <Bell size={11} className="mt-0.5 shrink-0" /> {reason}
+                  </li>
+                ))}
+              </ul>
+            </Field>
+          )}
 
           <Field label="Valor estimado / fecha esperada de cierre">
             {editable ? (

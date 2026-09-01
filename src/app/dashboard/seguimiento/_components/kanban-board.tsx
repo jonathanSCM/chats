@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Sparkles, AlertTriangle } from "lucide-react";
 import { updateOpportunityFieldAction } from "@/server/actions/crm";
 import { ALL_STAGES, STAGE_LABEL, STAGE_COLOR, PRIORITY_COLOR, type Stage } from "@/lib/pipeline";
@@ -51,6 +51,49 @@ export function KanbanBoard({
   const dragIdRef = useRef<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
 
+  // Barra de scroll horizontal "espejo", pegada abajo de la pantalla —
+  // mismo patrón que la tabla de Seguimiento: con muchas columnas de etapa
+  // la barra nativa queda al final de las tarjetas, lejos de la vista si
+  // hay que bajar mucho dentro de una columna.
+  const boardScrollRef = useRef<HTMLDivElement>(null);
+  const mirrorScrollRef = useRef<HTMLDivElement>(null);
+  const [contentWidth, setContentWidth] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const syncingRef = useRef<"board" | "mirror" | null>(null);
+
+  useEffect(() => {
+    const el = boardScrollRef.current;
+    if (!el) return;
+    const measure = () => {
+      setContentWidth(el.scrollWidth);
+      setContainerWidth(el.clientWidth);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [rows]);
+
+  function handleBoardScroll() {
+    if (syncingRef.current === "mirror") {
+      syncingRef.current = null;
+      return;
+    }
+    if (!boardScrollRef.current || !mirrorScrollRef.current) return;
+    syncingRef.current = "board";
+    mirrorScrollRef.current.scrollLeft = boardScrollRef.current.scrollLeft;
+  }
+
+  function handleMirrorScroll() {
+    if (syncingRef.current === "board") {
+      syncingRef.current = null;
+      return;
+    }
+    if (!boardScrollRef.current || !mirrorScrollRef.current) return;
+    syncingRef.current = "mirror";
+    boardScrollRef.current.scrollLeft = mirrorScrollRef.current.scrollLeft;
+  }
+
   function stageOf(row: Row): Stage {
     return localStage[row.id] ?? row.stage;
   }
@@ -75,7 +118,8 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="-mx-4 overflow-x-auto pb-2 md:-mx-8">
+    <>
+    <div ref={boardScrollRef} onScroll={handleBoardScroll} className="-mx-4 overflow-x-auto pb-2 md:-mx-8">
       <div className="flex min-w-max gap-3 px-4 md:px-8">
         {ALL_STAGES.map((stage) => {
           const cards = rows.filter((r) => stageOf(r) === stage);
@@ -196,5 +240,17 @@ export function KanbanBoard({
         })}
       </div>
     </div>
+
+    {contentWidth > containerWidth && (
+      <div
+        ref={mirrorScrollRef}
+        onScroll={handleMirrorScroll}
+        className="sticky bottom-0 z-20 -mx-4 overflow-x-auto overflow-y-hidden border-t border-border bg-surface md:-mx-8"
+        style={{ height: 16 }}
+      >
+        <div style={{ width: contentWidth, height: 1 }} />
+      </div>
+    )}
+    </>
   );
 }

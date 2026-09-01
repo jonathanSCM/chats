@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, Clock, Copy, ArchiveRestore, Archive } from "lucide-react";
+import { CalendarDays, Clock, Copy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { vendorColor } from "@/lib/vendor-color";
 
-interface MeetingRow {
+export interface MeetingRow {
   id: string;
   scheduledAt: string;
   durationMinutes: number;
@@ -48,7 +48,7 @@ function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 }
 
-export function CalendarList({ rows, viewingPast }: { rows: MeetingRow[]; viewingPast: boolean }) {
+export function CalendarList({ rows }: { rows: MeetingRow[] }) {
   // Agrupa por día para que se lea como una agenda, no como una tabla plana.
   const groups = new Map<string, MeetingRow[]>();
   for (const r of rows) {
@@ -60,26 +60,10 @@ export function CalendarList({ rows, viewingPast }: { rows: MeetingRow[]; viewin
 
   return (
     <div className="space-y-4">
-      <Link
-        href={viewingPast ? "/dashboard/calendario" : "/dashboard/calendario?pasadas=1"}
-        className="flex w-fit items-center gap-1 text-xs text-ink-muted hover:text-accent"
-      >
-        {viewingPast ? (
-          <>
-            <ArchiveRestore size={13} /> Ver próximas
-          </>
-        ) : (
-          <>
-            <Archive size={13} /> Ver pasadas
-          </>
-        )}
-      </Link>
-
       {rows.length === 0 && (
         <Card className="text-sm text-ink-muted">
-          {viewingPast
-            ? "Todavía no hay reuniones pasadas."
-            : "No hay reuniones agendadas. Se agendan desde la ficha de una oportunidad en Seguimiento."}
+          No hay reuniones agendadas este mes. Se agendan desde la ficha de una oportunidad en
+          Seguimiento.
         </Card>
       )}
 

@@ -40,6 +40,13 @@ export async function enqueue(options: EnqueueOptions): Promise<void> {
  * Reprograma un job existente por uniqueKey, o lo crea si no existe.
  * Es la base del debounce: cada mensaje nuevo empuja hacia adelante el
  * análisis de esa conversación en vez de encolar uno por mensaje.
+ *
+ * Si el job anterior con esa uniqueKey ya terminó (DONE/FAILED), hay que
+ * reabrirlo — si solo se le toca `runAfter` y se deja `status` como estaba,
+ * claimJobs() (que solo mira `status = 'PENDING'`) nunca lo vuelve a
+ * levantar, y el mensaje nuevo se queda sin respuesta para siempre. Volver a
+ * PENDING y limpiar los rastros de la corrida anterior es lo que lo reabre
+ * de verdad.
  */
 export async function enqueueOrReschedule(options: EnqueueOptions & { uniqueKey: string }) {
   const { type, payload, uniqueKey, runAfter, maxAttempts } = options;
@@ -55,9 +62,13 @@ export async function enqueueOrReschedule(options: EnqueueOptions & { uniqueKey:
       maxAttempts: maxAttempts ?? 5,
     },
     update: {
-      // Solo se reprograma si sigue pendiente; si ya corrió, se deja quieto.
+      status: "PENDING",
       runAfter: when,
       payload: payload as Prisma.InputJsonValue,
+      attempts: 0,
+      lastError: null,
+      lockedAt: null,
+      completedAt: null,
     },
   });
 }

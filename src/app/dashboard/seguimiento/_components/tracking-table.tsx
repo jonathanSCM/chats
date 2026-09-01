@@ -21,6 +21,8 @@ import {
   Table2,
   Paperclip,
   FileText,
+  AlertTriangle,
+  Eye,
 } from "lucide-react";
 import {
   createOpportunityAction,
@@ -71,6 +73,8 @@ export interface Row {
   lastUpdate: string;
   priority: Priority | null;
   nextContactAt: string | null;
+  nextAction: string;
+  nextActionAt: string | null;
   probability: number | null;
   aiRecommendation: string;
   aiSuggestedMessage: string;
@@ -131,15 +135,35 @@ interface Props {
   currentUserId: string;
   isAdmin: boolean;
   viewingArchived: boolean;
+  /** `?estado=todos` — muestra también Ganado/Perdido/En pausa (ocultos por defecto). */
+  viewingAllStages: boolean;
   /** Si viene de `?open=<id>` (ej. desde el botón del inbox), abre ese cliente ni bien carga. */
   openId?: string;
   summary: {
-    inFollowUp: number;
-    quotesSent: number;
-    highPriority: number;
-    nextContact: string | null;
+    activeCount: number;
+    overdueCount: number;
+    highPriorityCount: number;
+    noNextActionCount: number;
   };
   ai: { spent: number; budget: number; enabled: boolean };
+}
+
+type QuickFilter = "hoy" | "vencidos" | "semana" | "alta" | "sin_accion" | null;
+
+/** 🔴 vencido / 🟠 hoy / 🔵 mañana / fecha corta — para que el vencimiento salte a la vista. */
+function dueBadge(iso: string | null): { text: string; color: string } | null {
+  if (!iso) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const date = new Date(iso.slice(0, 10) + "T00:00:00");
+  const diffDays = Math.round((date.getTime() - today.getTime()) / 86_400_000);
+
+  if (diffDays < 0) {
+    return { text: `Vencido hace ${-diffDays} día${-diffDays === 1 ? "" : "s"}`, color: "#dc2626" };
+  }
+  if (diffDays === 0) return { text: "Hoy", color: "#ea580c" };
+  if (diffDays === 1) return { text: "Mañana", color: "#2563eb" };
+  return { text: dateShort(iso), color: "var(--color-ink-faint)" };
 }
 
 type SortField =
@@ -177,15 +201,6 @@ function canEdit(row: Row, currentUserId: string, isAdmin: boolean): boolean {
   return isAdmin || row.assignedTo?.id === currentUserId;
 }
 
-function dateFmt(iso: string | null): string {
-  if (!iso) return "";
-  return new Date(iso).toLocaleDateString("es", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 /** Versión corta para la tabla, donde cada píxel de ancho cuenta. */
 function dateShort(iso: string | null): string {
   if (!iso) return "";
@@ -207,6 +222,7 @@ export function TrackingTable({
   currentUserId,
   isAdmin,
   viewingArchived,
+  viewingAllStages,
   openId,
   summary,
   ai,
@@ -260,6 +276,11 @@ export function TrackingTable({
   // el equipo para planear el día, más que la fecha de registro.
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [serviceFilter, setServiceFilter] = useState("");
+  // Chips rápidos sobre la fecha de PRÓXIMA ACCIÓN (nextActionAt) — distinto
+  // del rango de "próximo contacto" de arriba, que es el campo viejo.
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -327,18 +348,38 @@ export function TrackingTable({
   }
 
   const hasActiveFilter =
-    Boolean(stageFilter) || Boolean(priorityFilter) || Boolean(dateFrom) || Boolean(dateTo);
+    Boolean(stageFilter) ||
+    Boolean(priorityFilter) ||
+    Boolean(dateFrom) ||
+    Boolean(dateTo) ||
+    Boolean(assigneeFilter) ||
+    Boolean(serviceFilter) ||
+    Boolean(quickFilter);
   const canDrag = !sortField && !query.trim() && !hasActiveFilter && !viewingArchived;
+
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const weekAheadStr = new Date(now.getTime() + 7 * 86_400_000).toISOString().slice(0, 10);
 
   const filtered = orderedRows
     .filter((r) => {
       if (stageFilter && r.stage !== stageFilter) return false;
       if (priorityFilter && r.priority !== priorityFilter) return false;
+      if (assigneeFilter && r.assignedTo?.id !== assigneeFilter) return false;
+      if (serviceFilter && r.service !== serviceFilter) return false;
       if (dateFrom || dateTo) {
         if (!r.nextContactAt) return false;
         const d = r.nextContactAt.slice(0, 10);
         if (dateFrom && d < dateFrom) return false;
         if (dateTo && d > dateTo) return false;
+      }
+      if (quickFilter) {
+        const d = r.nextActionAt?.slice(0, 10) ?? null;
+        if (quickFilter === "alta" && r.priority !== "ALTA") return false;
+        if (quickFilter === "sin_accion" && r.nextAction && r.nextActionAt) return false;
+        if (quickFilter === "hoy" && d !== todayStr) return false;
+        if (quickFilter === "vencidos" && !(d && d < todayStr)) return false;
+        if (quickFilter === "semana" && !(d && d >= todayStr && d <= weekAheadStr)) return false;
       }
       if (!query.trim()) return true;
       const q = query.toLowerCase();
@@ -358,14 +399,60 @@ export function TrackingTable({
       return sortDir === "asc" ? cmp : -cmp;
     });
 
+  const quickFilterChips: { key: NonNullable<QuickFilter>; label: string }[] = [
+    { key: "hoy", label: "Hoy" },
+    { key: "vencidos", label: "Vencidos" },
+    { key: "semana", label: "Esta semana" },
+    { key: "alta", label: "Alta prioridad" },
+    { key: "sin_accion", label: "Sin próxima acción" },
+  ];
+
   return (
     <div className="space-y-4">
-      {/* Los mismos cuatro indicadores de la cabecera de la planilla */}
+      {/* Los cuatro indicadores de la cabecera — clicables, funcionan como filtro rápido */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Clientes en seguimiento" value={summary.inFollowUp.toString()} />
-        <Stat label="Cotizaciones enviadas" value={summary.quotesSent.toString()} />
-        <Stat label="Prioridad alta" value={summary.highPriority.toString()} />
-        <Stat label="Próximo contacto" value={dateFmt(summary.nextContact) || "—"} />
+        <Stat
+          label="Oportunidades activas"
+          value={summary.activeCount.toString()}
+          active={quickFilter === null && !hasActiveFilter}
+          onClick={() => setQuickFilter(null)}
+        />
+        <Stat
+          label="Acciones vencidas"
+          value={summary.overdueCount.toString()}
+          active={quickFilter === "vencidos"}
+          onClick={() => setQuickFilter((f) => (f === "vencidos" ? null : "vencidos"))}
+        />
+        <Stat
+          label="Prioridad alta"
+          value={summary.highPriorityCount.toString()}
+          active={quickFilter === "alta"}
+          onClick={() => setQuickFilter((f) => (f === "alta" ? null : "alta"))}
+        />
+        <Stat
+          label="Sin próxima acción"
+          value={summary.noNextActionCount.toString()}
+          active={quickFilter === "sin_accion"}
+          onClick={() => setQuickFilter((f) => (f === "sin_accion" ? null : "sin_accion"))}
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs text-ink-faint">Filtros rápidos:</span>
+        {quickFilterChips.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            onClick={() => setQuickFilter((f) => (f === c.key ? null : c.key))}
+            className={`cursor-pointer rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+              quickFilter === c.key
+                ? "border-accent bg-accent text-accent-ink"
+                : "border-border text-ink-muted hover:border-accent-dim hover:text-accent"
+            }`}
+          >
+            {c.label}
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -397,6 +484,30 @@ export function TrackingTable({
           <option value="MEDIA">MEDIA</option>
           <option value="BAJA">BAJA</option>
         </Select>
+        <Select
+          value={assigneeFilter}
+          onChange={(e) => setAssigneeFilter(e.target.value)}
+          className="w-full py-1.5 text-sm sm:w-40"
+        >
+          <option value="">Todo vendedor</option>
+          {members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          value={serviceFilter}
+          onChange={(e) => setServiceFilter(e.target.value)}
+          className="w-full py-1.5 text-sm sm:w-36"
+        >
+          <option value="">Todo servicio</option>
+          {SERVICES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </Select>
         <div className="flex items-center gap-1.5">
           <Input
             type="date"
@@ -422,6 +533,9 @@ export function TrackingTable({
               setPriorityFilter("");
               setDateFrom("");
               setDateTo("");
+              setAssigneeFilter("");
+              setServiceFilter("");
+              setQuickFilter(null);
             }}
             className="cursor-pointer whitespace-nowrap text-xs text-ink-faint hover:text-accent"
           >
@@ -451,6 +565,15 @@ export function TrackingTable({
             </>
           )}
         </Link>
+        {!viewingArchived && (
+          <Link
+            href={viewingAllStages ? "/dashboard/seguimiento" : "/dashboard/seguimiento?estado=todos"}
+            title="Ganado, Perdido y En pausa/Nutrir quedan ocultos por defecto para no competir con lo activo"
+            className="flex items-center gap-1 whitespace-nowrap text-xs text-ink-muted hover:text-accent"
+          >
+            <Eye size={13} /> {viewingAllStages ? "Ocultar cerrados/pausados" : "Ver ganados/perdidos/pausados"}
+          </Link>
+        )}
         <div className="ml-auto flex items-center gap-2">
           <div className="flex items-center rounded-md border border-border p-0.5">
             <button
@@ -476,7 +599,7 @@ export function TrackingTable({
           </div>
           {!viewingArchived && (
             <Button type="button" onClick={() => setCreating(true)}>
-              <Plus size={16} /> Agregar cliente
+              <Plus size={16} /> Nueva oportunidad
             </Button>
           )}
         </div>
@@ -529,9 +652,17 @@ export function TrackingTable({
                   <SortableTh field="stage" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>
                     Estado
                   </SortableTh>
+                  <Th>Próxima acción</Th>
                   <Th>Última actualización</Th>
                   {/* De aquí en adelante lo llena el asesor IA */}
-                  <SortableTh field="leadScore" sortField={sortField} sortDir={sortDir} onSort={toggleSort} ai>
+                  <SortableTh
+                    field="leadScore"
+                    sortField={sortField}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    ai
+                    title="Qué tan buen prospecto es según necesidad, encaje, autoridad, capacidad y urgencia."
+                  >
                     Calidad del lead
                   </SortableTh>
                   <SortableTh field="priority" sortField={sortField} sortDir={sortDir} onSort={toggleSort} ai>
@@ -546,7 +677,14 @@ export function TrackingTable({
                   >
                     Próximo contacto
                   </SortableTh>
-                  <SortableTh field="probability" sortField={sortField} sortDir={sortDir} onSort={toggleSort} ai>
+                  <SortableTh
+                    field="probability"
+                    sortField={sortField}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    ai
+                    title="Qué tan cerca está actualmente de convertirse en una venta."
+                  >
                     Prob. de cierre
                   </SortableTh>
                   <Th ai>Recomendación para cerrar</Th>
@@ -649,6 +787,7 @@ function SortableTh({
   onSort,
   ai,
   frozen,
+  title,
   children,
 }: {
   field: SortField;
@@ -659,11 +798,13 @@ function SortableTh({
   /** Congela esta columna al hacer scroll horizontal — debe coincidir con
    * la celda del cuerpo que usa `sticky left-0` para la misma columna. */
   frozen?: boolean;
+  title?: string;
   children: React.ReactNode;
 }) {
   const active = sortField === field;
   return (
     <th
+      title={title}
       className={`sticky top-0 whitespace-nowrap border-b border-border bg-surface px-1 py-1 text-left font-mono text-[11px] font-semibold uppercase tracking-wide ${
         frozen ? "left-0 z-30 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]" : "z-20"
       } ${ai ? "text-accent" : "text-ink-muted"}`}
@@ -680,6 +821,50 @@ function SortableTh({
           (sortDir === "asc" ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
       </button>
     </th>
+  );
+}
+
+/** Texto + fecha de la próxima acción, con el aviso si falta alguno de los
+ * dos — reusado en la tabla, el Kanban y la ficha. */
+function NextActionCell({
+  row,
+  locked,
+  onSave,
+}: {
+  row: Row;
+  locked: boolean;
+  onSave: (field: string, value: string) => void;
+}) {
+  const badge = dueBadge(row.nextActionAt);
+  const missing = !row.nextAction || !row.nextActionAt;
+  return (
+    <div className="space-y-1">
+      <Input
+        defaultValue={row.nextAction}
+        disabled={locked}
+        placeholder="Ej. Llamar para calificar"
+        onBlur={(e) => onSave("nextAction", e.target.value)}
+        className="w-full py-1 text-xs"
+      />
+      <Input
+        type="date"
+        defaultValue={dateInputValue(row.nextActionAt)}
+        disabled={locked}
+        onBlur={(e) => onSave("nextActionAt", e.target.value)}
+        className="w-full py-1 text-xs"
+      />
+      {missing ? (
+        <p className="flex items-center gap-1 text-[11px] text-warning">
+          <AlertTriangle size={10} /> Sin próxima acción
+        </p>
+      ) : (
+        badge && (
+          <p className="text-[11px] font-medium" style={{ color: badge.color }}>
+            {badge.text}
+          </p>
+        )
+      )}
+    </div>
   );
 }
 
@@ -789,6 +974,10 @@ function TableRow({
             </option>
           ))}
         </Select>
+      </Td>
+
+      <Td className="max-w-[11rem]">
+        <NextActionCell row={row} locked={locked} onSave={save} />
       </Td>
 
       <Td className="max-w-[14rem]">
@@ -949,14 +1138,36 @@ function CopyableMessage({ text }: { text: string }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <Card className="py-3">
+function Stat({
+  label,
+  value,
+  onClick,
+  active,
+}: {
+  label: string;
+  value: string;
+  onClick?: () => void;
+  active?: boolean;
+}) {
+  const content = (
+    <>
       <CardDescription className="mb-1 font-mono text-[11px] uppercase tracking-wide">
         {label}
       </CardDescription>
       <CardTitle className="font-mono text-xl">{value}</CardTitle>
-    </Card>
+    </>
+  );
+
+  if (!onClick) {
+    return <Card className="py-3">{content}</Card>;
+  }
+
+  return (
+    <button type="button" onClick={onClick} className="w-full cursor-pointer text-left">
+      <Card className={`py-3 transition-colors ${active ? "border-accent bg-accent/5" : "hover:border-accent-dim"}`}>
+        {content}
+      </Card>
+    </button>
   );
 }
 
@@ -978,7 +1189,7 @@ function CreateForm({
   return (
     <form action={formAction} className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="font-display text-sm font-semibold text-ink">Agregar cliente</p>
+        <p className="font-display text-sm font-semibold text-ink">Nueva oportunidad</p>
         <button type="button" onClick={onDone} className="cursor-pointer text-ink-faint hover:text-ink">
           <X size={16} />
         </button>
@@ -1126,6 +1337,37 @@ function DetailPanel({
               />
             ) : (
               <p className="text-sm leading-relaxed text-ink-muted">{row.lastUpdate || "—"}</p>
+            )}
+          </Field>
+
+          <Field label="Próxima acción">
+            {editable ? (
+              <div className="flex gap-2">
+                <Input
+                  defaultValue={row.nextAction}
+                  disabled={locked}
+                  placeholder="Ej. Llamar para calificar"
+                  onBlur={(e) => save("nextAction", e.target.value)}
+                  className="flex-1 py-1.5 text-sm"
+                />
+                <Input
+                  type="date"
+                  defaultValue={dateInputValue(row.nextActionAt)}
+                  disabled={locked}
+                  onBlur={(e) => save("nextActionAt", e.target.value)}
+                  className="w-36 py-1.5 text-sm"
+                />
+              </div>
+            ) : (
+              <p className="text-sm leading-relaxed text-ink-muted">
+                {row.nextAction || "—"}
+                {row.nextActionAt && ` · ${dateShort(row.nextActionAt)}`}
+              </p>
+            )}
+            {(!row.nextAction || !row.nextActionAt) && (
+              <p className="flex items-center gap-1 text-xs text-warning">
+                <AlertTriangle size={11} /> Sin próxima acción
+              </p>
             )}
           </Field>
 

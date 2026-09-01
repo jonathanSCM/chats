@@ -1,69 +1,82 @@
 /**
- * Estados tal como los usa el equipo en su planilla de seguimiento.
- * No son los del manual: si el sistema no habla el idioma del vendedor,
- * termina sin usarse.
+ * Etapas del pipeline comercial de ProShop: representan el trabajo pendiente
+ * y avanzan con evidencia, no simplemente porque hubo actividad.
  */
 export type Stage =
-  | "LLAMAR"
-  | "ENVIAR_COTI"
-  | "COTI_ENVIADA"
-  | "REUNION"
-  | "NEGOCIACION"
-  | "CERRADO"
+  | "POR_CALIFICAR"
+  | "ENTREVISTA"
+  | "DIAGNOSTICO"
+  | "PRESENTAR_SOLUCION"
+  | "PROPUESTA"
+  | "DECISION"
+  | "GANADO"
+  | "EN_PAUSA_NUTRIR"
   | "PERDIDO";
 
 export const STAGE_LABEL: Record<Stage, string> = {
-  LLAMAR: "LLAMAR",
-  ENVIAR_COTI: "ENVIAR COTI",
-  COTI_ENVIADA: "COTI ENVIADA",
-  REUNION: "REUNIÓN",
-  NEGOCIACION: "NEGOCIACIÓN",
-  CERRADO: "CERRADO",
+  POR_CALIFICAR: "POR CALIFICAR",
+  ENTREVISTA: "ENTREVISTA",
+  DIAGNOSTICO: "DIAGNÓSTICO",
+  PRESENTAR_SOLUCION: "PRESENTAR SOLUCIÓN",
+  PROPUESTA: "PROPUESTA",
+  DECISION: "DECISIÓN",
+  GANADO: "GANADO",
+  EN_PAUSA_NUTRIR: "EN PAUSA / NUTRIR",
   PERDIDO: "PERDIDO",
 };
 
 export const ALL_STAGES: Stage[] = [
-  "LLAMAR",
-  "ENVIAR_COTI",
-  "COTI_ENVIADA",
-  "REUNION",
-  "NEGOCIACION",
-  "CERRADO",
+  "POR_CALIFICAR",
+  "ENTREVISTA",
+  "DIAGNOSTICO",
+  "PRESENTAR_SOLUCION",
+  "PROPUESTA",
+  "DECISION",
+  "GANADO",
+  "EN_PAUSA_NUTRIR",
   "PERDIDO",
 ];
 
-/** Sigue en juego: necesita próximo paso y entra en los conteos. */
+/** Sigue en juego: necesita próximo paso y entra en los conteos/KPIs. */
 export const OPEN_STAGES: Stage[] = [
-  "LLAMAR",
-  "ENVIAR_COTI",
-  "COTI_ENVIADA",
-  "REUNION",
-  "NEGOCIACION",
+  "POR_CALIFICAR",
+  "ENTREVISTA",
+  "DIAGNOSTICO",
+  "PRESENTAR_SOLUCION",
+  "PROPUESTA",
+  "DECISION",
 ];
+
+/** Fuera del flujo principal: no aparecen por defecto en Seguimiento comercial. */
+export const HIDDEN_BY_DEFAULT_STAGES: Stage[] = ["GANADO", "PERDIDO", "EN_PAUSA_NUTRIR"];
 
 export function isOpenStage(stage: Stage): boolean {
   return OPEN_STAGES.includes(stage);
 }
 
-/** Qué tiene que pasar para salir de cada estado. */
+/** Qué significa cada etapa y cuándo corresponde usarla — tooltip por etapa. */
 export const STAGE_CRITERIA: Record<Stage, string> = {
-  LLAMAR: "Hay que contactarlo o retomar el contacto.",
-  ENVIAR_COTI: "Ya se sabe qué necesita; falta armar y mandar la cotización.",
-  COTI_ENVIADA: "La cotización está en manos del cliente, esperando respuesta.",
-  REUNION: "Hay reunión acordada o en curso.",
-  NEGOCIACION: "Se discuten precio, alcance o condiciones.",
-  CERRADO: "Acuerdo confirmado.",
+  POR_CALIFICAR: "Lead recién llegado; filtro inicial por WhatsApp o llamada.",
+  ENTREVISTA: "Reunión de levantamiento para entender empresa, proceso, problema e impacto.",
+  DIAGNOSTICO: "Trabajo interno de ProShop para analizar el caso y definir recomendación.",
+  PRESENTAR_SOLUCION: "Reunión con cliente/decisor para mostrar diagnóstico y solución propuesta.",
+  PROPUESTA: "Preparar/presentar alcance, tiempos, inversión y condiciones.",
+  DECISION: "Seguimiento, objeciones, cambios, negociación y decisión final.",
+  GANADO: "Aceptación, firma, pago o inicio del trabajo.",
+  EN_PAUSA_NUTRIR: "Sin actividad por ahora; se retoma más adelante.",
   PERDIDO: "No se concretó. Registrar el motivo para aprender de ello.",
 };
 
-/** Color por estado, de frío a caliente, para leer la tabla de un vistazo. */
+/** Color por estado, de frío a caliente, para leer la tabla/Kanban de un vistazo. */
 export const STAGE_COLOR: Record<Stage, string> = {
-  LLAMAR: "#64748b",
-  ENVIAR_COTI: "#ca8a04",
-  COTI_ENVIADA: "#ea580c",
-  REUNION: "#2563eb",
-  NEGOCIACION: "#db2777",
-  CERRADO: "#059669",
+  POR_CALIFICAR: "#64748b",
+  ENTREVISTA: "#0891b2",
+  DIAGNOSTICO: "#ca8a04",
+  PRESENTAR_SOLUCION: "#ea580c",
+  PROPUESTA: "#2563eb",
+  DECISION: "#db2777",
+  GANADO: "#059669",
+  EN_PAUSA_NUTRIR: "#78716c",
   PERDIDO: "#dc2626",
 };
 

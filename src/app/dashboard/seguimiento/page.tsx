@@ -1,20 +1,23 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
-import { isOpenStage, type Stage, type Priority } from "@/lib/pipeline";
+import { isOpenStage, HIDDEN_BY_DEFAULT_STAGES, type Stage, type Priority } from "@/lib/pipeline";
 import { getAiSpendToday } from "@/server/actions/crm";
 import { TrackingTable } from "./_components/tracking-table";
 
 export default async function SeguimientoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ archived?: string; open?: string }>;
+  searchParams: Promise<{ archived?: string; open?: string; estado?: string }>;
 }) {
   const session = await auth();
   if (!session?.user.organizationId) redirect("/dashboard");
 
-  const { archived, open: openId } = await searchParams;
+  const { archived, open: openId, estado } = await searchParams;
   const viewingArchived = archived === "1";
+  // Independiente de "archivado": oculta por defecto lo Ganado/Perdido/En
+  // pausa (siguen existiendo, solo no compiten visualmente con lo activo).
+  const viewingAllStages = estado === "todos";
 
   const organizationId = session.user.organizationId;
   const isAdmin = session.user.role === "OWNER" || session.user.role === "SUPERADMIN";
@@ -24,7 +27,13 @@ export default async function SeguimientoPage({
   // (canEditOpportunity) a quien la tiene asignada, o al admin.
   const [opportunities, contacts, members, ai] = await Promise.all([
     prisma.opportunity.findMany({
-      where: { organizationId, archivedAt: viewingArchived ? { not: null } : null },
+      where: {
+        organizationId,
+        archivedAt: viewingArchived ? { not: null } : null,
+        ...(viewingArchived || viewingAllStages
+          ? {}
+          : { stage: { notIn: HIDDEN_BY_DEFAULT_STAGES } }),
+      },
       include: {
         contact: { select: { id: true, fullName: true, phone: true, city: true } },
         assignedTo: { select: { id: true, name: true, email: true, color: true } },
@@ -70,6 +79,8 @@ export default async function SeguimientoPage({
     lastUpdate: o.lastUpdate ?? "",
     priority: (o.priority as Priority | null) ?? null,
     nextContactAt: o.nextContactAt?.toISOString() ?? null,
+    nextAction: o.nextAction ?? "",
+    nextActionAt: o.nextActionAt?.toISOString() ?? null,
     probability: o.probability,
     aiRecommendation: o.aiRecommendation ?? "",
     aiSuggestedMessage: o.aiSuggestedMessage ?? "",
@@ -101,18 +112,18 @@ export default async function SeguimientoPage({
       : null,
   }));
 
-  // Los mismos cuatro indicadores que el equipo lleva arriba de su planilla.
+  // Los cuatro indicadores que el equipo lleva arriba de la planilla — ahora
+  // orientados a la acción pendiente, no a la cotización.
   const open = rows.filter((r) => isOpenStage(r.stage));
-  const nextContactDates = open
-    .map((r) => r.nextContactAt)
-    .filter((d): d is string => Boolean(d))
-    .sort();
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const overdue = open.filter((r) => r.nextActionAt && r.nextActionAt.slice(0, 10) < todayStr);
+  const withoutNextAction = open.filter((r) => !r.nextAction || !r.nextActionAt);
 
   return (
     <div className="animate-fade-up">
-      <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Seguimiento</h1>
+      <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Seguimiento comercial</h1>
       <p className="mb-6 text-sm text-ink-muted">
-        Clientes con cotización enviada y próxima acción comercial para avanzar al cierre.
+        Oportunidades activas con acciones pendientes para avanzar en el proceso comercial.
       </p>
 
       <TrackingTable
@@ -122,13 +133,14 @@ export default async function SeguimientoPage({
         currentUserId={session.user.id}
         isAdmin={isAdmin}
         viewingArchived={viewingArchived}
+        viewingAllStages={viewingAllStages}
         openId={openId}
         ai={ai}
         summary={{
-          inFollowUp: open.length,
-          quotesSent: rows.filter((r) => r.stage === "COTI_ENVIADA").length,
-          highPriority: open.filter((r) => r.priority === "ALTA").length,
-          nextContact: nextContactDates[0] ?? null,
+          activeCount: open.length,
+          overdueCount: overdue.length,
+          highPriorityCount: open.filter((r) => r.priority === "ALTA").length,
+          noNextActionCount: withoutNextAction.length,
         }}
       />
     </div>

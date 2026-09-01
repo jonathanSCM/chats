@@ -132,6 +132,8 @@ const fieldSchema = z.discriminatedUnion("field", [
   z.object({ field: z.literal("needSummary"), value: z.string().max(5000) }),
   z.object({ field: z.literal("lastUpdate"), value: z.string().max(5000) }),
   z.object({ field: z.literal("nextContactAt"), value: z.string() }),
+  z.object({ field: z.literal("nextAction"), value: z.string().max(300) }),
+  z.object({ field: z.literal("nextActionAt"), value: z.string() }),
   z.object({ field: z.literal("probability"), value: z.coerce.number().min(0).max(100) }),
   z.object({ field: z.literal("lostReason"), value: z.string().max(500) }),
   // "" = sin asignar (lo suelta el vendedor, o el admin lo deja libre para
@@ -167,13 +169,17 @@ export async function updateOpportunityFieldAction(
     case "stage": {
       const stage = parsed.data.value;
       data.stage = stage;
-      data.wonAt = stage === "CERRADO" ? now : null;
+      data.wonAt = stage === "GANADO" ? now : null;
       data.lostAt = stage === "PERDIDO" ? now : null;
-      if (stage === "COTI_ENVIADA" && !opportunity.proposalSentAt) data.proposalSentAt = now;
+      // "Propuesta" es la etapa que representa preparar/mandar la cotización.
+      if (stage === "PROPUESTA" && !opportunity.proposalSentAt) data.proposalSentAt = now;
       break;
     }
     case "nextContactAt":
       data.nextContactAt = parsed.data.value ? new Date(parsed.data.value) : null;
+      break;
+    case "nextActionAt":
+      data.nextActionAt = parsed.data.value ? new Date(parsed.data.value) : null;
       break;
     case "probability":
       data.probability = Math.round(parsed.data.value);

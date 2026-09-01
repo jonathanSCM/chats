@@ -527,12 +527,14 @@ model Contact {
 // Estados tal como los usa el equipo en su planilla de seguimiento, no los
 // del manual: si el sistema no habla su idioma, no lo usan.
 enum OpportunityStage {
-  LLAMAR
-  ENVIAR_COTI
-  COTI_ENVIADA
-  REUNION
-  NEGOCIACION
-  CERRADO
+  POR_CALIFICAR
+  ENTREVISTA
+  DIAGNOSTICO
+  PRESENTAR_SOLUCION
+  PROPUESTA
+  DECISION
+  GANADO
+  EN_PAUSA_NUTRIR
   PERDIDO
 }
 
@@ -558,7 +560,7 @@ model Opportunity {
   assignedTo     User?        @relation("OpportunityOwner", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   title             String
-  stage             OpportunityStage @default(LLAMAR)
+  stage             OpportunityStage @default(POR_CALIFICAR)
   serviceInterest   String?
   estimatedValue    Decimal?         @db.Decimal(12, 2)
   currency          String           @default("USD")

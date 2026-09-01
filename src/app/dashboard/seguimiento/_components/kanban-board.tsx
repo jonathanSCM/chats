@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, AlertTriangle } from "lucide-react";
 import { updateOpportunityFieldAction } from "@/server/actions/crm";
 import { ALL_STAGES, STAGE_LABEL, STAGE_COLOR, PRIORITY_COLOR, type Stage } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
@@ -17,6 +17,20 @@ function leadScoreColor(score: number): string {
   if (score >= 60) return "#3b82f6";
   if (score >= 40) return "#eab308";
   return "#71717a";
+}
+
+/** 🔴 vencido / 🟠 hoy / 🔵 mañana / fecha corta — mismo criterio que la tabla. */
+function dueBadge(iso: string | null): { text: string; color: string } | null {
+  if (!iso) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const date = new Date(iso.slice(0, 10) + "T00:00:00");
+  const diffDays = Math.round((date.getTime() - today.getTime()) / 86_400_000);
+
+  if (diffDays < 0) return { text: `Vencido (${-diffDays}d)`, color: "#dc2626" };
+  if (diffDays === 0) return { text: "Hoy", color: "#ea580c" };
+  if (diffDays === 1) return { text: "Mañana", color: "#2563eb" };
+  return { text: dateShort(iso), color: "var(--color-ink-faint)" };
 }
 
 export function KanbanBoard({
@@ -135,12 +149,27 @@ export function KanbanBoard({
                             <Sparkles size={9} /> {row.leadScore}
                           </span>
                         )}
-                        {row.nextContactAt && (
-                          <span className="font-mono text-[9px] text-ink-faint">
-                            📅 {dateShort(row.nextContactAt)}
-                          </span>
-                        )}
                       </div>
+
+                      {row.nextAction && row.nextActionAt ? (
+                        <p className="mt-1.5 flex items-center gap-1 truncate text-[10px] text-ink-muted">
+                          📅 {row.nextAction}
+                          {(() => {
+                            const badge = dueBadge(row.nextActionAt);
+                            return (
+                              badge && (
+                                <span className="font-semibold" style={{ color: badge.color }}>
+                                  {badge.text}
+                                </span>
+                              )
+                            );
+                          })()}
+                        </p>
+                      ) : (
+                        <p className="mt-1.5 flex items-center gap-1 text-[10px] text-warning">
+                          <AlertTriangle size={9} /> Sin próxima acción
+                        </p>
+                      )}
 
                       {row.assignedTo && (
                         <div className="mt-2 flex items-center gap-1.5">

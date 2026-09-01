@@ -1664,6 +1664,20 @@ function MeetingsSection({
     setHandledMessage(state.message);
     setAdding(false);
   }
+  // Borrar una reunión se lleva sus adjuntos con ella — igual de
+  // irreversible que borrar la oportunidad, mismo patrón de confirmación.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  function handleDeleteMeeting(id: string) {
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      setTimeout(() => setConfirmDeleteId((c) => (c === id ? null : c)), 3000);
+      return;
+    }
+    setConfirmDeleteId(null);
+    startTransition(async () => {
+      await deleteMeetingAction(id);
+    });
+  }
 
   return (
     <div className="rounded-lg border border-border bg-surface-2/40 p-3">
@@ -1723,9 +1737,11 @@ function MeetingsSection({
                   <button
                     type="button"
                     disabled={disabled || isPending}
-                    onClick={() => startTransition(async () => { await deleteMeetingAction(m.id); })}
-                    className="cursor-pointer text-ink-faint hover:text-danger disabled:cursor-not-allowed"
-                    title="Borrar reunión"
+                    onClick={() => handleDeleteMeeting(m.id)}
+                    className={`cursor-pointer disabled:cursor-not-allowed ${
+                      confirmDeleteId === m.id ? "text-danger" : "text-ink-faint hover:text-danger"
+                    }`}
+                    title={confirmDeleteId === m.id ? "¿Seguro? Toca de nuevo" : "Borrar reunión"}
                   >
                     <Trash2 size={12} />
                   </button>
@@ -1777,6 +1793,19 @@ function MeetingAttachments({
 }) {
   const [isPending, startTransition] = useTransition();
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  function handleDeleteAttachment(id: string) {
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      setTimeout(() => setConfirmDeleteId((c) => (c === id ? null : c)), 3000);
+      return;
+    }
+    setConfirmDeleteId(null);
+    startTransition(async () => {
+      await deleteMeetingAttachmentAction(id);
+    });
+  }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -1817,13 +1846,11 @@ function MeetingAttachments({
                 <button
                   type="button"
                   disabled={disabled || isPending}
-                  onClick={() =>
-                    startTransition(async () => {
-                      await deleteMeetingAttachmentAction(a.id);
-                    })
-                  }
-                  className="ml-auto shrink-0 cursor-pointer text-ink-faint hover:text-danger disabled:cursor-not-allowed"
-                  title="Borrar archivo"
+                  onClick={() => handleDeleteAttachment(a.id)}
+                  className={`ml-auto shrink-0 cursor-pointer disabled:cursor-not-allowed ${
+                    confirmDeleteId === a.id ? "text-danger" : "text-ink-faint hover:text-danger"
+                  }`}
+                  title={confirmDeleteId === a.id ? "¿Seguro? Toca de nuevo" : "Borrar archivo"}
                 >
                   <Trash2 size={11} />
                 </button>

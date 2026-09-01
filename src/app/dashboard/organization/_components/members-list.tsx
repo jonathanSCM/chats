@@ -43,6 +43,42 @@ export function MembersList({
 
 function MemberRow({ member, isSelf }: { member: Member; isSelf: boolean }) {
   const [isPending, startTransition] = useTransition();
+  const [role, setRole] = useState(member.role);
+  // Cambiar el rol es tan sensible como expulsar a alguien (le da o le
+  // saca acceso de Admin) — se pide confirmación antes de aplicar, y el
+  // select vuelve al valor real si falla o se cancela (antes era
+  // `defaultValue`: no controlado, así que un error lo dejaba mostrando el
+  // rol nuevo aunque no se hubiera guardado).
+  const [pendingRole, setPendingRole] = useState<"OWNER" | "MEMBER" | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+
+  function confirmRoleChange() {
+    if (!pendingRole) return;
+    const next = pendingRole;
+    setPendingRole(null);
+    setRoleError(null);
+    startTransition(async () => {
+      const result = await changeMemberRoleAction(member.id, next);
+      if (result.error) setRoleError(result.error);
+      else setRole(next);
+    });
+  }
+
+  function handleRemove() {
+    if (!confirmRemove) {
+      setConfirmRemove(true);
+      setTimeout(() => setConfirmRemove(false), 3000);
+      return;
+    }
+    setConfirmRemove(false);
+    setRemoveError(null);
+    startTransition(async () => {
+      const result = await removeMemberAction(member.id);
+      if (result.error) setRemoveError(result.error);
+    });
+  }
 
   return (
     <Tr>
@@ -57,37 +93,57 @@ function MemberRow({ member, isSelf }: { member: Member; isSelf: boolean }) {
         {isSelf ? (
           <span className="text-sm text-ink-muted">{member.role === "OWNER" ? "Admin" : "Vendedor"}</span>
         ) : (
-          <Select
-            defaultValue={member.role}
-            disabled={isPending}
-            className="w-32 py-1.5 text-xs"
-            onChange={(e) => {
-              const role = e.target.value as "OWNER" | "MEMBER";
-              startTransition(async () => {
-                await changeMemberRoleAction(member.id, role);
-              });
-            }}
-          >
-            <option value="OWNER">Admin</option>
-            <option value="MEMBER">Vendedor</option>
-          </Select>
+          <div className="space-y-1">
+            <Select
+              value={pendingRole ?? role}
+              disabled={isPending}
+              className="w-32 py-1.5 text-xs"
+              onChange={(e) => setPendingRole(e.target.value as "OWNER" | "MEMBER")}
+            >
+              <option value="OWNER">Admin</option>
+              <option value="MEMBER">Vendedor</option>
+            </Select>
+            {pendingRole && pendingRole !== role && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-ink-faint">¿Cambiar a {pendingRole === "OWNER" ? "Admin" : "Vendedor"}?</span>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={confirmRoleChange}
+                  className="cursor-pointer font-medium text-accent hover:opacity-80"
+                >
+                  Confirmar
+                </button>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => setPendingRole(null)}
+                  className="cursor-pointer text-ink-faint hover:text-ink"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+            {roleError && <p className="text-xs text-danger">{roleError}</p>}
+          </div>
         )}
       </Td>
       <Td>
         {!isSelf && (
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() =>
-              startTransition(async () => {
-                await removeMemberAction(member.id);
-              })
-            }
-            className="cursor-pointer text-ink-faint transition-colors hover:text-danger"
-            title="Quitar del equipo"
-          >
-            <UserX size={15} />
-          </button>
+          <div className="space-y-1">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={handleRemove}
+              className={`cursor-pointer transition-colors ${
+                confirmRemove ? "text-danger" : "text-ink-faint hover:text-danger"
+              }`}
+              title={confirmRemove ? "¿Seguro? Toca de nuevo" : "Quitar del equipo"}
+            >
+              <UserX size={15} />
+            </button>
+            {removeError && <p className="text-xs text-danger">{removeError}</p>}
+          </div>
         )}
       </Td>
     </Tr>

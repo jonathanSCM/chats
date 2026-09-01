@@ -736,9 +736,28 @@ export function InboxClient({
   // Archivar/bloquear puede sacar la conversación de la vista actual (si
   // estabas en "Chats" y archivas, o viceversa) — se cierra el chat abierto
   // y se refresca la lista para no dejarla mostrando algo que ya no calza.
+  // Solo se pide confirmación para el sentido destructivo (archivar,
+  // bloquear); deshacerlo (desarchivar, desbloquear) es de un solo toque.
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  // Si se arma la confirmación de archivar/bloquear y se cambia de chat
+  // antes de tocar de nuevo, no debe quedar "armada" para el chat nuevo.
+  const [confirmSelectedId, setConfirmSelectedId] = useState(selectedId);
+  if (confirmSelectedId !== selectedId) {
+    setConfirmSelectedId(selectedId);
+    if (confirmArchive) setConfirmArchive(false);
+    if (confirmBlock) setConfirmBlock(false);
+  }
+
   function toggleArchive() {
     const id = selectedIdRef.current;
     if (!id) return;
+    if (conversationStatus !== "CLOSED" && !confirmArchive) {
+      setConfirmArchive(true);
+      setTimeout(() => setConfirmArchive(false), 3000);
+      return;
+    }
+    setConfirmArchive(false);
     const nextStatus = conversationStatus === "CLOSED" ? "OPEN" : "CLOSED";
     setConversationStatus(nextStatus);
     setConversationStatusAction(id, nextStatus).then(() => {
@@ -750,6 +769,12 @@ export function InboxClient({
   function toggleBlock() {
     const id = selectedIdRef.current;
     if (!id) return;
+    if (!conversationBlocked && !confirmBlock) {
+      setConfirmBlock(true);
+      setTimeout(() => setConfirmBlock(false), 3000);
+      return;
+    }
+    setConfirmBlock(false);
     const next = !conversationBlocked;
     setConversationBlocked(next);
     setConversationBlockedAction(id, next).then(() => {
@@ -1024,22 +1049,26 @@ export function InboxClient({
               <button
                 type="button"
                 onClick={toggleBlock}
-                aria-label={conversationBlocked ? "Desbloquear" : "Bloquear"}
-                title={conversationBlocked ? "Desbloquear" : "Bloquear"}
+                aria-label={conversationBlocked ? "Desbloquear" : confirmBlock ? "¿Seguro? Toca de nuevo" : "Bloquear"}
+                title={conversationBlocked ? "Desbloquear" : confirmBlock ? "¿Seguro? Toca de nuevo" : "Bloquear"}
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface ${
-                  conversationBlocked ? "text-danger" : "text-ink-muted"
-                }`}
+                  conversationBlocked || confirmBlock ? "text-danger" : "text-ink-muted"
+                } ${confirmBlock ? "ring-2 ring-danger" : ""}`}
               >
                 {conversationBlocked ? <ShieldCheck size={18} /> : <Ban size={18} />}
               </button>
               <button
                 type="button"
                 onClick={toggleArchive}
-                aria-label={conversationStatus === "CLOSED" ? "Desarchivar" : "Archivar"}
-                title={conversationStatus === "CLOSED" ? "Desarchivar" : "Archivar"}
+                aria-label={
+                  conversationStatus === "CLOSED" ? "Desarchivar" : confirmArchive ? "¿Seguro? Toca de nuevo" : "Archivar"
+                }
+                title={
+                  conversationStatus === "CLOSED" ? "Desarchivar" : confirmArchive ? "¿Seguro? Toca de nuevo" : "Archivar"
+                }
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface ${
-                  conversationStatus === "CLOSED" ? "text-accent" : "text-ink-muted"
-                }`}
+                  conversationStatus === "CLOSED" ? "text-accent" : confirmArchive ? "text-danger" : "text-ink-muted"
+                } ${confirmArchive ? "ring-2 ring-danger" : ""}`}
               >
                 {conversationStatus === "CLOSED" ? <ArchiveRestore size={18} /> : <Archive size={18} />}
               </button>

@@ -99,6 +99,7 @@ export function ConversationPanel({
   const [error, setError] = useState<string | null>(null);
   const [newTag, setNewTag] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDeleteNoteId, setConfirmDeleteNoteId] = useState<string | null>(null);
   const [addingToTracking, setAddingToTracking] = useState(false);
 
   // Se recarga subiendo el token en vez de llamar a una función que haga
@@ -139,6 +140,16 @@ export function ConversationPanel({
         onChanged();
       }
     });
+  }
+
+  function handleDeleteNote(noteId: string) {
+    if (confirmDeleteNoteId !== noteId) {
+      setConfirmDeleteNoteId(noteId);
+      setTimeout(() => setConfirmDeleteNoteId((c) => (c === noteId ? null : c)), 3000);
+      return;
+    }
+    setConfirmDeleteNoteId(null);
+    run(() => deleteConversationNoteAction(noteId));
   }
 
   function handleDeleteConversation() {
@@ -426,9 +437,11 @@ export function ConversationPanel({
                   <button
                     type="button"
                     disabled={isPending}
-                    onClick={() => run(() => deleteConversationNoteAction(note.id))}
-                    className="shrink-0 cursor-pointer text-ink-faint hover:text-danger"
-                    title="Borrar nota"
+                    onClick={() => handleDeleteNote(note.id)}
+                    className={`shrink-0 cursor-pointer ${
+                      confirmDeleteNoteId === note.id ? "text-danger" : "text-ink-faint hover:text-danger"
+                    }`}
+                    title={confirmDeleteNoteId === note.id ? "¿Seguro? Toca de nuevo" : "Borrar nota"}
                   >
                     <Trash2 size={12} />
                   </button>

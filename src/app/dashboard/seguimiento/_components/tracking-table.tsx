@@ -107,6 +107,7 @@ export interface Row {
     scheduledAt: string;
     status: string;
     notes: string;
+    meetingUrl: string | null;
     attachments: MeetingAttachmentInfo[];
   }[];
   archived: boolean;
@@ -2004,7 +2005,7 @@ function MeetingsSection({
         <form action={formAction} className="mb-3 space-y-2 rounded-md border border-border p-2.5">
           <input type="hidden" name="opportunityId" value={opportunityId} />
           <div className="flex gap-2">
-            <Input type="date" name="scheduledAt" required className="py-1.5 text-xs" />
+            <Input type="datetime-local" name="scheduledAt" required className="py-1.5 text-xs" />
             <Input
               type="number"
               name="durationMinutes"
@@ -2013,6 +2014,16 @@ function MeetingsSection({
               className="w-20 py-1.5 text-xs"
             />
           </div>
+          <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+            <input type="checkbox" name="withGoogleMeet" className="h-3.5 w-3.5" />
+            Crear con Google Meet (genera el link automáticamente)
+          </label>
+          <Input
+            type="url"
+            name="meetingUrl"
+            placeholder="o pegá un link de reunión manualmente"
+            className="py-1.5 text-xs"
+          />
           <textarea
             name="notes"
             rows={5}
@@ -2032,10 +2043,26 @@ function MeetingsSection({
         <ul className="space-y-2">
           {meetings.map((m) => (
             <li key={m.id} className="rounded-md border border-border p-2.5">
-              <div className="mb-1 flex items-center justify-between">
+              <div className="mb-1 flex items-center justify-between gap-2">
                 <p className="font-mono text-xs text-ink-muted">
-                  {new Date(m.scheduledAt).toLocaleDateString("es")} · {m.status}
+                  {new Date(m.scheduledAt).toLocaleString("es", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}{" "}
+                  · {m.status}
                 </p>
+                {m.meetingUrl && (
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(m.meetingUrl!)}
+                    title="Copiar link de la reunión"
+                    className="ml-auto flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[10px] text-ink-muted hover:border-accent-dim hover:text-accent"
+                  >
+                    <Copy size={10} /> Link
+                  </button>
+                )}
                 {editable && (
                   <button
                     type="button"

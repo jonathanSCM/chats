@@ -68,6 +68,7 @@ export default async function SeguimientoPage({
             scheduledAt: true,
             status: true,
             notes: true,
+            meetingUrl: true,
             attachments: {
               select: { id: true, url: true, fileName: true, mimeType: true, fileSize: true },
               orderBy: { createdAt: "asc" },
@@ -131,6 +132,7 @@ export default async function SeguimientoPage({
       scheduledAt: m.scheduledAt.toISOString(),
       status: m.status,
       notes: m.notes ?? "",
+      meetingUrl: m.meetingUrl,
       attachments: m.attachments.map((a) => ({
         id: a.id,
         url: a.url,

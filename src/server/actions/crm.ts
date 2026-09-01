@@ -9,6 +9,7 @@ import { ALL_STAGES, OPEN_STAGES, ALL_LOSS_REASONS, type Stage, type LossReason 
 import { analyzeFollowUp } from "@/server/services/ai/follow-up";
 import { isAiEnabled, isWithinBudget, spentToday } from "@/server/services/ai/client";
 import { saveMediaFile, deleteMediaFile } from "@/lib/media-storage";
+import { createMeetEvent, isGoogleMeetEnabled } from "@/server/services/google-calendar";
 import type { ActionState } from "./types";
 
 const PATH = "/dashboard/seguimiento";
@@ -374,6 +375,7 @@ const createMeetingSchema = z.object({
   scheduledAt: z.string().min(1, "Poné la fecha"),
   durationMinutes: z.coerce.number().int().positive().max(600).optional(),
   meetingUrl: z.string().max(500).optional(),
+  withGoogleMeet: z.coerce.boolean().optional(),
   notes: meetingNotesField.optional(), // transcripción o resumen de la reunión
 });
 
@@ -388,6 +390,7 @@ export async function createMeetingAction(
     scheduledAt: formData.get("scheduledAt"),
     durationMinutes: formData.get("durationMinutes") || undefined,
     meetingUrl: formData.get("meetingUrl") || undefined,
+    withGoogleMeet: formData.get("withGoogleMeet") || undefined,
     notes: formData.get("notes") || undefined,
   });
   if (!parsed.success) {
@@ -396,7 +399,12 @@ export async function createMeetingAction(
 
   const opportunity = await prisma.opportunity.findUnique({
     where: { id: parsed.data.opportunityId },
-    select: { organizationId: true, assignedToId: true },
+    select: {
+      organizationId: true,
+      assignedToId: true,
+      title: true,
+      contact: { select: { fullName: true, phone: true } },
+    },
   });
   if (!opportunity || opportunity.organizationId !== organizationId) {
     return { error: "Cliente no encontrado" };
@@ -410,13 +418,31 @@ export async function createMeetingAction(
     return { error: "Fecha inválida" };
   }
 
+  const durationMinutes = parsed.data.durationMinutes ?? 30;
+  let meetingUrl = parsed.data.meetingUrl || null;
+
+  if (!meetingUrl && parsed.data.withGoogleMeet) {
+    if (!isGoogleMeetEnabled()) {
+      return { error: "Google Meet no está configurado en el servidor. Contactá al administrador." };
+    }
+    try {
+      meetingUrl = await createMeetEvent({
+        summary: `Reunión con ${opportunity.contact.fullName || opportunity.contact.phone} — ${opportunity.title}`,
+        scheduledAt,
+        durationMinutes,
+      });
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : "No se pudo crear el evento en Google Calendar." };
+    }
+  }
+
   await prisma.meeting.create({
     data: {
       organizationId,
       opportunityId: parsed.data.opportunityId,
       scheduledAt,
-      durationMinutes: parsed.data.durationMinutes ?? 30,
-      meetingUrl: parsed.data.meetingUrl || null,
+      durationMinutes,
+      meetingUrl,
       notes: parsed.data.notes || null,
       status: parsed.data.notes ? "DONE" : "SCHEDULED",
     },

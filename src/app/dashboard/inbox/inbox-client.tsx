@@ -29,6 +29,8 @@ import {
   setConversationStatusAction,
   setConversationBlockedAction,
   markConversationFromAdAction,
+  pauseBotAction,
+  resumeBotAction,
 } from "@/server/actions/conversation-panel";
 import { vendorColor } from "@/lib/vendor-color";
 import { usePushNotifications } from "@/lib/use-push-notifications";
@@ -756,6 +758,15 @@ export function InboxClient({
     });
   }
 
+  function toggleBot() {
+    const id = selectedIdRef.current;
+    if (!id) return;
+    const next = !conversationBotPaused;
+    setConversationBotPaused(next);
+    const action = next ? pauseBotAction(id) : resumeBotAction(id);
+    action.then(() => fetchConversations());
+  }
+
   function markFromAd() {
     const id = selectedIdRef.current;
     if (!id) return;
@@ -977,15 +988,30 @@ export function InboxClient({
                   <p className="truncate font-mono text-xs text-ink-faint">{customerPhone}</p>
                 )}
               </div>
-              {conversationAiEnabled && conversationBotPaused && messages.at(-1)?.role === "SYSTEM" && (
-                <span className="flex shrink-0 items-center gap-1 rounded-full bg-danger-dim px-2.5 py-1 text-xs font-medium text-danger">
-                  <AlertTriangle size={12} /> Necesita atención
-                </span>
+              {conversationAiEnabled && conversationBotPaused && (
+                <button
+                  type="button"
+                  onClick={toggleBot}
+                  title="Reactivar el bot en esta conversación"
+                  className={`flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                    messages.at(-1)?.role === "SYSTEM"
+                      ? "bg-danger-dim text-danger hover:opacity-80"
+                      : "bg-surface-2 text-ink-muted hover:text-ink"
+                  }`}
+                >
+                  {messages.at(-1)?.role === "SYSTEM" && <AlertTriangle size={12} />}
+                  {messages.at(-1)?.role === "SYSTEM" ? "Necesita atención" : "Bot pausado"} · Reactivar
+                </button>
               )}
               {conversationAiEnabled && !conversationBotPaused && (
-                <span className="flex shrink-0 items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
-                  <BotIcon size={12} /> Bot activo
-                </span>
+                <button
+                  type="button"
+                  onClick={toggleBot}
+                  title="Tomar control: pausa el bot en esta conversación sin mandar ningún mensaje"
+                  className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent transition-colors hover:opacity-80"
+                >
+                  <BotIcon size={12} /> Bot activo · Tomar control
+                </button>
               )}
               {assignedTo && (
                 <span

@@ -124,6 +124,10 @@ Reglas duras, siempre:
 - Usa lo que el cliente ya explicó, aunque lo haya contado de pasada al responder otra pregunta. Si un
   dato ya se sabe (por la conversación o por la MEMORIA ANTERIOR) no lo vuelvas a preguntar ni pidas más
   detalle sobre algo que ya quedó claro — avanza directo a lo que todavía falta.
+- Si en la conversación aparecen mensajes de "Vendedor humano" (alguien del equipo tomó el chat un rato
+  y después te reactivaron), leelos igual que los del cliente: no repitas preguntas que ya respondió ahí,
+  no contradigas nada que esa persona ya le dijo al cliente, y seguí la charla de forma natural desde
+  donde quedó.
 - No inventes información que el cliente no dio.
 - No ofrezcas ni menciones soluciones concretas de ProShop todavía — eso se hace en la reunión de diagnóstico.
 - No hagas el diagnóstico completo por WhatsApp (presupuesto, volumen exacto, decisor, urgencia, etc.):
@@ -198,7 +202,11 @@ async function buildInput(conversation: ConversationForBot, slots: MeetingSlot[]
       take: 40,
     }),
     prisma.message.findMany({
-      where: { conversationId: conversation.id, role: { in: ["CUSTOMER", "BOT"] } },
+      // Incluye STAFF: si un vendedor tomó la conversación un rato y
+      // después la reactivó, el bot tiene que ver lo que la persona ya
+      // contestó — si no, puede repreguntar algo que el cliente ya le
+      // aclaró a un humano.
+      where: { conversationId: conversation.id, role: { in: ["CUSTOMER", "BOT", "STAFF"] } },
       select: { role: true, content: true, createdAt: true },
       orderBy: { createdAt: "desc" },
       take: 40,
@@ -216,11 +224,12 @@ async function buildInput(conversation: ConversationForBot, slots: MeetingSlot[]
     ? toneItems.map((k) => `${k.title}\n${k.content}`).join("\n\n---\n\n")
     : "(No hay tono cargado. Usa un tono cercano, sencillo y profesional.)";
 
+  const speakerLabel = { CUSTOMER: "Cliente", BOT: "Bot", STAFF: "Vendedor humano" } as const;
   const conversationText = recentMessages.length
     ? recentMessages
         .slice()
         .reverse()
-        .map((m) => `${m.role === "CUSTOMER" ? "Cliente" : "Bot"}: ${m.content}`)
+        .map((m) => `${speakerLabel[m.role as "CUSTOMER" | "BOT" | "STAFF"]}: ${m.content}`)
         .join("\n")
     : "(Sin mensajes previos — es el primer mensaje de esta conversación.)";
 

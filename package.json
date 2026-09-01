@@ -8,7 +8,8 @@
     "start": "next start -H 0.0.0.0",
     "lint": "eslint",
     "test": "vitest run",
-    "db:backup": "bash scripts/backup-db.sh"
+    "db:backup": "bash scripts/backup-db.sh",
+    "google:refresh-token": "tsx scripts/get-google-refresh-token.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1096.0",

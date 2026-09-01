@@ -47,6 +47,7 @@ const createSchema = z
     estimatedValue: z.coerce.number().nonnegative().optional(),
     nextAction: z.string().max(300).optional(),
     nextActionAt: z.string().optional(),
+    expectedCloseDate: z.string().optional(),
   })
   .refine((d) => d.contactId || d.newContactPhone, {
     message: "Elegí un contacto o cargá el teléfono de uno nuevo",
@@ -67,6 +68,7 @@ export async function createOpportunityAction(
     estimatedValue: formData.get("estimatedValue") || undefined,
     nextAction: formData.get("nextAction") || undefined,
     nextActionAt: formData.get("nextActionAt") || undefined,
+    expectedCloseDate: formData.get("expectedCloseDate") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -107,6 +109,7 @@ export async function createOpportunityAction(
       estimatedValue: parsed.data.estimatedValue ?? null,
       nextAction: parsed.data.nextAction ?? null,
       nextActionAt: parsed.data.nextActionAt ? new Date(parsed.data.nextActionAt) : null,
+      expectedCloseDate: parsed.data.expectedCloseDate ? new Date(parsed.data.expectedCloseDate) : null,
       // El admin carga clientes para el equipo: quedan sin asignar y
       // cualquier vendedor los puede tomar. Un vendedor que agrega uno
       // propio se lo asigna directo, como ya hacía antes.
@@ -142,6 +145,8 @@ const fieldSchema = z.discriminatedUnion("field", [
   z.object({ field: z.literal("nextActionAt"), value: z.string() }),
   z.object({ field: z.literal("probability"), value: z.coerce.number().min(0).max(100) }),
   z.object({ field: z.literal("lostReason"), value: z.string().max(500) }),
+  z.object({ field: z.literal("estimatedValue"), value: z.coerce.number().nonnegative() }),
+  z.object({ field: z.literal("expectedCloseDate"), value: z.string() }),
   // "" = sin asignar (lo suelta el vendedor, o el admin lo deja libre para
   // que cualquiera lo tome). Cualquier otro valor debe ser un userId real.
   z.object({ field: z.literal("assignedToId"), value: z.string().max(60) }),
@@ -189,6 +194,12 @@ export async function updateOpportunityFieldAction(
       break;
     case "probability":
       data.probability = Math.round(parsed.data.value);
+      break;
+    case "estimatedValue":
+      data.estimatedValue = parsed.data.value;
+      break;
+    case "expectedCloseDate":
+      data.expectedCloseDate = parsed.data.value ? new Date(parsed.data.value) : null;
       break;
     case "assignedToId": {
       const targetId = parsed.data.value || null;

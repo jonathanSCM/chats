@@ -23,6 +23,7 @@ import {
   FileText,
   AlertTriangle,
   Eye,
+  TrendingUp,
 } from "lucide-react";
 import {
   createOpportunityAction,
@@ -53,6 +54,7 @@ import {
 } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 import { KanbanBoard } from "./kanban-board";
+import { AnalysisView } from "./analysis-view";
 
 export interface MeetingAttachmentInfo {
   id: string;
@@ -71,6 +73,8 @@ export interface Row {
   service: string;
   need: string;
   stage: Stage;
+  estimatedValue: number | null;
+  expectedCloseDate: string | null;
   lastUpdate: string;
   priority: Priority | null;
   nextContactAt: string | null;
@@ -217,6 +221,12 @@ function dateInputValue(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
 }
 
+const money = new Intl.NumberFormat("es", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+
 export function TrackingTable({
   rows,
   contacts,
@@ -230,7 +240,7 @@ export function TrackingTable({
   ai,
 }: Props) {
   const [creating, setCreating] = useState(false);
-  const [boardView, setBoardView] = useState<"table" | "kanban">("table");
+  const [boardView, setBoardView] = useState<"table" | "kanban" | "analisis">("table");
 
   // Barra de scroll horizontal "espejo", pegada abajo de la pantalla: la
   // tabla puede tener muchas filas, y la barra nativa del navegador queda
@@ -613,6 +623,16 @@ export function TrackingTable({
             >
               <LayoutGrid size={13} />
             </button>
+            <button
+              type="button"
+              onClick={() => setBoardView("analisis")}
+              title="Vista de análisis"
+              className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                boardView === "analisis" ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              <TrendingUp size={13} />
+            </button>
           </div>
           {!viewingArchived && (
             <Button type="button" onClick={() => setCreating(true)}>
@@ -648,6 +668,8 @@ export function TrackingTable({
         <KanbanBoard rows={filtered} currentUserId={currentUserId} isAdmin={isAdmin} onOpen={setDetail} />
       )}
 
+      {boardView === "analisis" && <AnalysisView isAdmin={isAdmin} />}
+
       {rows.length > 0 && boardView === "table" && (
         <>
         <div ref={tableScrollRef} onScroll={handleTableScroll} className="-mx-4 overflow-x-auto md:-mx-8">
@@ -669,6 +691,7 @@ export function TrackingTable({
                   <SortableTh field="stage" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>
                     Estado
                   </SortableTh>
+                  <Th>Valor</Th>
                   <Th>Próxima acción</Th>
                   <Th>Última actualización</Th>
                   {/* De aquí en adelante lo llena el asesor IA */}
@@ -1021,6 +1044,21 @@ function TableRow({
         </Select>
       </Td>
 
+      <Td>
+        <Input
+          type="number"
+          min="0"
+          defaultValue={row.estimatedValue ?? ""}
+          disabled={locked}
+          placeholder="USD"
+          onBlur={(e) => {
+            if (!e.target.value) return;
+            save("estimatedValue", String(Math.max(0, Number(e.target.value))));
+          }}
+          className="w-24 py-1.5 text-sm"
+        />
+      </Td>
+
       <Td className="max-w-[11rem]">
         <NextActionCell row={row} locked={locked} onSave={save} />
       </Td>
@@ -1125,7 +1163,7 @@ function TableRow({
     </tr>
     {error && (
       <tr>
-        <td colSpan={16} className="border-b border-border px-3 pb-2 text-xs text-danger">
+        <td colSpan={17} className="border-b border-border px-3 pb-2 text-xs text-danger">
           {error}
         </td>
       </tr>
@@ -1311,6 +1349,14 @@ function CreateForm({
           <Label htmlFor="nextActionAt">Fecha</Label>
           <Input id="nextActionAt" name="nextActionAt" type="date" />
         </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="estimatedValue">Valor estimado (USD, opcional)</Label>
+          <Input id="estimatedValue" name="estimatedValue" type="number" min="0" placeholder="USD" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="expectedCloseDate">Fecha esperada de cierre (opcional)</Label>
+          <Input id="expectedCloseDate" name="expectedCloseDate" type="date" />
+        </div>
       </div>
 
       {state.error && <p className="text-sm text-danger">{state.error}</p>}
@@ -1460,6 +1506,37 @@ function DetailPanel({
             {(!row.nextAction || !row.nextActionAt) && (
               <p className="flex items-center gap-1 text-xs text-warning">
                 <AlertTriangle size={11} /> Sin próxima acción
+              </p>
+            )}
+          </Field>
+
+          <Field label="Valor estimado / fecha esperada de cierre">
+            {editable ? (
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  defaultValue={row.estimatedValue ?? ""}
+                  disabled={locked}
+                  placeholder="USD"
+                  onBlur={(e) => {
+                    if (!e.target.value) return;
+                    save("estimatedValue", String(Math.max(0, Number(e.target.value))));
+                  }}
+                  className="flex-1 py-1.5 text-sm"
+                />
+                <Input
+                  type="date"
+                  defaultValue={dateInputValue(row.expectedCloseDate)}
+                  disabled={locked}
+                  onBlur={(e) => save("expectedCloseDate", e.target.value)}
+                  className="w-36 py-1.5 text-sm"
+                />
+              </div>
+            ) : (
+              <p className="text-sm leading-relaxed text-ink-muted">
+                {row.estimatedValue !== null ? money.format(row.estimatedValue) : "—"}
+                {row.expectedCloseDate && ` · ${dateShort(row.expectedCloseDate)}`}
               </p>
             )}
           </Field>

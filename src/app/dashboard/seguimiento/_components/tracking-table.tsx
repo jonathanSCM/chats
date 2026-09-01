@@ -237,6 +237,14 @@ export function TrackingTable({
     return () => observer.disconnect();
   }, [boardView]);
   const [detail, setDetail] = useState<Row | null>(null);
+  // `detail` es una foto fija tomada al abrir la ficha — si el servidor
+  // revalida `rows` mientras está abierta (ej. al guardar una reunión), hay
+  // que refrescarla con los datos nuevos o la ficha se queda mostrando lo
+  // viejo aunque el guardado haya funcionado.
+  if (detail) {
+    const fresh = rows.find((r) => r.id === detail.id);
+    if (fresh && fresh !== detail) setDetail(fresh);
+  }
   const [openedFromLink, setOpenedFromLink] = useState(false);
   if (openId && !openedFromLink) {
     const match = rows.find((r) => r.id === openId);

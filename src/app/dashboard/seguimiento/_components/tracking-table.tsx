@@ -53,8 +53,11 @@ import {
   isOpenStage,
   hasCompleteNextAction,
   missingForStage,
+  ALL_LOSS_REASONS,
+  LOSS_REASON_LABEL,
   type Stage,
   type Priority,
+  type LossReason,
 } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 import { KanbanBoard } from "./kanban-board";
@@ -110,6 +113,7 @@ export interface Row {
   sortOrder: number;
   assignedTo: { id: string; name: string; color: string | null } | null;
   lostReason: string;
+  lostReasonCategory: LossReason | null;
 }
 
 const LEAD_SCORE_BREAKDOWN_LABEL: Record<string, [string, number]> = {
@@ -153,6 +157,12 @@ interface Props {
   viewingAllStages: boolean;
   /** Si viene de `?open=<id>` (ej. desde el botón del inbox), abre ese cliente ni bien carga. */
   openId?: string;
+  /** Click-through desde el Dashboard: preseleccionan filtros al cargar. */
+  initialStage?: Stage;
+  initialQuickFilter?: string;
+  initialAssignee?: string;
+  initialSource?: string;
+  initialService?: string;
   summary: {
     activeCount: number;
     overdueCount: number;
@@ -249,6 +259,11 @@ export function TrackingTable({
   viewingArchived,
   viewingAllStages,
   openId,
+  initialStage,
+  initialQuickFilter,
+  initialAssignee,
+  initialSource,
+  initialService,
   summary,
   ai,
 }: Props) {
@@ -295,20 +310,27 @@ export function TrackingTable({
     }
   }
   const [query, setQuery] = useState("");
-  const [stageFilter, setStageFilter] = useState<Stage | "">("");
+  const [stageFilter, setStageFilter] = useState<Stage | "">(initialStage ?? "");
   const [priorityFilter, setPriorityFilter] = useState<Priority | "">("");
   // Filtra por "Fecha de próxima acción" (nextActionAt) — pedido explícito
   // del scope: es el campo que de verdad usa el equipo para planear el
   // día, más que la fecha de registro.
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [assigneeFilter, setAssigneeFilter] = useState("");
-  const [serviceFilter, setServiceFilter] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState(initialAssignee ?? "");
+  const [serviceFilter, setServiceFilter] = useState(initialService ?? "");
+  const [sourceFilter, setSourceFilter] = useState(initialSource ?? "");
   // Chips rápidos sobre la fecha de próxima acción — mismo campo
   // (nextActionAt) que el rango de arriba, solo que como atajos de un
-  // clic para los rangos más comunes.
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
+  // clic para los rangos más comunes. Click-through desde el Dashboard
+  // manda la key como string por la URL — se valida contra las keys
+  // reales antes de usarla como estado inicial.
+  const VALID_QUICK_FILTERS: QuickFilter[] = ["hoy", "vencidos", "semana", "alta", "sin_accion", "atencion"];
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>(
+    VALID_QUICK_FILTERS.includes(initialQuickFilter as QuickFilter)
+      ? (initialQuickFilter as QuickFilter)
+      : null,
+  );
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   // "Ordenar por: Más urgente" (scope §8): orden compuesto fijo, no una
@@ -1667,12 +1689,27 @@ function DetailPanel({
 
           {row.stage === "PERDIDO" && editable && (
             <Field label="Motivo de la pérdida">
-              <EditableText
-                value={row.lostReason}
-                disabled={locked}
-                onSave={(v) => save("lostReason", v)}
-                placeholder="Precio, tiempos, se fue con otro proveedor…"
-              />
+              <div className="space-y-1.5">
+                <Select
+                  value={row.lostReasonCategory ?? ""}
+                  disabled={locked}
+                  onChange={(e) => save("lostReasonCategory", e.target.value)}
+                  className="w-full py-1.5 text-sm"
+                >
+                  <option value="">Elegir motivo…</option>
+                  {ALL_LOSS_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {LOSS_REASON_LABEL[r]}
+                    </option>
+                  ))}
+                </Select>
+                <EditableText
+                  value={row.lostReason}
+                  disabled={locked}
+                  onSave={(v) => save("lostReason", v)}
+                  placeholder="Detalle (opcional): precio, tiempos, se fue con otro proveedor…"
+                />
+              </div>
             </Field>
           )}
 

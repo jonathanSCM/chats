@@ -550,6 +550,20 @@ enum DataStatus {
   UNKNOWN
 }
 
+// Categoría fija para poder rankear motivos de pérdida en el Dashboard —
+// `lostReason` (texto libre) sigue existiendo como el detalle de esta
+// categoría, no se reemplaza.
+enum LossReason {
+  PRESUPUESTO
+  SIN_URGENCIA
+  ELIGIO_COMPETENCIA
+  NO_RESPONDIO
+  PROYECTO_CANCELADO
+  NO_FIT
+  DECISION_POSTERGADA
+  OTRO
+}
+
 model Opportunity {
   id             String       @id @default(cuid())
   organizationId String
@@ -619,6 +633,7 @@ model Opportunity {
   wonAt          DateTime?
   lostAt         DateTime?
   lostReason     String?
+  lostReasonCategory LossReason?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

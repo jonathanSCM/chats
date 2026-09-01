@@ -1,0 +1,12 @@
+CREATE TYPE "LossReason" AS ENUM (
+  'PRESUPUESTO',
+  'SIN_URGENCIA',
+  'ELIGIO_COMPETENCIA',
+  'NO_RESPONDIO',
+  'PROYECTO_CANCELADO',
+  'NO_FIT',
+  'DECISION_POSTERGADA',
+  'OTRO'
+);
+
+ALTER TABLE "opportunities" ADD COLUMN "lostReasonCategory" "LossReason";

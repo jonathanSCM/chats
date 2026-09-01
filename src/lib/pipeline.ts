@@ -130,3 +130,35 @@ export const PRIORITY_COLOR: Record<Priority, string> = {
 
 /** Servicios que ofrece la empresa, como los escribe el equipo. */
 export const SERVICES = ["AGENTES IA", "SISTEMAS", "APP", "TAXI"] as const;
+
+export type LossReason =
+  | "PRESUPUESTO"
+  | "SIN_URGENCIA"
+  | "ELIGIO_COMPETENCIA"
+  | "NO_RESPONDIO"
+  | "PROYECTO_CANCELADO"
+  | "NO_FIT"
+  | "DECISION_POSTERGADA"
+  | "OTRO";
+
+export const ALL_LOSS_REASONS: LossReason[] = [
+  "PRESUPUESTO",
+  "SIN_URGENCIA",
+  "ELIGIO_COMPETENCIA",
+  "NO_RESPONDIO",
+  "PROYECTO_CANCELADO",
+  "NO_FIT",
+  "DECISION_POSTERGADA",
+  "OTRO",
+];
+
+export const LOSS_REASON_LABEL: Record<LossReason, string> = {
+  PRESUPUESTO: "Presupuesto",
+  SIN_URGENCIA: "Sin urgencia",
+  ELIGIO_COMPETENCIA: "Eligió competencia",
+  NO_RESPONDIO: "No respondió",
+  PROYECTO_CANCELADO: "Proyecto cancelado",
+  NO_FIT: "No fit",
+  DECISION_POSTERGADA: "Decisión postergada",
+  OTRO: "Otro",
+};

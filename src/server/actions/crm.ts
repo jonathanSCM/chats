@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { audit } from "@/server/services/audit";
-import { ALL_STAGES, OPEN_STAGES, type Stage } from "@/lib/pipeline";
+import { ALL_STAGES, OPEN_STAGES, ALL_LOSS_REASONS, type Stage, type LossReason } from "@/lib/pipeline";
 import { analyzeFollowUp } from "@/server/services/ai/follow-up";
 import { isAiEnabled, isWithinBudget, spentToday } from "@/server/services/ai/client";
 import { saveMediaFile, deleteMediaFile } from "@/lib/media-storage";
@@ -145,6 +145,10 @@ const fieldSchema = z.discriminatedUnion("field", [
   z.object({ field: z.literal("nextActionAt"), value: z.string() }),
   z.object({ field: z.literal("probability"), value: z.coerce.number().min(0).max(100) }),
   z.object({ field: z.literal("lostReason"), value: z.string().max(500) }),
+  z.object({
+    field: z.literal("lostReasonCategory"),
+    value: z.union([z.enum(ALL_LOSS_REASONS as [LossReason, ...LossReason[]]), z.literal("")]),
+  }),
   z.object({ field: z.literal("estimatedValue"), value: z.coerce.number().nonnegative() }),
   z.object({ field: z.literal("expectedCloseDate"), value: z.string() }),
   // "" = sin asignar (lo suelta el vendedor, o el admin lo deja libre para
@@ -200,6 +204,9 @@ export async function updateOpportunityFieldAction(
       break;
     case "expectedCloseDate":
       data.expectedCloseDate = parsed.data.value ? new Date(parsed.data.value) : null;
+      break;
+    case "lostReasonCategory":
+      data.lostReasonCategory = parsed.data.value || null;
       break;
     case "assignedToId": {
       const targetId = parsed.data.value || null;

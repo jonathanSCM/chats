@@ -7,6 +7,7 @@ import {
   HIDDEN_BY_DEFAULT_STAGES,
   type Stage,
   type Priority,
+  type LossReason,
 } from "@/lib/pipeline";
 import { getAiSpendToday } from "@/server/actions/crm";
 import { TrackingTable } from "./_components/tracking-table";
@@ -14,12 +15,30 @@ import { TrackingTable } from "./_components/tracking-table";
 export default async function SeguimientoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ archived?: string; open?: string; estado?: string }>;
+  searchParams: Promise<{
+    archived?: string;
+    open?: string;
+    estado?: string;
+    stage?: string;
+    quick?: string;
+    vendedor?: string;
+    fuente?: string;
+    servicio?: string;
+  }>;
 }) {
   const session = await auth();
   if (!session?.user.organizationId) redirect("/dashboard");
 
-  const { archived, open: openId, estado } = await searchParams;
+  const {
+    archived,
+    open: openId,
+    estado,
+    stage: initialStage,
+    quick: initialQuickFilter,
+    vendedor: initialAssignee,
+    fuente: initialSource,
+    servicio: initialService,
+  } = await searchParams;
   const viewingArchived = archived === "1";
   // Independiente de "archivado": oculta por defecto lo Ganado/Perdido/En
   // pausa (siguen existiendo, solo no compiten visualmente con lo activo).
@@ -104,6 +123,7 @@ export default async function SeguimientoPage({
     aiAlerts: o.aiAlerts ?? "",
     authorityLevel: o.authorityLevel ?? "",
     lostReason: o.lostReason ?? "",
+    lostReasonCategory: (o.lostReasonCategory as LossReason | null) ?? null,
     archived: o.archivedAt !== null,
     sortOrder: o.sortOrder,
     meetings: o.meetings.map((m) => ({
@@ -147,6 +167,11 @@ export default async function SeguimientoPage({
         viewingArchived={viewingArchived}
         viewingAllStages={viewingAllStages}
         openId={openId}
+        initialStage={initialStage as Stage | undefined}
+        initialQuickFilter={initialQuickFilter}
+        initialAssignee={initialAssignee}
+        initialSource={initialSource}
+        initialService={initialService}
         ai={ai}
         summary={{
           activeCount: open.length,

@@ -87,9 +87,17 @@ export async function joinAndRecord(options: JoinOptions): Promise<void> {
  * aceptable (alguien admite al bot a mano, como a cualquier invitado nuevo).
  */
 async function joinMeeting(page: Page): Promise<void> {
+  // El botón de unirse queda deshabilitado hasta completar el nombre — con
+  // `isVisible()` (que no espera, solo mira el estado actual) el campo podía
+  // no existir todavía si la página seguía en "Preparando la llamada..."; con
+  // `waitFor` se espera de verdad a que aparezca antes de decidir si hay que
+  // completarlo o no.
   const nameInput = page.getByRole("textbox", { name: /tu nombre|your name/i });
-  if (await nameInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
+  try {
+    await nameInput.waitFor({ state: "visible", timeout: 15_000 });
     await nameInput.fill("Bot ProShop (grabando)");
+  } catch {
+    // No pidió nombre — probablemente ya hay una sesión reconocida y entra directo.
   }
 
   const joinButton = page.getByRole("button", {

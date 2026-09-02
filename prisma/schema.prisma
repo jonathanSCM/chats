@@ -703,8 +703,8 @@ enum MeetingBotStatus {
   PENDING
   JOINING
   RECORDING
-  RECORDED // audio ya subido, a la espera de que alguien pida transcribir (o ya vino con transcripción de subtítulos, ver Meeting.transcript)
-  TRANSCRIBING
+  RECORDED // legado: reuniones grabadas antes de que whisper.cpp transcribiera siempre solo — ya no se usa para reuniones nuevas
+  TRANSCRIBING // legado, ídem
   DONE
   FAILED
 }
@@ -724,7 +724,8 @@ model Meeting {
   botStatus       MeetingBotStatus?
   botJoinedAt     DateTime? // cuándo el bot quedó admitido de verdad en la llamada
   botLeftAt       DateTime? // cuándo terminó de grabar y subió el audio
-  transcript      String?           @db.Text // de subtítulos en vivo (con nombres) o de Whisper a pedido — separado de `notes`
+  transcript      String?           @db.Text // de subtítulos en vivo, con nombre de quién habló — separado de `notes`
+  audioTranscript String?           @db.Text // whisper.cpp local sobre el audio completo, sin nombres — complementa transcript cuando los subtítulos tienen huecos o fallaron
   notes           String?           @db.Text // texto cargado a mano por el vendedor, nunca lo pisa el bot
   aiSummary       String?           @db.Text
   createdAt       DateTime          @default(now())

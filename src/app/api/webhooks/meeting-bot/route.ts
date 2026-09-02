@@ -74,26 +74,30 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // La transcripción ya NO se dispara sola acá — si el bot mandó los
-  // subtítulos que leyó en vivo (con nombre de quién habló), esa ya es la
-  // transcripción definitiva, sin necesidad de Whisper. Si no vinieron
-  // (falló la lectura de subtítulos, o Meet no los mostró), queda en
-  // "RECORDED" — el audio está listo para bajar, y alguien tiene que pedir
-  // la transcripción a mano (botón "Transcribir" en la UI) si la quiere.
+  // Dos transcripciones que se complementan, ninguna bloquea a la otra: los
+  // subtítulos en vivo de Meet (con nombre de quién habló, pero pueden tener
+  // huecos) y whisper.cpp corrido local en el bot sobre el audio completo
+  // (sin nombres, pero sin huecos). Ya no hace falta pedir la transcripción
+  // a mano — whisper.cpp es gratis, así que el bot ya la manda siempre.
   const captionsTranscriptRaw = form.get("captionsTranscript");
   const captionsTranscriptTrimmed = typeof captionsTranscriptRaw === "string" ? captionsTranscriptRaw.trim() : "";
-  // Filtro de sanidad extra (además del que ya hace el bot antes de mandarlo):
-  // un match de subtítulos real trae varias líneas de diálogo — un texto
-  // corto casi seguro viene de un elemento de la interfaz equivocado, no de
-  // subtítulos de verdad. Mejor caer al fallback de Whisper que mostrar algo
-  // que no es la transcripción real.
+  // Filtro de sanidad (además del que ya hace el bot antes de mandarlo): un
+  // match de subtítulos real trae varias líneas de diálogo — un texto corto
+  // casi seguro viene de un elemento de la interfaz equivocado, no de
+  // subtítulos de verdad.
   const captionsTranscript = captionsTranscriptTrimmed.length >= 40 ? captionsTranscriptTrimmed : "";
+
+  const audioTranscriptRaw = form.get("audioTranscript");
+  const audioTranscript = typeof audioTranscriptRaw === "string" ? audioTranscriptRaw.trim() : "";
 
   await prisma.meeting.update({
     where: { id: meetingId },
-    data: captionsTranscript
-      ? { botStatus: "DONE", botLeftAt: new Date(), transcript: captionsTranscript }
-      : { botStatus: "RECORDED", botLeftAt: new Date() },
+    data: {
+      botStatus: "DONE",
+      botLeftAt: new Date(),
+      transcript: captionsTranscript || null,
+      audioTranscript: audioTranscript || null,
+    },
   });
 
   return NextResponse.json({ ok: true });

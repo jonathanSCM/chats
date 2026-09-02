@@ -4,6 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { startRecording } from "./record-audio";
 import { uploadRecording, notifyFailure, notifyRecording } from "./upload-recording";
 import { enableCaptions, startCapturingCaptions, type CaptionsCapture } from "./captions";
+import { transcribeWithWhisperCpp } from "./transcribe-audio";
 
 const PROFILE_DIR = process.env.CHROME_PROFILE_DIR || "/data/chrome-profile";
 // Capturas y volcados de accesibilidad en los pasos clave — útiles mientras
@@ -103,8 +104,20 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
   if (stopRecordingFn) await stopRecordingFn();
   await context.close().catch(() => {});
 
+  // Complemento gratis y local a los subtítulos en vivo: cubre los huecos
+  // que estos puedan tener (no se activaron a tiempo, Meet los perdió en
+  // algún tramo). Best-effort -- si falla, se sube igual lo que sí se tiene
+  // (audio + subtítulos), no se trata como un fallo de toda la reunión.
+  let audioTranscript = "";
   try {
-    await uploadRecording(callbackUrl, meetingId, recordingPath, captionsTranscript);
+    audioTranscript = await transcribeWithWhisperCpp(recordingPath);
+    console.log(`[meeting-bot] whisper.cpp transcribió ${audioTranscript.length} caracteres para ${meetingId}.`);
+  } catch (error) {
+    console.warn(`[meeting-bot] No se pudo transcribir el audio con whisper.cpp para ${meetingId}:`, error);
+  }
+
+  try {
+    await uploadRecording(callbackUrl, meetingId, recordingPath, captionsTranscript, audioTranscript);
   } catch (error) {
     await notifyFailure(callbackUrl, meetingId, `No se pudo subir la grabación: ${error}`);
   }

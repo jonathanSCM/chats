@@ -11,7 +11,7 @@ import { isAiEnabled, isWithinBudget, spentToday } from "@/server/services/ai/cl
 import { saveMediaFile, deleteMediaFile } from "@/lib/media-storage";
 import { createMeetEvent, isGoogleMeetEnabled } from "@/server/services/google-calendar";
 import { scheduleMeetingBotJoin, stopMeetingBot } from "@/server/services/meeting-bot";
-import { requestMeetingTranscription, requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
+import { requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
 import type { ActionState } from "./types";
 
 const PATH = "/dashboard/seguimiento";
@@ -538,27 +538,6 @@ export async function stopMeetingBotAction(meetingId: string): Promise<ActionSta
 
   revalidatePath(PATH);
   return { error: null, message: "Avisado — el bot debería salir en breve." };
-}
-
-export async function transcribeMeetingAction(meetingId: string): Promise<ActionState> {
-  const { organizationId, userId, isAdmin } = await requireOrg();
-
-  const meeting = await prisma.meeting.findUnique({
-    where: { id: meetingId },
-    include: { opportunity: { select: { assignedToId: true } } },
-  });
-  if (!meeting || meeting.organizationId !== organizationId) {
-    return { error: "Reunión no encontrada" };
-  }
-  if (meeting.opportunity && !canEditOpportunity(meeting.opportunity, userId, isAdmin)) {
-    return { error: "Este cliente está asignado a otro vendedor." };
-  }
-
-  const result = await requestMeetingTranscription(meetingId);
-  if (!result.ok) return { error: result.error ?? "No se pudo pedir la transcripción" };
-
-  revalidatePath(PATH);
-  return { error: null, message: "Transcribiendo — puede tardar unos minutos." };
 }
 
 export async function generateMeetingSummaryPdfAction(meetingId: string): Promise<ActionState> {

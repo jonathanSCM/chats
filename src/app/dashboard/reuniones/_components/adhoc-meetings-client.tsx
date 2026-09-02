@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { Plus, X, Copy, Trash2, Clock, Video, Zap, PhoneOff, FileDown, FileSearch } from "lucide-react";
+import { Plus, X, Copy, Trash2, Clock, Video, Zap, PhoneOff, FileDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import {
   deleteAdhocMeetingAction,
   joinMeetingNowAction,
   stopMeetingBotAction,
-  transcribeMeetingAction,
   generateMeetingSummaryPdfAction,
 } from "@/server/actions/adhoc-meetings";
 import { scheduledAtToUtcHidden } from "@/lib/datetime-local";
@@ -30,6 +29,7 @@ export interface AdhocMeetingRow {
   botLeftAt: string | null;
   notes: string;
   transcript: string;
+  audioTranscript: string;
   aiSummary: string;
   attachments: MeetingAttachmentInfo[];
 }
@@ -97,15 +97,6 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
 
   const [actionPendingId, setActionPendingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
-  function handleTranscribe(id: string) {
-    setActionPendingId(id);
-    setActionError(null);
-    startTransition(async () => {
-      const result = await transcribeMeetingAction(id);
-      setActionPendingId(null);
-      if (result.error) setActionError({ id, message: result.error });
-    });
-  }
   function handleGenerateSummary(id: string) {
     setActionPendingId(id);
     setActionError(null);
@@ -216,18 +207,7 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
                     <PhoneOff size={11} /> {stoppingId === m.id ? "Deteniendo…" : "Detener bot"}
                   </button>
                 )}
-                {m.botStatus === "RECORDED" && (
-                  <button
-                    type="button"
-                    disabled={isPending || actionPendingId === m.id}
-                    onClick={() => handleTranscribe(m.id)}
-                    title="Transcribir el audio con Whisper (sin nombres de quién habló)"
-                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <FileSearch size={11} /> {actionPendingId === m.id ? "Pidiendo…" : "Transcribir"}
-                  </button>
-                )}
-                {m.transcript && !pdfAttachment && (
+                {(m.transcript || m.audioTranscript) && !pdfAttachment && (
                   <button
                     type="button"
                     disabled={isPending || actionPendingId === m.id}
@@ -301,9 +281,18 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
               {m.transcript && (
                 <details className="text-xs text-ink-muted">
                   <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-                    Transcripción
+                    Transcripción (con nombres)
                   </summary>
                   <p className="mt-1.5 whitespace-pre-wrap leading-relaxed">{m.transcript}</p>
+                </details>
+              )}
+
+              {m.audioTranscript && (
+                <details className="text-xs text-ink-muted">
+                  <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+                    Transcripción completa del audio (sin nombres)
+                  </summary>
+                  <p className="mt-1.5 whitespace-pre-wrap leading-relaxed">{m.audioTranscript}</p>
                 </details>
               )}
 

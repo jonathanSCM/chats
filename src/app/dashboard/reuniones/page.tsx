@@ -22,6 +22,7 @@ export default async function ReunionesPage() {
       botLeftAt: true,
       notes: true,
       transcript: true,
+      audioTranscript: true,
       aiSummary: true,
       attachments: {
         select: { id: true, url: true, fileName: true, mimeType: true, fileSize: true },
@@ -42,6 +43,7 @@ export default async function ReunionesPage() {
     botLeftAt: m.botLeftAt?.toISOString() ?? null,
     notes: m.notes ?? "",
     transcript: m.transcript ?? "",
+    audioTranscript: m.audioTranscript ?? "",
     aiSummary: m.aiSummary ?? "",
     attachments: m.attachments,
   }));

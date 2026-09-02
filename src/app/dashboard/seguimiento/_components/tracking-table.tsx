@@ -25,7 +25,6 @@ import {
   Bell,
   PhoneOff,
   FileDown,
-  FileSearch,
 } from "lucide-react";
 import {
   createOpportunityAction,
@@ -39,7 +38,6 @@ import {
   updateMeetingNotesAction,
   deleteMeetingAction,
   stopMeetingBotAction,
-  transcribeMeetingAction,
   generateMeetingSummaryPdfAction,
 } from "@/server/actions/crm";
 import { MeetingAttachments, type MeetingAttachmentInfo } from "@/components/meeting-attachments";
@@ -110,6 +108,7 @@ export interface Row {
     botLeftAt: string | null;
     notes: string;
     transcript: string;
+    audioTranscript: string;
     meetingUrl: string | null;
     attachments: MeetingAttachmentInfo[];
   }[];
@@ -1998,19 +1997,10 @@ function MeetingsSection({
     });
   }
 
-  // "Transcribir" y "Generar resumen (PDF)" comparten el mismo tipo de
-  // estado (pendiente + error por reunión) — mismo patrón que "Detener bot".
+  // "Generar resumen (PDF)" tiene su propio estado (pendiente + error por
+  // reunión) — mismo patrón que "Detener bot".
   const [actionPendingId, setActionPendingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
-  function handleTranscribe(id: string) {
-    setActionPendingId(id);
-    setActionError(null);
-    startTransition(async () => {
-      const result = await transcribeMeetingAction(id);
-      setActionPendingId(null);
-      if (result.error) setActionError({ id, message: result.error });
-    });
-  }
   function handleGenerateSummary(id: string) {
     setActionPendingId(id);
     setActionError(null);
@@ -2120,18 +2110,7 @@ function MeetingsSection({
                     <PhoneOff size={10} /> {stoppingId === m.id ? "Deteniendo…" : "Detener bot"}
                   </button>
                 )}
-                {m.botStatus === "RECORDED" && (
-                  <button
-                    type="button"
-                    disabled={isPending || actionPendingId === m.id}
-                    onClick={() => handleTranscribe(m.id)}
-                    title="Transcribir el audio con Whisper (sin nombres de quién habló)"
-                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[10px] text-ink-muted hover:border-accent-dim hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <FileSearch size={10} /> {actionPendingId === m.id ? "Pidiendo…" : "Transcribir"}
-                  </button>
-                )}
-                {m.transcript && !pdfAttachment && (
+                {(m.transcript || m.audioTranscript) && !pdfAttachment && (
                   <button
                     type="button"
                     disabled={isPending || actionPendingId === m.id}
@@ -2194,9 +2173,18 @@ function MeetingsSection({
               {m.transcript && (
                 <details className="mb-1.5 text-xs text-ink-muted">
                   <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-                    Transcripción
+                    Transcripción (con nombres)
                   </summary>
                   <p className="mt-1.5 whitespace-pre-wrap leading-relaxed">{m.transcript}</p>
+                </details>
+              )}
+
+              {m.audioTranscript && (
+                <details className="mb-1.5 text-xs text-ink-muted">
+                  <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+                    Transcripción completa del audio (sin nombres)
+                  </summary>
+                  <p className="mt-1.5 whitespace-pre-wrap leading-relaxed">{m.audioTranscript}</p>
                 </details>
               )}
 

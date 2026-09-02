@@ -1,4 +1,4 @@
-import OpenAI, { toFile } from "openai";
+import OpenAI from "openai";
 import { prisma } from "@/server/db/client";
 
 let client: OpenAI | null = null;
@@ -12,22 +12,6 @@ function getClient(): OpenAI {
 
 export function isAiEnabled(): boolean {
   return Boolean(process.env.OPENAI_API_KEY) && process.env.AI_ENABLED !== "false";
-}
-
-/**
- * Transcribe un audio grabado (ej. la reunión que subió el bot) con Whisper.
- * Endpoint distinto de `runStructured` (que es chat/JSON-schema) — no pasa
- * por el tracking de costo de `AiAnalysis` porque no cobra por tokens sino
- * por minuto de audio (~US$0.006/min); el costo real se ve en la cuenta de
- * OpenAI, no acá.
- */
-export async function transcribeAudio(buffer: Buffer, fileName: string, mimeType: string): Promise<string> {
-  if (!isAiEnabled()) {
-    throw new Error("La IA no está configurada (falta OPENAI_API_KEY)");
-  }
-  const file = await toFile(buffer, fileName, { type: mimeType });
-  const response = await getClient().audio.transcriptions.create({ file, model: "whisper-1" });
-  return response.text;
 }
 
 /**

@@ -3,7 +3,6 @@ import { handleDownloadMedia, markMediaFailed } from "./handlers/download-media"
 import { handleAnalyzeFollowUp } from "./handlers/analyze-follow-up";
 import { handleBotReply } from "./handlers/bot-reply";
 import { handleMeetingBotJoin, markMeetingBotJoinFailed } from "./handlers/meeting-bot-join";
-import { handleMeetingTranscribe, markMeetingTranscribeFailed } from "./handlers/meeting-transcribe";
 import { markBotReplyFailed } from "@/server/services/ai/qualification-bot";
 
 export { enqueue, enqueueOrReschedule } from "./queue";
@@ -18,14 +17,12 @@ const handlers: Record<string, JobHandler> = {
   analyze_follow_up: handleAnalyzeFollowUp,
   bot_reply: handleBotReply,
   meeting_bot_join: handleMeetingBotJoin,
-  meeting_transcribe: handleMeetingTranscribe,
 };
 
 const onExhausted: Record<string, JobExhaustedHandler> = {
   download_media: markMediaFailed,
   bot_reply: markBotReplyFailed,
   meeting_bot_join: markMeetingBotJoinFailed,
-  meeting_transcribe: markMeetingTranscribeFailed,
 };
 
 const BATCH_SIZE = 10;

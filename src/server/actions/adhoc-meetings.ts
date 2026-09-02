@@ -11,7 +11,7 @@ import {
   stopMeetingBot,
   isMeetingBotEnabled,
 } from "@/server/services/meeting-bot";
-import { requestMeetingTranscription, requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
+import { requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
 import { deleteMediaFile } from "@/lib/media-storage";
 import type { ActionState } from "./types";
 
@@ -150,21 +150,6 @@ export async function stopMeetingBotAction(meetingId: string): Promise<ActionSta
 
   revalidatePath(PATH);
   return { error: null, message: "Avisado — el bot debería salir en breve." };
-}
-
-export async function transcribeMeetingAction(meetingId: string): Promise<ActionState> {
-  const { organizationId } = await requireOrg();
-
-  const meeting = await prisma.meeting.findUnique({ where: { id: meetingId }, select: { organizationId: true } });
-  if (!meeting || meeting.organizationId !== organizationId) {
-    return { error: "Reunión no encontrada" };
-  }
-
-  const result = await requestMeetingTranscription(meetingId);
-  if (!result.ok) return { error: result.error ?? "No se pudo pedir la transcripción" };
-
-  revalidatePath(PATH);
-  return { error: null, message: "Transcribiendo — puede tardar unos minutos." };
 }
 
 export async function generateMeetingSummaryPdfAction(meetingId: string): Promise<ActionState> {

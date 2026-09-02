@@ -11,12 +11,14 @@ export async function uploadRecording(
   meetingId: string,
   filePath: string,
   captionsTranscript: string,
+  audioTranscript: string,
 ): Promise<void> {
   const buffer = await readFile(filePath);
   const form = new FormData();
   form.append("meetingId", meetingId);
   form.append("audio", new Blob([buffer], { type: "audio/mpeg" }), `${meetingId}.mp3`);
   if (captionsTranscript) form.append("captionsTranscript", captionsTranscript);
+  if (audioTranscript) form.append("audioTranscript", audioTranscript);
 
   const response = await fetch(callbackUrl, {
     method: "POST",

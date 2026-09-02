@@ -39,12 +39,19 @@ export async function enableCaptions(page: Page): Promise<boolean> {
 async function selectSpanishCaptionLanguage(page: Page): Promise<void> {
   try {
     const languageCombobox = page.getByRole("combobox", { name: /idioma de la reunión|meeting language/i });
-    await languageCombobox.click({ timeout: 5_000 });
+    await languageCombobox.waitFor({ state: "visible", timeout: 5_000 });
+    // La barra de subtítulos (siempre visible una vez activada) tapa
+    // parcialmente este combobox según el chequeo de Playwright, aunque en
+    // los hechos sigue siendo clickeable — se confirmó con un log real
+    // ("<div class='iOzk7'>… subtree intercepts pointer events") que sin
+    // `force` esto siempre tira timeout y los subtítulos quedan en inglés.
+    await languageCombobox.click({ timeout: 5_000, force: true });
 
     const spanishOption = page
       .getByRole("option", { name: /español \(méxico\)/i })
       .or(page.getByRole("option", { name: /español/i }));
-    await spanishOption.first().click({ timeout: 5_000 });
+    await spanishOption.first().waitFor({ state: "visible", timeout: 5_000 });
+    await spanishOption.first().click({ timeout: 5_000, force: true });
     console.log("[meeting-bot] Idioma de subtítulos puesto en español.");
   } catch (error) {
     console.warn(

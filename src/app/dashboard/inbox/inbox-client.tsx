@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Bot as BotIcon,
   Search,
+  Smile,
 } from "lucide-react";
 import { sendInboxMessageAction, sendInboxAttachmentAction } from "@/server/actions/inbox";
 import {
@@ -120,6 +121,17 @@ const mediaPreviewLabel: Record<MediaType, string> = {
   AUDIO: "🎵 Audio",
   DOCUMENT: "📄 Documento",
 };
+
+const EMOJI_LIST = [
+  "😀", "😁", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😍",
+  "🥰", "😘", "😋", "😎", "🤩", "🥳", "😢", "😭", "😡", "🤬",
+  "😱", "😴", "🤔", "🤗", "🙄", "😬", "🤐", "😷", "🤒", "🥺",
+  "😅", "😆", "😳", "🥲", "😏", "😒", "🙁", "😞", "😔", "😩",
+  "👍", "👎", "👌", "🙌", "👏", "🙏", "💪", "🤝", "✌️", "🤞",
+  "👋", "🤙", "💯", "🔥", "✨", "🎉", "🎊", "❤️", "🧡", "💛",
+  "💚", "💙", "💜", "🖤", "💔", "❤️‍🔥", "✅", "❌", "⚠️", "❓",
+  "📌", "📎", "📅", "⏰", "💰", "💳", "📦", "🚚", "🛒", "🏢",
+];
 
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 
@@ -374,6 +386,7 @@ export function InboxClient({
   const [conversationAiEnabled, setConversationAiEnabled] = useState(false);
   const [conversationBotId, setConversationBotId] = useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -394,6 +407,8 @@ export function InboxClient({
   // sola si ya estaba cerca del final.
   const isNearBottomRef = useRef(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
   const selectedIdRef = useRef<string | null>(null);
   const prevUnreadRef = useRef<Map<string, number>>(new Map());
   const isFirstFetchRef = useRef(true);
@@ -729,6 +744,38 @@ export function InboxClient({
     }
 
     setSending(false);
+  }
+
+  // Cierra el selector de emojis al tocar afuera — mismo patrón que
+  // cualquier popover, no hay overlay de fondo cubriendo toda la pantalla.
+  useEffect(() => {
+    if (!emojiPickerOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setEmojiPickerOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [emojiPickerOpen]);
+
+  // Inserta en la posición del cursor (no siempre al final) y deja el foco
+  // ahí mismo, para poder seguir escribiendo o agregar otro emoji seguido.
+  function insertEmoji(emoji: string) {
+    const el = textareaRef.current;
+    if (!el) {
+      setDraft((d) => d + emoji);
+      return;
+    }
+    const start = el.selectionStart ?? draft.length;
+    const end = el.selectionEnd ?? draft.length;
+    const next = draft.slice(0, start) + emoji + draft.slice(end);
+    setDraft(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + emoji.length;
+      el.setSelectionRange(pos, pos);
+    });
   }
 
   function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1344,7 +1391,7 @@ export function InboxClient({
                   </button>
                 </div>
               ) : (
-                <div className="flex items-end gap-1.5 md:gap-2">
+                <div className="relative flex items-end gap-1.5 md:gap-2">
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1359,7 +1406,34 @@ export function InboxClient({
                   >
                     <Paperclip size={19} />
                   </button>
+                  <button
+                    onClick={() => setEmojiPickerOpen((v) => !v)}
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface ${
+                      emojiPickerOpen ? "text-accent" : "text-ink-muted"
+                    }`}
+                    title="Emojis"
+                  >
+                    <Smile size={19} />
+                  </button>
+                  {emojiPickerOpen && (
+                    <div
+                      ref={emojiPickerRef}
+                      className="absolute bottom-full left-0 z-10 mb-2 grid w-64 grid-cols-8 gap-0.5 rounded-lg border border-border bg-surface-2 p-2 shadow-lg"
+                    >
+                      {EMOJI_LIST.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => insertEmoji(emoji)}
+                          className="flex h-7 w-7 items-center justify-center rounded text-lg hover:bg-surface"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <textarea
+                    ref={textareaRef}
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => {

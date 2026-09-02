@@ -22,6 +22,7 @@ import {
   Ban,
   ShieldCheck,
   Bot as BotIcon,
+  Search,
 } from "lucide-react";
 import { sendInboxMessageAction, sendInboxAttachmentAction } from "@/server/actions/inbox";
 import {
@@ -172,6 +173,17 @@ function dayLabel(iso: string): string {
 // WhatsApp, para no confundir "3:45" de hace tres días con la de hace rato.
 function listTimeFmt(iso: string): string {
   return isSameDay(new Date(iso), new Date()) ? timeFmt(iso) : dayLabel(iso);
+}
+
+// Nombre por substring (sin distinguir mayúsculas) y teléfono comparando
+// solo dígitos — así "591 700-123 45" encuentra igual buscando "70012345"
+// o pegando el número tal cual viene con espacios/guiones.
+function matchesSearch(c: ConversationSummary, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  if ((c.customerName || "").toLowerCase().includes(q)) return true;
+  const digitsQuery = q.replace(/\D/g, "");
+  return digitsQuery.length > 0 && c.customerPhone.replace(/\D/g, "").includes(digitsQuery);
 }
 
 function durationFmt(seconds: number) {
@@ -333,6 +345,12 @@ export function InboxClient({
   const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
   const [view, setView] = useState<"active" | "archived" | "blocked">("active");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // "Ir al chat" desde Seguimiento llega como /dashboard/inbox?phone=... —
+  // se lee una sola vez al montar (lazy initializer, no un efecto) para no
+  // disparar un render extra.
+  const [searchQuery, setSearchQuery] = useState(() =>
+    typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("phone") ?? "",
+  );
   const [messages, setMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
@@ -379,6 +397,11 @@ export function InboxClient({
   const selectedIdRef = useRef<string | null>(null);
   const prevUnreadRef = useRef<Map<string, number>>(new Map());
   const isFirstFetchRef = useRef(true);
+  // En cuanto la lista traiga una conversación con este teléfono, se abre
+  // sola (puede no venir en el primer fetch si cae en otra vista/cuenta).
+  const pendingPhoneLinkRef = useRef<string | null>(
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("phone"),
+  );
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const cancelRecordRef = useRef(false);
@@ -491,6 +514,14 @@ export function InboxClient({
     document.title = totalUnread > 0 ? `(${totalUnread}) WhatsApp ProShop` : "WhatsApp ProShop";
 
     setConversations(list);
+
+    if (pendingPhoneLinkRef.current) {
+      const match = list.find((c) => c.customerPhone === pendingPhoneLinkRef.current);
+      if (match) {
+        setSelectedId(match.id);
+        pendingPhoneLinkRef.current = null;
+      }
+    }
   }, [selectedBotId, view]);
 
   const fetchMessages = useCallback(async (id: string) => {
@@ -804,6 +835,8 @@ export function InboxClient({
     });
   }
 
+  const filteredConversations = conversations.filter((c) => matchesSearch(c, searchQuery));
+
   return (
     <div
       ref={rootRef}
@@ -861,6 +894,19 @@ export function InboxClient({
           ))}
         </div>
 
+        <div className="shrink-0 border-b border-border bg-surface px-3 py-2">
+          <div className="relative">
+            <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por nombre o teléfono…"
+              className="w-full rounded-full border border-border bg-surface-2 py-1.5 pl-8 pr-3 text-xs text-ink outline-none focus:border-accent-dim"
+            />
+          </div>
+        </div>
+
         {bots.length > 1 && (
           <div className="flex min-h-[42px] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-border bg-surface px-3 py-2">
             <button
@@ -902,7 +948,12 @@ export function InboxClient({
                   : "Los mensajes que te escriban por WhatsApp van a aparecer acá."}
           </p>
         )}
-        {conversations.map((c) => (
+        {conversations.length > 0 && filteredConversations.length === 0 && (
+          <p className="px-4 py-6 text-sm text-ink-faint">
+            Ninguna conversación coincide con &quot;{searchQuery}&quot;.
+          </p>
+        )}
+        {filteredConversations.map((c) => (
           <button
             key={c.id}
             onClick={() => setSelectedId(c.id)}

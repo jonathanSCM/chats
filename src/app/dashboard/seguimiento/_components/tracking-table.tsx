@@ -25,6 +25,7 @@ import {
   Bell,
   PhoneOff,
   FileDown,
+  MessageCircle,
 } from "lucide-react";
 import {
   createOpportunityAction,
@@ -1131,7 +1132,18 @@ function TableRow({
         )}
       </Td>
 
-      <Td className="whitespace-nowrap font-mono text-[13px] text-ink-muted">{row.phone}</Td>
+      <Td className="whitespace-nowrap font-mono text-[13px] text-ink-muted">
+        <span className="inline-flex items-center gap-1.5">
+          {row.phone}
+          <Link
+            href={`/dashboard/inbox?phone=${encodeURIComponent(row.phone)}`}
+            title="Ir al chat"
+            className="text-ink-faint hover:text-accent"
+          >
+            <MessageCircle size={12} />
+          </Link>
+        </span>
+      </Td>
       <Td className="whitespace-nowrap text-sm text-ink-muted">{row.city || "—"}</Td>
 
       <Td>
@@ -1554,6 +1566,12 @@ function DetailPanel({
               {row.phone}
               {row.city && ` · ${row.city}`}
             </p>
+            <Link
+              href={`/dashboard/inbox?phone=${encodeURIComponent(row.phone)}`}
+              className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent"
+            >
+              <MessageCircle size={11} /> Ir al chat
+            </Link>
           </div>
           <button type="button" onClick={onClose} className="cursor-pointer text-ink-faint hover:text-ink">
             <X size={18} />

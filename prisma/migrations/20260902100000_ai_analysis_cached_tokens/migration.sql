@@ -1,0 +1,1 @@
+ALTER TABLE "ai_analyses" ADD COLUMN "cachedTokens" INTEGER NOT NULL DEFAULT 0;

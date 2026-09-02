@@ -28,16 +28,30 @@ export const MODELS = {
  * Precio por millón de tokens, configurable porque cambia con el tiempo.
  * Solo sirve para estimar el gasto y cortar a tiempo, no para facturar.
  */
-function pricePerMillion(): { input: number; output: number } {
+function pricePerMillion(): { input: number; output: number; cachedInput: number } {
+  const input = Number(process.env.OPENAI_PRICE_INPUT_PER_M ?? 0.4);
   return {
-    input: Number(process.env.OPENAI_PRICE_INPUT_PER_M ?? 0.4),
+    input,
     output: Number(process.env.OPENAI_PRICE_OUTPUT_PER_M ?? 1.6),
+    // OpenAI cobra los tokens de entrada que pega contra el cache automático
+    // a un precio reducido (no gratis). Sin variable propia, asumimos la
+    // mitad del precio de entrada normal — ajustable si el precio real
+    // publicado difiere.
+    cachedInput: Number(process.env.OPENAI_PRICE_CACHED_INPUT_PER_M ?? input / 2),
   };
 }
 
-export function estimateCost(inputTokens: number, outputTokens: number): number {
+/**
+ * `cachedTokens` ya viene incluido en `inputTokens` (así lo reporta la API) —
+ * se descuenta la porción cacheada al precio reducido en vez de cobrarla toda
+ * al precio full.
+ */
+export function estimateCost(inputTokens: number, outputTokens: number, cachedTokens = 0): number {
   const price = pricePerMillion();
-  return (inputTokens * price.input + outputTokens * price.output) / 1_000_000;
+  const freshInputTokens = Math.max(0, inputTokens - cachedTokens);
+  return (
+    (freshInputTokens * price.input + cachedTokens * price.cachedInput + outputTokens * price.output) / 1_000_000
+  );
 }
 
 /** Tope de gasto diario en USD; al superarlo se deja de analizar (manual §34). */
@@ -102,6 +116,7 @@ export async function runStructured<T>(options: RunOptions<T>): Promise<T> {
   const startedAt = Date.now();
   let inputTokens = 0;
   let outputTokens = 0;
+  let cachedTokens = 0;
   let lastError: unknown = null;
 
   // Un solo reintento: si el modelo devuelve algo que no valida dos veces,
@@ -127,6 +142,7 @@ export async function runStructured<T>(options: RunOptions<T>): Promise<T> {
 
       inputTokens += response.usage?.input_tokens ?? 0;
       outputTokens += response.usage?.output_tokens ?? 0;
+      cachedTokens += response.usage?.input_tokens_details?.cached_tokens ?? 0;
 
       const parsed = options.parse(JSON.parse(response.output_text));
 
@@ -140,7 +156,8 @@ export async function runStructured<T>(options: RunOptions<T>): Promise<T> {
           promptVersion: options.promptVersion,
           inputTokens,
           outputTokens,
-          costEstimate: estimateCost(inputTokens, outputTokens),
+          cachedTokens,
+          costEstimate: estimateCost(inputTokens, outputTokens, cachedTokens),
           result: parsed as never,
           durationMs: Date.now() - startedAt,
         },
@@ -162,7 +179,8 @@ export async function runStructured<T>(options: RunOptions<T>): Promise<T> {
       promptVersion: options.promptVersion,
       inputTokens,
       outputTokens,
-      costEstimate: estimateCost(inputTokens, outputTokens),
+      cachedTokens,
+      costEstimate: estimateCost(inputTokens, outputTokens, cachedTokens),
       error: lastError instanceof Error ? lastError.message : String(lastError),
       durationMs: Date.now() - startedAt,
     },

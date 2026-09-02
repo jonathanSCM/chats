@@ -240,7 +240,18 @@ async function buildInput(conversation: ConversationForBot, slots: MeetingSlot[]
     .map((slot, i) => `${letters[i]}) ${slot.label}`)
     .join("\n");
 
+  // Mismo criterio de orden que buildInput() en follow-up.ts: lo fijo por
+  // organización (fecha, guía, tono) primero para que el cache automático de
+  // OpenAI lo reconozca como el mismo prefijo entre turnos y conversaciones
+  // distintas; lo que cambia en cada turno (cliente, memoria, conversación)
+  // al final.
   return `FECHA DE HOY: ${new Date().toISOString().slice(0, 10)}
+
+GUÍA DE CALIFICACIÓN (obligatoria)
+${qualificationText}
+
+TONO DE CONVERSACIÓN (obligatorio)
+${toneText}
 
 CLIENTE
 Nombre de perfil de WhatsApp: ${conversation.customerName ?? "(desconocido)"}
@@ -253,13 +264,7 @@ FRANJAS DISPONIBLES para la reunión de diagnóstico (solo ofrécelas si el clie
 ${slotsText}
 
 CONVERSACIÓN DE WHATSAPP (más reciente al final)
-${conversationText}
-
-GUÍA DE CALIFICACIÓN (obligatoria)
-${qualificationText}
-
-TONO DE CONVERSACIÓN (obligatorio)
-${toneText}`;
+${conversationText}`;
 }
 
 /**

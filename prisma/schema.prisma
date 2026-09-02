@@ -750,6 +750,7 @@ model AiAnalysis {
   promptVersion  String
   inputTokens    Int
   outputTokens   Int
+  cachedTokens   Int          @default(0) // ya incluidos en inputTokens, cobrados a precio reducido
   costEstimate   Decimal?     @db.Decimal(10, 6)
   result         Json?
   error          String?      @db.Text

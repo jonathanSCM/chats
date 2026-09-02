@@ -299,7 +299,20 @@ async function buildInput(opportunity: OpportunityContext): Promise<string> {
         .join("\n\n")
     : null;
 
+  // El orden importa para el prompt caching automático de OpenAI: cachea el
+  // PREFIJO de tokens desde el principio, así que lo que es igual para toda
+  // la organización (fecha del día, conocimiento, guía) va primero, y lo que
+  // cambia en cada llamada (cliente, conversación) va al final. Antes el
+  // conocimiento iba al final, después de la conversación variable — eso
+  // invalidaba el cache en cada llamada en vez de reusarlo entre análisis de
+  // la misma organización.
   return `FECHA DE HOY: ${today}
+
+INFORMACIÓN AUTORIZADA DE LA EMPRESA
+${knowledgeText}
+
+GUÍA DE CALIFICACIÓN (obligatoria — usa exactamente estos criterios y puntajes para "calidad_lead" y "desglose")
+${qualificationGuideText ?? "(No hay ninguna guía cargada en la Base de Conocimiento, categoría 'Guía de calificación'. Usa la referencia general del SYSTEM.)"}
 
 CLIENTE
 Nombre: ${opportunity.contact.fullName ?? "(desconocido)"}
@@ -325,13 +338,7 @@ NOTAS INTERNAS DEL EQUIPO
 ${notesText}
 
 CONVERSACIÓN DE WHATSAPP, ventana de los últimos ${messageLimit} mensajes (más reciente al final)
-${conversationText}
-
-INFORMACIÓN AUTORIZADA DE LA EMPRESA
-${knowledgeText}
-
-GUÍA DE CALIFICACIÓN (obligatoria — usa exactamente estos criterios y puntajes para "calidad_lead" y "desglose")
-${qualificationGuideText ?? "(No hay ninguna guía cargada en la Base de Conocimiento, categoría 'Guía de calificación'. Usa la referencia general del SYSTEM.)"}`;
+${conversationText}`;
 }
 
 /**

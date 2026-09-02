@@ -73,7 +73,7 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
     await sendAnnouncement(page);
 
     if (await enableCaptions(page)) {
-      captions = startCapturingCaptions(page);
+      captions = startCapturingCaptions(page, meetingId);
       // Espera un toque a que la barra de subtítulos termine de aparecer en
       // pantalla antes de sacar la foto — así la captura sirve para
       // confirmar (o descartar) que Meet los prendió de verdad, no solo que

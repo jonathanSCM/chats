@@ -1,6 +1,9 @@
 import type { Page } from "playwright";
+import path from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
 
 const CAPTIONS_POLL_MS = 2_000;
+const DEBUG_DIR = path.join(process.env.RECORDINGS_DIR || "/tmp/recordings", "debug");
 
 /**
  * Activa los subtítulos en vivo de Meet — es la única forma práctica de
@@ -72,7 +75,7 @@ export interface CaptionsCapture {
  * recién se guarda una línea como "terminada" cuando el texto visible
  * cambia a algo distinto (cambió de hablante, o pasó a una línea nueva).
  */
-export function startCapturingCaptions(page: Page): CaptionsCapture {
+export function startCapturingCaptions(page: Page, meetingId: string): CaptionsCapture {
   const lines: string[] = [];
   let lastRaw = "";
   let stopped = false;
@@ -123,10 +126,18 @@ export function startCapturingCaptions(page: Page): CaptionsCapture {
         );
       }
 
+      // Volcado completo de accesibilidad cada ~40s — a diferencia del que
+      // se saca una sola vez al activar los subtítulos (cuando todavía no
+      // habló nadie y el panel real está vacío), este se repite mientras
+      // dura la reunión, así hay chances reales de agarrar uno con diálogo
+      // de verdad adentro del panel de subtítulos para poder identificarlo.
+      if (ticks % 20 === 0) void dumpAccessibilityTree(page, meetingId, ticks);
+
       // Filtro de sanidad: un match de subtítulos real tiene una frase
-      // completa, no una o dos palabras sueltas (que es lo que da un
-      // elemento de UI equivocado, como pasó con "settings").
-      if (debug.best && debug.best.length >= 15 && debug.best !== lastRaw) {
+      // completa, no una o dos palabras sueltas ni una fecha de calendario
+      // (elementos de UI equivocados que ya se colaron con umbrales más
+      // bajos — "settings", "septiembre 2026").
+      if (debug.best && debug.best.length >= 25 && debug.best !== lastRaw) {
         if (lastRaw) lines.push(lastRaw);
         lastRaw = debug.best;
       }
@@ -146,4 +157,28 @@ export function startCapturingCaptions(page: Page): CaptionsCapture {
       return lines.join("\n");
     },
   };
+}
+
+async function dumpAccessibilityTree(page: Page, meetingId: string, ticks: number): Promise<void> {
+  try {
+    await mkdir(DEBUG_DIR, { recursive: true });
+    const nodes = await page.evaluate(() => {
+      const elements = Array.from(
+        document.querySelectorAll("[role], [aria-label], [aria-live], [jsname]"),
+      ) as HTMLElement[];
+      return elements.slice(0, 400).map((el) => ({
+        tag: el.tagName.toLowerCase(),
+        role: el.getAttribute("role"),
+        ariaLabel: el.getAttribute("aria-label"),
+        ariaLive: el.getAttribute("aria-live"),
+        jsname: el.getAttribute("jsname"),
+        text: (el.innerText || "").trim().slice(0, 200),
+      }));
+    });
+    const file = path.join(DEBUG_DIR, `${meetingId}-subtitulos-tick${ticks}-a11y.json`);
+    await writeFile(file, JSON.stringify(nodes, null, 2));
+    console.log(`[meeting-bot] Volcado de accesibilidad en vivo (${nodes.length} elementos): ${file}`);
+  } catch (error) {
+    console.warn("[meeting-bot] No se pudo volcar el árbol de accesibilidad en vivo:", error);
+  }
 }

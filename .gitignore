@@ -7,6 +7,9 @@
 # perfil de Chrome logueado con la cuenta del bot (cookies de sesión reales,
 # nunca se commitea — se sube a mano al volumen del servidor, ver README)
 /meeting-bot/chrome-profile-local
+
+# capturas de pantalla bajadas del contenedor para diagnosticar en el momento
+/meeting-bot/meeting-bot-debug
 /.pnp
 .pnp.*
 .yarn/*

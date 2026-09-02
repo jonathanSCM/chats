@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { createMeetEvent, isGoogleMeetEnabled } from "@/server/services/google-calendar";
-import { scheduleMeetingBotJoin } from "@/server/services/meeting-bot";
+import { scheduleMeetingBotJoin, scheduleMeetingBotJoinNow, isMeetingBotEnabled } from "@/server/services/meeting-bot";
 import type { ActionState } from "./types";
 
 const PATH = "/dashboard/reuniones";
@@ -83,6 +83,49 @@ export async function createAdhocMeetingAction(
   revalidatePath("/dashboard/calendario");
   revalidatePath("/dashboard");
   return { error: null, message: "Reunión creada." };
+}
+
+const joinNowSchema = z.object({
+  meetingUrl: z.string().min(1, "Pegá el link de la reunión").max(500),
+});
+
+/**
+ * "Unir el bot ya mismo": alguien ya está en una reunión en vivo y quiere
+ * que el bot se sume ahora — sin fecha, sin Google Meet (el link ya existe,
+ * es de una reunión que ya empezó). No se sabe cuánto va a durar, así que
+ * se usa un colchón generoso (90 min) — el bot igual corta antes solo si
+ * detecta que se quedó solo en la llamada.
+ */
+export async function joinMeetingNowAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const { organizationId } = await requireOrg();
+
+  if (!isMeetingBotEnabled()) {
+    return { error: "El bot no está configurado en el servidor. Contactá al administrador." };
+  }
+
+  const parsed = joinNowSchema.safeParse({ meetingUrl: formData.get("meetingUrl") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  const meeting = await prisma.meeting.create({
+    data: {
+      organizationId,
+      opportunityId: null,
+      title: "Reunión en vivo",
+      scheduledAt: new Date(),
+      durationMinutes: 90,
+      meetingUrl: parsed.data.meetingUrl,
+      status: "CONFIRMED",
+    },
+  });
+
+  await scheduleMeetingBotJoinNow(meeting.id);
+
+  revalidatePath(PATH);
+  revalidatePath("/dashboard/calendario");
+  revalidatePath("/dashboard");
+  return { error: null, message: "Avisado — el bot debería pedir unirse en un par de minutos." };
 }
 
 export async function deleteAdhocMeetingAction(meetingId: string): Promise<ActionState> {

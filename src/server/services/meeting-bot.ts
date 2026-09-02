@@ -1,4 +1,4 @@
-import { enqueueOrReschedule } from "@/server/jobs";
+import { enqueueOrReschedule, runJobsSoon } from "@/server/jobs";
 import { prisma } from "@/server/db/client";
 
 /**
@@ -32,4 +32,25 @@ export async function scheduleMeetingBotJoin(meetingId: string, scheduledAt: Dat
   // recién dispare más cerca de la hora — sin esto, botStatus queda null
   // (indistinguible de "no se pidió bot") hasta el minuto exacto.
   await prisma.meeting.update({ where: { id: meetingId }, data: { botStatus: "PENDING" } });
+}
+
+/**
+ * "Unir el bot ya mismo" — para cuando alguien ya está en una reunión en
+ * vivo y quiere que se sume a grabar sin esperar nada agendado. Encola con
+ * `runAfter: ahora` (en vez de esperar a un `scheduledAt` futuro) y dispara
+ * `runJobsSoon()` para que no haya que esperar al próximo tick del cron
+ * (hasta 1 minuto) — el mismo patrón que ya usa el webhook de WhatsApp.
+ */
+export async function scheduleMeetingBotJoinNow(meetingId: string): Promise<void> {
+  if (!isMeetingBotEnabled()) return;
+
+  await enqueueOrReschedule({
+    type: "meeting_bot_join",
+    uniqueKey: `meeting-bot-${meetingId}`,
+    payload: { meetingId },
+    runAfter: new Date(),
+  });
+
+  await prisma.meeting.update({ where: { id: meetingId }, data: { botStatus: "PENDING" } });
+  runJobsSoon();
 }

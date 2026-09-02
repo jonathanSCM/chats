@@ -1,11 +1,15 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { Plus, X, Copy, Trash2, Clock, Video, Bot } from "lucide-react";
+import { Plus, X, Copy, Trash2, Clock, Video, Bot, Zap } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { createAdhocMeetingAction, deleteAdhocMeetingAction } from "@/server/actions/adhoc-meetings";
+import {
+  createAdhocMeetingAction,
+  deleteAdhocMeetingAction,
+  joinMeetingNowAction,
+} from "@/server/actions/adhoc-meetings";
 import { scheduledAtToUtcHidden } from "@/lib/datetime-local";
 
 export interface AdhocMeetingRow {
@@ -58,6 +62,14 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
     setAdding(false);
   }
 
+  // "Unir el bot ya mismo" — para cuando ya estás adentro de una reunión en
+  // vivo, sin pasar por el formulario de agendar.
+  const [joinNowState, joinNowFormAction] = useActionState(joinMeetingNowAction, { error: null });
+  const [handledJoinNowMessage, setHandledJoinNowMessage] = useState<string | undefined>(undefined);
+  if (joinNowState.message && joinNowState.message !== handledJoinNowMessage) {
+    setHandledJoinNowMessage(joinNowState.message);
+  }
+
   const [isPending, startTransition] = useTransition();
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   function handleDelete(id: string) {
@@ -74,6 +86,24 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
 
   return (
     <div className="space-y-4">
+      <Card className="border-accent-dim/40 bg-accent-dim/10">
+        <form action={joinNowFormAction} className="flex flex-wrap items-end gap-2.5">
+          <div className="min-w-[240px] flex-1">
+            <label className="mb-1 flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent">
+              <Zap size={12} /> Unir el bot ya mismo
+            </label>
+            <Input type="url" name="meetingUrl" placeholder="Pegá el link de la reunión en la que estás" required className="text-sm" />
+          </div>
+          <Button type="submit" size="sm">
+            Unir bot ahora
+          </Button>
+          {joinNowState.error && <p className="w-full text-xs text-danger">{joinNowState.error}</p>}
+          {joinNowState.message && (
+            <p className="w-full text-xs text-accent">{joinNowState.message}</p>
+          )}
+        </form>
+      </Card>
+
       <div className="flex items-center justify-between">
         <p className="font-mono text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
           Reuniones internas

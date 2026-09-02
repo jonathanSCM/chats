@@ -35,11 +35,22 @@ export async function joinAndRecord(options: JoinOptions): Promise<void> {
   // Perfil persistente: ya tiene la sesión de la cuenta del bot logueada
   // (ver README — "Primer login" — se hace una sola vez a mano con
   // `npm run login`). Sin esto, cada reunión pediría loguearse de cero.
-  const context = await chromium.launchPersistentContext(PROFILE_DIR, {
-    headless: false, // corre bajo Xvfb (pantalla virtual, ver entrypoint.sh) — no hay pantalla física, pero Meet bloquea el modo headless "de verdad"
-    args: ["--use-fake-ui-for-media-stream", "--disable-blink-features=AutomationControlled"],
-    permissions: ["camera", "microphone"],
-  });
+  //
+  // Si esto falla (ej. el perfil sigue "en uso" porque una reunión anterior
+  // no lo soltó a tiempo — un solo perfil no admite dos instancias de Chrome
+  // al mismo tiempo), hay que avisarle a la app principal: si no, el error
+  // queda solo en este log y `botStatus` se pega en "JOINING" para siempre.
+  let context;
+  try {
+    context = await chromium.launchPersistentContext(PROFILE_DIR, {
+      headless: false, // corre bajo Xvfb (pantalla virtual, ver entrypoint.sh) — no hay pantalla física, pero Meet bloquea el modo headless "de verdad"
+      args: ["--use-fake-ui-for-media-stream", "--disable-blink-features=AutomationControlled"],
+      permissions: ["camera", "microphone"],
+    });
+  } catch (error) {
+    await notifyFailure(callbackUrl, meetingId, `No se pudo abrir el navegador: ${error}`);
+    return;
+  }
 
   let recordingPath: string | null = null;
   let stopRecordingFn: (() => Promise<void>) | null = null;
@@ -119,18 +130,16 @@ async function joinMeeting(page: Page): Promise<void> {
 
 /**
  * Si entró pidiendo permiso ("Solicitar unirse"), queda en una sala de
- * espera hasta que alguien de la reunión lo admita — se le da hasta 5
- * minutos antes de seguir igual (por si el selector de "ya está adentro"
- * no matchea pero en realidad sí entró).
+ * espera hasta que alguien de la reunión lo admita — hasta 5 minutos. Si
+ * nadie lo admite, tira un error a propósito (en vez de seguir el flujo
+ * igual): sin esto, seguía adelante grabando ~45 minutos de nada, y el
+ * navegador quedaba abierto todo ese tiempo bloqueando el perfil para la
+ * próxima reunión que quisiera usarlo.
  */
 async function waitForAdmission(page: Page): Promise<void> {
   const inCallIndicator = page.getByRole("button", { name: /personas|people/i }).first();
-  try {
-    await inCallIndicator.waitFor({ timeout: 5 * 60_000 });
-    console.log("[meeting-bot] Ya está adentro de la reunión.");
-  } catch {
-    console.warn("[meeting-bot] Nadie lo admitió en 5 minutos (o no se detectó) — sigue igual.");
-  }
+  await inCallIndicator.waitFor({ timeout: 5 * 60_000 });
+  console.log("[meeting-bot] Ya está adentro de la reunión.");
 }
 
 async function debugScreenshot(page: Page, meetingId: string, step: string): Promise<void> {

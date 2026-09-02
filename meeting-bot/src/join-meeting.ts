@@ -239,7 +239,9 @@ async function debugAccessibilityDump(page: Page, meetingId: string, step: strin
 async function sendAnnouncement(page: Page): Promise<void> {
   try {
     await openChatPanel(page);
-    const input = page.getByRole("textbox", { name: /enviar un mensaje|send a message/i });
+    // Confirmado con un log real: el campo es "Envía un mensaje" (imperativo),
+    // no "Enviar un mensaje" (infinitivo) como asumía antes.
+    const input = page.getByRole("textbox", { name: /env[ií]a?r? un mensaje|send a message/i });
     await input.fill("Esta reunión se está grabando para transcripción interna.");
     await input.press("Enter");
     console.log("[meeting-bot] Aviso de grabación mandado por el chat.");
@@ -299,6 +301,14 @@ async function logToolbarButtons(page: Page): Promise<void> {
 async function waitForMeetingEnd(page: Page, expectedDurationMinutes: number, signal: AbortSignal): Promise<void> {
   const deadline = Date.now() + (expectedDurationMinutes + END_BUFFER_MINUTES) * 60_000;
   let sinceLastCheck = 0;
+  // Confirmado con un log real: cuando Meet termina la reunión (o saca al
+  // bot), navega a una pantalla sin el botón "Personas" -- antes, no poder
+  // leerlo se interpretaba como "no estoy solo" y el bot se quedaba
+  // grabando hasta el límite de duración+margen, sin darse cuenta nunca de
+  // que la reunión ya había terminado. Dos fallos seguidos (con
+  // END_CHECK_INTERVAL_MS de por medio) para no cortar por un glitch
+  // pasajero de un solo chequeo.
+  let consecutiveEndSignals = 0;
 
   // Se fija en `signal.aborted` cada 1s (para que "Detener bot" responda
   // casi al instante) pero solo consulta el DOM de participantes cada
@@ -309,18 +319,30 @@ async function waitForMeetingEnd(page: Page, expectedDurationMinutes: number, si
     sinceLastCheck += 1_000;
     if (sinceLastCheck >= END_CHECK_INTERVAL_MS) {
       sinceLastCheck = 0;
-      if (await isAlone(page)) return;
+      if (await meetingLooksOver(page)) {
+        consecutiveEndSignals += 1;
+        console.log(`[meeting-bot] La reunión parece haber terminado (señal ${consecutiveEndSignals}/2).`);
+        if (consecutiveEndSignals >= 2) return;
+      } else {
+        consecutiveEndSignals = 0;
+      }
     }
   }
 }
 
-/** true si el contador de participantes de Meet muestra 1 (solo el bot) o menos. */
-async function isAlone(page: Page): Promise<boolean> {
+/**
+ * true si el contador de participantes de Meet muestra 1 (solo el bot) o
+ * menos, O si ya no se puede leer ese contador -- lo segundo, en la
+ * práctica, casi siempre significa que Meet navegó lejos de la pantalla de
+ * la llamada (reunión terminada, o el bot fue expulsado), no que "hay
+ * alguien más" (que sería el significado de simplemente ignorar el error).
+ */
+async function meetingLooksOver(page: Page): Promise<boolean> {
   try {
     const text = await page.getByRole("button", { name: /personas|people/i }).first().innerText({ timeout: 5_000 });
     const match = text.match(/\d+/);
     return match ? Number(match[0]) <= 1 : false;
   } catch {
-    return false;
+    return true;
   }
 }

@@ -201,11 +201,19 @@ async function sendAnnouncement(page: Page): Promise<void> {
  */
 async function waitForMeetingEnd(page: Page, expectedDurationMinutes: number, signal: AbortSignal): Promise<void> {
   const deadline = Date.now() + (expectedDurationMinutes + END_BUFFER_MINUTES) * 60_000;
+  let sinceLastCheck = 0;
 
+  // Se fija en `signal.aborted` cada 1s (para que "Detener bot" responda
+  // casi al instante) pero solo consulta el DOM de participantes cada
+  // END_CHECK_INTERVAL_MS — es una consulta más cara, no hace falta tan seguido.
   while (Date.now() < deadline) {
     if (signal.aborted) return;
-    await page.waitForTimeout(END_CHECK_INTERVAL_MS);
-    if (await isAlone(page)) return;
+    await page.waitForTimeout(1_000);
+    sinceLastCheck += 1_000;
+    if (sinceLastCheck >= END_CHECK_INTERVAL_MS) {
+      sinceLastCheck = 0;
+      if (await isAlone(page)) return;
+    }
   }
 }
 

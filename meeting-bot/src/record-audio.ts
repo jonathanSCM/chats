@@ -30,6 +30,19 @@ export async function startRecording(meetingId: string): Promise<Recording> {
     if (process.env.FFMPEG_DEBUG === "true") console.error(chunk.toString());
   });
 
+  // Diagnóstico: si el audio graba en silencio, esto dice de una vez si el
+  // problema es que Chromium nunca conectó su audio al sink (0 sink-inputs
+  // — la reunión no está "sonando" ahí) o si el sink está mudo/en volumen 0
+  // (hay un sink-input pero el volumen da 0%) — dos causas con arreglos
+  // distintos. Se corre una sola vez, unos segundos después de arrancar,
+  // para darle tiempo a Chromium a conectar el audio.
+  setTimeout(() => {
+    const check = spawn("sh", ["-c", "pactl list short sink-inputs && pactl get-sink-volume virtual_sink"]);
+    let output = "";
+    check.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
+    check.on("close", () => console.log(`[meeting-bot] Diagnóstico de audio:\n${output || "(sin salida)"}`));
+  }, 8_000);
+
   const exitPromise = new Promise<void>((resolve) => ffmpeg.once("close", () => resolve()));
 
   const stop = async (): Promise<void> => {

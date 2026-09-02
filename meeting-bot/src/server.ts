@@ -74,6 +74,7 @@ app.post("/join", (req, res) => {
 // que se quede solo o se cumpla la duración esperada.
 app.post("/stop", (req, res) => {
   if (!isAuthorized(req.headers.authorization)) {
+    console.warn("[meeting-bot] POST /stop con auth inválida");
     res.status(401).send("Unauthorized");
     return;
   }
@@ -84,13 +85,17 @@ app.post("/stop", (req, res) => {
     return;
   }
 
+  console.log(`[meeting-bot] POST /stop para ${meetingId} — sesiones activas: [${[...activeSessions.keys()].join(", ")}]`);
+
   const controller = activeSessions.get(meetingId);
   if (!controller) {
+    console.warn(`[meeting-bot] /stop: no hay sesión activa para ${meetingId}`);
     res.status(404).json({ ok: false, error: "No hay una sesión activa para esa reunión" });
     return;
   }
 
   controller.abort();
+  console.log(`[meeting-bot] /stop: se pidió cortar ${meetingId} — puede tardar hasta 30s en notarlo si ya estaba grabando.`);
   res.json({ ok: true });
 });
 

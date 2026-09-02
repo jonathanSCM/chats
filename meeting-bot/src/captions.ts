@@ -51,14 +51,26 @@ export function startCapturingCaptions(page: Page): CaptionsCapture {
     if (stopped) return;
     try {
       const raw = await page.evaluate(() => {
-        const region =
-          document.querySelector('[aria-label*="Subtítulos" i]') ||
-          document.querySelector('[aria-label*="captions" i]') ||
-          document.querySelector('[jsname="dsyhDe"]'); // contenedor observado en Meet — puede cambiar con un rediseño
-        return region ? (region as HTMLElement).innerText.trim() : "";
+        // `[aria-live]` es el patrón de accesibilidad real para contenido que
+        // se actualiza solo y hay que anunciarlo (subtítulos en vivo, acá y
+        // en cualquier otra app) — más confiable que adivinar un atributo
+        // específico de Meet, que puede no existir o apuntar a otra cosa
+        // (una prueba real terminó agarrando el panel de "Configuración").
+        const regions = Array.from(document.querySelectorAll<HTMLElement>("[aria-live]"));
+        // De haber varias regiones con aria-live en la página, la de
+        // subtítulos suele ser la que tiene más texto en un momento dado.
+        let best = "";
+        for (const region of regions) {
+          const text = region.innerText?.trim() ?? "";
+          if (text.length > best.length) best = text;
+        }
+        return best;
       });
 
-      if (raw && raw !== lastRaw) {
+      // Filtro de sanidad: un match de subtítulos real tiene una frase
+      // completa, no una o dos palabras sueltas (que es lo que da un
+      // elemento de UI equivocado, como pasó con "settings").
+      if (raw && raw.length >= 15 && raw !== lastRaw) {
         if (lastRaw) lines.push(lastRaw);
         lastRaw = raw;
       }

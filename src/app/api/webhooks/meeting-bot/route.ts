@@ -81,7 +81,13 @@ export async function POST(req: NextRequest) {
   // "RECORDED" — el audio está listo para bajar, y alguien tiene que pedir
   // la transcripción a mano (botón "Transcribir" en la UI) si la quiere.
   const captionsTranscriptRaw = form.get("captionsTranscript");
-  const captionsTranscript = typeof captionsTranscriptRaw === "string" ? captionsTranscriptRaw.trim() : "";
+  const captionsTranscriptTrimmed = typeof captionsTranscriptRaw === "string" ? captionsTranscriptRaw.trim() : "";
+  // Filtro de sanidad extra (además del que ya hace el bot antes de mandarlo):
+  // un match de subtítulos real trae varias líneas de diálogo — un texto
+  // corto casi seguro viene de un elemento de la interfaz equivocado, no de
+  // subtítulos de verdad. Mejor caer al fallback de Whisper que mostrar algo
+  // que no es la transcripción real.
+  const captionsTranscript = captionsTranscriptTrimmed.length >= 40 ? captionsTranscriptTrimmed : "";
 
   await prisma.meeting.update({
     where: { id: meetingId },

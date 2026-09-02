@@ -11,6 +11,12 @@ pulseaudio -D --exit-idle-time=-1 --disallow-exit
 pactl load-module module-null-sink sink_name=virtual_sink
 pactl set-default-sink virtual_sink
 pactl set-default-source virtual_sink.monitor
+# El sink null a veces se crea muteado o a volumen bajo por defecto — si
+# eso pasa, Chromium "reproduce" bien pero ffmpeg graba silencio real
+# (la causa más común de un audio grabado que pesa lo esperado pero no
+# suena nada). Fuerza volumen y desmuteo explícitos por las dudas.
+pactl set-sink-mute virtual_sink 0
+pactl set-sink-volume virtual_sink 100%
 
 # El candado de Chrome (SingletonLock/-Socket/-Cookie) identifica al
 # contenedor que lo escribió por hostname — como cada redeploy es un

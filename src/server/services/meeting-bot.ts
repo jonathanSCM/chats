@@ -1,4 +1,4 @@
-import { enqueueOrReschedule, runJobsSoon } from "@/server/jobs";
+import { enqueueOrReschedule, cancelJob, runJobsSoon } from "@/server/jobs";
 import { prisma } from "@/server/db/client";
 
 /**
@@ -53,6 +53,21 @@ export async function scheduleMeetingBotJoinNow(meetingId: string): Promise<void
 
   await prisma.meeting.update({ where: { id: meetingId }, data: { botStatus: "PENDING" } });
   runJobsSoon();
+}
+
+/**
+ * Saca al bot de una reunión que todavía no arrancó (se apagó "que el bot
+ * se una", o se canceló la reunión) — distinto de `stopMeetingBot`, que es
+ * para cortar una grabación que ya está en curso. Si el bot ya entró
+ * (`botStatus` más allá de PENDING), no se toca nada acá: usar
+ * `stopMeetingBot` para eso.
+ */
+export async function cancelMeetingBotJoin(meetingId: string): Promise<void> {
+  await cancelJob(`meeting-bot-${meetingId}`);
+  await prisma.meeting.updateMany({
+    where: { id: meetingId, botStatus: "PENDING" },
+    data: { botStatus: null },
+  });
 }
 
 /**

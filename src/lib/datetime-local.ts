@@ -16,3 +16,15 @@ export function scheduledAtToUtcHidden(e: ChangeEvent<HTMLInputElement>): void {
   if (!(hidden instanceof HTMLInputElement) || !e.currentTarget.value) return;
   hidden.value = new Date(e.currentTarget.value).toISOString();
 }
+
+/**
+ * Vuelta del camino inverso: para precargar un <input type="datetime-local">
+ * con una fecha que ya está guardada (formato UTC ISO), al editar una
+ * reunión existente — el input necesita "YYYY-MM-DDTHH:mm" en hora LOCAL de
+ * quien lo mira, no la UTC guardada.
+ */
+export function utcIsoToLocalInputValue(iso: string): string {
+  const date = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}

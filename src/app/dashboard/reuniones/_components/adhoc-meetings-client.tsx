@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { Plus, X, Copy, Trash2, Clock, Video, Zap, PhoneOff, FileDown } from "lucide-react";
+import { Plus, X, Copy, Trash2, Clock, Video, Zap, PhoneOff, FileDown, Pencil, Ban } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,10 @@ import {
   joinMeetingNowAction,
   stopMeetingBotAction,
   generateMeetingSummaryPdfAction,
+  updateAdhocMeetingAction,
+  cancelAdhocMeetingAction,
 } from "@/server/actions/adhoc-meetings";
-import { scheduledAtToUtcHidden } from "@/lib/datetime-local";
+import { scheduledAtToUtcHidden, utcIsoToLocalInputValue } from "@/lib/datetime-local";
 import { BOT_STATUS_CONFIG } from "@/lib/meeting-bot-status";
 import { MeetingAttachments, type MeetingAttachmentInfo } from "@/components/meeting-attachments";
 import { PdfViewerModal } from "@/components/pdf-viewer-modal";
@@ -27,6 +29,7 @@ export interface AdhocMeetingRow {
   botStatus: string | null;
   botJoinedAt: string | null;
   botLeftAt: string | null;
+  botEnabled: boolean;
   notes: string;
   transcript: string;
   audioTranscript: string;
@@ -110,6 +113,35 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
 
   const [viewingPdf, setViewingPdf] = useState<{ url: string; title: string } | null>(null);
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPending, setEditPending] = useState(false);
+  const [editError, setEditError] = useState<{ id: string; message: string } | null>(null);
+  function handleEditSubmit(id: string, e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    setEditPending(true);
+    setEditError(null);
+    startTransition(async () => {
+      const result = await updateAdhocMeetingAction(id, formData);
+      setEditPending(false);
+      if (result.error) setEditError({ id, message: result.error });
+      else setEditingId(null);
+    });
+  }
+
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
+  function handleCancelMeeting(id: string) {
+    if (cancelingId !== id) {
+      setCancelingId(id);
+      setTimeout(() => setCancelingId((c) => (c === id ? null : c)), 3000);
+      return;
+    }
+    setCancelingId(null);
+    startTransition(async () => {
+      await cancelAdhocMeetingAction(id);
+    });
+  }
+
   return (
     <div className="space-y-4">
       <Card className="border-accent-dim/40 bg-accent-dim/10">
@@ -169,6 +201,10 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
                 onChange={(e) => setWithGoogleMeet(e.target.checked)}
               />
               Crear con Google Meet (genera el link automáticamente)
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+              <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked />
+              Que el bot se una a esta reunión (grabe y transcriba)
             </label>
             {withGoogleMeet && (
               <Input
@@ -243,6 +279,31 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
                     <FileDown size={11} /> Ver PDF
                   </button>
                 )}
+                {m.status !== "CANCELED" && m.status !== "DONE" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(editingId === m.id ? null : m.id)}
+                      title="Editar fecha, duración o si el bot se une"
+                      className={`flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:border-accent-dim hover:text-accent ${
+                        editingId === m.id ? "border-accent-dim text-accent" : "text-ink-muted"
+                      }`}
+                    >
+                      <Pencil size={11} /> Editar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleCancelMeeting(m.id)}
+                      title={cancelingId === m.id ? "¿Seguro? Tocá de nuevo" : "Cancelar reunión"}
+                      className={`flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] disabled:cursor-not-allowed ${
+                        cancelingId === m.id ? "border-danger text-danger" : "text-ink-muted hover:border-danger hover:text-danger"
+                      }`}
+                    >
+                      <Ban size={11} /> {cancelingId === m.id ? "¿Seguro?" : "Cancelar"}
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   disabled={isPending}
@@ -255,6 +316,44 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
                   <Trash2 size={13} />
                 </button>
               </div>
+
+              {editingId === m.id && (
+                <form
+                  onSubmit={(e) => handleEditSubmit(m.id, e)}
+                  className="space-y-2 rounded-md border border-border bg-surface-2/40 p-2.5"
+                >
+                  <input type="hidden" name="scheduledAt" defaultValue={m.scheduledAt} />
+                  <div className="flex flex-wrap gap-2">
+                    <Input
+                      type="datetime-local"
+                      required
+                      defaultValue={utcIsoToLocalInputValue(m.scheduledAt)}
+                      onChange={scheduledAtToUtcHidden}
+                      className="text-sm"
+                    />
+                    <Input
+                      type="number"
+                      name="durationMinutes"
+                      min={1}
+                      defaultValue={m.durationMinutes}
+                      className="w-24 text-sm"
+                    />
+                  </div>
+                  <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+                    <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked={m.botEnabled} />
+                    Que el bot se una a esta reunión
+                  </label>
+                  {editError?.id === m.id && <p className="text-xs text-danger">{editError.message}</p>}
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm" disabled={editPending}>
+                      {editPending ? "Guardando…" : "Guardar cambios"}
+                    </Button>
+                    <Button type="button" size="sm" variant="secondary" onClick={() => setEditingId(null)}>
+                      Cancelar edición
+                    </Button>
+                  </div>
+                </form>
+              )}
 
               {stopError?.id === m.id && <p className="text-xs text-danger">{stopError.message}</p>}
               {actionError?.id === m.id && <p className="text-xs text-danger">{actionError.message}</p>}

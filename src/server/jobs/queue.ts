@@ -73,6 +73,16 @@ export async function enqueueOrReschedule(options: EnqueueOptions & { uniqueKey:
   });
 }
 
+/**
+ * Saca un trabajo que todavía no corrió (p. ej. "que el bot se una" cuando
+ * se apaga esa opción, o se cancela la reunión). Si ya estaba RUNNING/DONE
+ * no hace nada — no hay forma de interrumpir algo que ya está corriendo
+ * desde acá (para eso está "Detener bot", que le habla directo al servicio).
+ */
+export async function cancelJob(uniqueKey: string): Promise<void> {
+  await prisma.job.deleteMany({ where: { uniqueKey, status: "PENDING" } });
+}
+
 export interface ClaimedJob {
   id: string;
   type: string;

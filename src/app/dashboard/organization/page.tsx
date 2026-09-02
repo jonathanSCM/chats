@@ -6,6 +6,7 @@ import { RenameOrgForm } from "./_components/rename-org-form";
 import { MembersList } from "./_components/members-list";
 import { InvitePanel } from "./_components/invite-panel";
 import { AiSettingsForm } from "./_components/ai-settings-form";
+import { SharedCalendarForm } from "./_components/shared-calendar-form";
 import { BotAccessMatrix } from "./_components/bot-access-matrix";
 import { DangerZone } from "./_components/danger-zone";
 
@@ -54,6 +55,16 @@ export default async function OrganizationSettingsPage() {
           Cuánto contexto de la conversación recibe el asesor al analizar un cliente.
         </CardDescription>
         <AiSettingsForm currentLimit={org.aiMessageLimit} />
+      </Card>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Calendario compartido de Google</CardTitle>
+        <CardDescription className="mb-4">
+          Los correos que agregues acá ven, en su propio Google Calendar, todas las reuniones que
+          se agenden con &quot;Crear con Google Meet&quot; — no una invitación puntual, todo el
+          calendario de esta organización (solo lectura).
+        </CardDescription>
+        <SharedCalendarForm sharedEmails={org.googleCalendarShares} />
       </Card>
 
       <Card className="mb-6">

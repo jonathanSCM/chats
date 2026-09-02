@@ -10,8 +10,14 @@ import { analyzeFollowUp } from "@/server/services/ai/follow-up";
 import { isAiEnabled, isWithinBudget, spentToday } from "@/server/services/ai/client";
 import { saveMediaFile, deleteMediaFile } from "@/lib/media-storage";
 import { parseGuestEmails } from "@/lib/guest-emails";
-import { createMeetEvent, isGoogleMeetEnabled } from "@/server/services/google-calendar";
-import { scheduleMeetingBotJoin, stopMeetingBot } from "@/server/services/meeting-bot";
+import {
+  createMeetEvent,
+  updateMeetEvent,
+  cancelMeetEvent,
+  getOrCreateOrgCalendar,
+  isGoogleMeetEnabled,
+} from "@/server/services/google-calendar";
+import { scheduleMeetingBotJoin, cancelMeetingBotJoin, stopMeetingBot } from "@/server/services/meeting-bot";
 import { requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
 import type { ActionState } from "./types";
 
@@ -380,6 +386,7 @@ const createMeetingSchema = z.object({
   meetingUrl: z.string().max(500).optional(),
   withGoogleMeet: z.coerce.boolean().optional(),
   guestEmails: z.string().max(2000).optional(),
+  botEnabled: z.coerce.boolean().optional(),
   notes: meetingNotesField.optional(), // transcripción o resumen de la reunión
 });
 
@@ -396,6 +403,7 @@ export async function createMeetingAction(
     meetingUrl: formData.get("meetingUrl") || undefined,
     withGoogleMeet: formData.get("withGoogleMeet") || undefined,
     guestEmails: formData.get("guestEmails") || undefined,
+    botEnabled: formData.has("botEnabled") ? "true" : "false",
     notes: formData.get("notes") || undefined,
   });
   if (!parsed.success) {
@@ -414,6 +422,7 @@ export async function createMeetingAction(
       assignedToId: true,
       title: true,
       contact: { select: { fullName: true, phone: true } },
+      organization: { select: { name: true } },
     },
   });
   if (!opportunity || opportunity.organizationId !== organizationId) {
@@ -430,18 +439,24 @@ export async function createMeetingAction(
 
   const durationMinutes = parsed.data.durationMinutes ?? 30;
   let meetingUrl = parsed.data.meetingUrl || null;
+  let googleEventId: string | null = null;
+  const botEnabled = parsed.data.botEnabled ?? true;
 
   if (!meetingUrl && parsed.data.withGoogleMeet) {
     if (!isGoogleMeetEnabled()) {
       return { error: "Google Meet no está configurado en el servidor. Contactá al administrador." };
     }
     try {
-      meetingUrl = await createMeetEvent({
+      const calendarId = await getOrCreateOrgCalendar(organizationId, opportunity.organization.name);
+      const event = await createMeetEvent({
+        calendarId,
         summary: `Reunión con ${opportunity.contact.fullName || opportunity.contact.phone} — ${opportunity.title}`,
         scheduledAt,
         durationMinutes,
         attendeeEmails: guestEmailsResult.emails,
       });
+      meetingUrl = event.meetingUrl;
+      googleEventId = event.eventId;
     } catch (error) {
       return { error: error instanceof Error ? error.message : "No se pudo crear el evento en Google Calendar." };
     }
@@ -454,13 +469,15 @@ export async function createMeetingAction(
       scheduledAt,
       durationMinutes,
       meetingUrl,
+      googleEventId,
       guestEmails: guestEmailsResult.emails,
+      botEnabled,
       notes: parsed.data.notes || null,
       status: parsed.data.notes ? "DONE" : "SCHEDULED",
     },
   });
 
-  if (meetingUrl) {
+  if (meetingUrl && botEnabled) {
     await scheduleMeetingBotJoin(meeting.id, scheduledAt);
   }
 
@@ -523,8 +540,111 @@ export async function deleteMeetingAction(meetingId: string): Promise<ActionStat
 
   await prisma.meeting.delete({ where: { id: meetingId } });
   await Promise.all(meeting.attachments.map((a) => deleteMediaFile(a.url)));
+  await cancelMeetingBotJoin(meetingId);
+  if (meeting.googleEventId) {
+    const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { googleCalendarId: true } });
+    if (org?.googleCalendarId) {
+      await cancelMeetEvent({ calendarId: org.googleCalendarId, eventId: meeting.googleEventId }).catch(() => {});
+    }
+  }
   revalidatePath(PATH);
   return { error: null };
+}
+
+const updateMeetingSchema = z.object({
+  scheduledAt: z.string().min(1, "Poné la fecha"),
+  durationMinutes: z.coerce.number().int().positive().max(600),
+  botEnabled: z.coerce.boolean().optional(),
+});
+
+/** Cambiar fecha/hora, duración o si el bot se une — refleja el cambio en el evento real de Calendar, si lo hay. */
+export async function updateMeetingAction(meetingId: string, formData: FormData): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    include: { opportunity: { select: { assignedToId: true } } },
+  });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+  if (meeting.opportunity && !canEditOpportunity(meeting.opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  const parsed = updateMeetingSchema.safeParse({
+    scheduledAt: formData.get("scheduledAt"),
+    durationMinutes: formData.get("durationMinutes"),
+    botEnabled: formData.has("botEnabled") ? formData.get("botEnabled") : undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  const scheduledAt = new Date(parsed.data.scheduledAt);
+  if (Number.isNaN(scheduledAt.getTime())) {
+    return { error: "Fecha inválida" };
+  }
+  const botEnabled = parsed.data.botEnabled ?? false;
+
+  if (meeting.googleEventId) {
+    const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { googleCalendarId: true } });
+    if (org?.googleCalendarId) {
+      try {
+        await updateMeetEvent({
+          calendarId: org.googleCalendarId,
+          eventId: meeting.googleEventId,
+          scheduledAt,
+          durationMinutes: parsed.data.durationMinutes,
+        });
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : "No se pudo actualizar el evento en Google Calendar." };
+      }
+    }
+  }
+
+  await prisma.meeting.update({
+    where: { id: meetingId },
+    data: { scheduledAt, durationMinutes: parsed.data.durationMinutes, botEnabled },
+  });
+
+  if (meeting.meetingUrl && botEnabled) {
+    await scheduleMeetingBotJoin(meetingId, scheduledAt);
+  } else {
+    await cancelMeetingBotJoin(meetingId);
+  }
+
+  revalidatePath(PATH);
+  return { error: null, message: "Reunión actualizada." };
+}
+
+/** Cancela la reunión (no la borra) — si tiene evento de Calendar, lo cancela y avisa a los invitados. */
+export async function cancelMeetingAction(meetingId: string): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    include: { opportunity: { select: { assignedToId: true } } },
+  });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+  if (meeting.opportunity && !canEditOpportunity(meeting.opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  if (meeting.googleEventId) {
+    const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { googleCalendarId: true } });
+    if (org?.googleCalendarId) {
+      await cancelMeetEvent({ calendarId: org.googleCalendarId, eventId: meeting.googleEventId }).catch(() => {});
+    }
+  }
+
+  await cancelMeetingBotJoin(meetingId);
+  await prisma.meeting.update({ where: { id: meetingId }, data: { status: "CANCELED" } });
+
+  revalidatePath(PATH);
+  return { error: null, message: "Reunión cancelada." };
 }
 
 export async function stopMeetingBotAction(meetingId: string): Promise<ActionState> {

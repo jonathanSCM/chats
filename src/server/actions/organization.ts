@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { signOut } from "@/server/auth";
+import { getOrCreateOrgCalendar, shareCalendar, unshareCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
 import type { ActionState } from "./types";
 
 const renameSchema = z.object({ name: z.string().min(2, "Requerido").max(120) });
@@ -69,6 +70,80 @@ export async function updateAiSettingsAction(
 
   revalidatePath("/dashboard/organization");
   return { error: null, message: "Configuración de IA actualizada." };
+}
+
+const shareCalendarSchema = z.object({ email: z.email("Correo inválido") });
+
+/**
+ * Comparte el calendario de Google de la organización (solo lectura) con un
+ * correo — quien lo reciba ve ahí TODAS las reuniones que se agenden con
+ * Google Meet desde esta organización, no solo una puntual. Crea el
+ * calendario si todavía no existía (primera vez que se comparte o se agenda
+ * una reunión con Meet).
+ */
+export async function shareOrgCalendarAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireSession();
+  if (session.user.role !== "OWNER" || !session.user.organizationId) {
+    return { error: "Solo el dueño de la organización puede cambiar este dato" };
+  }
+  if (!isGoogleMeetEnabled()) {
+    return { error: "Google Meet no está configurado en el servidor." };
+  }
+
+  const parsed = shareCalendarSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  const org = await prisma.organization.findUniqueOrThrow({
+    where: { id: session.user.organizationId },
+    select: { name: true, googleCalendarShares: true },
+  });
+  if (org.googleCalendarShares.includes(parsed.data.email)) {
+    return { error: "Ese correo ya tiene acceso." };
+  }
+
+  try {
+    const calendarId = await getOrCreateOrgCalendar(session.user.organizationId, org.name);
+    await shareCalendar(calendarId, parsed.data.email);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo compartir el calendario." };
+  }
+
+  await prisma.organization.update({
+    where: { id: session.user.organizationId },
+    data: { googleCalendarShares: { push: parsed.data.email } },
+  });
+
+  revalidatePath("/dashboard/organization");
+  return { error: null, message: "Calendario compartido." };
+}
+
+export async function unshareOrgCalendarAction(email: string): Promise<ActionState> {
+  const session = await requireSession();
+  if (session.user.role !== "OWNER" || !session.user.organizationId) {
+    return { error: "Solo el dueño de la organización puede cambiar este dato" };
+  }
+
+  const org = await prisma.organization.findUniqueOrThrow({
+    where: { id: session.user.organizationId },
+    select: { googleCalendarId: true, googleCalendarShares: true },
+  });
+
+  if (org.googleCalendarId) {
+    await unshareCalendar(org.googleCalendarId, email).catch(() => {});
+  }
+
+  await prisma.organization.update({
+    where: { id: session.user.organizationId },
+    data: { googleCalendarShares: org.googleCalendarShares.filter((e) => e !== email) },
+  });
+
+  revalidatePath("/dashboard/organization");
+  return { error: null };
 }
 
 /**

@@ -5,7 +5,7 @@ import { handleBotReply } from "./handlers/bot-reply";
 import { handleMeetingBotJoin, markMeetingBotJoinFailed } from "./handlers/meeting-bot-join";
 import { markBotReplyFailed } from "@/server/services/ai/qualification-bot";
 
-export { enqueue, enqueueOrReschedule } from "./queue";
+export { enqueue, enqueueOrReschedule, cancelJob } from "./queue";
 
 type JobHandler = (payload: unknown) => Promise<void>;
 

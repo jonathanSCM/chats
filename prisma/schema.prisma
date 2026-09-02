@@ -27,6 +27,13 @@ model Organization {
   // análisis (ajustable por el dueño en /dashboard/organization). Más
   // mensajes = más contexto pero más costo por análisis.
   aiMessageLimit Int      @default(25)
+  // Calendario secundario de Google (no el "primary" de la cuenta
+  // compartida de todo el bot) donde se crean las reuniones de ESTA
+  // organización — separa a cada cliente de la plataforma para poder
+  // compartir el calendario sin filtrar reuniones entre organizaciones.
+  // Se crea recién la primera vez que hace falta (ver getOrCreateOrgCalendar).
+  googleCalendarId     String?
+  googleCalendarShares String[] @default([]) // correos con los que está compartido (solo lectura)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -721,6 +728,8 @@ model Meeting {
   meetingUrl      String?
   location        String?
   guestEmails     String[]          @default([]) // invitados por correo — si la reunión se creó con Google Meet, Calendar les manda la invitación real
+  botEnabled      Boolean           @default(true) // si además de haber link, se quiere que el bot se una a grabar
+  googleEventId   String? // id del evento real en Calendar — sin esto no se puede editar la hora ni cancelarlo después
   status          MeetingStatus     @default(SCHEDULED)
   botStatus       MeetingBotStatus?
   botJoinedAt     DateTime? // cuándo el bot quedó admitido de verdad en la llamada

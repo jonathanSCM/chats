@@ -79,13 +79,22 @@ export async function joinAndRecord(options: JoinOptions): Promise<void> {
 }
 
 /**
- * Como la cuenta del bot es la organizadora del evento (lo creó vía Calendar
- * API), Meet la deja entrar directo — nunca aparece la pantalla de "pedir
- * unirse" que sí ve un invitado común. El botón puede tardar en aparecer o
- * ya haber entrado solo; ambos casos se toleran.
+ * En la práctica, Google trata a un navegador controlado por automatización
+ * como invitado sin sesión aunque el perfil tenga cookies válidas (aparece
+ * "Acceder" arriba a la derecha en vez de la cuenta) — el flujo real es el
+ * de invitado: pide un nombre y el botón dice "Solicitar unirse", no
+ * "Unirse ahora". Es la fricción de admisión manual que ya se aceptó como
+ * aceptable (alguien admite al bot a mano, como a cualquier invitado nuevo).
  */
 async function joinMeeting(page: Page): Promise<void> {
-  const joinButton = page.getByRole("button", { name: /unirse ahora|ask to join|join now|participar/i });
+  const nameInput = page.getByRole("textbox", { name: /tu nombre|your name/i });
+  if (await nameInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await nameInput.fill("Bot ProShop (grabando)");
+  }
+
+  const joinButton = page.getByRole("button", {
+    name: /unirse ahora|ask to join|join now|participar|solicitar unirse|pedir unirse|ask to be let in/i,
+  });
   try {
     await joinButton.click({ timeout: 30_000 });
     console.log(`[meeting-bot] Encontró y clickeó el botón de unirse (url: ${page.url()})`);
@@ -94,8 +103,26 @@ async function joinMeeting(page: Page): Promise<void> {
     // selector no matchee el texto/idioma real del botón — ver la captura
     // "02-despues-de-unirse" para diferenciar un caso del otro.
     console.warn(`[meeting-bot] No encontró el botón de unirse (url: ${page.url()})`);
+    return;
   }
-  await page.waitForTimeout(3_000);
+
+  await waitForAdmission(page);
+}
+
+/**
+ * Si entró pidiendo permiso ("Solicitar unirse"), queda en una sala de
+ * espera hasta que alguien de la reunión lo admita — se le da hasta 5
+ * minutos antes de seguir igual (por si el selector de "ya está adentro"
+ * no matchea pero en realidad sí entró).
+ */
+async function waitForAdmission(page: Page): Promise<void> {
+  const inCallIndicator = page.getByRole("button", { name: /personas|people/i }).first();
+  try {
+    await inCallIndicator.waitFor({ timeout: 5 * 60_000 });
+    console.log("[meeting-bot] Ya está adentro de la reunión.");
+  } catch {
+    console.warn("[meeting-bot] Nadie lo admitió en 5 minutos (o no se detectó) — sigue igual.");
+  }
 }
 
 async function debugScreenshot(page: Page, meetingId: string, step: string): Promise<void> {

@@ -1,8 +1,15 @@
 import { chromium, type Page } from "playwright";
+import path from "node:path";
+import { mkdir } from "node:fs/promises";
 import { startRecording } from "./record-audio";
 import { uploadRecording, notifyFailure } from "./upload-recording";
 
 const PROFILE_DIR = process.env.CHROME_PROFILE_DIR || "/data/chrome-profile";
+// Capturas en los pasos clave — los selectores de Meet son lo más frágil de
+// todo esto, y sin ver la pantalla real es adivinar a ciegas por qué no
+// encontró un botón. Se guardan en el disco del contenedor (no persistente),
+// alcanza con sacarlas por `docker cp` mientras el contenedor sigue vivo.
+const DEBUG_DIR = path.join(process.env.RECORDINGS_DIR || "/tmp/recordings", "debug");
 // Cada cuánto se fija si quedó solo en la reunión.
 const END_CHECK_INTERVAL_MS = 30_000;
 // Margen sobre la duración esperada antes de cortar por las dudas, aunque
@@ -36,12 +43,16 @@ export async function joinAndRecord(options: JoinOptions): Promise<void> {
 
   let recordingPath: string | null = null;
   let stopRecordingFn: (() => Promise<void>) | null = null;
+  let page: Page | undefined;
 
   try {
-    const page = await context.newPage();
+    page = await context.newPage();
     await page.goto(meetingUrl, { waitUntil: "networkidle", timeout: 60_000 });
+    await debugScreenshot(page, meetingId, "01-cargada");
 
     await joinMeeting(page);
+    await debugScreenshot(page, meetingId, "02-despues-de-unirse");
+
     await sendAnnouncement(page);
 
     const recording = await startRecording(meetingId);
@@ -50,6 +61,7 @@ export async function joinAndRecord(options: JoinOptions): Promise<void> {
 
     await waitForMeetingEnd(page, expectedDurationMinutes);
   } catch (error) {
+    if (page) await debugScreenshot(page, meetingId, "03-error");
     if (stopRecordingFn) await stopRecordingFn().catch(() => {});
     await context.close().catch(() => {});
     await notifyFailure(callbackUrl, meetingId, error instanceof Error ? error.message : String(error));
@@ -74,10 +86,27 @@ export async function joinAndRecord(options: JoinOptions): Promise<void> {
  */
 async function joinMeeting(page: Page): Promise<void> {
   const joinButton = page.getByRole("button", { name: /unirse ahora|ask to join|join now|participar/i });
-  await joinButton.click({ timeout: 30_000 }).catch(() => {
-    // Sin botón visible: probablemente ya entró directo.
-  });
+  try {
+    await joinButton.click({ timeout: 30_000 });
+    console.log(`[meeting-bot] Encontró y clickeó el botón de unirse (url: ${page.url()})`);
+  } catch {
+    // Sin botón visible: puede que ya haya entrado directo, o que el
+    // selector no matchee el texto/idioma real del botón — ver la captura
+    // "02-despues-de-unirse" para diferenciar un caso del otro.
+    console.warn(`[meeting-bot] No encontró el botón de unirse (url: ${page.url()})`);
+  }
   await page.waitForTimeout(3_000);
+}
+
+async function debugScreenshot(page: Page, meetingId: string, step: string): Promise<void> {
+  try {
+    await mkdir(DEBUG_DIR, { recursive: true });
+    const file = path.join(DEBUG_DIR, `${meetingId}-${step}.png`);
+    await page.screenshot({ path: file });
+    console.log(`[meeting-bot] Captura: ${file} (url: ${page.url()})`);
+  } catch (error) {
+    console.warn("[meeting-bot] No se pudo guardar la captura de debug:", error);
+  }
 }
 
 async function sendAnnouncement(page: Page): Promise<void> {

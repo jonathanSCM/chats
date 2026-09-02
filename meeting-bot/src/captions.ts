@@ -46,16 +46,13 @@ export function startCapturingCaptions(page: Page): CaptionsCapture {
   const lines: string[] = [];
   let lastRaw = "";
   let stopped = false;
+  let ticks = 0;
 
   async function tick(): Promise<void> {
     if (stopped) return;
+    ticks += 1;
     try {
-      const raw = await page.evaluate(() => {
-        // `[aria-live]` es el patrón de accesibilidad real para contenido que
-        // se actualiza solo y hay que anunciarlo (subtítulos en vivo, acá y
-        // en cualquier otra app) — más confiable que adivinar un atributo
-        // específico de Meet, que puede no existir o apuntar a otra cosa
-        // (una prueba real terminó agarrando el panel de "Configuración").
+      const debug = await page.evaluate(() => {
         const regions = Array.from(document.querySelectorAll<HTMLElement>("[aria-live]"));
         // De haber varias regiones con aria-live en la página, la de
         // subtítulos suele ser la que tiene más texto en un momento dado.
@@ -64,15 +61,24 @@ export function startCapturingCaptions(page: Page): CaptionsCapture {
           const text = region.innerText?.trim() ?? "";
           if (text.length > best.length) best = text;
         }
-        return best;
+        return { count: regions.length, best };
       });
+
+      // Log cada ~20s (no en cada tick de 2s, sería demasiado) — para saber
+      // si el selector encuentra regiones `[aria-live]` en la página y qué
+      // tienen adentro, aunque el texto sea muy corto para aceptarlo.
+      if (ticks % 10 === 0) {
+        console.log(
+          `[meeting-bot] Subtítulos — ${debug.count} región(es) [aria-live], mejor texto: "${debug.best.slice(0, 80)}"`,
+        );
+      }
 
       // Filtro de sanidad: un match de subtítulos real tiene una frase
       // completa, no una o dos palabras sueltas (que es lo que da un
       // elemento de UI equivocado, como pasó con "settings").
-      if (raw && raw.length >= 15 && raw !== lastRaw) {
+      if (debug.best && debug.best.length >= 15 && debug.best !== lastRaw) {
         if (lastRaw) lines.push(lastRaw);
-        lastRaw = raw;
+        lastRaw = debug.best;
       }
     } catch {
       // La página puede no estar lista, o haberse cerrado — se ignora, reintenta en el próximo tick.

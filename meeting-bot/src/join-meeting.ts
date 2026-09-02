@@ -74,6 +74,12 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
 
     if (await enableCaptions(page)) {
       captions = startCapturingCaptions(page);
+      // Espera un toque a que la barra de subtítulos termine de aparecer en
+      // pantalla antes de sacar la foto — así la captura sirve para
+      // confirmar (o descartar) que Meet los prendió de verdad, no solo que
+      // se clickeó algo con el nombre correcto.
+      await page.waitForTimeout(3_000);
+      await debugScreenshot(page, meetingId, "03-subtitulos-activados");
     }
 
     const recording = await startRecording(meetingId);

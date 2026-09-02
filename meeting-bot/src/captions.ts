@@ -53,23 +53,43 @@ export function startCapturingCaptions(page: Page): CaptionsCapture {
     ticks += 1;
     try {
       const debug = await page.evaluate(() => {
+        // Meet tiene VARIAS regiones `[aria-live]` en la misma página — al
+        // menos una es el panel real de subtítulos, y otra es un anunciador
+        // genérico de accesibilidad ("Se activaron los subtítulos", "Se
+        // agregó el video de Fulano a la pantalla principal"...), que suele
+        // tener frases MÁS largas que una línea de subtítulo real y por eso
+        // "gana" si solo se compara por longitud. Se prioriza el aria-label
+        // específico de subtítulos; solo si no aparece ninguno se cae al
+        // barrido genérico, filtrando primero las frases de anuncios
+        // conocidas de Meet (no son diálogo real).
+        const ANNOUNCEMENT_PATTERNS =
+          /se activaron|se desactivaron|se agregó|se quitó|está en la pantalla principal|solicitó unirse|se unió a la|abandonó la llamada|comenzó a compartir|dejó de compartir|silenciad[oa]/i;
+
+        const labeled = Array.from(
+          document.querySelectorAll<HTMLElement>('[aria-label*="Subtítulos" i], [aria-label*="captions" i]'),
+        );
+        for (const el of labeled) {
+          const text = el.innerText?.trim() ?? "";
+          if (text && !ANNOUNCEMENT_PATTERNS.test(text)) {
+            return { count: labeled.length, best: text, source: "aria-label" };
+          }
+        }
+
         const regions = Array.from(document.querySelectorAll<HTMLElement>("[aria-live]"));
-        // De haber varias regiones con aria-live en la página, la de
-        // subtítulos suele ser la que tiene más texto en un momento dado.
         let best = "";
         for (const region of regions) {
           const text = region.innerText?.trim() ?? "";
-          if (text.length > best.length) best = text;
+          if (text && !ANNOUNCEMENT_PATTERNS.test(text) && text.length > best.length) best = text;
         }
-        return { count: regions.length, best };
+        return { count: regions.length, best, source: "aria-live" };
       });
 
       // Log cada ~20s (no en cada tick de 2s, sería demasiado) — para saber
-      // si el selector encuentra regiones `[aria-live]` en la página y qué
-      // tienen adentro, aunque el texto sea muy corto para aceptarlo.
+      // qué está encontrando el selector, aunque el texto sea muy corto
+      // para aceptarlo.
       if (ticks % 10 === 0) {
         console.log(
-          `[meeting-bot] Subtítulos — ${debug.count} región(es) [aria-live], mejor texto: "${debug.best.slice(0, 80)}"`,
+          `[meeting-bot] Subtítulos — ${debug.count} región(es) (${debug.source}), mejor texto: "${debug.best.slice(0, 80)}"`,
         );
       }
 

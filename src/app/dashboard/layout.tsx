@@ -10,6 +10,7 @@ import {
   ClipboardList,
   CalendarDays,
   LayoutDashboard,
+  Video,
 } from "lucide-react";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
@@ -58,6 +59,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </NavLink>
         <NavLink href="/dashboard/calendario">
           <CalendarDays size={16} /> Calendario
+        </NavLink>
+        <NavLink href="/dashboard/reuniones">
+          <Video size={16} /> Reuniones
         </NavLink>
         <NavLink href="/dashboard/whatsapp">
           <Smartphone size={16} /> Conexión WhatsApp

@@ -49,7 +49,7 @@ export default async function CalendarioPage({
   const meetings = await prisma.meeting.findMany({
     where: {
       organizationId,
-      opportunity: { archivedAt: null },
+      OR: [{ opportunityId: null }, { opportunity: { archivedAt: null } }],
       scheduledAt: { gte: gridStart, lte: new Date(gridEndInclusive.getTime() + 86_399_999) },
     },
     include: {
@@ -74,7 +74,8 @@ export default async function CalendarioPage({
     meetingUrl: mtg.meetingUrl,
     status: mtg.status,
     opportunityId: mtg.opportunity?.id ?? null,
-    client: mtg.opportunity?.contact.fullName || mtg.opportunity?.contact.phone || "—",
+    client: mtg.opportunity?.contact.fullName || mtg.opportunity?.contact.phone || mtg.title || "Reunión interna",
+    isInternal: mtg.opportunity === null,
     service: mtg.opportunity?.serviceInterest ?? "",
     need: mtg.opportunity?.title ?? "",
     assignedTo: mtg.opportunity?.assignedTo

@@ -247,11 +247,22 @@ export function CalendarMonth({
                     </span>
                   </div>
                   <Link
-                    href={m.opportunityId ? `/dashboard/seguimiento?open=${m.opportunityId}` : "/dashboard/seguimiento"}
+                    href={
+                      m.opportunityId
+                        ? `/dashboard/seguimiento?open=${m.opportunityId}`
+                        : m.isInternal
+                          ? "/dashboard/reuniones"
+                          : "/dashboard/seguimiento"
+                    }
                     className="font-medium text-ink hover:text-accent"
                   >
                     {m.client}
                   </Link>
+                  {m.isInternal && (
+                    <span className="ml-1 rounded-full bg-surface-2 px-1.5 py-0.5 font-mono text-[9px] uppercase text-ink-faint">
+                      Interna
+                    </span>
+                  )}
                   <p className="text-xs text-ink-faint">
                     {[m.service, m.need].filter(Boolean).join(" · ") || "Sin descripción"}
                   </p>

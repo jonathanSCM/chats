@@ -13,6 +13,7 @@ export interface MeetingRow {
   status: string;
   opportunityId: string | null;
   client: string;
+  isInternal: boolean;
   service: string;
   need: string;
   assignedTo: { id: string; name: string; color: string | null } | null;
@@ -106,7 +107,13 @@ function MeetingCard({ m }: { m: MeetingRow }) {
 
       <div className="min-w-0 flex-1">
         <Link
-          href={m.opportunityId ? `/dashboard/seguimiento?open=${m.opportunityId}` : "/dashboard/seguimiento"}
+          href={
+            m.opportunityId
+              ? `/dashboard/seguimiento?open=${m.opportunityId}`
+              : m.isInternal
+                ? "/dashboard/reuniones"
+                : "/dashboard/seguimiento"
+          }
           className="truncate font-medium text-ink hover:text-accent"
         >
           {m.client}
@@ -116,6 +123,11 @@ function MeetingCard({ m }: { m: MeetingRow }) {
         </p>
       </div>
 
+      {m.isInternal && (
+        <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] uppercase text-ink-faint">
+          Interna
+        </span>
+      )}
       <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-ink-muted">
         {STATUS_LABEL[m.status] ?? m.status}
       </span>

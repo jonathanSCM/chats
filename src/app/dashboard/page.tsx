@@ -12,7 +12,11 @@ export default async function DashboardPage() {
 
   const [meetings, members, sourcesRaw] = await Promise.all([
     prisma.meeting.findMany({
-      where: { organizationId, opportunity: { archivedAt: null }, scheduledAt: { gte: new Date() } },
+      where: {
+        organizationId,
+        OR: [{ opportunityId: null }, { opportunity: { archivedAt: null } }],
+        scheduledAt: { gte: new Date() },
+      },
       include: {
         opportunity: {
           select: {
@@ -41,7 +45,8 @@ export default async function DashboardPage() {
     id: m.id,
     scheduledAt: m.scheduledAt.toISOString(),
     opportunityId: m.opportunity?.id ?? null,
-    client: m.opportunity?.contact.fullName || m.opportunity?.contact.phone || "—",
+    client: m.opportunity?.contact.fullName || m.opportunity?.contact.phone || m.title || "Reunión interna",
+    isInternal: m.opportunityId === null,
     assignedTo: m.opportunity?.assignedTo
       ? {
           id: m.opportunity.assignedTo.id,

@@ -21,6 +21,7 @@ interface UpcomingMeeting {
   scheduledAt: string;
   opportunityId: string | null;
   client: string;
+  isInternal: boolean;
   assignedTo: { id: string; name: string; color: string | null } | null;
 }
 
@@ -405,7 +406,13 @@ export function DashboardClient({
             {upcomingMeetings.map((m) => (
               <Link
                 key={m.id}
-                href={m.opportunityId ? `/dashboard/seguimiento?open=${m.opportunityId}` : "/dashboard/calendario"}
+                href={
+                  m.opportunityId
+                    ? `/dashboard/seguimiento?open=${m.opportunityId}`
+                    : m.isInternal
+                      ? "/dashboard/reuniones"
+                      : "/dashboard/calendario"
+                }
                 className="flex items-center gap-3 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-surface-2/60"
               >
                 <span className="w-28 shrink-0 font-mono text-xs text-ink-muted">
@@ -417,6 +424,11 @@ export function DashboardClient({
                   })}
                 </span>
                 <span className="flex-1 truncate text-ink">{m.client}</span>
+                {m.isInternal && (
+                  <span className="shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 font-mono text-[9px] uppercase text-ink-faint">
+                    Interna
+                  </span>
+                )}
                 {m.assignedTo && (
                   <span
                     className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold text-white"

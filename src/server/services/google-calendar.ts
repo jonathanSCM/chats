@@ -32,10 +32,13 @@ export async function createMeetEvent({
   summary,
   scheduledAt,
   durationMinutes,
+  attendeeEmails,
 }: {
   summary: string;
   scheduledAt: Date;
   durationMinutes: number;
+  /** Si se pasa, Calendar les manda a estos correos la invitación real (aceptar/rechazar, recordatorio). */
+  attendeeEmails?: string[];
 }): Promise<string> {
   const calendar = google.calendar({ version: "v3", auth: getOAuthClient() });
   const endAt = new Date(scheduledAt.getTime() + durationMinutes * 60_000);
@@ -43,6 +46,9 @@ export async function createMeetEvent({
   const res = await calendar.events.insert({
     calendarId: "primary",
     conferenceDataVersion: 1,
+    // Sin esto, la API crea el evento pero no manda ningún correo a los
+    // invitados — quedarían agregados "en silencio".
+    sendUpdates: attendeeEmails?.length ? "all" : "none",
     requestBody: {
       summary,
       start: { dateTime: scheduledAt.toISOString() },
@@ -50,6 +56,7 @@ export async function createMeetEvent({
       conferenceData: {
         createRequest: { requestId: randomUUID(), conferenceSolutionKey: { type: "hangoutsMeet" } },
       },
+      attendees: attendeeEmails?.map((email) => ({ email })),
     },
   });
 

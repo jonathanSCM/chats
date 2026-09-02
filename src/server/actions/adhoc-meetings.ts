@@ -13,6 +13,7 @@ import {
 } from "@/server/services/meeting-bot";
 import { requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
 import { deleteMediaFile } from "@/lib/media-storage";
+import { parseGuestEmails } from "@/lib/guest-emails";
 import type { ActionState } from "./types";
 
 const PATH = "/dashboard/reuniones";
@@ -32,6 +33,7 @@ const createAdhocMeetingSchema = z.object({
   durationMinutes: z.coerce.number().int().positive().max(600).optional(),
   meetingUrl: z.string().max(500).optional(),
   withGoogleMeet: z.coerce.boolean().optional(),
+  guestEmails: z.string().max(2000).optional(),
 });
 
 export async function createAdhocMeetingAction(
@@ -46,9 +48,15 @@ export async function createAdhocMeetingAction(
     durationMinutes: formData.get("durationMinutes") || undefined,
     meetingUrl: formData.get("meetingUrl") || undefined,
     withGoogleMeet: formData.get("withGoogleMeet") || undefined,
+    guestEmails: formData.get("guestEmails") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  const guestEmailsResult = parseGuestEmails(parsed.data.guestEmails);
+  if ("error" in guestEmailsResult) {
+    return { error: guestEmailsResult.error };
   }
 
   const scheduledAt = new Date(parsed.data.scheduledAt);
@@ -64,7 +72,12 @@ export async function createAdhocMeetingAction(
       return { error: "Google Meet no está configurado en el servidor. Contactá al administrador." };
     }
     try {
-      meetingUrl = await createMeetEvent({ summary: parsed.data.title, scheduledAt, durationMinutes });
+      meetingUrl = await createMeetEvent({
+        summary: parsed.data.title,
+        scheduledAt,
+        durationMinutes,
+        attendeeEmails: guestEmailsResult.emails,
+      });
     } catch (error) {
       return { error: error instanceof Error ? error.message : "No se pudo crear el evento en Google Calendar." };
     }
@@ -78,6 +91,7 @@ export async function createAdhocMeetingAction(
       scheduledAt,
       durationMinutes,
       meetingUrl,
+      guestEmails: guestEmailsResult.emails,
       status: "SCHEDULED",
     },
   });

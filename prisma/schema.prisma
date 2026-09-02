@@ -720,6 +720,7 @@ model Meeting {
   durationMinutes Int               @default(30)
   meetingUrl      String?
   location        String?
+  guestEmails     String[]          @default([]) // invitados por correo — si la reunión se creó con Google Meet, Calendar les manda la invitación real
   status          MeetingStatus     @default(SCHEDULED)
   botStatus       MeetingBotStatus?
   botJoinedAt     DateTime? // cuándo el bot quedó admitido de verdad en la llamada

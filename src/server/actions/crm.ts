@@ -9,6 +9,7 @@ import { ALL_STAGES, OPEN_STAGES, ALL_LOSS_REASONS, type Stage, type LossReason 
 import { analyzeFollowUp } from "@/server/services/ai/follow-up";
 import { isAiEnabled, isWithinBudget, spentToday } from "@/server/services/ai/client";
 import { saveMediaFile, deleteMediaFile } from "@/lib/media-storage";
+import { parseGuestEmails } from "@/lib/guest-emails";
 import { createMeetEvent, isGoogleMeetEnabled } from "@/server/services/google-calendar";
 import { scheduleMeetingBotJoin, stopMeetingBot } from "@/server/services/meeting-bot";
 import { requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
@@ -378,6 +379,7 @@ const createMeetingSchema = z.object({
   durationMinutes: z.coerce.number().int().positive().max(600).optional(),
   meetingUrl: z.string().max(500).optional(),
   withGoogleMeet: z.coerce.boolean().optional(),
+  guestEmails: z.string().max(2000).optional(),
   notes: meetingNotesField.optional(), // transcripción o resumen de la reunión
 });
 
@@ -393,10 +395,16 @@ export async function createMeetingAction(
     durationMinutes: formData.get("durationMinutes") || undefined,
     meetingUrl: formData.get("meetingUrl") || undefined,
     withGoogleMeet: formData.get("withGoogleMeet") || undefined,
+    guestEmails: formData.get("guestEmails") || undefined,
     notes: formData.get("notes") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  const guestEmailsResult = parseGuestEmails(parsed.data.guestEmails);
+  if ("error" in guestEmailsResult) {
+    return { error: guestEmailsResult.error };
   }
 
   const opportunity = await prisma.opportunity.findUnique({
@@ -432,6 +440,7 @@ export async function createMeetingAction(
         summary: `Reunión con ${opportunity.contact.fullName || opportunity.contact.phone} — ${opportunity.title}`,
         scheduledAt,
         durationMinutes,
+        attendeeEmails: guestEmailsResult.emails,
       });
     } catch (error) {
       return { error: error instanceof Error ? error.message : "No se pudo crear el evento en Google Calendar." };
@@ -445,6 +454,7 @@ export async function createMeetingAction(
       scheduledAt,
       durationMinutes,
       meetingUrl,
+      guestEmails: guestEmailsResult.emails,
       notes: parsed.data.notes || null,
       status: parsed.data.notes ? "DONE" : "SCHEDULED",
     },

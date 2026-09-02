@@ -19,11 +19,10 @@ export async function enableCaptions(page: Page): Promise<boolean> {
     await button.click({ timeout: 10_000 });
     console.log("[meeting-bot] Subtítulos activados.");
 
-    // Causa real encontrada con un volcado de accesibilidad: al activar los
-    // subtítulos, Meet abre un selector de "Idioma de la reunión" que por
-    // defecto queda en Inglés — con la reunión en español, Meet intentaba
-    // transcribir audio en español como si fuera inglés, y por eso nunca
-    // salía texto real. Hay que elegir español a mano.
+    // Al activar los subtítulos, Meet abre un selector de "Idioma de la
+    // reunión" que por defecto queda en Inglés — con la reunión en español,
+    // Meet intentaba transcribir audio en español como si fuera inglés, y
+    // por eso nunca salía texto real. Hay que elegir español a mano.
     await selectSpanishCaptionLanguage(page);
 
     // El selector de idioma queda abierto como un panel — hay que cerrarlo
@@ -60,87 +59,81 @@ export interface CaptionsCapture {
   stop: () => string;
 }
 
+interface CaptionBlock {
+  name: string;
+  text: string;
+}
+
 /**
- * Lee el panel de subtítulos de Meet cada pocos segundos y arma líneas de
- * texto. Es, con diferencia, la parte más frágil de todo el bot — el
- * selector del contenedor de subtítulos es una suposición razonable sobre
- * la estructura actual de Meet, no algo confirmado contra capturas reales
- * todavía; puede necesitar ajuste apenas se pruebe contra una reunión de
- * verdad (mismo criterio que ya se usó para el botón de unirse y el chat:
- * mejor esfuerzo, con logs claros para poder corregir el selector viendo
- * capturas de debug, sin bloquear el resto del flujo si falla).
+ * Lee el panel de subtítulos de Meet cada pocos segundos y arma líneas
+ * "Nombre: lo que dijo". Confirmado contra el HTML real de una reunión con
+ * subtítulos andando (ya no es una suposición): el panel es
+ * `[role="region"][aria-label="Subtítulos"]` (coincidencia EXACTA — con
+ * `*=` de substring también entraban el botón de "Abrir configuración de
+ * subtítulos" y el de activarlos, que tienen "subtítulos" en su propio
+ * aria-label), y cada intervención es un bloque `.nMcdL` con el nombre en
+ * `.NWpY1d` y el texto en `.ygicle`. Si Google cambia estas clases en un
+ * rediseño, cae a un fallback más genérico (todo el texto del panel,
+ * sin separar nombre de texto) antes que no capturar nada.
  *
- * Estrategia: Meet va actualizando la ÚLTIMA línea mientras la persona
- * sigue hablando (no agrega una línea nueva por cada palabra) — así que
- * recién se guarda una línea como "terminada" cuando el texto visible
- * cambia a algo distinto (cambió de hablante, o pasó a una línea nueva).
+ * Estrategia de acumulado: Meet mantiene varios bloques visibles a la vez,
+ * y el ÚLTIMO se sigue actualizando mientras esa persona sigue hablando —
+ * recién se guarda como "terminado" cuando aparece un bloque nuevo después
+ * (cambió de hablante, o hizo una pausa larga).
  */
 export function startCapturingCaptions(page: Page, meetingId: string): CaptionsCapture {
-  const lines: string[] = [];
-  let lastRaw = "";
+  const finalizedKeys = new Set<string>();
+  const finalizedLines: string[] = [];
+  let pending: CaptionBlock | null = null;
   let stopped = false;
   let ticks = 0;
+
+  function recordIfNew(block: CaptionBlock): void {
+    const key = `${block.name}:${block.text}`;
+    if (block.text && !finalizedKeys.has(key)) {
+      finalizedKeys.add(key);
+      finalizedLines.push(`${block.name}: ${block.text}`);
+    }
+  }
 
   async function tick(): Promise<void> {
     if (stopped) return;
     ticks += 1;
     try {
-      const debug = await page.evaluate(() => {
-        // Meet tiene VARIAS regiones `[aria-live]` en la misma página — al
-        // menos una es el panel real de subtítulos, y otra es un anunciador
-        // genérico de accesibilidad ("Se activaron los subtítulos", "Se
-        // agregó el video de Fulano a la pantalla principal"...), que suele
-        // tener frases MÁS largas que una línea de subtítulo real y por eso
-        // "gana" si solo se compara por longitud. Se prioriza el aria-label
-        // específico de subtítulos; solo si no aparece ninguno se cae al
-        // barrido genérico, filtrando primero las frases de anuncios
-        // conocidas de Meet (no son diálogo real).
-        const ANNOUNCEMENT_PATTERNS =
-          /se activaron|se desactivaron|se agregó|se quitó|está en la pantalla principal|solicitó unirse|se unió a la|abandonó la llamada|comenzó a compartir|dejó de compartir|silenciad[oa]|volverá a la pantalla principal|quedan \d+ segundos/i;
+      const result = await page.evaluate(() => {
+        const region = document.querySelector('[role="region"][aria-label="Subtítulos"]');
+        if (!region) return { blocks: [] as { name: string; text: string }[], fallback: "" };
 
-        const labeled = Array.from(
-          document.querySelectorAll<HTMLElement>('[aria-label*="Subtítulos" i], [aria-label*="captions" i]'),
-        );
-        for (const el of labeled) {
-          const text = el.innerText?.trim() ?? "";
-          if (text && !ANNOUNCEMENT_PATTERNS.test(text)) {
-            return { count: labeled.length, best: text, source: "aria-label" };
-          }
+        const blockEls = Array.from(region.querySelectorAll(".nMcdL"));
+        if (blockEls.length > 0) {
+          const blocks = blockEls.map((el) => ({
+            name: el.querySelector(".NWpY1d")?.textContent?.trim() || "Alguien",
+            text: el.querySelector(".ygicle")?.textContent?.trim() || "",
+          }));
+          return { blocks, fallback: "" };
         }
 
-        const regions = Array.from(document.querySelectorAll<HTMLElement>("[aria-live]"));
-        let best = "";
-        for (const region of regions) {
-          const text = region.innerText?.trim() ?? "";
-          if (text && !ANNOUNCEMENT_PATTERNS.test(text) && text.length > best.length) best = text;
-        }
-        return { count: regions.length, best, source: "aria-live" };
+        // Fallback si Google cambió las clases internas: todo el texto del
+        // panel, sin poder separar nombre de lo dicho.
+        return { blocks: [], fallback: (region as HTMLElement).innerText?.trim() ?? "" };
       });
 
-      // Log cada ~20s (no en cada tick de 2s, sería demasiado) — para saber
-      // qué está encontrando el selector, aunque el texto sea muy corto
-      // para aceptarlo.
+      if (result.blocks.length > 0) {
+        // Todos menos el último ya están "terminados" — Meet agregó uno
+        // nuevo después, así que ese ya no va a cambiar más.
+        for (let i = 0; i < result.blocks.length - 1; i++) recordIfNew(result.blocks[i]);
+        pending = result.blocks[result.blocks.length - 1] ?? null;
+      } else if (result.fallback && result.fallback.length >= 25) {
+        recordIfNew({ name: "", text: result.fallback });
+      }
+
       if (ticks % 10 === 0) {
         console.log(
-          `[meeting-bot] Subtítulos — ${debug.count} región(es) (${debug.source}), mejor texto: "${debug.best.slice(0, 80)}"`,
+          `[meeting-bot] Subtítulos — ${finalizedLines.length} línea(s) guardadas, pendiente: "${(pending?.text ?? "").slice(0, 60)}"`,
         );
       }
 
-      // Volcado completo de accesibilidad cada ~40s — a diferencia del que
-      // se saca una sola vez al activar los subtítulos (cuando todavía no
-      // habló nadie y el panel real está vacío), este se repite mientras
-      // dura la reunión, así hay chances reales de agarrar uno con diálogo
-      // de verdad adentro del panel de subtítulos para poder identificarlo.
       if (ticks % 20 === 0) void dumpAccessibilityTree(page, meetingId, ticks);
-
-      // Filtro de sanidad: un match de subtítulos real tiene una frase
-      // completa, no una o dos palabras sueltas ni una fecha de calendario
-      // (elementos de UI equivocados que ya se colaron con umbrales más
-      // bajos — "settings", "septiembre 2026").
-      if (debug.best && debug.best.length >= 25 && debug.best !== lastRaw) {
-        if (lastRaw) lines.push(lastRaw);
-        lastRaw = debug.best;
-      }
     } catch {
       // La página puede no estar lista, o haberse cerrado — se ignora, reintenta en el próximo tick.
     }
@@ -153,8 +146,8 @@ export function startCapturingCaptions(page: Page, meetingId: string): CaptionsC
   return {
     stop(): string {
       stopped = true;
-      if (lastRaw && lines[lines.length - 1] !== lastRaw) lines.push(lastRaw);
-      return lines.join("\n");
+      if (pending) recordIfNew(pending);
+      return finalizedLines.join("\n");
     },
   };
 }

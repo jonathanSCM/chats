@@ -10,7 +10,8 @@ import { analyzeFollowUp } from "@/server/services/ai/follow-up";
 import { isAiEnabled, isWithinBudget, spentToday } from "@/server/services/ai/client";
 import { saveMediaFile, deleteMediaFile } from "@/lib/media-storage";
 import { createMeetEvent, isGoogleMeetEnabled } from "@/server/services/google-calendar";
-import { scheduleMeetingBotJoin } from "@/server/services/meeting-bot";
+import { scheduleMeetingBotJoin, stopMeetingBot } from "@/server/services/meeting-bot";
+import { requestMeetingTranscription, requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
 import type { ActionState } from "./types";
 
 const PATH = "/dashboard/seguimiento";
@@ -516,6 +517,71 @@ export async function deleteMeetingAction(meetingId: string): Promise<ActionStat
   return { error: null };
 }
 
+export async function stopMeetingBotAction(meetingId: string): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    include: { opportunity: { select: { assignedToId: true } } },
+  });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+  if (meeting.opportunity && !canEditOpportunity(meeting.opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  const result = await stopMeetingBot(meetingId);
+  if (!result.ok) {
+    return { error: result.error ?? "No se pudo detener el bot" };
+  }
+
+  revalidatePath(PATH);
+  return { error: null, message: "Avisado — el bot debería salir en breve." };
+}
+
+export async function transcribeMeetingAction(meetingId: string): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    include: { opportunity: { select: { assignedToId: true } } },
+  });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+  if (meeting.opportunity && !canEditOpportunity(meeting.opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  const result = await requestMeetingTranscription(meetingId);
+  if (!result.ok) return { error: result.error ?? "No se pudo pedir la transcripción" };
+
+  revalidatePath(PATH);
+  return { error: null, message: "Transcribiendo — puede tardar unos minutos." };
+}
+
+export async function generateMeetingSummaryPdfAction(meetingId: string): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    include: { opportunity: { select: { assignedToId: true } } },
+  });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+  if (meeting.opportunity && !canEditOpportunity(meeting.opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  const result = await requestMeetingSummaryPdf(meetingId, organizationId);
+  if (!result.ok) return { error: result.error ?? "No se pudo generar el resumen" };
+
+  revalidatePath(PATH);
+  return { error: null, message: "Resumen en PDF generado." };
+}
+
 // Mismos límites que ya usa el inbox para adjuntos salientes — ver
 // MAX_SIZE_BY_TYPE en server/actions/inbox.ts.
 const MEETING_ATTACHMENT_MAX_BYTES = 100 * 1024 * 1024;
@@ -559,6 +625,7 @@ export async function addMeetingAttachmentAction(
   });
 
   revalidatePath(PATH);
+  revalidatePath("/dashboard/reuniones");
   return { error: null };
 }
 
@@ -580,6 +647,7 @@ export async function deleteMeetingAttachmentAction(attachmentId: string): Promi
   await deleteMediaFile(attachment.url);
 
   revalidatePath(PATH);
+  revalidatePath("/dashboard/reuniones");
   return { error: null };
 }
 

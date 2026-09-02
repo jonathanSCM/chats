@@ -18,8 +18,15 @@ export default async function ReunionesPage() {
       meetingUrl: true,
       status: true,
       botStatus: true,
+      botJoinedAt: true,
+      botLeftAt: true,
       notes: true,
+      transcript: true,
       aiSummary: true,
+      attachments: {
+        select: { id: true, url: true, fileName: true, mimeType: true, fileSize: true },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
 
@@ -31,8 +38,12 @@ export default async function ReunionesPage() {
     meetingUrl: m.meetingUrl,
     status: m.status,
     botStatus: m.botStatus,
+    botJoinedAt: m.botJoinedAt?.toISOString() ?? null,
+    botLeftAt: m.botLeftAt?.toISOString() ?? null,
     notes: m.notes ?? "",
+    transcript: m.transcript ?? "",
     aiSummary: m.aiSummary ?? "",
+    attachments: m.attachments,
   }));
 
   return (

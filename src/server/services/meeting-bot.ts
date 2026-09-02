@@ -54,3 +54,33 @@ export async function scheduleMeetingBotJoinNow(meetingId: string): Promise<void
   await prisma.meeting.update({ where: { id: meetingId }, data: { botStatus: "PENDING" } });
   runJobsSoon();
 }
+
+/**
+ * "Salir de la reunión" a mano — le pega directo al servicio del bot
+ * (`POST /stop`), que corta la grabación ahí mismo y sube lo que tenga
+ * hasta ese momento (no espera a que la app principal reprocese nada). El
+ * `botStatus` lo actualiza el propio bot al terminar de subir, como
+ * cualquier fin de reunión normal — acá no se toca a propósito.
+ */
+export async function stopMeetingBot(meetingId: string): Promise<{ ok: boolean; error?: string }> {
+  const url = process.env.BOT_SERVICE_URL;
+  const secret = process.env.BOT_SERVICE_SECRET;
+  if (!url || !secret) {
+    return { ok: false, error: "El bot no está configurado en el servidor." };
+  }
+
+  try {
+    const response = await fetch(`${url}/stop`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ meetingId }),
+    });
+    if (!response.ok) {
+      const detail = response.status === 404 ? "El bot no tiene ninguna sesión activa para esta reunión." : `El servicio del bot respondió ${response.status}.`;
+      return { ok: false, error: detail };
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "No se pudo contactar al servicio del bot." };
+  }
+}

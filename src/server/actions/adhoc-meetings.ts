@@ -5,7 +5,13 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { createMeetEvent, isGoogleMeetEnabled } from "@/server/services/google-calendar";
-import { scheduleMeetingBotJoin, scheduleMeetingBotJoinNow, isMeetingBotEnabled } from "@/server/services/meeting-bot";
+import {
+  scheduleMeetingBotJoin,
+  scheduleMeetingBotJoinNow,
+  stopMeetingBot,
+  isMeetingBotEnabled,
+} from "@/server/services/meeting-bot";
+import { requestMeetingTranscription, requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
 import type { ActionState } from "./types";
 
 const PATH = "/dashboard/reuniones";
@@ -126,6 +132,53 @@ export async function joinMeetingNowAction(_prevState: ActionState, formData: Fo
   revalidatePath("/dashboard/calendario");
   revalidatePath("/dashboard");
   return { error: null, message: "Avisado — el bot debería pedir unirse en un par de minutos." };
+}
+
+export async function stopMeetingBotAction(meetingId: string): Promise<ActionState> {
+  const { organizationId } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({ where: { id: meetingId }, select: { organizationId: true } });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+
+  const result = await stopMeetingBot(meetingId);
+  if (!result.ok) {
+    return { error: result.error ?? "No se pudo detener el bot" };
+  }
+
+  revalidatePath(PATH);
+  return { error: null, message: "Avisado — el bot debería salir en breve." };
+}
+
+export async function transcribeMeetingAction(meetingId: string): Promise<ActionState> {
+  const { organizationId } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({ where: { id: meetingId }, select: { organizationId: true } });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+
+  const result = await requestMeetingTranscription(meetingId);
+  if (!result.ok) return { error: result.error ?? "No se pudo pedir la transcripción" };
+
+  revalidatePath(PATH);
+  return { error: null, message: "Transcribiendo — puede tardar unos minutos." };
+}
+
+export async function generateMeetingSummaryPdfAction(meetingId: string): Promise<ActionState> {
+  const { organizationId } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({ where: { id: meetingId }, select: { organizationId: true } });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+
+  const result = await requestMeetingSummaryPdf(meetingId, organizationId);
+  if (!result.ok) return { error: result.error ?? "No se pudo generar el resumen" };
+
+  revalidatePath(PATH);
+  return { error: null, message: "Resumen en PDF generado." };
 }
 
 export async function deleteAdhocMeetingAction(meetingId: string): Promise<ActionState> {

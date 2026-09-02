@@ -67,7 +67,11 @@ export default async function SeguimientoPage({
             id: true,
             scheduledAt: true,
             status: true,
+            botStatus: true,
+            botJoinedAt: true,
+            botLeftAt: true,
             notes: true,
+            transcript: true,
             meetingUrl: true,
             attachments: {
               select: { id: true, url: true, fileName: true, mimeType: true, fileSize: true },
@@ -131,7 +135,11 @@ export default async function SeguimientoPage({
       id: m.id,
       scheduledAt: m.scheduledAt.toISOString(),
       status: m.status,
+      botStatus: m.botStatus,
+      botJoinedAt: m.botJoinedAt?.toISOString() ?? null,
+      botLeftAt: m.botLeftAt?.toISOString() ?? null,
       notes: m.notes ?? "",
+      transcript: m.transcript ?? "",
       meetingUrl: m.meetingUrl,
       attachments: m.attachments.map((a) => ({
         id: a.id,

@@ -2,7 +2,8 @@ import { chromium, type Page } from "playwright";
 import path from "node:path";
 import { mkdir } from "node:fs/promises";
 import { startRecording } from "./record-audio";
-import { uploadRecording, notifyFailure } from "./upload-recording";
+import { uploadRecording, notifyFailure, notifyRecording } from "./upload-recording";
+import { enableCaptions, startCapturingCaptions, type CaptionsCapture } from "./captions";
 
 const PROFILE_DIR = process.env.CHROME_PROFILE_DIR || "/data/chrome-profile";
 // Capturas en los pasos clave — los selectores de Meet son lo más frágil de
@@ -28,8 +29,12 @@ export interface JoinOptions {
  * grabar, detectar el final, y subir el audio. Se llama fire-and-forget
  * desde `server.ts` — todo lo que pasa acá se reporta al `callbackUrl`, no
  * hay respuesta HTTP que esperar mientras la reunión sigue.
+ *
+ * `signal` permite cortar a mano desde `POST /stop` (server.ts la aborta) —
+ * si ya estaba grabando, corta prolijo y sube lo que se grabó hasta ese
+ * momento, igual que si detectara que la reunión terminó sola.
  */
-export async function joinAndRecord(options: JoinOptions): Promise<void> {
+export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): Promise<void> {
   const { meetingId, meetingUrl, expectedDurationMinutes, callbackUrl } = options;
 
   // Perfil persistente: ya tiene la sesión de la cuenta del bot logueada
@@ -54,6 +59,7 @@ export async function joinAndRecord(options: JoinOptions): Promise<void> {
 
   let recordingPath: string | null = null;
   let stopRecordingFn: (() => Promise<void>) | null = null;
+  let captions: CaptionsCapture | null = null;
   let page: Page | undefined;
 
   try {
@@ -61,16 +67,21 @@ export async function joinAndRecord(options: JoinOptions): Promise<void> {
     await page.goto(meetingUrl, { waitUntil: "networkidle", timeout: 60_000 });
     await debugScreenshot(page, meetingId, "01-cargada");
 
-    await joinMeeting(page);
+    await joinMeeting(page, signal);
     await debugScreenshot(page, meetingId, "02-despues-de-unirse");
 
     await sendAnnouncement(page);
 
+    if (await enableCaptions(page)) {
+      captions = startCapturingCaptions(page);
+    }
+
     const recording = await startRecording(meetingId);
     recordingPath = recording.filePath;
     stopRecordingFn = recording.stop;
+    void notifyRecording(callbackUrl, meetingId);
 
-    await waitForMeetingEnd(page, expectedDurationMinutes);
+    await waitForMeetingEnd(page, expectedDurationMinutes, signal);
   } catch (error) {
     if (page) await debugScreenshot(page, meetingId, "03-error");
     if (stopRecordingFn) await stopRecordingFn().catch(() => {});
@@ -79,11 +90,12 @@ export async function joinAndRecord(options: JoinOptions): Promise<void> {
     return;
   }
 
+  const captionsTranscript = captions?.stop() ?? "";
   if (stopRecordingFn) await stopRecordingFn();
   await context.close().catch(() => {});
 
   try {
-    await uploadRecording(callbackUrl, meetingId, recordingPath);
+    await uploadRecording(callbackUrl, meetingId, recordingPath, captionsTranscript);
   } catch (error) {
     await notifyFailure(callbackUrl, meetingId, `No se pudo subir la grabación: ${error}`);
   }
@@ -97,7 +109,7 @@ export async function joinAndRecord(options: JoinOptions): Promise<void> {
  * "Unirse ahora". Es la fricción de admisión manual que ya se aceptó como
  * aceptable (alguien admite al bot a mano, como a cualquier invitado nuevo).
  */
-async function joinMeeting(page: Page): Promise<void> {
+async function joinMeeting(page: Page, signal: AbortSignal): Promise<void> {
   // El botón de unirse queda deshabilitado hasta completar el nombre — con
   // `isVisible()` (que no espera, solo mira el estado actual) el campo podía
   // no existir todavía si la página seguía en "Preparando la llamada..."; con
@@ -125,7 +137,7 @@ async function joinMeeting(page: Page): Promise<void> {
     return;
   }
 
-  await waitForAdmission(page);
+  await waitForAdmission(page, signal);
 }
 
 /**
@@ -134,12 +146,26 @@ async function joinMeeting(page: Page): Promise<void> {
  * nadie lo admite, tira un error a propósito (en vez de seguir el flujo
  * igual): sin esto, seguía adelante grabando ~45 minutos de nada, y el
  * navegador quedaba abierto todo ese tiempo bloqueando el perfil para la
- * próxima reunión que quisiera usarlo.
+ * próxima reunión que quisiera usarlo. También corta si alguien pide
+ * `/stop` mientras todavía está esperando que lo admitan.
  */
-async function waitForAdmission(page: Page): Promise<void> {
+async function waitForAdmission(page: Page, signal: AbortSignal): Promise<void> {
   const inCallIndicator = page.getByRole("button", { name: /personas|people/i }).first();
-  await inCallIndicator.waitFor({ timeout: 5 * 60_000 });
+  await Promise.race([
+    inCallIndicator.waitFor({ timeout: 5 * 60_000 }),
+    abortPromise(signal, "Se pidió detener el bot mientras esperaba que lo admitieran."),
+  ]);
   console.log("[meeting-bot] Ya está adentro de la reunión.");
+}
+
+function abortPromise(signal: AbortSignal, message: string): Promise<never> {
+  return new Promise((_, reject) => {
+    if (signal.aborted) {
+      reject(new Error(message));
+      return;
+    }
+    signal.addEventListener("abort", () => reject(new Error(message)), { once: true });
+  });
 }
 
 async function debugScreenshot(page: Page, meetingId: string, step: string): Promise<void> {
@@ -167,10 +193,17 @@ async function sendAnnouncement(page: Page): Promise<void> {
   }
 }
 
-async function waitForMeetingEnd(page: Page, expectedDurationMinutes: number): Promise<void> {
+/**
+ * Corta cuando pasa lo que sea primero: se queda solo en la llamada, se
+ * cumple la duración esperada + margen, o alguien pide `/stop` a mano
+ * (`signal`). En los tres casos es una salida "normal" — se sube igual lo
+ * que se grabó hasta ese momento, no se trata como un fallo.
+ */
+async function waitForMeetingEnd(page: Page, expectedDurationMinutes: number, signal: AbortSignal): Promise<void> {
   const deadline = Date.now() + (expectedDurationMinutes + END_BUFFER_MINUTES) * 60_000;
 
   while (Date.now() < deadline) {
+    if (signal.aborted) return;
     await page.waitForTimeout(END_CHECK_INTERVAL_MS);
     if (await isAlone(page)) return;
   }

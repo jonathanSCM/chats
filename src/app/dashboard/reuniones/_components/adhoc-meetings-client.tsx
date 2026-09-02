@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { Plus, X, Copy, Trash2, Clock, Video, Bot, Zap } from "lucide-react";
+import { Plus, X, Copy, Trash2, Clock, Video, Zap, PhoneOff, FileDown, FileSearch } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,14 @@ import {
   createAdhocMeetingAction,
   deleteAdhocMeetingAction,
   joinMeetingNowAction,
+  stopMeetingBotAction,
+  transcribeMeetingAction,
+  generateMeetingSummaryPdfAction,
 } from "@/server/actions/adhoc-meetings";
 import { scheduledAtToUtcHidden } from "@/lib/datetime-local";
+import { BOT_STATUS_CONFIG } from "@/lib/meeting-bot-status";
+import { MeetingAttachments, type MeetingAttachmentInfo } from "@/components/meeting-attachments";
+import { PdfViewerModal } from "@/components/pdf-viewer-modal";
 
 export interface AdhocMeetingRow {
   id: string;
@@ -20,8 +26,12 @@ export interface AdhocMeetingRow {
   meetingUrl: string | null;
   status: string;
   botStatus: string | null;
+  botJoinedAt: string | null;
+  botLeftAt: string | null;
   notes: string;
+  transcript: string;
   aiSummary: string;
+  attachments: MeetingAttachmentInfo[];
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -30,17 +40,6 @@ const STATUS_LABEL: Record<string, string> = {
   DONE: "Realizada",
   CANCELED: "Cancelada",
   NO_SHOW: "No se presentó",
-};
-
-// Estado del bot de grabación (independiente del estado de la reunión) —
-// null significa que no se pidió que el bot se una (sin link de Meet).
-const BOT_STATUS_LABEL: Record<string, string> = {
-  PENDING: "Se va a grabar",
-  JOINING: "El bot está entrando…",
-  RECORDING: "Grabando…",
-  TRANSCRIBING: "Transcribiendo…",
-  DONE: "Transcripción lista",
-  FAILED: "Falló — revisar a mano",
 };
 
 function timeLabel(iso: string): string {
@@ -83,6 +82,41 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
       await deleteAdhocMeetingAction(id);
     });
   }
+
+  const [stoppingId, setStoppingId] = useState<string | null>(null);
+  const [stopError, setStopError] = useState<{ id: string; message: string } | null>(null);
+  function handleStop(id: string) {
+    setStoppingId(id);
+    setStopError(null);
+    startTransition(async () => {
+      const result = await stopMeetingBotAction(id);
+      setStoppingId(null);
+      if (result.error) setStopError({ id, message: result.error });
+    });
+  }
+
+  const [actionPendingId, setActionPendingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
+  function handleTranscribe(id: string) {
+    setActionPendingId(id);
+    setActionError(null);
+    startTransition(async () => {
+      const result = await transcribeMeetingAction(id);
+      setActionPendingId(null);
+      if (result.error) setActionError({ id, message: result.error });
+    });
+  }
+  function handleGenerateSummary(id: string) {
+    setActionPendingId(id);
+    setActionError(null);
+    startTransition(async () => {
+      const result = await generateMeetingSummaryPdfAction(id);
+      setActionPendingId(null);
+      if (result.error) setActionError({ id, message: result.error });
+    });
+  }
+
+  const [viewingPdf, setViewingPdf] = useState<{ url: string; title: string } | null>(null);
 
   return (
     <div className="space-y-4">
@@ -154,17 +188,65 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
         </Card>
       ) : (
         <div className="space-y-2">
-          {meetings.map((m) => (
+          {meetings.map((m) => {
+            const botConfig = m.botStatus ? BOT_STATUS_CONFIG[m.botStatus] : null;
+            const BotIcon = botConfig?.icon;
+            const pdfAttachment = m.attachments.find((a) => a.mimeType === "application/pdf");
+            return (
             <Card key={m.id} className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-medium text-ink">{m.title}</p>
                 <span className="ml-auto rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-ink-muted">
                   {STATUS_LABEL[m.status] ?? m.status}
                 </span>
-                {m.botStatus && (
-                  <span className="flex items-center gap-1 rounded-full bg-accent-dim/20 px-2 py-0.5 font-mono text-[10px] text-accent">
-                    <Bot size={10} /> {BOT_STATUS_LABEL[m.botStatus] ?? m.botStatus}
+                {botConfig && BotIcon && (
+                  <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10px] ${botConfig.className}`}>
+                    <BotIcon size={10} className={m.botStatus === "JOINING" || m.botStatus === "TRANSCRIBING" ? "animate-spin" : ""} />
+                    {botConfig.label}
                   </span>
+                )}
+                {botConfig?.canStop && (
+                  <button
+                    type="button"
+                    disabled={isPending || stoppingId === m.id}
+                    onClick={() => handleStop(m.id)}
+                    title="Sacar al bot de la reunión ahora"
+                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-danger hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <PhoneOff size={11} /> {stoppingId === m.id ? "Deteniendo…" : "Detener bot"}
+                  </button>
+                )}
+                {m.botStatus === "RECORDED" && (
+                  <button
+                    type="button"
+                    disabled={isPending || actionPendingId === m.id}
+                    onClick={() => handleTranscribe(m.id)}
+                    title="Transcribir el audio con Whisper (sin nombres de quién habló)"
+                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <FileSearch size={11} /> {actionPendingId === m.id ? "Pidiendo…" : "Transcribir"}
+                  </button>
+                )}
+                {m.transcript && !pdfAttachment && (
+                  <button
+                    type="button"
+                    disabled={isPending || actionPendingId === m.id}
+                    onClick={() => handleGenerateSummary(m.id)}
+                    title="Generar un resumen ejecutivo en PDF a partir de la transcripción"
+                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <FileDown size={11} /> {actionPendingId === m.id ? "Generando…" : "Generar resumen (PDF)"}
+                  </button>
+                )}
+                {pdfAttachment && (
+                  <button
+                    type="button"
+                    onClick={() => setViewingPdf({ url: pdfAttachment.url, title: `Resumen — ${m.title}` })}
+                    title="Ver el resumen en PDF"
+                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent"
+                  >
+                    <FileDown size={11} /> Ver PDF
+                  </button>
                 )}
                 <button
                   type="button"
@@ -178,6 +260,9 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
                   <Trash2 size={13} />
                 </button>
               </div>
+
+              {stopError?.id === m.id && <p className="text-xs text-danger">{stopError.message}</p>}
+              {actionError?.id === m.id && <p className="text-xs text-danger">{actionError.message}</p>}
 
               <div className="flex flex-wrap items-center gap-3 text-xs text-ink-muted">
                 <span className="flex items-center gap-1">
@@ -201,26 +286,37 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
                 )}
               </div>
 
-              {m.aiSummary && (
-                <div className="rounded-md border border-accent-dim/30 bg-accent-dim/10 p-2.5">
-                  <p className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-accent">
-                    Resumen
-                  </p>
-                  <p className="text-xs leading-relaxed text-ink-muted">{m.aiSummary}</p>
-                </div>
+              {m.botJoinedAt && (
+                <p className="font-mono text-[10px] text-ink-faint">
+                  Grabó de {new Date(m.botJoinedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}{" "}
+                  a{" "}
+                  {m.botLeftAt
+                    ? new Date(m.botLeftAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })
+                    : "ahora"}
+                  {m.botLeftAt &&
+                    ` (${Math.round((new Date(m.botLeftAt).getTime() - new Date(m.botJoinedAt).getTime()) / 60_000)}m)`}
+                </p>
               )}
 
-              {m.notes && (
+              {m.transcript && (
                 <details className="text-xs text-ink-muted">
                   <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-                    Transcripción completa
+                    Transcripción
                   </summary>
-                  <p className="mt-1.5 whitespace-pre-wrap leading-relaxed">{m.notes}</p>
+                  <p className="mt-1.5 whitespace-pre-wrap leading-relaxed">{m.transcript}</p>
                 </details>
               )}
+
+              {m.notes && <p className="whitespace-pre-wrap text-xs leading-relaxed text-ink-muted">{m.notes}</p>}
+
+              <MeetingAttachments meetingId={m.id} attachments={m.attachments} editable disabled={isPending} />
             </Card>
-          ))}
+            );
+          })}
         </div>
+      )}
+      {viewingPdf && (
+        <PdfViewerModal url={viewingPdf.url} title={viewingPdf.title} onClose={() => setViewingPdf(null)} />
       )}
     </div>
   );

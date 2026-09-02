@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
-import { enqueueOrReschedule, runJobsSoon } from "@/server/jobs";
 
 /**
  * Recibe la grabación que sube el servicio del bot al terminar una reunión
@@ -47,6 +46,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  // Avisa que ya entró y arrancó a grabar de verdad — sin esto, el estado se
+  // quedaba pegado en "entrando" (JOINING) durante toda la reunión.
+  if (status === "recording") {
+    await prisma.meeting.update({
+      where: { id: meetingId },
+      data: { botStatus: "RECORDING", botJoinedAt: new Date() },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
   if (!(audio instanceof File)) {
     return new NextResponse("Falta audio", { status: 400 });
   }
@@ -55,7 +64,7 @@ export async function POST(req: NextRequest) {
   const mimeType = audio.type || "audio/mpeg";
   const url = await saveMediaFile(buffer, mimeType);
 
-  const attachment = await prisma.meetingAttachment.create({
+  await prisma.meetingAttachment.create({
     data: {
       meetingId,
       url,
@@ -65,14 +74,21 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  await prisma.meeting.update({ where: { id: meetingId }, data: { botStatus: "TRANSCRIBING" } });
+  // La transcripción ya NO se dispara sola acá — si el bot mandó los
+  // subtítulos que leyó en vivo (con nombre de quién habló), esa ya es la
+  // transcripción definitiva, sin necesidad de Whisper. Si no vinieron
+  // (falló la lectura de subtítulos, o Meet no los mostró), queda en
+  // "RECORDED" — el audio está listo para bajar, y alguien tiene que pedir
+  // la transcripción a mano (botón "Transcribir" en la UI) si la quiere.
+  const captionsTranscriptRaw = form.get("captionsTranscript");
+  const captionsTranscript = typeof captionsTranscriptRaw === "string" ? captionsTranscriptRaw.trim() : "";
 
-  await enqueueOrReschedule({
-    type: "meeting_transcribe",
-    uniqueKey: `meeting-transcribe-${attachment.id}`,
-    payload: { meetingId, attachmentId: attachment.id },
+  await prisma.meeting.update({
+    where: { id: meetingId },
+    data: captionsTranscript
+      ? { botStatus: "DONE", botLeftAt: new Date(), transcript: captionsTranscript }
+      : { botStatus: "RECORDED", botLeftAt: new Date() },
   });
-  runJobsSoon();
 
   return NextResponse.json({ ok: true });
 }

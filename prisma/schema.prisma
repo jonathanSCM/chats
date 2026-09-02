@@ -703,6 +703,7 @@ enum MeetingBotStatus {
   PENDING
   JOINING
   RECORDING
+  RECORDED // audio ya subido, a la espera de que alguien pida transcribir (o ya vino con transcripción de subtítulos, ver Meeting.transcript)
   TRANSCRIBING
   DONE
   FAILED
@@ -721,7 +722,10 @@ model Meeting {
   location        String?
   status          MeetingStatus     @default(SCHEDULED)
   botStatus       MeetingBotStatus?
-  notes           String?           @db.Text
+  botJoinedAt     DateTime? // cuándo el bot quedó admitido de verdad en la llamada
+  botLeftAt       DateTime? // cuándo terminó de grabar y subió el audio
+  transcript      String?           @db.Text // de subtítulos en vivo (con nombres) o de Whisper a pedido — separado de `notes`
+  notes           String?           @db.Text // texto cargado a mano por el vendedor, nunca lo pisa el bot
   aiSummary       String?           @db.Text
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt

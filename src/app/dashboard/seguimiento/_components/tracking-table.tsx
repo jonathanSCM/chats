@@ -19,12 +19,13 @@ import {
   ArrowDown,
   LayoutGrid,
   Table2,
-  Paperclip,
-  FileText,
   AlertTriangle,
   Eye,
   TrendingUp,
   Bell,
+  PhoneOff,
+  FileDown,
+  FileSearch,
 } from "lucide-react";
 import {
   createOpportunityAction,
@@ -37,9 +38,12 @@ import {
   createMeetingAction,
   updateMeetingNotesAction,
   deleteMeetingAction,
-  addMeetingAttachmentAction,
-  deleteMeetingAttachmentAction,
+  stopMeetingBotAction,
+  transcribeMeetingAction,
+  generateMeetingSummaryPdfAction,
 } from "@/server/actions/crm";
+import { MeetingAttachments, type MeetingAttachmentInfo } from "@/components/meeting-attachments";
+import { PdfViewerModal } from "@/components/pdf-viewer-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input, Label, Select } from "@/components/ui/input";
@@ -61,17 +65,11 @@ import {
 } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 import { scheduledAtToUtcHidden } from "@/lib/datetime-local";
+import { BOT_STATUS_CONFIG } from "@/lib/meeting-bot-status";
 import { KanbanBoard } from "./kanban-board";
 import { AnalysisView } from "./analysis-view";
 import { deriveAlerts, urgencyRank, type DerivedAlert } from "@/lib/opportunity-alerts";
 
-export interface MeetingAttachmentInfo {
-  id: string;
-  url: string;
-  fileName: string;
-  mimeType: string;
-  fileSize: number;
-}
 
 export interface Row {
   id: string;
@@ -107,7 +105,11 @@ export interface Row {
     id: string;
     scheduledAt: string;
     status: string;
+    botStatus: string | null;
+    botJoinedAt: string | null;
+    botLeftAt: string | null;
     notes: string;
+    transcript: string;
     meetingUrl: string | null;
     attachments: MeetingAttachmentInfo[];
   }[];
@@ -1984,6 +1986,43 @@ function MeetingsSection({
     });
   }
 
+  const [stoppingId, setStoppingId] = useState<string | null>(null);
+  const [stopError, setStopError] = useState<{ id: string; message: string } | null>(null);
+  function handleStopBot(id: string) {
+    setStoppingId(id);
+    setStopError(null);
+    startTransition(async () => {
+      const result = await stopMeetingBotAction(id);
+      setStoppingId(null);
+      if (result.error) setStopError({ id, message: result.error });
+    });
+  }
+
+  // "Transcribir" y "Generar resumen (PDF)" comparten el mismo tipo de
+  // estado (pendiente + error por reunión) — mismo patrón que "Detener bot".
+  const [actionPendingId, setActionPendingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
+  function handleTranscribe(id: string) {
+    setActionPendingId(id);
+    setActionError(null);
+    startTransition(async () => {
+      const result = await transcribeMeetingAction(id);
+      setActionPendingId(null);
+      if (result.error) setActionError({ id, message: result.error });
+    });
+  }
+  function handleGenerateSummary(id: string) {
+    setActionPendingId(id);
+    setActionError(null);
+    startTransition(async () => {
+      const result = await generateMeetingSummaryPdfAction(id);
+      setActionPendingId(null);
+      if (result.error) setActionError({ id, message: result.error });
+    });
+  }
+
+  const [viewingPdf, setViewingPdf] = useState<{ url: string; title: string } | null>(null);
+
   return (
     <div className="rounded-lg border border-border bg-surface-2/40 p-3">
       <div className="mb-2 flex items-center justify-between">
@@ -2048,9 +2087,13 @@ function MeetingsSection({
         <p className="text-xs text-ink-faint">Todavía no hay reuniones registradas.</p>
       ) : (
         <ul className="space-y-2">
-          {meetings.map((m) => (
+          {meetings.map((m) => {
+            const botConfig = m.botStatus ? BOT_STATUS_CONFIG[m.botStatus] : null;
+            const BotIcon = botConfig?.icon;
+            const pdfAttachment = m.attachments.find((a) => a.mimeType === "application/pdf");
+            return (
             <li key={m.id} className="rounded-md border border-border p-2.5">
-              <div className="mb-1 flex items-center justify-between gap-2">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
                 <p className="font-mono text-xs text-ink-muted">
                   {new Date(m.scheduledAt).toLocaleString("es", {
                     day: "2-digit",
@@ -2060,6 +2103,55 @@ function MeetingsSection({
                   })}{" "}
                   · {m.status}
                 </p>
+                {botConfig && BotIcon && (
+                  <span className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${botConfig.className}`}>
+                    <BotIcon size={9} className={m.botStatus === "JOINING" || m.botStatus === "TRANSCRIBING" ? "animate-spin" : ""} />
+                    {botConfig.label}
+                  </span>
+                )}
+                {botConfig?.canStop && (
+                  <button
+                    type="button"
+                    disabled={isPending || stoppingId === m.id}
+                    onClick={() => handleStopBot(m.id)}
+                    title="Sacar al bot de la reunión ahora"
+                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[10px] text-ink-muted hover:border-danger hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <PhoneOff size={10} /> {stoppingId === m.id ? "Deteniendo…" : "Detener bot"}
+                  </button>
+                )}
+                {m.botStatus === "RECORDED" && (
+                  <button
+                    type="button"
+                    disabled={isPending || actionPendingId === m.id}
+                    onClick={() => handleTranscribe(m.id)}
+                    title="Transcribir el audio con Whisper (sin nombres de quién habló)"
+                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[10px] text-ink-muted hover:border-accent-dim hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <FileSearch size={10} /> {actionPendingId === m.id ? "Pidiendo…" : "Transcribir"}
+                  </button>
+                )}
+                {m.transcript && !pdfAttachment && (
+                  <button
+                    type="button"
+                    disabled={isPending || actionPendingId === m.id}
+                    onClick={() => handleGenerateSummary(m.id)}
+                    title="Generar un resumen ejecutivo en PDF a partir de la transcripción"
+                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[10px] text-ink-muted hover:border-accent-dim hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <FileDown size={10} /> {actionPendingId === m.id ? "Generando…" : "Generar resumen (PDF)"}
+                  </button>
+                )}
+                {pdfAttachment && (
+                  <button
+                    type="button"
+                    onClick={() => setViewingPdf({ url: pdfAttachment.url, title: `Resumen — ${m.status}` })}
+                    title="Ver el resumen en PDF"
+                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[10px] text-ink-muted hover:border-accent-dim hover:text-accent"
+                  >
+                    <FileDown size={10} /> Ver PDF
+                  </button>
+                )}
                 {m.meetingUrl && (
                   <button
                     type="button"
@@ -2084,17 +2176,41 @@ function MeetingsSection({
                   </button>
                 )}
               </div>
+
+              {m.botJoinedAt && (
+                <p className="mb-1.5 font-mono text-[10px] text-ink-faint">
+                  Grabó de {new Date(m.botJoinedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}{" "}
+                  a{" "}
+                  {m.botLeftAt
+                    ? new Date(m.botLeftAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })
+                    : "ahora"}
+                  {m.botLeftAt &&
+                    ` (${Math.round((new Date(m.botLeftAt).getTime() - new Date(m.botJoinedAt).getTime()) / 60_000)}m)`}
+                </p>
+              )}
+              {stopError?.id === m.id && <p className="mb-1 text-[11px] text-danger">{stopError.message}</p>}
+              {actionError?.id === m.id && <p className="mb-1 text-[11px] text-danger">{actionError.message}</p>}
+
+              {m.transcript && (
+                <details className="mb-1.5 text-xs text-ink-muted">
+                  <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+                    Transcripción
+                  </summary>
+                  <p className="mt-1.5 whitespace-pre-wrap leading-relaxed">{m.transcript}</p>
+                </details>
+              )}
+
               {editable ? (
                 <EditableText
                   value={m.notes}
                   disabled={disabled}
-                  placeholder="Transcripción o resumen de la reunión"
+                  placeholder="Notas de la reunión (a mano)"
                   onSave={(v) => startTransition(async () => { await updateMeetingNotesAction(m.id, v); })}
                 />
               ) : (
-                <p className="whitespace-pre-wrap text-xs leading-relaxed text-ink-muted">
-                  {m.notes || "(sin transcripción cargada)"}
-                </p>
+                m.notes && (
+                  <p className="whitespace-pre-wrap text-xs leading-relaxed text-ink-muted">{m.notes}</p>
+                )
               )}
 
               <MeetingAttachments
@@ -2104,116 +2220,13 @@ function MeetingsSection({
                 disabled={disabled}
               />
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
-    </div>
-  );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function MeetingAttachments({
-  meetingId,
-  attachments,
-  editable,
-  disabled,
-}: {
-  meetingId: string;
-  attachments: MeetingAttachmentInfo[];
-  editable: boolean;
-  disabled: boolean;
-}) {
-  const [isPending, startTransition] = useTransition();
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
-  function handleDeleteAttachment(id: string) {
-    if (confirmDeleteId !== id) {
-      setConfirmDeleteId(id);
-      setTimeout(() => setConfirmDeleteId((c) => (c === id ? null : c)), 3000);
-      return;
-    }
-    setConfirmDeleteId(null);
-    startTransition(async () => {
-      await deleteMeetingAttachmentAction(id);
-    });
-  }
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    setUploadError(null);
-    startTransition(async () => {
-      for (const file of Array.from(files)) {
-        const formData = new FormData();
-        formData.append("file", file);
-        const result = await addMeetingAttachmentAction(meetingId, formData);
-        if (result.error) {
-          setUploadError(result.error);
-          break;
-        }
-      }
-    });
-    e.target.value = "";
-  }
-
-  return (
-    <div className="mt-2 border-t border-border/60 pt-2">
-      {attachments.length > 0 && (
-        <ul className="mb-1.5 space-y-1">
-          {attachments.map((a) => (
-            <li key={a.id} className="flex items-center gap-1.5 text-[11px]">
-              <FileText size={11} className="shrink-0 text-ink-faint" />
-              <a
-                href={a.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="truncate text-accent hover:underline"
-                title={a.fileName}
-              >
-                {a.fileName}
-              </a>
-              <span className="shrink-0 text-ink-faint">({formatFileSize(a.fileSize)})</span>
-              {editable && (
-                <button
-                  type="button"
-                  disabled={disabled || isPending}
-                  onClick={() => handleDeleteAttachment(a.id)}
-                  className={`ml-auto shrink-0 cursor-pointer disabled:cursor-not-allowed ${
-                    confirmDeleteId === a.id ? "text-danger" : "text-ink-faint hover:text-danger"
-                  }`}
-                  title={confirmDeleteId === a.id ? "¿Seguro? Toca de nuevo" : "Borrar archivo"}
-                >
-                  <Trash2 size={11} />
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+      {viewingPdf && (
+        <PdfViewerModal url={viewingPdf.url} title={viewingPdf.title} onClose={() => setViewingPdf(null)} />
       )}
-      {editable && (
-        <label
-          className={`flex w-fit items-center gap-1 text-[11px] ${
-            disabled || isPending ? "cursor-not-allowed text-ink-faint" : "cursor-pointer text-accent hover:opacity-80"
-          }`}
-        >
-          <Paperclip size={11} />
-          {isPending ? "Subiendo…" : "Adjuntar archivo"}
-          <input
-            type="file"
-            multiple
-            disabled={disabled || isPending}
-            onChange={handleFileChange}
-            className="hidden"
-          />
-        </label>
-      )}
-      {uploadError && <p className="mt-1 text-[11px] text-danger">{uploadError}</p>}
     </div>
   );
 }

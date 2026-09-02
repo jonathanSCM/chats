@@ -6,11 +6,17 @@ import { readFile } from "node:fs/promises";
  * responde 401 y el intento se pierde (no hay reintento propio acá, el bot
  * ya hizo su parte; ver nota en `notifyFailure`).
  */
-export async function uploadRecording(callbackUrl: string, meetingId: string, filePath: string): Promise<void> {
+export async function uploadRecording(
+  callbackUrl: string,
+  meetingId: string,
+  filePath: string,
+  captionsTranscript: string,
+): Promise<void> {
   const buffer = await readFile(filePath);
   const form = new FormData();
   form.append("meetingId", meetingId);
   form.append("audio", new Blob([buffer], { type: "audio/mpeg" }), `${meetingId}.mp3`);
+  if (captionsTranscript) form.append("captionsTranscript", captionsTranscript);
 
   const response = await fetch(callbackUrl, {
     method: "POST",
@@ -20,6 +26,24 @@ export async function uploadRecording(callbackUrl: string, meetingId: string, fi
 
   if (!response.ok) {
     throw new Error(`El callback de la app principal respondió ${response.status}`);
+  }
+}
+
+/**
+ * Avisa que el bot ya está adentro de la reunión y arrancó a grabar de
+ * verdad — sin esto, el estado se quedaba pegado en "entrando" (JOINING)
+ * durante toda la reunión, sin ninguna señal de que efectivamente estaba
+ * grabando. Best-effort: si falla, no es grave — es solo un dato visual,
+ * no afecta la grabación en sí.
+ */
+export async function notifyRecording(callbackUrl: string, meetingId: string): Promise<void> {
+  try {
+    const form = new FormData();
+    form.append("meetingId", meetingId);
+    form.append("status", "recording");
+    await fetch(callbackUrl, { method: "POST", headers: authHeaders(), body: form });
+  } catch (error) {
+    console.warn(`[meeting-bot] No se pudo avisar que ${meetingId} empezó a grabar:`, error);
   }
 }
 

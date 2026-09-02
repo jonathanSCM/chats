@@ -15,10 +15,40 @@ export async function enableCaptions(page: Page): Promise<boolean> {
     const button = page.getByRole("button", { name: /subtítulos|activar los subtítulos|captions|turn on captions/i });
     await button.click({ timeout: 10_000 });
     console.log("[meeting-bot] Subtítulos activados.");
+
+    // Causa real encontrada con un volcado de accesibilidad: al activar los
+    // subtítulos, Meet abre un selector de "Idioma de la reunión" que por
+    // defecto queda en Inglés — con la reunión en español, Meet intentaba
+    // transcribir audio en español como si fuera inglés, y por eso nunca
+    // salía texto real. Hay que elegir español a mano.
+    await selectSpanishCaptionLanguage(page);
+
+    // El selector de idioma queda abierto como un panel — hay que cerrarlo
+    // para que la barra de subtítulos real quede visible y generando texto.
+    await page.keyboard.press("Escape").catch(() => {});
+
     return true;
   } catch (error) {
     console.warn("[meeting-bot] No se pudo activar los subtítulos (se sigue sin nombres de quién habló):", error);
     return false;
+  }
+}
+
+async function selectSpanishCaptionLanguage(page: Page): Promise<void> {
+  try {
+    const languageCombobox = page.getByRole("combobox", { name: /idioma de la reunión|meeting language/i });
+    await languageCombobox.click({ timeout: 5_000 });
+
+    const spanishOption = page
+      .getByRole("option", { name: /español \(méxico\)/i })
+      .or(page.getByRole("option", { name: /español/i }));
+    await spanishOption.first().click({ timeout: 5_000 });
+    console.log("[meeting-bot] Idioma de subtítulos puesto en español.");
+  } catch (error) {
+    console.warn(
+      "[meeting-bot] No se pudo poner los subtítulos en español (puede haber quedado en otro idioma):",
+      error,
+    );
   }
 }
 

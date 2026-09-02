@@ -695,21 +695,36 @@ enum MeetingStatus {
   NO_SHOW
 }
 
+// Estado del bot de grabación para esta reunión — independiente de
+// MeetingStatus (ciclo de vida comercial de la reunión). Null = no se pidió
+// que el bot se una (reunión sin link de Meet, o el link se pegó a mano sin
+// tildar la grabación).
+enum MeetingBotStatus {
+  PENDING
+  JOINING
+  RECORDING
+  TRANSCRIBING
+  DONE
+  FAILED
+}
+
 model Meeting {
-  id              String        @id @default(cuid())
+  id              String            @id @default(cuid())
   organizationId  String
-  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   opportunityId   String?
-  opportunity     Opportunity?  @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  opportunity     Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  title           String? // solo se usa cuando opportunityId es null (reunión suelta/ad-hoc)
   scheduledAt     DateTime
-  durationMinutes Int           @default(30)
+  durationMinutes Int               @default(30)
   meetingUrl      String?
   location        String?
-  status          MeetingStatus @default(SCHEDULED)
-  notes           String?       @db.Text
-  aiSummary       String?       @db.Text
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  status          MeetingStatus     @default(SCHEDULED)
+  botStatus       MeetingBotStatus?
+  notes           String?           @db.Text
+  aiSummary       String?           @db.Text
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   attachments MeetingAttachment[]
 

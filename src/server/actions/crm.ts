@@ -10,6 +10,7 @@ import { analyzeFollowUp } from "@/server/services/ai/follow-up";
 import { isAiEnabled, isWithinBudget, spentToday } from "@/server/services/ai/client";
 import { saveMediaFile, deleteMediaFile } from "@/lib/media-storage";
 import { createMeetEvent, isGoogleMeetEnabled } from "@/server/services/google-calendar";
+import { scheduleMeetingBotJoin } from "@/server/services/meeting-bot";
 import type { ActionState } from "./types";
 
 const PATH = "/dashboard/seguimiento";
@@ -436,7 +437,7 @@ export async function createMeetingAction(
     }
   }
 
-  await prisma.meeting.create({
+  const meeting = await prisma.meeting.create({
     data: {
       organizationId,
       opportunityId: parsed.data.opportunityId,
@@ -447,6 +448,10 @@ export async function createMeetingAction(
       status: parsed.data.notes ? "DONE" : "SCHEDULED",
     },
   });
+
+  if (meetingUrl) {
+    await scheduleMeetingBotJoin(meeting.id, scheduledAt);
+  }
 
   revalidatePath(PATH);
   return { error: null, message: "Reunión registrada." };

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile, unlink } from "node:fs/promises";
+import { mkdir, writeFile, unlink, readFile } from "node:fs/promises";
 import path from "node:path";
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
@@ -143,6 +143,26 @@ export async function deleteMediaFile(mediaUrl: string): Promise<void> {
     // Ya no existe o nunca se guardó en disco (por ejemplo, si se cambió de
     // S3 a disco local después de que se subió el archivo) — no es un error.
   }
+}
+
+// Simétrico a saveMediaFile: lee de vuelta un archivo ya guardado a partir de
+// la URL relativa que devolvió (`/api/media/{f}` o `/media/{f}`). A
+// diferencia de readMediaFileFromS3 (pensado para servir la respuesta HTTP
+// del proxy /api/media), este devuelve el buffer completo en memoria — lo
+// que necesita, por ejemplo, mandar el audio grabado a la API de Whisper.
+export async function readMediaFile(mediaUrl: string): Promise<Buffer> {
+  const fileName = mediaUrl.split("/").pop();
+  if (!fileName) throw new Error(`URL de media inválida: ${mediaUrl}`);
+
+  const config = s3Config();
+  if (config) {
+    const client = getS3Client(config);
+    const res = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: `media/${fileName}` }));
+    if (!res.Body) throw new Error(`No se encontró en S3: ${fileName}`);
+    return Buffer.from(await res.Body.transformToByteArray());
+  }
+
+  return readFile(path.join(MEDIA_DIR, fileName));
 }
 
 export function isS3Configured(): boolean {

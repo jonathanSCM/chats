@@ -1,6 +1,6 @@
 import { chromium, type Page } from "playwright";
 import path from "node:path";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { startRecording } from "./record-audio";
 import { uploadRecording, notifyFailure, notifyRecording } from "./upload-recording";
 import { enableCaptions, startCapturingCaptions, type CaptionsCapture } from "./captions";
@@ -80,6 +80,7 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
       // se clickeó algo con el nombre correcto.
       await page.waitForTimeout(3_000);
       await debugScreenshot(page, meetingId, "03-subtitulos-activados");
+      await debugAccessibilityDump(page, meetingId, "03-subtitulos-activados");
     }
 
     const recording = await startRecording(meetingId);
@@ -182,6 +183,38 @@ async function debugScreenshot(page: Page, meetingId: string, step: string): Pro
     console.log(`[meeting-bot] Captura: ${file} (url: ${page.url()})`);
   } catch (error) {
     console.warn("[meeting-bot] No se pudo guardar la captura de debug:", error);
+  }
+}
+
+/**
+ * Vuelca todos los elementos con algún atributo de accesibilidad (role,
+ * aria-label, aria-live) a un JSON — mucho más preciso que adivinar
+ * selectores mirando una captura de pantalla. Playwright sacó su API de
+ * accessibility tree hace un tiempo, así que se arma a mano con
+ * `page.evaluate`. Se usa puntualmente para encontrar de una vez el
+ * contenedor real de subtítulos, en vez de seguir probando a ciegas.
+ */
+async function debugAccessibilityDump(page: Page, meetingId: string, step: string): Promise<void> {
+  try {
+    await mkdir(DEBUG_DIR, { recursive: true });
+    const nodes = await page.evaluate(() => {
+      const elements = Array.from(
+        document.querySelectorAll("[role], [aria-label], [aria-live], [jsname]"),
+      ) as HTMLElement[];
+      return elements.slice(0, 400).map((el) => ({
+        tag: el.tagName.toLowerCase(),
+        role: el.getAttribute("role"),
+        ariaLabel: el.getAttribute("aria-label"),
+        ariaLive: el.getAttribute("aria-live"),
+        jsname: el.getAttribute("jsname"),
+        text: (el.innerText || "").trim().slice(0, 200),
+      }));
+    });
+    const file = path.join(DEBUG_DIR, `${meetingId}-${step}-a11y.json`);
+    await writeFile(file, JSON.stringify(nodes, null, 2));
+    console.log(`[meeting-bot] Volcado de accesibilidad (${nodes.length} elementos): ${file}`);
+  } catch (error) {
+    console.warn("[meeting-bot] No se pudo volcar el árbol de accesibilidad:", error);
   }
 }
 

@@ -63,7 +63,7 @@ export function startCapturingCaptions(page: Page): CaptionsCapture {
         // barrido genérico, filtrando primero las frases de anuncios
         // conocidas de Meet (no son diálogo real).
         const ANNOUNCEMENT_PATTERNS =
-          /se activaron|se desactivaron|se agregó|se quitó|está en la pantalla principal|solicitó unirse|se unió a la|abandonó la llamada|comenzó a compartir|dejó de compartir|silenciad[oa]/i;
+          /se activaron|se desactivaron|se agregó|se quitó|está en la pantalla principal|solicitó unirse|se unió a la|abandonó la llamada|comenzó a compartir|dejó de compartir|silenciad[oa]|volverá a la pantalla principal|quedan \d+ segundos/i;
 
         const labeled = Array.from(
           document.querySelectorAll<HTMLElement>('[aria-label*="Subtítulos" i], [aria-label*="captions" i]'),

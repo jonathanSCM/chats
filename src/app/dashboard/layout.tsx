@@ -20,6 +20,7 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { SidebarToggle } from "@/components/layout/sidebar-toggle";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ServerClock } from "@/components/layout/server-clock";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -39,6 +40,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const org = session?.user.organizationId
     ? await prisma.organization.findUnique({ where: { id: session.user.organizationId } })
     : null;
+
+  const serverNowIso = new Date().toISOString();
+  const serverTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   // Mismo contenido para el sidebar de escritorio y el drawer de móvil.
   const navContent = (
@@ -89,6 +93,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <p className="truncate font-mono text-[11px] text-ink-faint">
             {org?.name ?? "Sin organización"}
           </p>
+          <ServerClock initialIso={serverNowIso} timeZone={serverTimeZone} />
         </div>
         <ThemeToggle />
         <form action={logoutAction}>

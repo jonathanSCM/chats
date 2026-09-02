@@ -3,6 +3,10 @@ import path from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 
 const CAPTIONS_POLL_MS = 2_000;
+// Ver la nota en join-meeting.ts — apagado por default para no llenar el
+// almacenamiento con un volcado de accesibilidad cada ~40s durante toda la
+// reunión; se prende con MEETING_BOT_DEBUG=true si hace falta.
+const DEBUG_ENABLED = process.env.MEETING_BOT_DEBUG === "true";
 const DEBUG_DIR = path.join(process.env.RECORDINGS_DIR || "/tmp/recordings", "debug");
 
 /**
@@ -171,6 +175,7 @@ export function startCapturingCaptions(page: Page, meetingId: string): CaptionsC
 }
 
 async function dumpAccessibilityTree(page: Page, meetingId: string, ticks: number): Promise<void> {
+  if (!DEBUG_ENABLED) return;
   try {
     await mkdir(DEBUG_DIR, { recursive: true });
     const nodes = await page.evaluate(() => {

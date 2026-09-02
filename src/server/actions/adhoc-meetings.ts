@@ -12,6 +12,7 @@ import {
   isMeetingBotEnabled,
 } from "@/server/services/meeting-bot";
 import { requestMeetingTranscription, requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
+import { deleteMediaFile } from "@/lib/media-storage";
 import type { ActionState } from "./types";
 
 const PATH = "/dashboard/reuniones";
@@ -186,13 +187,14 @@ export async function deleteAdhocMeetingAction(meetingId: string): Promise<Actio
 
   const meeting = await prisma.meeting.findUnique({
     where: { id: meetingId },
-    select: { organizationId: true, opportunityId: true },
+    select: { organizationId: true, opportunityId: true, attachments: true },
   });
   if (!meeting || meeting.organizationId !== organizationId || meeting.opportunityId !== null) {
     return { error: "Reunión no encontrada" };
   }
 
   await prisma.meeting.delete({ where: { id: meetingId } });
+  await Promise.all(meeting.attachments.map((a) => deleteMediaFile(a.url)));
 
   revalidatePath(PATH);
   revalidatePath("/dashboard/calendario");

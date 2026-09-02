@@ -6,10 +6,12 @@ import { uploadRecording, notifyFailure, notifyRecording } from "./upload-record
 import { enableCaptions, startCapturingCaptions, type CaptionsCapture } from "./captions";
 
 const PROFILE_DIR = process.env.CHROME_PROFILE_DIR || "/data/chrome-profile";
-// Capturas en los pasos clave — los selectores de Meet son lo más frágil de
-// todo esto, y sin ver la pantalla real es adivinar a ciegas por qué no
-// encontró un botón. Se guardan en el disco del contenedor (no persistente),
-// alcanza con sacarlas por `docker cp` mientras el contenedor sigue vivo.
+// Capturas y volcados de accesibilidad en los pasos clave — útiles mientras
+// se ajustan los selectores de Meet (lo más frágil de todo esto), pero se
+// acumulan en el disco del contenedor en cada reunión — apagados por
+// default para no llenar el almacenamiento; se prenden puntualmente con
+// MEETING_BOT_DEBUG=true si hay que volver a diagnosticar algo a ciegas.
+const DEBUG_ENABLED = process.env.MEETING_BOT_DEBUG === "true";
 const DEBUG_DIR = path.join(process.env.RECORDINGS_DIR || "/tmp/recordings", "debug");
 // Cada cuánto se fija si quedó solo en la reunión.
 const END_CHECK_INTERVAL_MS = 30_000;
@@ -176,6 +178,7 @@ function abortPromise(signal: AbortSignal, message: string): Promise<never> {
 }
 
 async function debugScreenshot(page: Page, meetingId: string, step: string): Promise<void> {
+  if (!DEBUG_ENABLED) return;
   try {
     await mkdir(DEBUG_DIR, { recursive: true });
     const file = path.join(DEBUG_DIR, `${meetingId}-${step}.png`);
@@ -195,6 +198,7 @@ async function debugScreenshot(page: Page, meetingId: string, step: string): Pro
  * contenedor real de subtítulos, en vez de seguir probando a ciegas.
  */
 async function debugAccessibilityDump(page: Page, meetingId: string, step: string): Promise<void> {
+  if (!DEBUG_ENABLED) return;
   try {
     await mkdir(DEBUG_DIR, { recursive: true });
     const nodes = await page.evaluate(() => {

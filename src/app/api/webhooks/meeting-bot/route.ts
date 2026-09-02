@@ -28,14 +28,27 @@ export async function POST(req: NextRequest) {
   const form = await req.formData();
   const meetingId = form.get("meetingId");
   const audio = form.get("audio");
+  const status = form.get("status");
 
-  if (typeof meetingId !== "string" || !(audio instanceof File)) {
-    return new NextResponse("Faltan meetingId/audio", { status: 400 });
+  if (typeof meetingId !== "string") {
+    return new NextResponse("Falta meetingId", { status: 400 });
   }
 
   const meeting = await prisma.meeting.findUnique({ where: { id: meetingId }, select: { id: true } });
   if (!meeting) {
     return new NextResponse("Reunión no encontrada", { status: 404 });
+  }
+
+  // El bot avisa así cuando no pudo entrar/grabar/subir — sin esto, la
+  // reunión quedaría colgada en "JOINING" para siempre en vez de mostrar el
+  // fallo.
+  if (status === "failed") {
+    await prisma.meeting.update({ where: { id: meetingId }, data: { botStatus: "FAILED" } });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (!(audio instanceof File)) {
+    return new NextResponse("Falta audio", { status: 400 });
   }
 
   const buffer = Buffer.from(await audio.arrayBuffer());

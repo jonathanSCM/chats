@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Servicio aparte, su propio package.json/tsconfig y set de dependencias
+    // (Playwright, express) — no forma parte de esta app Next.js.
+    "meeting-bot/**",
   ]),
 ]);
 

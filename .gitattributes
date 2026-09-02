@@ -1,0 +1,4 @@
+# El entrypoint corre dentro de un contenedor Linux al construir la imagen —
+# si git lo trae con CRLF (por el core.autocrlf de Windows), el shebang
+# "#!/bin/sh" se rompe (interpreta un \r final como parte del intérprete).
+meeting-bot/entrypoint.sh text eol=lf

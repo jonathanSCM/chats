@@ -1,32 +1,59 @@
-import { chromium } from "playwright";
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import readline from "node:readline/promises";
+import { stdin, stdout } from "node:process";
 
 const PROFILE_DIR = process.env.CHROME_PROFILE_DIR || "/data/chrome-profile";
 
+const CANDIDATE_PATHS = [
+  process.env.LOGIN_BROWSER_PATH,
+  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+].filter((p): p is string => Boolean(p));
+
+function findBrowser(): string {
+  const found = CANDIDATE_PATHS.find((p) => existsSync(p));
+  if (!found) {
+    throw new Error(
+      "No encontré Edge ni Chrome instalados en las rutas usuales de Windows. " +
+        "Definí LOGIN_BROWSER_PATH con la ruta completa al ejecutable y volvé a correr.",
+    );
+  }
+  return found;
+}
+
 /**
- * Trámite de una sola vez: abre Chrome con el perfil persistente (vacío la
- * primera vez) para loguearse a mano con la cuenta de Google del bot. Una
- * vez logueada, la sesión queda guardada en PROFILE_DIR — de ahí en más
- * `join-meeting.ts` la reusa sin volver a pedir contraseña (salvo que
- * alguien la revoque desde la cuenta de Google).
- *
- * Correr con pantalla real (`npm run login` en una máquina con monitor, o
- * por VNC al contenedor) — game over si se corre headless, no se puede
- * tipear la contraseña/2FA.
+ * A propósito NO usa Playwright para este paso: Google bloquea el login
+ * ("el navegador o la aplicación no son seguros") apenas detecta el
+ * protocolo de depuración remota que Playwright activa para poder controlar
+ * la pestaña — aunque en el momento del login nada la esté manejando. Acá se
+ * abre el navegador exactamente como lo abriría cualquier persona (un doble
+ * click), apuntando al mismo perfil que después usa `join-meeting.ts` — ese
+ * sí con Playwright, pero ya con la sesión guardada como cookie, sin volver
+ * a pasar por la pantalla de login de Google.
  */
 async function main() {
   console.log(`Perfil: ${PROFILE_DIR}`);
-  console.log("Se abre Chrome — logueate con la cuenta de Google del bot y dejala en accounts.google.com.");
-  console.log("Cuando termines, cerrá la ventana de Chrome para terminar.");
+  const browserPath = findBrowser();
+  console.log(`Abriendo: ${browserPath}`);
 
-  const context = await chromium.launchPersistentContext(PROFILE_DIR, { headless: false });
-  const page = await context.newPage();
-  await page.goto("https://accounts.google.com");
+  const child = spawn(
+    browserPath,
+    [`--user-data-dir=${PROFILE_DIR}`, "--no-first-run", "https://accounts.google.com"],
+    { detached: true, stdio: "ignore" },
+  );
+  child.unref();
 
-  await new Promise<void>((resolve) => {
-    context.on("close", () => resolve());
-  });
+  const rl = readline.createInterface({ input: stdin, output: stdout });
+  await rl.question(
+    "\nLogueate con la cuenta del bot. Cuando termines, cerrá la ventana del navegador y " +
+      "presioná Enter acá para terminar... ",
+  );
+  rl.close();
 
-  console.log("Listo — la sesión quedó guardada en el perfil persistente.");
+  console.log("Listo — la sesión debería haber quedado guardada en el perfil.");
 }
 
 main().catch((error) => {

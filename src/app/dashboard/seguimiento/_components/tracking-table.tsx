@@ -60,6 +60,7 @@ import {
   type LossReason,
 } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
+import { scheduledAtToUtcHidden } from "@/lib/datetime-local";
 import { KanbanBoard } from "./kanban-board";
 import { AnalysisView } from "./analysis-view";
 import { deriveAlerts, urgencyRank, type DerivedAlert } from "@/lib/opportunity-alerts";
@@ -2004,8 +2005,14 @@ function MeetingsSection({
       {adding && (
         <form action={formAction} className="mb-3 space-y-2 rounded-md border border-border p-2.5">
           <input type="hidden" name="opportunityId" value={opportunityId} />
+          <input type="hidden" name="scheduledAt" />
           <div className="flex gap-2">
-            <Input type="datetime-local" name="scheduledAt" required className="py-1.5 text-xs" />
+            <Input
+              type="datetime-local"
+              required
+              className="py-1.5 text-xs"
+              onChange={scheduledAtToUtcHidden}
+            />
             <Input
               type="number"
               name="durationMinutes"

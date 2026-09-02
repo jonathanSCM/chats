@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createAdhocMeetingAction, deleteAdhocMeetingAction } from "@/server/actions/adhoc-meetings";
+import { scheduledAtToUtcHidden } from "@/lib/datetime-local";
 
 export interface AdhocMeetingRow {
   id: string;
@@ -98,8 +99,9 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
         <Card>
           <form action={formAction} className="space-y-2.5">
             <Input name="title" placeholder="Ej. Reunión de emergencia con el equipo" required className="text-sm" />
+            <input type="hidden" name="scheduledAt" />
             <div className="flex gap-2">
-              <Input type="datetime-local" name="scheduledAt" required className="text-sm" />
+              <Input type="datetime-local" required className="text-sm" onChange={scheduledAtToUtcHidden} />
               <Input type="number" name="durationMinutes" placeholder="min" min={1} className="w-24 text-sm" />
             </div>
             <label className="flex items-center gap-1.5 text-xs text-ink-muted">

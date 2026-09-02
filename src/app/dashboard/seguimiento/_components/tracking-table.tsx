@@ -2188,24 +2188,6 @@ function MeetingsSection({
               {stopError?.id === m.id && <p className="mb-1 text-[11px] text-danger">{stopError.message}</p>}
               {actionError?.id === m.id && <p className="mb-1 text-[11px] text-danger">{actionError.message}</p>}
 
-              {m.transcript && (
-                <details className="mb-1.5 text-xs text-ink-muted">
-                  <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-                    Transcripción (con nombres)
-                  </summary>
-                  <p className="mt-1.5 whitespace-pre-wrap leading-relaxed">{m.transcript}</p>
-                </details>
-              )}
-
-              {m.audioTranscript && (
-                <details className="mb-1.5 text-xs text-ink-muted">
-                  <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-                    Transcripción completa del audio (sin nombres)
-                  </summary>
-                  <p className="mt-1.5 whitespace-pre-wrap leading-relaxed">{m.audioTranscript}</p>
-                </details>
-              )}
-
               {editable ? (
                 <EditableText
                   value={m.notes}

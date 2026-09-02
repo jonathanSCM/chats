@@ -112,5 +112,34 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Además de guardarse en la fila (lo que usa "Generar resumen (PDF)"),
+  // cada transcripción se guarda como adjunto .txt -- de texto plano, se
+  // abre en una pestaña nueva y se lee/scrollea ahí, en vez de tener que
+  // mostrar un bloque larguísimo adentro de la propia página.
+  if (captionsTranscript) {
+    const txtUrl = await saveMediaFile(Buffer.from(captionsTranscript, "utf-8"), "text/plain");
+    await prisma.meetingAttachment.create({
+      data: {
+        meetingId,
+        url: txtUrl,
+        fileName: "transcripcion-subtitulos.txt",
+        mimeType: "text/plain",
+        fileSize: Buffer.byteLength(captionsTranscript, "utf-8"),
+      },
+    });
+  }
+  if (audioTranscript) {
+    const txtUrl = await saveMediaFile(Buffer.from(audioTranscript, "utf-8"), "text/plain");
+    await prisma.meetingAttachment.create({
+      data: {
+        meetingId,
+        url: txtUrl,
+        fileName: "transcripcion-audio-completo.txt",
+        mimeType: "text/plain",
+        fileSize: Buffer.byteLength(audioTranscript, "utf-8"),
+      },
+    });
+  }
+
   return NextResponse.json({ ok: true });
 }

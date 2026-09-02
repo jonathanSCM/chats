@@ -278,24 +278,6 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
                 </p>
               )}
 
-              {m.transcript && (
-                <details className="text-xs text-ink-muted">
-                  <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-                    Transcripción (con nombres)
-                  </summary>
-                  <p className="mt-1.5 whitespace-pre-wrap leading-relaxed">{m.transcript}</p>
-                </details>
-              )}
-
-              {m.audioTranscript && (
-                <details className="text-xs text-ink-muted">
-                  <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-ink-faint">
-                    Transcripción completa del audio (sin nombres)
-                  </summary>
-                  <p className="mt-1.5 whitespace-pre-wrap leading-relaxed">{m.audioTranscript}</p>
-                </details>
-              )}
-
               {m.notes && <p className="whitespace-pre-wrap text-xs leading-relaxed text-ink-muted">{m.notes}</p>}
 
               <MeetingAttachments meetingId={m.id} attachments={m.attachments} editable disabled={isPending} />

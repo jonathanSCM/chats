@@ -47,11 +47,22 @@ async function selectSpanishCaptionLanguage(page: Page): Promise<void> {
     // `force` esto siempre tira timeout y los subtítulos quedan en inglés.
     await languageCombobox.click({ timeout: 5_000, force: true });
 
-    const spanishOption = page
+    // Confirmado con un volcado real: la lista completa de ~140 idiomas
+    // (incluido "Español (México)") sí está en el DOM apenas se abre el
+    // listbox, pero está lejos en la lista alfabética -- Playwright no la
+    // considera "visible" hasta hacerle scroll dentro del propio listbox
+    // (algo que el `force` del clic anterior se saltea). Por eso primero se
+    // confirma que el listbox en sí abrió, y recién ahí se busca la opción
+    // adentro y se le hace scroll a mano antes de clickearla.
+    const listbox = page.getByRole("listbox", { name: /idioma de la reunión|meeting language/i });
+    await listbox.waitFor({ state: "visible", timeout: 8_000 });
+
+    const spanishOption = listbox
       .getByRole("option", { name: /español \(méxico\)/i })
-      .or(page.getByRole("option", { name: /español/i }));
-    await spanishOption.first().waitFor({ state: "visible", timeout: 5_000 });
-    await spanishOption.first().click({ timeout: 5_000, force: true });
+      .or(listbox.getByRole("option", { name: /español/i }));
+    const option = spanishOption.first();
+    await option.scrollIntoViewIfNeeded({ timeout: 8_000 });
+    await option.click({ timeout: 5_000, force: true });
     console.log("[meeting-bot] Idioma de subtítulos puesto en español.");
   } catch (error) {
     console.warn(

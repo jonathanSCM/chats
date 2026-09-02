@@ -3,6 +3,7 @@ import { prisma } from "@/server/db/client";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge, StatusDot } from "@/components/ui/badge";
 import { Table, Thead, Th, Td, Tr } from "@/components/ui/table";
+import { CreateOrgForm } from "./_components/create-org-form";
 
 export default async function AdminOrganizationsPage() {
   const organizations = await prisma.organization.findMany({
@@ -40,6 +41,14 @@ export default async function AdminOrganizationsPage() {
         <StatCard label="Números activos" value={totalConnected.toString()} />
         <StatCard label="Conversaciones" value={totalConversations.toLocaleString("es")} />
       </div>
+
+      <Card className="mb-8">
+        <CardTitle className="mb-1">Dar de alta un cliente nuevo</CardTitle>
+        <CardDescription className="mb-4">
+          Crea la organización y un link de invitación para su dueño.
+        </CardDescription>
+        <CreateOrgForm />
+      </Card>
 
       <Table>
         <Thead>

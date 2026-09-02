@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { signIn } from "@/server/auth";
-import { slugify } from "@/lib/slugify";
+import { uniqueOrgSlug } from "@/lib/slugify";
 import { getClientIp, rateLimit, rateLimitMessage } from "@/lib/rate-limit";
 import type { ActionState } from "./types";
 
@@ -18,19 +18,6 @@ const signupSchema = z.object({
     error: "Debes aceptar los términos de servicio y la política de privacidad",
   }),
 });
-
-async function uniqueSlug(base: string): Promise<string> {
-  const root = slugify(base) || "empresa";
-  let candidate = root;
-  let suffix = 1;
-
-  while (await prisma.organization.findUnique({ where: { slug: candidate } })) {
-    suffix += 1;
-    candidate = `${root}-${suffix}`;
-  }
-
-  return candidate;
-}
 
 export async function signupAction(
   _prevState: ActionState,
@@ -69,7 +56,7 @@ export async function signupAction(
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const slug = await uniqueSlug(companyName);
+  const slug = await uniqueOrgSlug(companyName);
 
   await prisma.$transaction(async (tx) => {
     const org = await tx.organization.create({ data: { name: companyName, slug } });

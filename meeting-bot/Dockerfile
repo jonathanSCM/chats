@@ -12,8 +12,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends git cmake g++ m
   && rm -rf /var/lib/apt/lists/*
 # Tag fija por reproducibilidad -- si el build falla por un cambio de layout
 # en un release más nuevo, es el primer lugar para mirar.
+# -DBUILD_SHARED_LIBS=OFF: sin esto, whisper-cli queda linkeado contra
+# libwhisper.so/libggml*.so (confirmado con un fallo real en producción:
+# "error while loading shared libraries: libwhisper.so.1") -- copiar solo el
+# binario al stage final no alcanza sin también copiar y ubicar bien esas
+# librerías. Estático es más simple: un solo archivo, sin nada que enlazar
+# en tiempo de ejecución.
 RUN git clone --depth 1 --branch v1.7.4 https://github.com/ggerganov/whisper.cpp /opt/whisper.cpp \
-  && cmake -B /opt/whisper.cpp/build -S /opt/whisper.cpp -DCMAKE_BUILD_TYPE=Release \
+  && cmake -B /opt/whisper.cpp/build -S /opt/whisper.cpp -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
   && cmake --build /opt/whisper.cpp/build --config Release -j"$(nproc)"
 # Modelo cuantizado "base" -- liviano y anda bien en CPU sin GPU; menos
 # preciso que "small"/"medium", aceptable porque esto es un complemento de

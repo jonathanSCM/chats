@@ -261,8 +261,10 @@ async function sendAnnouncement(page: Page): Promise<void> {
  * aparece directo, se prueba abriéndolo desde "Más opciones".
  */
 async function openChatPanel(page: Page): Promise<void> {
+  // Confirmado con un log real: el botón se llama "Chatear con todos" (no
+  // "Chat con todos" -- el verbo conjugado, no el sustantivo solo).
   const directChatButton = page.getByRole("button", {
-    name: /chat con todos|mostrar chat|abrir chat|enviar chat|chat with everyone|show chat|open chat/i,
+    name: /chatear con todos|chat con todos|mostrar chat|abrir chat|enviar chat|chat with everyone|show chat|open chat/i,
   });
   try {
     await directChatButton.click({ timeout: 5_000 });

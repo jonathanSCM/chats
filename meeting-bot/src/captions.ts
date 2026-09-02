@@ -45,11 +45,16 @@ async function selectSpanishCaptionLanguage(page: Page): Promise<void> {
     const languageCombobox = page.getByRole("combobox", { name: /idioma de la reunión|meeting language/i });
     await languageCombobox.waitFor({ state: "visible", timeout: 5_000 });
     // La barra de subtítulos (siempre visible una vez activada) tapa
-    // parcialmente este combobox según el chequeo de Playwright, aunque en
-    // los hechos sigue siendo clickeable — se confirmó con un log real
-    // ("<div class='iOzk7'>… subtree intercepts pointer events") que sin
-    // `force` esto siempre tira timeout y los subtítulos quedan en inglés.
-    await languageCombobox.click({ timeout: 5_000, force: true });
+    // parcialmente este combobox según el chequeo de "¿está tapado?" de
+    // Playwright, aunque en los hechos sigue siendo interactuable — un clic
+    // (aún forzado) resultó poco confiable en la práctica (a veces "abría"
+    // sin que el listbox llegara a aparecer). El propio elemento trae un
+    // manejador de teclado (`jsaction="...keydown:uYT2Vb..."`, confirmado
+    // en un volcado real), así que activarlo con Enter evita por completo
+    // el problema de "algo lo tapa" -- no hace falta que Playwright le
+    // pegue a un punto en la pantalla.
+    await languageCombobox.focus();
+    await languageCombobox.press("Enter", { timeout: 5_000 });
 
     // Confirmado con un volcado real: la lista completa de ~140 idiomas
     // (incluido "Español (México)") sí está en el DOM apenas se abre el

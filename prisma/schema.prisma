@@ -704,7 +704,7 @@ enum MeetingBotStatus {
   JOINING
   RECORDING
   RECORDED // legado: reuniones grabadas antes de que whisper.cpp transcribiera siempre solo — ya no se usa para reuniones nuevas
-  TRANSCRIBING // legado, ídem
+  TRANSCRIBING // el bot ya salió de la reunión y está corriendo whisper.cpp sobre el audio (puede tardar unos minutos)
   DONE
   FAILED
 }

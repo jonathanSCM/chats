@@ -56,6 +56,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  // Avisa que ya salió de la reunión y arrancó a transcribir el audio con
+  // whisper.cpp (puede tardar unos minutos) — sin esto, el estado se quedaba
+  // en "Grabando" aunque la reunión ya haya terminado de verdad. Este es el
+  // momento real en que el bot dejó la llamada, así que `botLeftAt` se marca
+  // acá, no cuando termina de subir (que puede ser varios minutos después).
+  if (status === "transcribing") {
+    await prisma.meeting.update({
+      where: { id: meetingId },
+      data: { botStatus: "TRANSCRIBING", botLeftAt: new Date() },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
   if (!(audio instanceof File)) {
     return new NextResponse("Falta audio", { status: 400 });
   }
@@ -94,7 +107,6 @@ export async function POST(req: NextRequest) {
     where: { id: meetingId },
     data: {
       botStatus: "DONE",
-      botLeftAt: new Date(),
       transcript: captionsTranscript || null,
       audioTranscript: audioTranscript || null,
     },

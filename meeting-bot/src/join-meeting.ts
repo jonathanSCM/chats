@@ -2,7 +2,7 @@ import { chromium, type Page } from "playwright";
 import path from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { startRecording } from "./record-audio";
-import { uploadRecording, notifyFailure, notifyRecording } from "./upload-recording";
+import { uploadRecording, notifyFailure, notifyRecording, notifyTranscribing } from "./upload-recording";
 import { enableCaptions, startCapturingCaptions, type CaptionsCapture } from "./captions";
 import { transcribeWithWhisperCpp } from "./transcribe-audio";
 
@@ -108,6 +108,7 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
   // que estos puedan tener (no se activaron a tiempo, Meet los perdió en
   // algún tramo). Best-effort -- si falla, se sube igual lo que sí se tiene
   // (audio + subtítulos), no se trata como un fallo de toda la reunión.
+  void notifyTranscribing(callbackUrl, meetingId);
   let audioTranscript = "";
   try {
     audioTranscript = await transcribeWithWhisperCpp(recordingPath);
@@ -237,15 +238,53 @@ async function debugAccessibilityDump(page: Page, meetingId: string, step: strin
 
 async function sendAnnouncement(page: Page): Promise<void> {
   try {
-    await page.getByRole("button", { name: /chat con todos|chat with everyone|mostrar chat/i }).click({ timeout: 10_000 });
+    await openChatPanel(page);
     const input = page.getByRole("textbox", { name: /enviar un mensaje|send a message/i });
     await input.fill("Esta reunión se está grabando para transcripción interna.");
     await input.press("Enter");
+    console.log("[meeting-bot] Aviso de grabación mandado por el chat.");
   } catch (error) {
     // El selector del chat de Meet es justamente lo más frágil de toda esta
     // integración — cambia con cada rediseño de Google. Si falla, seguir
-    // grabando igual es mejor que cortar toda la reunión por esto.
+    // grabando igual es mejor que cortar toda la reunión por esto. Se loguean
+    // los botones visibles (no una captura/archivo, para no llenar disco) —
+    // con eso alcanza para ajustar el selector la próxima vez sin adivinar.
     console.warn("[meeting-bot] No se pudo mandar el aviso de grabación por el chat:", error);
+    await logToolbarButtons(page);
+  }
+}
+
+/**
+ * Un botón de chat directo en la barra de Meet no siempre está —
+ * confirmado con un volcado de accesibilidad real que no encontró ninguno
+ * con "chat" en el nombre en cierto momento. Como red de apoyo, si no
+ * aparece directo, se prueba abriéndolo desde "Más opciones".
+ */
+async function openChatPanel(page: Page): Promise<void> {
+  const directChatButton = page.getByRole("button", {
+    name: /chat con todos|mostrar chat|abrir chat|enviar chat|chat with everyone|show chat|open chat/i,
+  });
+  try {
+    await directChatButton.click({ timeout: 5_000 });
+    return;
+  } catch {
+    // Sigue con el fallback de "Más opciones".
+  }
+
+  await page.getByRole("button", { name: /más opciones|more options/i }).click({ timeout: 5_000 });
+  await page.getByRole("menuitem", { name: /chat/i }).click({ timeout: 5_000 });
+}
+
+async function logToolbarButtons(page: Page): Promise<void> {
+  try {
+    const labels = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('[role="button"], [role="menuitem"]'))
+        .map((el) => el.getAttribute("aria-label"))
+        .filter((label): label is string => Boolean(label)),
+    );
+    console.log(`[meeting-bot] Botones visibles (para ajustar el selector del chat): ${JSON.stringify(labels)}`);
+  } catch {
+    // best-effort, no bloquea nada si falla.
   }
 }
 

@@ -50,6 +50,23 @@ export async function notifyRecording(callbackUrl: string, meetingId: string): P
 }
 
 /**
+ * Avisa que el bot ya salió de la reunión y arrancó a transcribir el audio
+ * con whisper.cpp -- sin esto, el estado se quedaba en "Grabando" durante
+ * todo ese rato (puede tardar unos minutos), aunque la reunión ya haya
+ * terminado de verdad. Best-effort, igual que `notifyRecording`.
+ */
+export async function notifyTranscribing(callbackUrl: string, meetingId: string): Promise<void> {
+  try {
+    const form = new FormData();
+    form.append("meetingId", meetingId);
+    form.append("status", "transcribing");
+    await fetch(callbackUrl, { method: "POST", headers: authHeaders(), body: form });
+  } catch (error) {
+    console.warn(`[meeting-bot] No se pudo avisar que ${meetingId} empezó a transcribir:`, error);
+  }
+}
+
+/**
  * Avisa que la reunión falló (no se pudo entrar, grabar, etc.) para que la
  * app principal no deje la reunión colgada en "JOINING" para siempre. Es
  * best-effort: si esto también falla, no hay más reintentos de este lado —

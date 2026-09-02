@@ -30,7 +30,11 @@ const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI
 const authUrl = oauth2Client.generateAuthUrl({
   access_type: "offline", // imprescindible: sin esto Google no manda refresh_token
   prompt: "consent", // fuerza a que lo mande incluso si esta cuenta ya autorizó antes
-  scope: ["https://www.googleapis.com/auth/calendar.events"],
+  // "calendar.events" (crear/editar eventos) no alcanza para crear
+  // calendarios nuevos ni compartirlos (ACL) -- para eso hace falta el
+  // scope "calendar" completo. Si ya tenías un refresh token con el scope
+  // viejo, hay que generar uno nuevo (correr este script de nuevo).
+  scope: ["https://www.googleapis.com/auth/calendar"],
 });
 
 console.log("\nAbrí este link con la cuenta de Google que va a usar el bot, y aceptá los permisos:\n");

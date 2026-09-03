@@ -418,14 +418,24 @@ export interface ParsedHistoryMessage {
 export interface ParsedHistoryBatch {
   messages: ParsedHistoryMessage[];
   isComplete: boolean; // metadata.phase === "complete" (Meta manda el historial en chunks)
+  /**
+   * phone_number_id del chunk "complete" — se guarda aparte de `messages`
+   * porque ese último chunk (el que de verdad marca el fin de la
+   * importación) puede llegar sin ningún thread/mensaje adentro, solo como
+   * aviso de "ya terminé". Si `isComplete` dependiera de que `messages` no
+   * esté vacío, ese caso dejaría el estado pegado en "Importando..." para
+   * siempre.
+   */
+  completedPhoneNumberId: string | null;
 }
 
 export function parseHistoryPayload(payload: unknown): ParsedHistoryBatch {
   const parsed = historySchema.safeParse(payload);
-  if (!parsed.success) return { messages: [], isComplete: false };
+  if (!parsed.success) return { messages: [], isComplete: false, completedPhoneNumberId: null };
 
   const messages: ParsedHistoryMessage[] = [];
   let isComplete = false;
+  let completedPhoneNumberId: string | null = null;
 
   for (const entry of parsed.data.entry) {
     for (const change of entry.changes) {
@@ -433,7 +443,10 @@ export function parseHistoryPayload(payload: unknown): ParsedHistoryBatch {
       const { phone_number_id, display_phone_number } = change.value.metadata;
 
       for (const chunk of change.value.history ?? []) {
-        if (chunk.metadata?.phase === "complete") isComplete = true;
+        if (chunk.metadata?.phase === "complete") {
+          isComplete = true;
+          completedPhoneNumberId = phone_number_id;
+        }
 
         for (const thread of chunk.threads) {
           for (const message of thread.messages) {
@@ -453,7 +466,7 @@ export function parseHistoryPayload(payload: unknown): ParsedHistoryBatch {
     }
   }
 
-  return { messages, isComplete };
+  return { messages, isComplete, completedPhoneNumberId };
 }
 
 // ─── Coexistence: sincronización de contactos del negocio ───────────────

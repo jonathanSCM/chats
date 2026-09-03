@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
   }
 
   const historyBatch = parseHistoryPayload(payload);
-  if (historyBatch.messages.length > 0 || historyBatch.isComplete) {
+  if (historyBatch.messages.length > 0 || historyBatch.completedPhoneNumberId) {
     try {
       await handleHistoryImport(historyBatch);
     } catch (error) {

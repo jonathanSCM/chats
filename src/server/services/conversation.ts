@@ -366,9 +366,9 @@ export async function handleHistoryImport(batch: ParsedHistoryBatch): Promise<vo
     }
   }
 
-  if (batch.isComplete && batch.messages.length > 0) {
+  if (batch.isComplete && batch.completedPhoneNumberId) {
     await prisma.whatsAppConnection.updateMany({
-      where: { phoneNumberId: batch.messages[0].phoneNumberId },
+      where: { phoneNumberId: batch.completedPhoneNumberId },
       data: { historySyncStatus: "COMPLETE" },
     });
   }

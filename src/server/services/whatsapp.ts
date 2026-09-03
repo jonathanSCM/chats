@@ -86,10 +86,19 @@ const inboundSchema = z.object({
                   // Presente solo si el mensaje vino de un anuncio "Click to
                   // WhatsApp" o del botón de WhatsApp de una página de
                   // Facebook (requiere atribución activada en el WABA).
+                  // headline/body/media son del anuncio real -- antes se
+                  // descartaban y solo quedaba el booleano "vino de un
+                  // anuncio", sin poder ver de cuál.
                   referral: z
                     .object({
                       source_type: z.string().optional(),
                       source_id: z.string().optional(),
+                      headline: z.string().optional(),
+                      body: z.string().optional(),
+                      media_type: z.string().optional(),
+                      image_url: z.string().optional(),
+                      video_url: z.string().optional(),
+                      thumbnail_url: z.string().optional(),
                       ctwa_clid: z.string().optional(),
                     })
                     .optional(),
@@ -123,6 +132,16 @@ const inboundSchema = z.object({
 
 export type InboundMediaType = "image" | "video" | "audio" | "document";
 
+/** El anuncio real del que vino el lead — null si no vino de ninguno. */
+export interface AdReferralInfo {
+  sourceId: string | null;
+  sourceType: string | null;
+  headline: string | null;
+  body: string | null;
+  mediaUrl: string | null;
+  ctwaClid: string | null;
+}
+
 export interface ParsedInboundMessage {
   phoneNumberId: string;
   from: string;
@@ -138,6 +157,8 @@ export interface ParsedInboundMessage {
   // true si el mensaje trajo un objeto "referral" — vino de un anuncio
   // Click-to-WhatsApp o del botón de WhatsApp de una página de Facebook.
   fromAd: boolean;
+  /** Detalle del anuncio (mismo dato que `fromAd`, pero con lo que se pueda mostrar). */
+  adReferral: AdReferralInfo | null;
 }
 
 const MEDIA_TYPES: InboundMediaType[] = ["image", "video", "audio", "document"];
@@ -173,6 +194,20 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
       for (const message of change.value.messages ?? []) {
         const customerName = namesByWaId.get(message.from) ?? null;
         const fromAd = Boolean(message.referral);
+        const adReferral: AdReferralInfo | null = message.referral
+          ? {
+              sourceId: message.referral.source_id ?? null,
+              sourceType: message.referral.source_type ?? null,
+              headline: message.referral.headline ?? null,
+              body: message.referral.body ?? null,
+              mediaUrl:
+                message.referral.image_url ??
+                message.referral.video_url ??
+                message.referral.thumbnail_url ??
+                null,
+              ctwaClid: message.referral.ctwa_clid ?? null,
+            }
+          : null;
 
         if (message.type === "text" && message.text?.body) {
           results.push({
@@ -183,6 +218,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
             text: message.text.body,
             media: null,
             fromAd,
+            adReferral,
           });
           continue;
         }
@@ -204,6 +240,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
                 fileName: mediaObj.filename,
               },
               fromAd,
+              adReferral,
             });
           }
         }

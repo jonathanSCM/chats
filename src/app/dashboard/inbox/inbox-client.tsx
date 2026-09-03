@@ -73,6 +73,15 @@ interface ConversationSummary {
 
 type MediaType = "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT";
 
+interface AdReferralInfo {
+  sourceId: string | null;
+  sourceType: string | null;
+  headline: string | null;
+  body: string | null;
+  mediaUrl: string | null;
+  ctwaClid: string | null;
+}
+
 interface Message {
   id: string;
   role: "CUSTOMER" | "BOT" | "STAFF" | "SYSTEM";
@@ -382,6 +391,7 @@ export function InboxClient({
   const [conversationStatus, setConversationStatus] = useState<"OPEN" | "ON_HOLD" | "CLOSED">("OPEN");
   const [conversationBlocked, setConversationBlocked] = useState(false);
   const [conversationFromAd, setConversationFromAd] = useState(false);
+  const [adReferralData, setAdReferralData] = useState<AdReferralInfo | null>(null);
   const [conversationBotPaused, setConversationBotPaused] = useState(false);
   const [conversationAiEnabled, setConversationAiEnabled] = useState(false);
   const [conversationBotId, setConversationBotId] = useState<string | null>(null);
@@ -556,6 +566,7 @@ export function InboxClient({
     setCustomerPhone(data.conversation.customerPhone);
     setCustomerName(data.conversation.customerName ?? null);
     setAssignedTo(data.conversation.assignedTo ?? null);
+    setAdReferralData(data.conversation.adReferralData ?? null);
     setOutsideWindow(Boolean(data.conversation.outsideWindow));
     setConversationBotId(data.conversation.botId ?? null);
     setConversationStatus(data.conversation.status ?? "OPEN");
@@ -1100,7 +1111,11 @@ export function InboxClient({
                   {customerName || customerPhone}
                   {conversationFromAd ? (
                     <span
-                      title="Este lead llegó por un anuncio de Meta (Click to WhatsApp) — tiene 72h de gracia sin necesitar plantilla."
+                      title={
+                        adReferralData?.headline
+                          ? `Vino del anuncio "${adReferralData.headline}"${adReferralData.body ? ` — ${adReferralData.body}` : ""}`
+                          : "Este lead llegó por un anuncio de Meta (Click to WhatsApp) — tiene 72h de gracia sin necesitar plantilla."
+                      }
                       className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-accent"
                     >
                       Anuncio
@@ -1118,6 +1133,9 @@ export function InboxClient({
                 </p>
                 {customerName && (
                   <p className="truncate font-mono text-xs text-ink-faint">{customerPhone}</p>
+                )}
+                {conversationFromAd && adReferralData?.headline && (
+                  <p className="truncate text-xs text-accent">📢 {adReferralData.headline}</p>
                 )}
               </div>
               {conversationAiEnabled && conversationBotPaused && (

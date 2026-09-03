@@ -6,6 +6,7 @@ import type {
   ParsedHistoryBatch,
   ParsedContactSync,
   ParsedStatusUpdate,
+  AdReferralInfo,
 } from "@/server/services/whatsapp";
 import { notifyNewMessage } from "@/server/services/push";
 import { enqueue, enqueueOrReschedule, runJobsSoon } from "@/server/jobs";
@@ -65,6 +66,7 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
     inbound.from,
     inbound.customerName,
     inbound.fromAd,
+    inbound.adReferral,
   );
 
   // El mensaje se guarda de inmediato para que aparezca en la bandeja al
@@ -208,6 +210,7 @@ async function findOrCreateConversation(
   customerPhone: string,
   customerName?: string | null,
   fromAd?: boolean,
+  adReferral?: AdReferralInfo | null,
 ): Promise<string> {
   const existing = await prisma.conversation.findFirst({
     where: { botId, customerPhone },
@@ -229,7 +232,13 @@ async function findOrCreateConversation(
         where: { id: existing.id },
         data: {
           ...(customerName && customerName !== existing.customerName ? { customerName } : {}),
-          ...(fromAd && !existing.adReferral ? { adReferral: true, adReferralAt: new Date() } : {}),
+          ...(fromAd && !existing.adReferral
+            ? {
+                adReferral: true,
+                adReferralAt: new Date(),
+                adReferralData: (adReferral ?? undefined) as Prisma.InputJsonValue | undefined,
+              }
+            : {}),
         },
       });
     }
@@ -263,7 +272,13 @@ async function findOrCreateConversation(
       contactId,
       billed: true,
       botPaused: !botActiveForThisPhone,
-      ...(fromAd ? { adReferral: true, adReferralAt: new Date() } : {}),
+      ...(fromAd
+        ? {
+            adReferral: true,
+            adReferralAt: new Date(),
+            adReferralData: (adReferral ?? undefined) as Prisma.InputJsonValue | undefined,
+          }
+        : {}),
     },
   });
   return created.id;

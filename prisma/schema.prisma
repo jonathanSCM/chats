@@ -273,6 +273,10 @@ model Conversation {
   adReferral          Boolean   @default(false)
   adReferralAt        DateTime?
   freeEntryPointUntil DateTime?
+  // Detalle del anuncio real (headline, texto, imagen/video, source_id) que
+  // Meta manda junto con "referral" -- antes se descartaba y solo quedaba el
+  // booleano de arriba, sin poder ver de qué anuncio vino cada lead.
+  adReferralData      Json?
 
   // Vendedor dueño de esta conversación — se asigna automáticamente al
   // primer vendedor que responde. Mientras sea null, cualquier vendedor la

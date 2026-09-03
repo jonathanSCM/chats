@@ -196,6 +196,11 @@ model WhatsAppConnection {
   verified          Boolean           @default(false)
   coexistence       Boolean           @default(false) // conectado vía Embedded Signup en modo Coexistence (mismo número también usado en la app de WhatsApp Business)
   historySyncStatus HistorySyncStatus @default(NONE)
+  // Dataset de la Conversions API para reportar de vuelta a Meta qué leads
+  // de un anuncio terminaron en venta -- se crea una sola vez por WABA (la
+  // API es idempotente: pedirlo de nuevo devuelve el mismo id) y se cachea
+  // acá para no pedirlo en cada evento. Ver services/meta-conversions.ts.
+  metaDatasetId     String?
   createdAt         DateTime          @default(now())
 
   @@map("whatsapp_connections")
@@ -642,6 +647,10 @@ model Opportunity {
 
   proposalSentAt DateTime?
   wonAt          DateTime?
+  // Cuándo se le avisó a Meta (Conversions API) que este lead terminó en
+  // venta -- evita mandarlo dos veces. Meta no ofrece deduplicación propia
+  // para estos eventos, así que esto es lo único que la evita.
+  metaConversionSentAt DateTime?
   lostAt         DateTime?
   lostReason     String?
   lostReasonCategory LossReason?

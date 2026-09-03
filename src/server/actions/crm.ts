@@ -19,6 +19,7 @@ import {
 } from "@/server/services/google-calendar";
 import { scheduleMeetingBotJoin, cancelMeetingBotJoin, stopMeetingBot } from "@/server/services/meeting-bot";
 import { requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
+import { reportOpportunityWon } from "@/server/services/meta-conversions";
 import type { ActionState } from "./types";
 
 const PATH = "/dashboard/seguimiento";
@@ -249,6 +250,12 @@ export async function updateOpportunityFieldAction(
   }
 
   await prisma.opportunity.update({ where: { id: opportunityId }, data });
+
+  if (parsed.data.field === "stage" && parsed.data.value === "GANADO" && opportunity.stage !== "GANADO") {
+    void reportOpportunityWon(opportunityId).catch((error) =>
+      console.error(`[crm] Error reportando la venta ${opportunityId} a Meta:`, error),
+    );
+  }
 
   // Solo se auditan los cambios de estado y de dueño: son los que después
   // explican el embudo. Auditar cada tecleo de una nota solo generaría ruido.

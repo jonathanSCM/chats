@@ -10,6 +10,8 @@ import type {
 } from "@/server/services/whatsapp";
 import { notifyNewMessage } from "@/server/services/push";
 import { enqueue, enqueueOrReschedule, runJobsSoon } from "@/server/jobs";
+import { decrypt } from "@/lib/crypto";
+import { resolveAdInfo } from "@/server/services/meta-ads";
 
 const CONVERSATION_WINDOW_MS = 24 * 60 * 60 * 1000; // ventana de conversación de WhatsApp
 const FREE_ENTRY_POINT_MS = 72 * 60 * 60 * 1000; // gracia extra de Meta para leads de anuncios
@@ -67,6 +69,7 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
     inbound.customerName,
     inbound.fromAd,
     inbound.adReferral,
+    inbound.fromAd ? decrypt(connection.accessToken) : null,
   );
 
   // El mensaje se guarda de inmediato para que aparezca en la bandeja al
@@ -211,7 +214,20 @@ async function findOrCreateConversation(
   customerName?: string | null,
   fromAd?: boolean,
   adReferral?: AdReferralInfo | null,
+  /** Access token de la conexión de WhatsApp que recibió el mensaje -- se reusa para resolver el anuncio, ver meta-ads.ts. */
+  accessToken?: string | null,
 ): Promise<string> {
+  // El webhook de WhatsApp nunca manda el nombre del anuncio/campaña, solo
+  // su ID (`sourceId`) -- se resuelve acá contra la Marketing API (ver
+  // meta-ads.ts) antes de guardarlo. Se calcula una sola vez arriba, aunque
+  // en el caso raro de una conversación ya marcada como venida de un
+  // anuncio esto se termine descartando sin usar -- más simple que
+  // duplicar la misma llamada en las dos ramas de abajo.
+  const enrichedAdReferral =
+    fromAd && adReferral?.sourceId && accessToken
+      ? { ...adReferral, ...((await resolveAdInfo(adReferral.sourceId, accessToken)) ?? {}) }
+      : adReferral;
+
   const existing = await prisma.conversation.findFirst({
     where: { botId, customerPhone },
     orderBy: { lastMessageAt: "desc" },
@@ -236,7 +252,7 @@ async function findOrCreateConversation(
             ? {
                 adReferral: true,
                 adReferralAt: new Date(),
-                adReferralData: (adReferral ?? undefined) as Prisma.InputJsonValue | undefined,
+                adReferralData: (enrichedAdReferral ?? undefined) as Prisma.InputJsonValue | undefined,
               }
             : {}),
         },
@@ -276,7 +292,7 @@ async function findOrCreateConversation(
         ? {
             adReferral: true,
             adReferralAt: new Date(),
-            adReferralData: (adReferral ?? undefined) as Prisma.InputJsonValue | undefined,
+            adReferralData: (enrichedAdReferral ?? undefined) as Prisma.InputJsonValue | undefined,
           }
         : {}),
     },

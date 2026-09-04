@@ -132,7 +132,12 @@ const inboundSchema = z.object({
 
 export type InboundMediaType = "image" | "video" | "audio" | "document";
 
-/** El anuncio real del que vino el lead — null si no vino de ninguno. */
+/**
+ * El anuncio real del que vino el lead — null si no vino de ninguno.
+ * adName/campaignName/adsetName no vienen en el webhook (Meta ahí solo
+ * manda `sourceId`) -- se completan aparte, resolviendo contra la
+ * Marketing API, ver services/meta-ads.ts.
+ */
 export interface AdReferralInfo {
   sourceId: string | null;
   sourceType: string | null;
@@ -140,6 +145,9 @@ export interface AdReferralInfo {
   body: string | null;
   mediaUrl: string | null;
   ctwaClid: string | null;
+  adName?: string | null;
+  campaignName?: string | null;
+  adsetName?: string | null;
 }
 
 export interface ParsedInboundMessage {

@@ -80,6 +80,9 @@ interface AdReferralInfo {
   body: string | null;
   mediaUrl: string | null;
   ctwaClid: string | null;
+  adName?: string | null;
+  campaignName?: string | null;
+  adsetName?: string | null;
 }
 
 interface Message {
@@ -1113,7 +1116,7 @@ export function InboxClient({
                     <span
                       title={
                         adReferralData?.headline
-                          ? `Vino del anuncio "${adReferralData.headline}"${adReferralData.body ? ` — ${adReferralData.body}` : ""}`
+                          ? `Vino del anuncio "${adReferralData.headline}"${adReferralData.campaignName ? ` — campaña "${adReferralData.campaignName}"` : ""}${adReferralData.body ? ` — ${adReferralData.body}` : ""}`
                           : "Este lead llegó por un anuncio de Meta (Click to WhatsApp) — tiene 72h de gracia sin necesitar plantilla."
                       }
                       className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-accent"
@@ -1135,7 +1138,10 @@ export function InboxClient({
                   <p className="truncate font-mono text-xs text-ink-faint">{customerPhone}</p>
                 )}
                 {conversationFromAd && adReferralData?.headline && (
-                  <p className="truncate text-xs text-accent">📢 {adReferralData.headline}</p>
+                  <p className="truncate text-xs text-accent">
+                    📢 {adReferralData.headline}
+                    {adReferralData.campaignName && ` · ${adReferralData.campaignName}`}
+                  </p>
                 )}
               </div>
               {conversationAiEnabled && conversationBotPaused && (

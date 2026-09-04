@@ -20,7 +20,7 @@ export async function GET() {
   const organizationId = session.user.organizationId;
   const isAdmin = session.user.role === "OWNER" || session.user.role === "SUPERADMIN";
 
-  const [opportunities, stageEvents, members] = await Promise.all([
+  const [opportunities, stageEvents, members, adConversations, opportunitiesWithPhone] = await Promise.all([
     prisma.opportunity.findMany({
       where: { organizationId },
       select: {
@@ -43,6 +43,16 @@ export async function GET() {
     prisma.user.findMany({
       where: { organizationId },
       select: { id: true, name: true, email: true },
+    }),
+    // Para el reporte por campaña, más abajo.
+    prisma.conversation.findMany({
+      where: { adReferral: true, bot: { organizationId } },
+      orderBy: { startedAt: "asc" },
+      select: { customerPhone: true, adReferralData: true },
+    }),
+    prisma.opportunity.findMany({
+      where: { organizationId },
+      select: { stage: true, estimatedValue: true, wonAt: true, contact: { select: { phone: true } } },
     }),
   ]);
 
@@ -185,6 +195,46 @@ export async function GET() {
       .sort((a, b) => b.valorGanado - a.valorGanado);
   }
 
+  // ── Reporte por campaña/anuncio ─────────────────────────────────────
+  // "Leads" se cuenta por teléfono, no por conversación — un mismo cliente
+  // no debería aparecer dos veces aunque haya escrito más de una vez desde
+  // el mismo (o distinto) anuncio. Se le atribuye a la campaña de su
+  // PRIMER contacto marcado como venido de un anuncio (primer touch) —
+  // mismo criterio que ya usa reportOpportunityWon() para la Conversions
+  // API, para no tener dos lógicas de atribución distintas en la app.
+  const campaignByPhone = new Map<string, string>();
+  for (const c of adConversations) {
+    if (campaignByPhone.has(c.customerPhone)) continue;
+    const data = c.adReferralData as
+      | { campaignName?: string | null; adName?: string | null; sourceId?: string | null }
+      | null;
+    const label =
+      data?.campaignName || data?.adName || (data?.sourceId ? `Anuncio ${data.sourceId}` : "Sin datos del anuncio");
+    campaignByPhone.set(c.customerPhone, label);
+  }
+
+  interface CampaignAgg {
+    leads: number;
+    won: number;
+    wonValue: number;
+  }
+  const byCampaign = new Map<string, CampaignAgg>();
+  for (const label of campaignByPhone.values()) {
+    const entry = byCampaign.get(label) ?? { leads: 0, won: 0, wonValue: 0 };
+    entry.leads += 1;
+    byCampaign.set(label, entry);
+  }
+  for (const o of opportunitiesWithPhone) {
+    const label = campaignByPhone.get(o.contact.phone);
+    const entry = label ? byCampaign.get(label) : undefined;
+    if (!entry || !o.wonAt) continue;
+    entry.won += 1;
+    entry.wonValue += o.estimatedValue ? Number(o.estimatedValue) : 0;
+  }
+  const campaignReport = [...byCampaign.entries()]
+    .map(([campaign, v]) => ({ campaign, ...v }))
+    .sort((a, b) => b.leads - a.leads);
+
   return NextResponse.json({
     valorEnJuego,
     forecast,
@@ -198,5 +248,6 @@ export async function GET() {
     funnel,
     historyStartsAt,
     vendorComparison,
+    campaignReport,
   });
 }

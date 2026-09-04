@@ -29,6 +29,13 @@ interface VendorRow {
   ticketPromedio: number;
 }
 
+interface CampaignRow {
+  campaign: string;
+  leads: number;
+  won: number;
+  wonValue: number;
+}
+
 interface AnalyticsData {
   valorEnJuego: number;
   forecast: number;
@@ -40,6 +47,7 @@ interface AnalyticsData {
   funnel: FunnelEntry[];
   historyStartsAt: string | null;
   vendorComparison: VendorRow[] | null;
+  campaignReport: CampaignRow[];
 }
 
 function monthLabel(mes: string): string {
@@ -222,6 +230,40 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
           ))}
         </div>
       </Card>
+
+      {data.campaignReport.length > 0 && (
+        <Card>
+          <CardTitle className="mb-1 text-sm">Leads por campaña/anuncio</CardTitle>
+          <p className="mb-3 text-[11px] text-ink-faint">
+            Cada cliente cuenta una sola vez, atribuido a su primer contacto marcado como venido de
+            un anuncio. Solo incluye leads de Click-to-WhatsApp con detalle capturado.
+          </p>
+          <Table>
+            <Thead>
+              <tr>
+                <Th>Campaña / anuncio</Th>
+                <Th>Leads</Th>
+                <Th>Ganados</Th>
+                <Th>Tasa de cierre</Th>
+                <Th>Valor ganado</Th>
+              </tr>
+            </Thead>
+            <tbody>
+              {data.campaignReport.map((c) => (
+                <Tr key={c.campaign}>
+                  <Td className="max-w-xs truncate" title={c.campaign}>
+                    {c.campaign}
+                  </Td>
+                  <Td className="font-mono">{c.leads}</Td>
+                  <Td className="font-mono">{c.won}</Td>
+                  <Td className="font-mono">{c.leads > 0 ? `${Math.round((c.won / c.leads) * 100)}%` : "—"}</Td>
+                  <Td className="font-mono">{money.format(c.wonValue)}</Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
+      )}
 
       {isAdmin && data.vendorComparison && (
         <Card>

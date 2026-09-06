@@ -2,11 +2,19 @@
 
 import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
+import { looksLikeStaleAction, reloadOnce } from "@/lib/stale-action-reload";
 
 // Red de seguridad de último nivel: si algo revienta en el render y ningún
 // error.tsx más específico lo atajó, esto reemplaza el <html> entero — por
 // eso no puede depender de layout.tsx ni de estilos globales que quizás no
 // llegaron a cargar.
+//
+// Caso especial: Server Action stale (ver stale-action-reload.ts) — pasa
+// cuando la excepción llega como error de render en vez de promesa
+// rechazada, típico de un `<form action={...}>`, que React puede tirar
+// directo al Error Boundary más cercano. No es un bug real (es solo una
+// pestaña vieja de antes del último redespliegue), así que no se reporta a
+// Sentry: se recarga la página sola.
 export default function GlobalError({
   error,
   reset,
@@ -15,6 +23,10 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    if (looksLikeStaleAction(error)) {
+      reloadOnce();
+      return;
+    }
     Sentry.captureException(error);
   }, [error]);
 

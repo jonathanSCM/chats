@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { StaleActionReload } from "@/components/stale-action-reload";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -73,7 +74,10 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="min-h-full flex flex-col bg-canvas text-ink font-sans">{children}</body>
+      <body className="min-h-full flex flex-col bg-canvas text-ink font-sans">
+        <StaleActionReload />
+        {children}
+      </body>
     </html>
   );
 }

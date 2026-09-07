@@ -47,6 +47,7 @@ model Organization {
   activities     Activity[]
   meetings       Meeting[]
   aiAnalyses     AiAnalysis[]
+  metaAttributionTouches MetaAttributionTouch[]
 
   @@map("organizations")
 }
@@ -304,11 +305,58 @@ model Conversation {
 
   messages Message[]
   reads    ConversationRead[]
+  metaAttributionTouches MetaAttributionTouch[]
 
   @@index([botId])
   @@index([customerPhone])
   @@index([assignedToId])
   @@map("conversations")
+}
+
+// Un registro por cada clic de anuncio "Click to WhatsApp" que generó
+// contacto -- a diferencia de Conversation.adReferralData (que solo guarda
+// el touch más reciente dentro de su propia ventana de 24h), esta tabla es
+// append-only: si un contacto vuelve después de esa ventana por un anuncio
+// distinto, se agrega un touch nuevo, nunca se pisa el anterior (Meta Ads
+// §"first touch"). Se popula desde services/conversation.ts, en paralelo a
+// los campos ya existentes en Conversation (que se dejan intactos, los usa
+// el badge "Anuncio" del inbox).
+model MetaAttributionTouch {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  opportunityId  String?
+  opportunity    Opportunity?  @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  sourcePlatform String @default("meta")
+  sourceChannel  String @default("whatsapp")
+  ctwaClid       String?
+  sourceId       String? // ad_id crudo del webhook (referral.source_id)
+  sourceType     String?
+  sourceUrl      String?
+  referralJson   Json? // payload crudo del referral, por si hace falta re-derivar algo
+
+  // Resuelto vía Marketing API (meta-ads.ts) -- puede quedar null si el
+  // token no tiene ads_read o el anuncio ya no existe.
+  adAccountId  String?
+  campaignId   String?
+  campaignName String?
+  adsetId      String?
+  adsetName    String?
+  adId         String?
+  adName       String?
+
+  capturedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([organizationId, contactId, capturedAt])
+  @@index([opportunityId])
+  @@map("meta_attribution_touches")
 }
 
 // Suscripción de Web Push por dispositivo/navegador — un mismo vendedor
@@ -530,6 +578,7 @@ model Contact {
   conversations Conversation[]
   opportunities Opportunity[]
   activities    Activity[]
+  metaAttributionTouches MetaAttributionTouch[]
 
   // El teléfono identifica al contacto dentro de la organización: es la
   // llave con la que llega WhatsApp y evita duplicados (manual §14).
@@ -649,16 +698,34 @@ model Opportunity {
   wonAt          DateTime?
   // Cuándo se le avisó a Meta (Conversions API) que este lead terminó en
   // venta -- evita mandarlo dos veces. Meta no ofrece deduplicación propia
-  // para estos eventos, así que esto es lo único que la evita.
+  // para estos eventos, así que esto es lo único que la evita. LEGACY: el
+  // código nuevo usa purchaseEventSentAt/purchaseEventId en su lugar; este
+  // campo se deja tal cual (ya tiene datos en producción), no se toca.
   metaConversionSentAt DateTime?
   lostAt         DateTime?
   lostReason     String?
   lostReasonCategory LossReason?
+
+  // Calificación (Meta Ads §Regla 2): se marca la primera vez que la
+  // oportunidad pasa de POR_CALIFICAR a ENTREVISTA. Es solo informativo --
+  // el guardia real contra reenvíos (incluyendo reversiones de etapa) es
+  // qualifiedEventSentAt, chequeado antes de encolar el evento a Meta.
+  qualifiedAt          DateTime?
+  // Idempotencia de los dos eventos de Conversions API que dispara el
+  // pipeline. event_id es determinístico ("opportunity_<id>_..._v1"), no un
+  // UUID nuevo en cada reintento -- así un reintento de la cola de jobs
+  // nunca genera una segunda conversión del lado de Meta.
+  qualifiedEventSentAt DateTime?
+  qualifiedEventId     String?
+  purchaseEventSentAt  DateTime?
+  purchaseEventId      String?
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   activities Activity[]
   meetings   Meeting[]
+  metaAttributionTouches MetaAttributionTouch[]
 
   @@index([organizationId, stage])
   @@index([contactId])

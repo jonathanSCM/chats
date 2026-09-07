@@ -16,7 +16,7 @@ import { GRAPH_API_VERSION } from "@/server/services/whatsapp";
  */
 
 interface DatasetResponse {
-  dataset_id?: string;
+  id?: string;
 }
 
 /**
@@ -41,8 +41,8 @@ export async function getOrCreateDataset(params: {
   }
 
   const data = (await res.json()) as DatasetResponse;
-  if (!data.dataset_id) throw new Error("Meta no devolvió un dataset_id.");
-  return data.dataset_id;
+  if (!data.id) throw new Error("Meta no devolvió un id de dataset.");
+  return data.id;
 }
 
 /**
@@ -56,11 +56,15 @@ export async function sendConversionEvent(params: {
   accessToken: string;
   eventName: "Purchase" | "QualifiedLead";
   ctwaClid: string;
+  /** Meta lo exige para eventos business_messaging/whatsapp -- confirmado
+   * probando contra Test Events: sin esto, Meta rechaza el evento entero
+   * con "Falta el identificador de la cuenta de WhatsApp Business". */
+  wabaId: string;
   eventTime?: Date;
   value?: number;
   currency?: string;
 }): Promise<void> {
-  const { datasetId, accessToken, eventName, ctwaClid, eventTime, value, currency } = params;
+  const { datasetId, accessToken, eventName, ctwaClid, wabaId, eventTime, value, currency } = params;
 
   const res = await fetch(
     `https://graph.facebook.com/${GRAPH_API_VERSION}/${datasetId}/events?access_token=${encodeURIComponent(accessToken)}`,
@@ -74,7 +78,7 @@ export async function sendConversionEvent(params: {
             event_time: Math.floor((eventTime ?? new Date()).getTime() / 1000),
             action_source: "business_messaging",
             messaging_channel: "whatsapp",
-            user_data: { ctwa_clid: ctwaClid },
+            user_data: { ctwa_clid: ctwaClid, whatsapp_business_account_id: wabaId },
             ...(value !== undefined ? { custom_data: { currency: currency ?? "USD", value } } : {}),
           },
         ],
@@ -158,6 +162,7 @@ export async function reportOpportunityWon(opportunityId: string): Promise<void>
       accessToken,
       eventName: "Purchase",
       ctwaClid,
+      wabaId: connection.wabaId,
       value: opportunity.estimatedValue ? Number(opportunity.estimatedValue) : undefined,
       currency: opportunity.currency,
     });

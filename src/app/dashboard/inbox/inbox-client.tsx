@@ -1116,7 +1116,7 @@ export function InboxClient({
                     <span
                       title={
                         adReferralData?.headline
-                          ? `Vino del anuncio "${adReferralData.headline}"${adReferralData.campaignName ? ` — campaña "${adReferralData.campaignName}"` : ""}${adReferralData.body ? ` — ${adReferralData.body}` : ""}`
+                          ? `Vino del anuncio "${adReferralData.headline}"${adReferralData.adName ? ` — anuncio "${adReferralData.adName}"` : ""}${adReferralData.campaignName ? ` — campaña "${adReferralData.campaignName}"` : ""}${adReferralData.body ? ` — ${adReferralData.body}` : ""}`
                           : "Este lead llegó por un anuncio de Meta (Click to WhatsApp) — tiene 72h de gracia sin necesitar plantilla."
                       }
                       className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-accent"
@@ -1140,6 +1140,7 @@ export function InboxClient({
                 {conversationFromAd && adReferralData?.headline && (
                   <p className="truncate text-xs text-accent">
                     📢 {adReferralData.headline}
+                    {adReferralData.adName && ` · ${adReferralData.adName}`}
                     {adReferralData.campaignName && ` · ${adReferralData.campaignName}`}
                   </p>
                 )}

@@ -5,6 +5,7 @@ import { sendTextMessage } from "@/server/services/whatsapp";
 import { notifyNewMessage } from "@/server/services/push";
 import { isOpenStage } from "@/lib/pipeline";
 import { getMeetingSlots, type MeetingSlot } from "@/lib/meeting-slots";
+import { isGoogleMeetEnabled, getOrCreateOrgCalendar, createMeetEvent } from "@/server/services/google-calendar";
 import { MODELS, runStructured } from "./client";
 
 export const PROMPT_VERSION = "bot-calificacion-v1";
@@ -323,13 +324,54 @@ async function maybeScheduleMeeting(
   const slot = slots[index];
   if (!slot) return;
 
+  // El modelo puede volver a devolver "reunion_elegida" en un turno
+  // posterior (el cliente reconfirma el horario, o simplemente lo repite)
+  // -- sin este chequeo, cada turno así crea otra Meeting duplicada para
+  // la misma oportunidad.
+  if (opportunityId) {
+    const alreadyScheduled = await prisma.meeting.findFirst({
+      where: { opportunityId, status: { not: "CANCELED" } },
+      select: { id: true },
+    });
+    if (alreadyScheduled) return;
+  }
+
+  // Mejor esfuerzo: si Google Calendar no está configurado o falla, la
+  // reunión igual se guarda (como antes) para que el vendedor mande el
+  // link a mano -- una caída de Calendar nunca debe impedir agendar.
+  let meetingUrl: string | null = null;
+  let googleEventId: string | null = null;
+  if (isGoogleMeetEnabled()) {
+    try {
+      const org = await prisma.organization.findUnique({
+        where: { id: conversation.organizationId },
+        select: { name: true },
+      });
+      const calendarId = await getOrCreateOrgCalendar(conversation.organizationId, org?.name ?? "CRM");
+      const event = await createMeetEvent({
+        calendarId,
+        summary: `Reunión de diagnóstico — ${conversation.contact?.fullName || conversation.contact?.phone || "Lead"}`,
+        scheduledAt: slot.date,
+        durationMinutes: 30,
+      });
+      meetingUrl = event.meetingUrl;
+      googleEventId = event.eventId;
+    } catch (error) {
+      console.error("[qualification-bot] No se pudo crear el evento en Google Calendar:", error);
+    }
+  }
+
   await prisma.meeting.create({
     data: {
       organizationId: conversation.organizationId,
       opportunityId,
       scheduledAt: slot.date,
+      meetingUrl,
+      googleEventId,
       status: "SCHEDULED",
-      notes: "Agendada por el bot de calificación — confirmar horario y mandar el link de Meet al cliente.",
+      notes: meetingUrl
+        ? "Agendada automáticamente por el bot de calificación, con Google Meet."
+        : "Agendada por el bot de calificación — confirmar horario y mandar el link de Meet al cliente.",
     },
   });
 

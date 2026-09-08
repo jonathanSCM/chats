@@ -264,16 +264,16 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
         config_id: configId,
         response_type: "code",
         override_default_response_type: true,
-        // La doc de "Versiones" dice que "extras" va vacío por defecto en
-        // v4 -- pero la propia página de "Versión 4" aclara que el registro
-        // de usuarios de la app de WhatsApp Business (Coexistence) "sigue
-        // siendo compatible mediante el parámetro feature_type". O sea:
-        // vacío es la base, featureType se agrega para pedir específicamente
-        // Coexistence. A diferencia de v2/v3, v4 no necesita "setup" ni
-        // "sessionInfoVersion" -- la info de sesión completa se devuelve
-        // siempre, en todos los flujos.
+        // Exactamente el snippet del "Paso 2: Personalizar el registro
+        // insertado" de la doc dedicada a Coexistence ("Registrar usuarios
+        // de la app de WhatsApp Business", actualizada 26 jun 2026) -- la
+        // página de "Versiones" (más genérica, cubre todo el producto) decía
+        // "extras vacío para v4", pero esta guía específica de la función
+        // que estamos usando pide los tres campos juntos.
         extras: {
+          setup: {},
           featureType: "whatsapp_business_app_onboarding",
+          sessionInfoVersion: "3",
         },
       },
     );

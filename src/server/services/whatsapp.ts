@@ -771,6 +771,32 @@ export async function getWabaPhoneNumbers(params: {
   return (data.data ?? []).map((n) => ({ id: n.id, displayPhoneNumber: n.display_phone_number ?? "" }));
 }
 
+/**
+ * Le pide a Meta que arranque la sincronización de contactos o de
+ * historial de una conexión de Coexistence -- sin este llamado, Meta NUNCA
+ * manda los webhooks `smb_app_state_sync`/`history`, sin importar que la
+ * app esté bien suscrita a esos campos. Solo se puede pedir UNA VEZ por
+ * conexión (si hace falta de nuevo, el cliente tiene que desconectar y
+ * volver a completar el Embedded Signup) y dentro de las primeras 24h
+ * después de conectar.
+ */
+export async function initiateSmbAppDataSync(params: {
+  phoneNumberId: string;
+  accessToken: string;
+  syncType: "smb_app_state_sync" | "history";
+}): Promise<void> {
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${params.phoneNumberId}/smb_app_data`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${params.accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ messaging_product: "whatsapp", sync_type: params.syncType }),
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`No se pudo iniciar la sincronización "${params.syncType}" (${res.status}): ${errorBody}`);
+  }
+}
+
 // ─── Embedded Signup (Coexistence) ──────────────────────────────
 
 // Intercambia el "code" que devuelve FB.login() (válido solo 30 segundos)

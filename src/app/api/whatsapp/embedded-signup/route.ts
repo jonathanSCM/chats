@@ -9,6 +9,7 @@ import {
   subscribeAppToWaba,
   verifyPhoneNumber,
   getWabaPhoneNumbers,
+  initiateSmbAppDataSync,
 } from "@/server/services/whatsapp";
 
 const bodySchema = z.object({
@@ -102,6 +103,19 @@ export async function POST(req: NextRequest) {
         historySyncStatus: "PENDING",
       },
     });
+
+    // Sin esto, Meta nunca manda los webhooks de contactos/historial, sin
+    // importar que la app esté suscrita a esos campos -- hay que pedirlos
+    // explícitamente, una sola vez, dentro de las primeras 24h de conectar
+    // (doc de Coexistence). Mejor esfuerzo: si falla, la conexión ya quedó
+    // guardada igual -- se puede reintentar más adelante sin tener que
+    // rehacer todo el Embedded Signup.
+    try {
+      await initiateSmbAppDataSync({ phoneNumberId, accessToken, syncType: "smb_app_state_sync" });
+      await initiateSmbAppDataSync({ phoneNumberId, accessToken, syncType: "history" });
+    } catch (error) {
+      console.error("[embedded-signup] No se pudo iniciar la sincronización de Coexistence:", error);
+    }
 
     return NextResponse.json({ error: null });
   } catch (error) {

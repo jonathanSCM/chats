@@ -28,8 +28,6 @@ declare global {
             setup: Record<string, unknown>;
             featureType: string;
             sessionInfoVersion: string;
-            version: string;
-            features: unknown[];
           };
         },
       ) => void;
@@ -63,7 +61,7 @@ function loadFacebookSdk(appId: string): Promise<void> {
 
       window.fbAsyncInit = () => {
         clearTimeout(timeout);
-        window.FB!.init({ appId, cookie: true, xfbml: true, autoLogAppEvents: true, version: "v23.0" });
+        window.FB!.init({ appId, cookie: true, xfbml: true, autoLogAppEvents: true, version: "v26.0" });
         resolve();
       };
 
@@ -268,16 +266,17 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
         config_id: configId,
         response_type: "code",
         override_default_response_type: true,
+        // La versión (v2/v3/v4) la define la Configuración (config_id) creada
+        // en el App Dashboard, no un parámetro acá -- la doc oficial de
+        // "Implementación" (24 jul 2026) no incluye "version" en extras, ni
+        // siquiera en el ejemplo específico de Coexistence. Forzar
+        // "v4-public-preview" acá (como se hizo antes, copiado de un link
+        // generado por la herramienta Builder, no de la doc real) podía
+        // contradecir la versión real de la Configuración v4 ya creada.
         extras: {
           setup: {},
           featureType: "whatsapp_business_app_onboarding",
           sessionInfoVersion: "3",
-          // Sin esto, Meta usa el default (v2, en camino a discontinuarse el
-          // 15/10/2026) -- este es el valor real que manda la propia
-          // herramienta "Embedded Signup Builder" de Meta al generar el link
-          // con Coexistence habilitado, no "v4" a secas.
-          version: "v4-public-preview",
-          features: [],
         },
       },
     );

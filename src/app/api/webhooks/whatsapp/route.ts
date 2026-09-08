@@ -7,6 +7,7 @@ import {
   parseMessageEchoes,
   parseHistoryPayload,
   parseContactSync,
+  parseAccountUpdate,
 } from "@/server/services/whatsapp";
 import {
   handleIncomingMessage,
@@ -102,6 +103,15 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       console.error("[webhook] Error importando historial (coexistence):", error);
     }
+  }
+
+  // Todavía no cambiamos nada en la base a partir de esto -- solo lo
+  // logueamos para tener visibilidad (recién se suscribió este campo). Ver
+  // doc de Meta "reconnect-offboarded-coexistence-clients": ACCOUNT_OFFBOARDED
+  // se recupera solo en minutos, no hace falta actuar sobre eso.
+  const accountUpdates = parseAccountUpdate(payload);
+  for (const update of accountUpdates) {
+    console.log("[webhook] account_update (coexistence):", JSON.stringify(update));
   }
 
   const contacts = parseContactSync(payload);

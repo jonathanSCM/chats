@@ -24,11 +24,9 @@ declare global {
           config_id: string;
           response_type: string;
           override_default_response_type: boolean;
-          extras: {
-            setup: Record<string, unknown>;
-            featureType: string;
-            sessionInfoVersion: string;
-          };
+          // Para v4, la doc de Meta pide "extras: {}" vacío a propósito --
+          // featureType/sessionInfoVersion son solo para v2/v3.
+          extras: Record<string, unknown>;
         },
       ) => void;
     };
@@ -266,18 +264,13 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
         config_id: configId,
         response_type: "code",
         override_default_response_type: true,
-        // La versión (v2/v3/v4) la define la Configuración (config_id) creada
-        // en el App Dashboard, no un parámetro acá -- la doc oficial de
-        // "Implementación" (24 jul 2026) no incluye "version" en extras, ni
-        // siquiera en el ejemplo específico de Coexistence. Forzar
-        // "v4-public-preview" acá (como se hizo antes, copiado de un link
-        // generado por la herramienta Builder, no de la doc real) podía
-        // contradecir la versión real de la Configuración v4 ya creada.
-        extras: {
-          setup: {},
-          featureType: "whatsapp_business_app_onboarding",
-          sessionInfoVersion: "3",
-        },
+        // La doc oficial de "Versiones" de Meta (24 jul 2026) es explícita:
+        // "The extras object is purposely empty for v4." -- featureType y
+        // sessionInfoVersion son solo para v2/v3 (versiones viejas, con UI
+        // separada). En v4 la detección de Coexistence es automática según
+        // el número que se ingresa, y los productos ya están definidos en
+        // la Configuración (config_id) creada en el App Dashboard, no acá.
+        extras: {},
       },
     );
   }

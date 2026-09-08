@@ -310,6 +310,66 @@ export function parseStatusUpdates(payload: unknown): ParsedStatusUpdate[] {
   return results;
 }
 
+// ─── Coexistence: cambios de estado de la cuenta (account_update) ──────
+
+// Se dispara cuando: se completa un registro de Coexistence
+// (PARTNER_ADDED), el cliente cambia de dispositivo o vuelve a registrar
+// su WhatsApp Business App (ACCOUNT_OFFBOARDED, restaura sola en minutos:
+// ver doc de Meta "reconnect-offboarded-coexistence-clients"), termina de
+// reconectarse (ACCOUNT_RECONNECTED), o desconecta la plataforma a mano
+// desde el celular (PARTNER_REMOVED, con disconnection_info).
+const accountUpdateSchema = z.object({
+  object: z.string(),
+  entry: z.array(
+    z.object({
+      id: z.string(), // WABA_ID
+      changes: z.array(
+        z.object({
+          field: z.string().optional(),
+          value: z.object({
+            phone_number: z.string().optional(),
+            event: z.string(),
+            disconnection_info: z
+              .object({
+                reason: z.string().optional(),
+                initiated_by: z.string().optional(),
+              })
+              .optional(),
+          }),
+        }),
+      ),
+    }),
+  ),
+});
+
+export interface ParsedAccountUpdate {
+  wabaId: string;
+  phoneNumber: string | null;
+  event: string;
+  disconnectionReason: string | null;
+  disconnectionInitiatedBy: string | null;
+}
+
+export function parseAccountUpdate(payload: unknown): ParsedAccountUpdate[] {
+  const parsed = accountUpdateSchema.safeParse(payload);
+  if (!parsed.success) return [];
+
+  const results: ParsedAccountUpdate[] = [];
+  for (const entry of parsed.data.entry) {
+    for (const change of entry.changes) {
+      if (!isFieldMatch(change.field, "account_update")) continue;
+      results.push({
+        wabaId: entry.id,
+        phoneNumber: change.value.phone_number ?? null,
+        event: change.value.event,
+        disconnectionReason: change.value.disconnection_info?.reason ?? null,
+        disconnectionInitiatedBy: change.value.disconnection_info?.initiated_by ?? null,
+      });
+    }
+  }
+  return results;
+}
+
 // ─── Coexistence: ecos de mensajes mandados desde la app del celular ────
 
 const echoSchema = z.object({

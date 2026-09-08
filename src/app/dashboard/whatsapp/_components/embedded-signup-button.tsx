@@ -28,6 +28,8 @@ declare global {
             setup: Record<string, unknown>;
             featureType: string;
             sessionInfoVersion: string;
+            version: string;
+            features: unknown[];
           };
         },
       ) => void;
@@ -262,6 +264,12 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
           setup: {},
           featureType: "whatsapp_business_app_onboarding",
           sessionInfoVersion: "3",
+          // Sin esto, Meta usa el default (v2, en camino a discontinuarse el
+          // 15/10/2026) -- este es el valor real que manda la propia
+          // herramienta "Embedded Signup Builder" de Meta al generar el link
+          // con Coexistence habilitado, no "v4" a secas.
+          version: "v4-public-preview",
+          features: [],
         },
       },
     );

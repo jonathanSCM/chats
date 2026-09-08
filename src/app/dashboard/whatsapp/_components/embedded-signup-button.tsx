@@ -264,13 +264,17 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
         config_id: configId,
         response_type: "code",
         override_default_response_type: true,
-        // La doc oficial de "Versiones" de Meta (24 jul 2026) es explícita:
-        // "The extras object is purposely empty for v4." -- featureType y
-        // sessionInfoVersion son solo para v2/v3 (versiones viejas, con UI
-        // separada). En v4 la detección de Coexistence es automática según
-        // el número que se ingresa, y los productos ya están definidos en
-        // la Configuración (config_id) creada en el App Dashboard, no acá.
-        extras: {},
+        // La doc de "Versiones" dice que "extras" va vacío por defecto en
+        // v4 -- pero la propia página de "Versión 4" aclara que el registro
+        // de usuarios de la app de WhatsApp Business (Coexistence) "sigue
+        // siendo compatible mediante el parámetro feature_type". O sea:
+        // vacío es la base, featureType se agrega para pedir específicamente
+        // Coexistence. A diferencia de v2/v3, v4 no necesita "setup" ni
+        // "sessionInfoVersion" -- la info de sesión completa se devuelve
+        // siempre, en todos los flujos.
+        extras: {
+          featureType: "whatsapp_business_app_onboarding",
+        },
       },
     );
   }

@@ -747,6 +747,30 @@ export async function verifyPhoneNumber(params: {
   };
 }
 
+/**
+ * Lista los números de teléfono de una WABA -- hace falta cuando el evento
+ * de finalización de Coexistence no trae `phone_number_id` (ver
+ * embedded-signup-button.tsx), a diferencia del signup normal que sí lo
+ * manda directo en el postMessage.
+ */
+export async function getWabaPhoneNumbers(params: {
+  wabaId: string;
+  accessToken: string;
+}): Promise<{ id: string; displayPhoneNumber: string }[]> {
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_API_VERSION}/${params.wabaId}/phone_numbers?fields=id,display_phone_number`,
+    { headers: { Authorization: `Bearer ${params.accessToken}` } },
+  );
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`No se pudieron listar los números de la WABA (${res.status}): ${errorBody}`);
+  }
+
+  const data = (await res.json()) as { data?: { id: string; display_phone_number?: string }[] };
+  return (data.data ?? []).map((n) => ({ id: n.id, displayPhoneNumber: n.display_phone_number ?? "" }));
+}
+
 // ─── Embedded Signup (Coexistence) ──────────────────────────────
 
 // Intercambia el "code" que devuelve FB.login() (válido solo 30 segundos)

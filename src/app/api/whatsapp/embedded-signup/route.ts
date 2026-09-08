@@ -8,12 +8,16 @@ import {
   exchangeEmbeddedSignupCode,
   subscribeAppToWaba,
   verifyPhoneNumber,
+  getWabaPhoneNumbers,
 } from "@/server/services/whatsapp";
 
 const bodySchema = z.object({
   code: z.string().min(1),
   wabaId: z.string().min(1),
-  phoneNumberId: z.string().min(1),
+  // El evento de finalización de Coexistence ("FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING")
+  // puede no traer phone_number_id -- ver embedded-signup-button.tsx. Si
+  // falta, se resuelve más abajo consultando los números de la WABA.
+  phoneNumberId: z.string().min(1).optional(),
   botId: z.string().min(1),
 });
 
@@ -50,8 +54,29 @@ export async function POST(req: NextRequest) {
       appSecret: settings.whatsappAppSecret,
     });
 
+    let phoneNumberId = body.phoneNumberId;
+    if (!phoneNumberId) {
+      const numbers = await getWabaPhoneNumbers({ wabaId: body.wabaId, accessToken });
+      if (numbers.length === 0) {
+        return NextResponse.json(
+          { error: "Meta no devolvió ningún número para esa cuenta de WhatsApp Business." },
+          { status: 500 },
+        );
+      }
+      if (numbers.length > 1) {
+        return NextResponse.json(
+          {
+            error:
+              "Esa cuenta de WhatsApp Business tiene varios números y Meta no indicó cuál conectar. Contactá a soporte.",
+          },
+          { status: 500 },
+        );
+      }
+      phoneNumberId = numbers[0].id;
+    }
+
     const [{ displayNumber }] = await Promise.all([
-      verifyPhoneNumber({ phoneNumberId: body.phoneNumberId, accessToken }),
+      verifyPhoneNumber({ phoneNumberId, accessToken }),
       subscribeAppToWaba({ wabaId: body.wabaId, accessToken }),
     ]);
 
@@ -59,7 +84,7 @@ export async function POST(req: NextRequest) {
       where: { botId: body.botId },
       create: {
         botId: body.botId,
-        phoneNumberId: body.phoneNumberId,
+        phoneNumberId,
         wabaId: body.wabaId,
         displayNumber,
         accessToken: encrypt(accessToken),
@@ -68,7 +93,7 @@ export async function POST(req: NextRequest) {
         historySyncStatus: "PENDING",
       },
       update: {
-        phoneNumberId: body.phoneNumberId,
+        phoneNumberId,
         wabaId: body.wabaId,
         displayNumber,
         accessToken: encrypt(accessToken),

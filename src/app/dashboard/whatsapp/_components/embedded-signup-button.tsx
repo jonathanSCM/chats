@@ -172,7 +172,12 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
         (data as { type?: unknown }).type === "WA_EMBEDDED_SIGNUP"
       ) {
         const payload = data as { event?: string; data?: { waba_id?: string; phone_number_id?: string } };
-        if (payload.event === "FINISH") {
+        // El signup normal termina con event "FINISH"; Coexistence (conectar
+        // una cuenta de WhatsApp Business App existente) termina con
+        // "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING" -- y ese evento puede NO
+        // traer phone_number_id (el ejemplo de la doc de Meta solo trae
+        // waba_id), a diferencia del signup normal que sí lo manda.
+        if (payload.event === "FINISH" || payload.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING") {
           sessionRef.current = {
             wabaId: payload.data?.waba_id,
             phoneNumberId: payload.data?.phone_number_id,
@@ -195,9 +200,12 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
     }
 
     const { wabaId, phoneNumberId } = sessionRef.current;
-    if (!wabaId || !phoneNumberId) {
+    // phoneNumberId puede faltar en el evento de Coexistence (ver el
+    // listener de arriba) -- el servidor lo resuelve consultando los
+    // números de la WABA si no llegó.
+    if (!wabaId) {
       setError(
-        "Meta no mandó el waba_id/phone_number_id esperado. Intenta de nuevo — si persiste, revisa la configuración de Embedded Signup en tu app de Meta.",
+        "Meta no mandó el waba_id esperado. Intenta de nuevo — si persiste, revisa la configuración de Embedded Signup en tu app de Meta.",
       );
       setStatus("error");
       return;

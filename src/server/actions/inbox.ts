@@ -8,6 +8,8 @@ import {
   sendTextMessage,
   sendMediaMessage,
   sendTemplateMessage,
+  sendLocationMessage,
+  googleMapsUrl,
   uploadMedia,
   type OutboundMediaType,
 } from "@/server/services/whatsapp";
@@ -17,6 +19,13 @@ import { convertWebpToPng } from "@/lib/image-convert";
 import { maybeActivateFreeEntryPoint } from "@/server/services/conversation";
 
 const messageSchema = z.object({ content: z.string().min(1).max(4000) });
+
+const locationSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  name: z.string().max(200).optional(),
+  address: z.string().max(300).optional(),
+});
 
 async function getOwnedConversation(conversationId: string) {
   const session = await requireSession();
@@ -89,6 +98,73 @@ export async function sendInboxMessageAction(
       data: { lastMessageAt: new Date(), botPaused: true },
     }),
     // Auto-asignación: si nadie la tenía, el primero que responde se queda con ella.
+    prisma.conversation.updateMany({
+      where: { id: conversationId, assignedToId: null },
+      data: { assignedToId: session.user.id },
+    }),
+  ]);
+  await maybeActivateFreeEntryPoint(conversationId);
+
+  return { error: null };
+}
+
+export async function sendInboxLocationAction(
+  conversationId: string,
+  location: { latitude: number; longitude: number; name?: string; address?: string },
+): Promise<{ error: string | null }> {
+  const parsed = locationSchema.safeParse(location);
+  if (!parsed.success) {
+    return { error: "Ubicación inválida" };
+  }
+
+  const conversation = await getOwnedConversation(conversationId);
+  if (!conversation) return { error: "Conversación no encontrada" };
+  if (conversation.blocked) {
+    return { error: "Esta conversación está bloqueada. Desbloquéala para poder responder." };
+  }
+
+  const connection = conversation.bot.whatsappConnection;
+  if (!connection?.verified) {
+    return { error: "WhatsApp no está conectado." };
+  }
+
+  const { latitude, longitude, name, address } = parsed.data;
+
+  let messageId: string | null;
+  try {
+    ({ messageId } = await sendLocationMessage({
+      phoneNumberId: connection.phoneNumberId,
+      accessToken: decrypt(connection.accessToken),
+      to: conversation.customerPhone,
+      latitude,
+      longitude,
+      name,
+      address,
+    }));
+  } catch (error) {
+    console.error(error);
+    return { error: "No se pudo enviar la ubicación por WhatsApp." };
+  }
+
+  const session = await requireSession();
+  const content = [name, address].filter(Boolean).join(", ") || "Ubicación compartida";
+
+  await prisma.$transaction([
+    prisma.message.create({
+      data: {
+        conversationId,
+        role: "STAFF",
+        content,
+        mediaType: "LOCATION",
+        mediaUrl: googleMapsUrl(latitude, longitude),
+        sentById: session.user.id,
+        externalId: messageId,
+      },
+    }),
+    prisma.conversation.update({
+      where: { id: conversationId },
+      data: { lastMessageAt: new Date(), botPaused: true },
+    }),
     prisma.conversation.updateMany({
       where: { id: conversationId, assignedToId: null },
       data: { assignedToId: session.user.id },

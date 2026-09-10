@@ -83,6 +83,14 @@ const inboundSchema = z.object({
                   video: mediaObjectSchema.optional(),
                   audio: mediaObjectSchema.optional(),
                   document: mediaObjectSchema.optional(),
+                  location: z
+                    .object({
+                      latitude: z.number(),
+                      longitude: z.number(),
+                      name: z.string().optional(),
+                      address: z.string().optional(),
+                    })
+                    .optional(),
                   // Presente solo si el mensaje vino de un anuncio "Click to
                   // WhatsApp" o del botón de WhatsApp de una página de
                   // Facebook (requiere atribución activada en el WABA).
@@ -162,11 +170,24 @@ export interface ParsedInboundMessage {
     mimeType?: string;
     fileName?: string;
   } | null;
+  // Ubicación compartida por el cliente — no tiene archivo que descargar (a
+  // diferencia de `media`), es solo coordenadas + nombre/dirección opcional.
+  location: {
+    latitude: number;
+    longitude: number;
+    name: string | null;
+    address: string | null;
+  } | null;
   // true si el mensaje trajo un objeto "referral" — vino de un anuncio
   // Click-to-WhatsApp o del botón de WhatsApp de una página de Facebook.
   fromAd: boolean;
   /** Detalle del anuncio (mismo dato que `fromAd`, pero con lo que se pueda mostrar). */
   adReferral: AdReferralInfo | null;
+}
+
+// Google Maps abre bien un link "?q=lat,lng" sin necesitar ninguna API key.
+export function googleMapsUrl(latitude: number, longitude: number): string {
+  return `https://www.google.com/maps?q=${latitude},${longitude}`;
 }
 
 const MEDIA_TYPES: InboundMediaType[] = ["image", "video", "audio", "document"];
@@ -225,6 +246,27 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
             messageId: message.id,
             text: message.text.body,
             media: null,
+            location: null,
+            fromAd,
+            adReferral,
+          });
+          continue;
+        }
+
+        if (message.type === "location" && message.location) {
+          results.push({
+            phoneNumberId: phone_number_id,
+            from: message.from,
+            customerName,
+            messageId: message.id,
+            text: null,
+            media: null,
+            location: {
+              latitude: message.location.latitude,
+              longitude: message.location.longitude,
+              name: message.location.name ?? null,
+              address: message.location.address ?? null,
+            },
             fromAd,
             adReferral,
           });
@@ -247,6 +289,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
                 mimeType: mediaObj.mime_type,
                 fileName: mediaObj.filename,
               },
+              location: null,
               fromAd,
               adReferral,
             });
@@ -662,6 +705,43 @@ export async function sendTextMessage(params: {
         to,
         type: "text",
         text: { body },
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`WhatsApp send failed (${res.status}): ${errorBody}`);
+  }
+
+  const data = (await res.json()) as SendMessageResponse;
+  return { messageId: data.messages?.[0]?.id ?? null };
+}
+
+export async function sendLocationMessage(params: {
+  phoneNumberId: string;
+  accessToken: string;
+  to: string;
+  latitude: number;
+  longitude: number;
+  name?: string;
+  address?: string;
+}): Promise<{ messageId: string | null }> {
+  const { phoneNumberId, accessToken, to, latitude, longitude, name, address } = params;
+
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "location",
+        location: { latitude, longitude, name, address },
       }),
     },
   );

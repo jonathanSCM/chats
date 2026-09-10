@@ -24,8 +24,13 @@ import {
   Bot as BotIcon,
   Search,
   Smile,
+  MapPin,
 } from "lucide-react";
-import { sendInboxMessageAction, sendInboxAttachmentAction } from "@/server/actions/inbox";
+import {
+  sendInboxMessageAction,
+  sendInboxAttachmentAction,
+  sendInboxLocationAction,
+} from "@/server/actions/inbox";
 import {
   deleteMessageAction,
   setConversationStatusAction,
@@ -71,7 +76,7 @@ interface ConversationSummary {
   } | null;
 }
 
-type MediaType = "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT";
+type MediaType = "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT" | "LOCATION";
 
 interface AdReferralInfo {
   sourceId: string | null;
@@ -132,6 +137,7 @@ const mediaPreviewLabel: Record<MediaType, string> = {
   VIDEO: "🎥 Video",
   AUDIO: "🎵 Audio",
   DOCUMENT: "📄 Documento",
+  LOCATION: "📍 Ubicación",
 };
 
 const EMOJI_LIST = [
@@ -309,6 +315,18 @@ function MessageMedia({ message }: { message: Message }) {
           <span className="truncate">{message.fileName ?? "Archivo"}</span>
         </a>
       );
+    case "LOCATION":
+      return (
+        <a
+          href={message.mediaUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-1.5 flex items-center gap-2 rounded-md border border-black/10 bg-black/5 px-3 py-2 text-sm hover:bg-black/10"
+        >
+          <MapPin size={18} className="shrink-0" />
+          <span>Abrir en Google Maps</span>
+        </a>
+      );
     default:
       return null;
   }
@@ -402,6 +420,7 @@ export function InboxClient({
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendingLocation, setSendingLocation] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [height, setHeight] = useState<number | null>(null);
@@ -758,6 +777,59 @@ export function InboxClient({
     }
 
     setSending(false);
+  }
+
+  // Toma la ubicación actual del navegador (sin necesitar ninguna API key de
+  // mapas) y la manda como mensaje de ubicación de WhatsApp. El cliente la ve
+  // en su chat con un pin, y puede tocarla para abrirla en Google Maps.
+  async function handleSendLocation() {
+    if (!selectedId || sendingLocation) return;
+    if (!navigator.geolocation) {
+      setError("Este navegador no admite compartir ubicación.");
+      return;
+    }
+
+    setSendingLocation(true);
+    setError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        const conversationId = selectedId;
+
+        const optimistic: Message = {
+          id: `optimistic-${Date.now()}`,
+          role: "STAFF",
+          content: "Ubicación compartida",
+          createdAt: new Date().toISOString(),
+          mediaUrl: `https://www.google.com/maps?q=${latitude},${longitude}`,
+          mediaType: "LOCATION",
+          mediaStatus: null,
+          mimeType: null,
+          fileName: null,
+          viaPhoneApp: false,
+          isHistorical: false,
+          sentBy: null,
+          status: "SENT",
+          errorDetail: null,
+        };
+        setMessages((prev) => [...prev, optimistic]);
+
+        const result = await sendInboxLocationAction(conversationId, { latitude, longitude });
+        if (result.error) {
+          setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+          setError(result.error);
+        }
+        await fetchMessages(conversationId);
+        await fetchConversations();
+        setSendingLocation(false);
+      },
+      () => {
+        setError("No se pudo obtener tu ubicación — revisa los permisos del navegador.");
+        setSendingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10_000 },
+    );
   }
 
   // Cierra el selector de emojis al tocar afuera — mismo patrón que
@@ -1430,6 +1502,18 @@ export function InboxClient({
                     title="Adjuntar archivo"
                   >
                     <Paperclip size={19} />
+                  </button>
+                  <button
+                    onClick={handleSendLocation}
+                    disabled={sendingLocation}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface disabled:opacity-50"
+                    title="Compartir tu ubicación"
+                  >
+                    {sendingLocation ? (
+                      <Loader2 size={19} className="animate-spin" />
+                    ) : (
+                      <MapPin size={19} />
+                    )}
                   </button>
                   <button
                     onClick={() => setEmojiPickerOpen((v) => !v)}

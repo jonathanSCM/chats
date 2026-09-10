@@ -457,6 +457,10 @@ enum MediaType {
   VIDEO
   AUDIO
   DOCUMENT
+  // No es un archivo descargado de Meta: mediaUrl guarda directo el link de
+  // Google Maps (ver googleMapsUrl en services/whatsapp.ts), así que nunca
+  // pasa por mediaStatus/el job de descarga.
+  LOCATION
 }
 
 enum MediaStatus {

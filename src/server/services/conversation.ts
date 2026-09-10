@@ -8,6 +8,7 @@ import type {
   ParsedStatusUpdate,
   AdReferralInfo,
 } from "@/server/services/whatsapp";
+import { googleMapsUrl } from "@/server/services/whatsapp";
 import { notifyNewMessage } from "@/server/services/push";
 import { enqueue, enqueueOrReschedule, runJobsSoon } from "@/server/jobs";
 import { decrypt } from "@/lib/crypto";
@@ -43,6 +44,10 @@ const MEDIA_TYPE_MAP = {
   audio: "AUDIO",
   document: "DOCUMENT",
 } as const;
+
+function locationLabel(location: { name: string | null; address: string | null }): string {
+  return [location.name, location.address].filter(Boolean).join(", ") || "Ubicación compartida";
+}
 
 // Este proyecto es una bandeja de conversaciones humana: no hay bots ni
 // respuestas automáticas. Cada mensaje entrante (texto o media) se guarda
@@ -81,9 +86,16 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
       data: {
         conversationId,
         role: "CUSTOMER",
-        content: inbound.text ?? "",
-        mediaType: inbound.media ? MEDIA_TYPE_MAP[inbound.media.type] : null,
+        content: inbound.location ? locationLabel(inbound.location) : inbound.text ?? "",
+        mediaType: inbound.location
+          ? "LOCATION"
+          : inbound.media
+            ? MEDIA_TYPE_MAP[inbound.media.type]
+            : null,
+        // La ubicación no descarga nada de Meta -- mediaUrl ya queda con el
+        // link final de Google Maps, así que nunca pasa por "PENDING".
         mediaStatus: inbound.media ? "PENDING" : null,
+        mediaUrl: inbound.location ? googleMapsUrl(inbound.location.latitude, inbound.location.longitude) : null,
         mimeType: inbound.media?.mimeType ?? null,
         fileName: inbound.media?.fileName ?? null,
         externalId: inbound.messageId,

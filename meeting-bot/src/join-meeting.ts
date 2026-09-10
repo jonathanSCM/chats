@@ -1,12 +1,17 @@
 import { chromium, type Page } from "playwright";
 import path from "node:path";
-import { mkdir, writeFile } from "node:fs/promises";
+import os from "node:os";
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile, cp, rm } from "node:fs/promises";
 import { startRecording } from "./record-audio";
 import { uploadRecording, notifyFailure, notifyRecording, notifyTranscribing } from "./upload-recording";
 import { enableCaptions, startCapturingCaptions, type CaptionsCapture } from "./captions";
 import { transcribeWithWhisperCpp } from "./transcribe-audio";
 
 const PROFILE_DIR = process.env.CHROME_PROFILE_DIR || "/data/chrome-profile";
+// Carpeta descartable por reunión — ver `acquireSessionProfile` más abajo.
+const SESSION_PROFILES_DIR =
+  process.env.CHROME_SESSION_PROFILES_DIR || path.join(os.tmpdir(), "chrome-profile-sessions");
 // Capturas y volcados de accesibilidad en los pasos clave — útiles mientras
 // se ajustan los selectores de Meet (lo más frágil de todo esto), pero se
 // acumulan en el disco del contenedor en cada reunión — apagados por
@@ -44,18 +49,29 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
   // (ver README — "Primer login" — se hace una sola vez a mano con
   // `npm run login`). Sin esto, cada reunión pediría loguearse de cero.
   //
-  // Si esto falla (ej. el perfil sigue "en uso" porque una reunión anterior
-  // no lo soltó a tiempo — un solo perfil no admite dos instancias de Chrome
-  // al mismo tiempo), hay que avisarle a la app principal: si no, el error
-  // queda solo en este log y `botStatus` se pega en "JOINING" para siempre.
+  // Chrome bloquea un perfil persistente para UN solo proceso a la vez. Antes
+  // se lanzaba directo contra PROFILE_DIR, así que si dos reuniones distintas
+  // se solapaban (una se alarga más de lo agendado, o se usa "unirse al
+  // instante" mientras otra sigue en curso — nada en server.ts lo impide,
+  // solo evita duplicar la MISMA reunión) la segunda fallaba de una con
+  // "Opening in existing browser session" y esa reunión se perdía por
+  // completo, sin grabar nada. Pasó de verdad en producción.
+  //
+  // Por eso cada reunión clona el perfil base (con la sesión de Google ya
+  // adentro) a una carpeta descartable propia antes de lanzar el navegador:
+  // varias reuniones pueden correr en paralelo sin pisarse el lock. Al
+  // terminar, se copia de vuelta el estado del perfil (por si Google refrescó
+  // cookies durante la reunión) y se borra la carpeta temporal.
+  const sessionProfileDir = await acquireSessionProfile(meetingId);
   let context;
   try {
-    context = await chromium.launchPersistentContext(PROFILE_DIR, {
+    context = await chromium.launchPersistentContext(sessionProfileDir, {
       headless: false, // corre bajo Xvfb (pantalla virtual, ver entrypoint.sh) — no hay pantalla física, pero Meet bloquea el modo headless "de verdad"
       args: ["--use-fake-ui-for-media-stream", "--disable-blink-features=AutomationControlled"],
       permissions: ["camera", "microphone"],
     });
   } catch (error) {
+    await releaseSessionProfile(sessionProfileDir);
     await notifyFailure(callbackUrl, meetingId, `No se pudo abrir el navegador: ${error}`);
     return;
   }
@@ -96,6 +112,7 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
     if (page) await debugScreenshot(page, meetingId, "03-error");
     if (stopRecordingFn) await stopRecordingFn().catch(() => {});
     await context.close().catch(() => {});
+    await releaseSessionProfile(sessionProfileDir);
     await notifyFailure(callbackUrl, meetingId, error instanceof Error ? error.message : String(error));
     return;
   }
@@ -103,6 +120,7 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
   const captionsTranscript = captions?.stop() ?? "";
   if (stopRecordingFn) await stopRecordingFn();
   await context.close().catch(() => {});
+  await releaseSessionProfile(sessionProfileDir);
 
   // Complemento gratis y local a los subtítulos en vivo: cubre los huecos
   // que estos puedan tener (no se activaron a tiempo, Meet los perdió en
@@ -122,6 +140,40 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
   } catch (error) {
     await notifyFailure(callbackUrl, meetingId, `No se pudo subir la grabación: ${error}`);
   }
+}
+
+/**
+ * Clona el perfil base de Chrome (login de Google ya hecho) a una carpeta
+ * descartable única para esta reunión, así el lock de Chrome nunca lo
+ * comparten dos reuniones en paralelo. Si el perfil base todavía no existe
+ * (primera vez, antes de correr `npm run login`), Playwright lo crea vacío
+ * en esa misma carpeta temporal — se comporta igual que antes, solo que sin
+ * sesión logueada.
+ */
+async function acquireSessionProfile(meetingId: string): Promise<string> {
+  const sessionDir = path.join(SESSION_PROFILES_DIR, `${meetingId}-${randomUUID()}`);
+  await mkdir(SESSION_PROFILES_DIR, { recursive: true });
+  await cp(PROFILE_DIR, sessionDir, { recursive: true }).catch(() => {
+    // No existe el perfil base todavía — Playwright lo crea de cero.
+  });
+  return sessionDir;
+}
+
+/**
+ * Copia de vuelta el estado del perfil al perfil base (por si Google
+ * refrescó cookies/tokens durante la reunión, para que el próximo clon
+ * arranque con la sesión más fresca posible) y borra la carpeta temporal.
+ * Todo best-effort: si el copiado de vuelta falla (por ejemplo, dos
+ * reuniones terminando casi al mismo tiempo y pisándose la escritura), la
+ * sesión logueada base sigue siendo válida igual, solo un poco más vieja —
+ * no rompe nada, en el peor caso alguien tiene que volver a correr
+ * `npm run login` un poco antes de lo que hubiera hecho falta.
+ */
+async function releaseSessionProfile(sessionDir: string): Promise<void> {
+  await cp(sessionDir, PROFILE_DIR, { recursive: true }).catch((error) => {
+    console.warn(`[meeting-bot] No se pudo sincronizar el perfil de vuelta a ${PROFILE_DIR}:`, error);
+  });
+  await rm(sessionDir, { recursive: true, force: true }).catch(() => {});
 }
 
 /**
@@ -165,17 +217,21 @@ async function joinMeeting(page: Page, signal: AbortSignal): Promise<void> {
 
 /**
  * Si entró pidiendo permiso ("Solicitar unirse"), queda en una sala de
- * espera hasta que alguien de la reunión lo admita — hasta 5 minutos. Si
- * nadie lo admite, tira un error a propósito (en vez de seguir el flujo
- * igual): sin esto, seguía adelante grabando ~45 minutos de nada, y el
- * navegador quedaba abierto todo ese tiempo bloqueando el perfil para la
- * próxima reunión que quisiera usarlo. También corta si alguien pide
- * `/stop` mientras todavía está esperando que lo admitan.
+ * espera hasta que alguien de la reunión lo admita — hasta 10 minutos (antes
+ * eran 5; en reuniones ad-hoc donde el bot entra como invitado, 5 minutos se
+ * quedaba corto varias veces en producción). Si nadie lo admite, tira un
+ * error a propósito (en vez de seguir el flujo igual): sin esto, seguía
+ * adelante grabando ~45 minutos de nada con el navegador abierto sin
+ * necesidad. Ahora que cada reunión tiene su propia carpeta de perfil (ver
+ * `acquireSessionProfile`), esperar más acá ya no bloquea a otras reuniones
+ * como antes — el límite de 10 minutos es solo para no desperdiciar el
+ * intento si nadie lo va a admitir. También corta si alguien pide `/stop`
+ * mientras todavía está esperando que lo admitan.
  */
 async function waitForAdmission(page: Page, signal: AbortSignal): Promise<void> {
   const inCallIndicator = page.getByRole("button", { name: /personas|people/i }).first();
   await Promise.race([
-    inCallIndicator.waitFor({ timeout: 5 * 60_000 }),
+    inCallIndicator.waitFor({ timeout: 10 * 60_000 }),
     abortPromise(signal, "Se pidió detener el bot mientras esperaba que lo admitieran."),
   ]);
   console.log("[meeting-bot] Ya está adentro de la reunión.");

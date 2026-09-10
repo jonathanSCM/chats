@@ -240,18 +240,26 @@ async function findOrCreateConversation(
       ? { ...adReferral, ...((await resolveAdInfo(adReferral.sourceId, accessToken)) ?? {}) }
       : adReferral;
 
+  // Un mismo contacto es SIEMPRE el mismo chat en la bandeja, sin importar
+  // cuánto tiempo pase entre mensajes -- igual que WhatsApp de verdad. Antes
+  // esto se cortaba a las 24h (CONVERSATION_WINDOW_MS), heredado de cuando
+  // `Conversation` representaba una unidad de facturación de la plataforma
+  // SaaS original, no un hilo de chat. El resultado real en producción: si
+  // un cliente volvía a escribir después de más de un día, se le creaba una
+  // conversación NUEVA y separada, duplicando el chat en la lista. La
+  // ventana de 24h de WhatsApp para poder mandar texto libre (vs. necesitar
+  // plantilla) es un chequeo aparte, sin relación con esto -- se calcula en
+  // api/inbox/conversations/[id]/messages/route.ts a partir del último
+  // mensaje del cliente, no de esta función.
   const existing = await prisma.conversation.findFirst({
     where: { botId, customerPhone },
     orderBy: { lastMessageAt: "desc" },
   });
 
-  const withinWindow =
-    existing && Date.now() - existing.lastMessageAt.getTime() < CONVERSATION_WINDOW_MS;
-
-  if (withinWindow) {
+  if (existing) {
     // El perfil de WhatsApp puede cambiar de nombre; se refresca si vino uno nuevo.
     // Si todavía no se había marcado como venida de un anuncio y este
-    // mensaje sí trae el "referral", se marca ahora (mismo hilo de 24h).
+    // mensaje sí trae el "referral", se marca ahora.
     if (
       (customerName && customerName !== existing.customerName) ||
       (fromAd && !existing.adReferral)

@@ -21,17 +21,39 @@ const bodySchema = z.object({
   token: z.string().optional(),
 });
 
+// El content script de la extensión corre pegado al origen de la propia
+// página de Meet (no al del chrome-extension://), así que el fetch() sale
+// como si lo hiciera "https://meet.google.com" -- sujeto a CORS normal,
+// aunque el manifest declare host_permissions (eso solo habilita leer la
+// respuesta cross-origin, no exime del preflight). Sin estos headers, el
+// navegador bloqueaba el POST antes de que llegara acá: confirmado en la
+// consola real de un vendedor ("blocked by CORS policy... No
+// 'Access-Control-Allow-Origin' header"). sendBeacon (la red de seguridad
+// de cierre de pestaña) no lo necesita porque nunca lee la respuesta.
+const ALLOWED_ORIGIN = "https://meet.google.com";
+
+function withCors(res: NextResponse): NextResponse {
+  res.headers.set("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+  res.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  return res;
+}
+
+export function OPTIONS(): NextResponse {
+  return withCors(new NextResponse(null, { status: 204 }));
+}
+
 export async function POST(req: NextRequest) {
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return new NextResponse("Datos inválidos", { status: 400 });
+    return withCors(new NextResponse("Datos inválidos", { status: 400 }));
   }
   const { meetingUrl, transcript } = parsed.data;
 
   const token =
     req.headers.get("authorization")?.replace("Bearer ", "").trim() || parsed.data.token;
   if (!token) {
-    return new NextResponse("Unauthorized", { status: 401 });
+    return withCors(new NextResponse("Unauthorized", { status: 401 }));
   }
 
   const org = await prisma.organization.findUnique({
@@ -39,7 +61,7 @@ export async function POST(req: NextRequest) {
     select: { id: true },
   });
   if (!org) {
-    return new NextResponse("Unauthorized", { status: 401 });
+    return withCors(new NextResponse("Unauthorized", { status: 401 }));
   }
 
   // Si la reunión ya estaba agendada en el sistema (con ese mismo link), se
@@ -92,5 +114,5 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ ok: true, meetingId: meeting.id });
+  return withCors(NextResponse.json({ ok: true, meetingId: meeting.id }));
 }

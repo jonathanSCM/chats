@@ -528,21 +528,34 @@ const historySchema = z.object({
                       progress: z.union([z.string(), z.number()]).optional(),
                     })
                     .optional(),
-                  threads: z.array(
-                    z.object({
-                      id: z.string(), // número del cliente
-                      messages: z.array(
-                        z.object({
-                          from: z.string(),
-                          to: z.string().optional(),
-                          id: z.string(),
-                          timestamp: z.string(),
-                          type: z.string(),
-                          text: z.object({ body: z.string() }).optional(),
-                        }),
-                      ),
-                    }),
-                  ),
+                  threads: z
+                    .array(
+                      z.object({
+                        id: z.string(), // número del cliente
+                        messages: z.array(
+                          z.object({
+                            from: z.string(),
+                            to: z.string().optional(),
+                            id: z.string(),
+                            timestamp: z.string(),
+                            type: z.string(),
+                            text: z.object({ body: z.string() }).optional(),
+                          }),
+                        ),
+                      }),
+                    )
+                    .optional(),
+                  // Si el negocio no compartió su historial desde la app de
+                  // WhatsApp Business, este chunk no trae "threads" -- trae
+                  // esto en su lugar (código 2593109 documentado por Meta).
+                  errors: z
+                    .array(
+                      z.object({
+                        code: z.number().optional(),
+                        title: z.string().optional(),
+                      }),
+                    )
+                    .optional(),
                 }),
               )
               .optional(),
@@ -575,15 +588,26 @@ export interface ParsedHistoryBatch {
    * siempre.
    */
   completedPhoneNumberId: string | null;
+  /**
+   * phone_number_id de un chunk que llegó como error en vez de contenido —
+   * el más común es 2593109 ("History sync is turned off by the business
+   * from the WhatsApp Business App"), pero se marca igual ante cualquier
+   * error acá: sea cual sea el motivo, no va a llegar historial para esta
+   * conexión y hay que avisarlo en vez de dejarlo pegado en "Importando...".
+   */
+  declinedPhoneNumberId: string | null;
 }
 
 export function parseHistoryPayload(payload: unknown): ParsedHistoryBatch {
   const parsed = historySchema.safeParse(payload);
-  if (!parsed.success) return { messages: [], isComplete: false, completedPhoneNumberId: null };
+  if (!parsed.success) {
+    return { messages: [], isComplete: false, completedPhoneNumberId: null, declinedPhoneNumberId: null };
+  }
 
   const messages: ParsedHistoryMessage[] = [];
   let isComplete = false;
   let completedPhoneNumberId: string | null = null;
+  let declinedPhoneNumberId: string | null = null;
 
   for (const entry of parsed.data.entry) {
     for (const change of entry.changes) {
@@ -591,12 +615,17 @@ export function parseHistoryPayload(payload: unknown): ParsedHistoryBatch {
       const { phone_number_id, display_phone_number } = change.value.metadata;
 
       for (const chunk of change.value.history ?? []) {
+        if (chunk.errors && chunk.errors.length > 0) {
+          declinedPhoneNumberId = phone_number_id;
+          continue;
+        }
+
         if (chunk.metadata?.phase === "complete") {
           isComplete = true;
           completedPhoneNumberId = phone_number_id;
         }
 
-        for (const thread of chunk.threads) {
+        for (const thread of chunk.threads ?? []) {
           for (const message of thread.messages) {
             if (message.type !== "text" || !message.text?.body) continue;
             messages.push({
@@ -614,7 +643,7 @@ export function parseHistoryPayload(payload: unknown): ParsedHistoryBatch {
     }
   }
 
-  return { messages, isComplete, completedPhoneNumberId };
+  return { messages, isComplete, completedPhoneNumberId, declinedPhoneNumberId };
 }
 
 // ─── Coexistence: sincronización de contactos del negocio ───────────────

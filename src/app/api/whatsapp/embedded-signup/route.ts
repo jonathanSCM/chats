@@ -11,6 +11,16 @@ import {
   getWabaPhoneNumbers,
   initiateSmbAppDataSync,
 } from "@/server/services/whatsapp";
+import { enqueueOrReschedule } from "@/server/jobs";
+
+// El "compartir tus chats" que confirma la pantalla del celular es un paso
+// async del lado del celular (mensaje de "Cuenta de Facebook Empresas" +
+// confirmación) que puede tardar más que este request web. Pedir el
+// historial recién a los pocos minutos, no al instante, evita pedirlo antes
+// de que esa confirmación llegue -- Meta solo deja pedirlo una vez por
+// conexión, así que si se pide demasiado pronto no hay forma de reintentar
+// sin desconectar y reconectar todo de cero (confirmado en producción).
+const HISTORY_SYNC_DELAY_MS = 3 * 60_000;
 
 const bodySchema = z.object({
   code: z.string().min(1),
@@ -81,7 +91,7 @@ export async function POST(req: NextRequest) {
       subscribeAppToWaba({ wabaId: body.wabaId, accessToken }),
     ]);
 
-    await prisma.whatsAppConnection.upsert({
+    const connection = await prisma.whatsAppConnection.upsert({
       where: { botId: body.botId },
       create: {
         botId: body.botId,
@@ -106,16 +116,27 @@ export async function POST(req: NextRequest) {
 
     // Sin esto, Meta nunca manda los webhooks de contactos/historial, sin
     // importar que la app esté suscrita a esos campos -- hay que pedirlos
-    // explícitamente, una sola vez, dentro de las primeras 24h de conectar
-    // (doc de Coexistence). Mejor esfuerzo: si falla, la conexión ya quedó
-    // guardada igual -- se puede reintentar más adelante sin tener que
-    // rehacer todo el Embedded Signup.
+    // explícitamente, dentro de las primeras 24h de conectar (doc de
+    // Coexistence). Contactos se pide ya mismo (no depende de ninguna
+    // confirmación del celular); el historial se encola con demora -- ver
+    // el comentario de HISTORY_SYNC_DELAY_MS más arriba.
     try {
       await initiateSmbAppDataSync({ phoneNumberId, accessToken, syncType: "smb_app_state_sync" });
-      await initiateSmbAppDataSync({ phoneNumberId, accessToken, syncType: "history" });
     } catch (error) {
-      console.error("[embedded-signup] No se pudo iniciar la sincronización de Coexistence:", error);
+      console.error("[embedded-signup] No se pudo iniciar la sincronización de contactos:", error);
     }
+
+    // enqueueOrReschedule (no enqueue) a propósito: si esto es una
+    // reconexión (mismo botId, mismo connection.id que un intento previo),
+    // tiene que volver a correr sí o sí -- enqueue() se callaría en
+    // silencio por el uniqueKey duplicado, dejando el reintento sin pedir
+    // nada nuevo.
+    await enqueueOrReschedule({
+      type: "coexistence_history_sync",
+      uniqueKey: `coexistence_history_sync:${connection.id}`,
+      payload: { connectionId: connection.id },
+      runAfter: new Date(Date.now() + HISTORY_SYNC_DELAY_MS),
+    });
 
     return NextResponse.json({ error: null });
   } catch (error) {

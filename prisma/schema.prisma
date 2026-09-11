@@ -217,6 +217,11 @@ enum HistorySyncStatus {
   NONE // no aplica (conexión sin coexistence) o todavía no llegó nada
   PENDING // coexistence conectado, esperando el webhook "history" de Meta
   COMPLETE // historial ya importado
+  // El negocio no compartió su historial en la app de WhatsApp Business (o
+  // llegó el webhook de error 2593109 por cualquier otro motivo). Antes esto
+  // se descartaba en silencio y el estado quedaba pegado en PENDING para
+  // siempre, sin avisarle a nadie que había que reconectar para reintentar.
+  DECLINED
 }
 
 // ─── Base de conocimiento ───────────────────────────────────────

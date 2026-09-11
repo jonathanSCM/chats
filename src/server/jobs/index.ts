@@ -4,6 +4,7 @@ import { handleAnalyzeFollowUp } from "./handlers/analyze-follow-up";
 import { handleBotReply } from "./handlers/bot-reply";
 import { handleMeetingBotJoin, markMeetingBotJoinFailed } from "./handlers/meeting-bot-join";
 import { handleCleanupMeetingMedia } from "./handlers/cleanup-meeting-media";
+import { handleCoexistenceHistorySync } from "./handlers/coexistence-history-sync";
 import { markBotReplyFailed } from "@/server/services/ai/qualification-bot";
 
 export { enqueue, enqueueOrReschedule, cancelJob } from "./queue";
@@ -19,6 +20,7 @@ const handlers: Record<string, JobHandler> = {
   bot_reply: handleBotReply,
   meeting_bot_join: handleMeetingBotJoin,
   cleanup_meeting_media: handleCleanupMeetingMedia,
+  coexistence_history_sync: handleCoexistenceHistorySync,
 };
 
 const onExhausted: Record<string, JobExhaustedHandler> = {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { CheckCircle2, CircleDashed, Lock, Smartphone, Clock } from "lucide-react";
+import { CheckCircle2, CircleDashed, Lock, Smartphone, Clock, AlertTriangle } from "lucide-react";
 import { connectWhatsAppAction } from "@/server/actions/whatsapp-connection";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -22,7 +22,7 @@ export function WhatsAppTab({
     verified: boolean;
     displayNumber?: string | null;
     coexistence?: boolean;
-    historySyncStatus?: "NONE" | "PENDING" | "COMPLETE";
+    historySyncStatus?: "NONE" | "PENDING" | "COMPLETE" | "DECLINED";
   } | null;
   readOnly?: boolean;
 }) {
@@ -55,6 +55,13 @@ export function WhatsAppTab({
             <p className="mt-1 flex items-center gap-1.5 text-xs text-warning">
               <Clock size={12} /> Importando historial de conversaciones previas… puede tardar
               varios minutos.
+            </p>
+          )}
+          {connection?.coexistence && connection.historySyncStatus === "DECLINED" && (
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-danger">
+              <AlertTriangle size={12} /> No se pudo importar el historial (el negocio no lo
+              compartió, o llegó demasiado pronto). Para reintentarlo: desconectá la cuenta desde
+              la app de WhatsApp Business del celular y volvé a conectar acá.
             </p>
           )}
         </div>

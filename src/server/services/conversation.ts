@@ -423,6 +423,13 @@ export async function handleHistoryImport(batch: ParsedHistoryBatch): Promise<vo
       data: { historySyncStatus: "COMPLETE" },
     });
   }
+
+  if (batch.declinedPhoneNumberId) {
+    await prisma.whatsAppConnection.updateMany({
+      where: { phoneNumberId: batch.declinedPhoneNumberId },
+      data: { historySyncStatus: "DECLINED" },
+    });
+  }
 }
 
 // ─── Confirmaciones de entrega/lectura de mensajes salientes ────────────

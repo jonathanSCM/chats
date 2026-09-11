@@ -19,7 +19,7 @@ interface Connection {
   verified: boolean;
   displayNumber?: string | null;
   coexistence?: boolean;
-  historySyncStatus?: "NONE" | "PENDING" | "COMPLETE";
+  historySyncStatus?: "NONE" | "PENDING" | "COMPLETE" | "DECLINED";
 }
 
 export function BotAccountCard({

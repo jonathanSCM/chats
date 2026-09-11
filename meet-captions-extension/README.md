@@ -22,8 +22,27 @@ audio real.
 Si no se toca "Grabar esta reunión", esa pestaña de Meet no manda absolutamente nada al CRM.
 
 Si el link de la reunión ya estaba agendado en el CRM, la transcripción se suma a esa reunión.
-Si no, se crea una nueva reunión "(extensión de subtítulos)" — igual que hace "Unir el bot ya
-mismo" con llamadas en vivo sin agendar.
+Si no, se crea una nueva reunión **"Reunión Extensión"** — igual que hace "Unir el bot ya mismo"
+con llamadas en vivo sin agendar, pero con un nombre distinto para que se distinga de un vistazo.
+
+## Audio real (para whisper.cpp) — opcional, además de los subtítulos
+
+Al tocar "Grabar esta reunión" también se intenta grabar el audio real (lo que dicen los demás
+participantes, capturado con `chrome.tabCapture`, mezclado con tu propio micrófono) y mandarlo a
+whisper.cpp -- reutiliza el mismo whisper.cpp que ya corre en `meeting-bot/`, no lo duplica. Es
+**best-effort**: si el audio falla por lo que sea, los subtítulos de arriba siguen funcionando
+igual, no se cae toda la grabación por esto.
+
+**Paso único antes de la primera vez**: abrí el ícono de la extensión → "Activar micrófono (una
+sola vez)". Chrome tiene que pedir permiso de micrófono desde acá porque la grabación de audio en
+sí corre en una página invisible de la extensión (un "offscreen document") que no puede mostrar
+ese diálogo. Sin este paso, igual se graba el audio, pero solo se escucha lo que dicen los demás,
+no tu propia voz.
+
+El audio se sube como adjunto a la reunión (`grabacion-extension.webm`) y, si whisper.cpp pudo
+transcribirlo, también queda como `audioTranscript` (con su .txt aparte) — la misma distinción que
+ya existe para el bot grabador: `transcript` (subtítulos, con nombre de quién habló) y
+`audioTranscript` (whisper, sin nombres, tapa los huecos que los subtítulos puedan tener).
 
 ## Instalación (uso interno, sin publicar en la Chrome Web Store)
 

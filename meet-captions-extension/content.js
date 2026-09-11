@@ -186,6 +186,10 @@
         if (consecutiveEndSignals >= 2) {
           if (pending) recordIfNew(pending.name, pending.text);
           void sendTranscript("fin de reunión detectado");
+          // Sin efecto si nunca se activó el audio en esta reunión (el
+          // offscreen document, si existe, revisa que haya algo grabando
+          // antes de hacer nada).
+          chrome.runtime.sendMessage({ type: "STOP_AUDIO_CAPTURE" });
         }
       } else {
         consecutiveEndSignals = 0;
@@ -199,6 +203,7 @@
   // que acá el token viaja en el body en vez de en Authorization (el
   // endpoint acepta las dos formas).
   window.addEventListener("pagehide", () => {
+    chrome.runtime.sendMessage({ type: "STOP_AUDIO_CAPTURE" });
     if (!started || sent) return;
     const transcript = currentTranscript().trim();
     if (transcript.length < 40) return;

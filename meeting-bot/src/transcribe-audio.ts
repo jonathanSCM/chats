@@ -13,8 +13,16 @@ const WHISPER_MODEL_PATH = process.env.WHISPER_MODEL_PATH || "/opt/whisper-model
  * algún tramo.
  */
 export async function transcribeWithWhisperCpp(mp3Path: string): Promise<string> {
-  const wavPath = mp3Path.replace(/\.mp3$/, ".wav");
-  await convertToWav(mp3Path, wavPath);
+  return transcribeAudioFile(mp3Path);
+}
+
+// Misma lógica que transcribeWithWhisperCpp, pero sin asumir la extensión
+// ".mp3" -- la usa el endpoint /transcribe (audio que manda la extensión de
+// subtítulos de Meet, que graba en webm/opus, no mp3). ffmpeg detecta el
+// formato solo con -i, así que basta con no asumir la extensión de entrada.
+export async function transcribeAudioFile(inputPath: string): Promise<string> {
+  const wavPath = inputPath.replace(/\.[^./\\]+$/, ".wav");
+  await convertToWav(inputPath, wavPath);
 
   try {
     return (await runWhisperCpp(wavPath)).trim();

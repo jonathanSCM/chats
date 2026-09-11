@@ -99,3 +99,37 @@ export async function stopMeetingBot(meetingId: string): Promise<{ ok: boolean; 
     return { ok: false, error: error instanceof Error ? error.message : "No se pudo contactar al servicio del bot." };
   }
 }
+
+/**
+ * Transcribe un audio suelto con whisper.cpp -- reutiliza el mismo servicio
+ * del bot grabador (ya tiene el binario y el modelo instalados) en vez de
+ * duplicarlos en la imagen de esta app. La usa api/extension/audio para el
+ * audio que graba la extensión de subtítulos de Meet en el navegador
+ * (tabCapture + micrófono), que no tiene nada que ver con que el bot entre a
+ * ninguna reunión.
+ */
+export async function transcribeAudioViaBotService(
+  buffer: Buffer,
+  mimeType: string,
+): Promise<{ ok: true; transcript: string } | { ok: false; error: string }> {
+  const url = process.env.BOT_SERVICE_URL;
+  const secret = process.env.BOT_SERVICE_SECRET;
+  if (!url || !secret) {
+    return { ok: false, error: "El servicio del bot no está configurado en el servidor." };
+  }
+
+  try {
+    const response = await fetch(`${url}/transcribe`, {
+      method: "POST",
+      headers: { "Content-Type": mimeType, Authorization: `Bearer ${secret}` },
+      body: new Uint8Array(buffer),
+    });
+    const data = (await response.json().catch(() => null)) as { transcript?: string; error?: string } | null;
+    if (!response.ok || !data?.transcript) {
+      return { ok: false, error: data?.error || `El servicio del bot respondió ${response.status}.` };
+    }
+    return { ok: true, transcript: data.transcript };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "No se pudo contactar al servicio del bot." };
+  }
+}

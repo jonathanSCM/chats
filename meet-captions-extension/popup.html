@@ -51,6 +51,12 @@
       button.record {
         background: #dc2626;
       }
+      button.secondary {
+        background: #ffffff;
+        color: #111827;
+        border: 1px solid #d1d5db;
+        margin-top: 8px;
+      }
       button:disabled {
         opacity: 0.5;
         cursor: default;
@@ -104,6 +110,14 @@
       Generá el token en chats.proshop.lat → Organización → "Extensión de subtítulos para Meet" y
       pegalo acá una sola vez. Después, en cada reunión que quieras grabar, abrí este ícono y
       tocá "Grabar esta reunión" — si no lo activás, no se manda nada.
+    </p>
+
+    <button id="micBtn" class="secondary">Activar micrófono (una sola vez)</button>
+    <div id="micStatus"></div>
+    <p class="help">
+      Sin este paso, la grabación de audio solo capta lo que dicen los demás, no tu propia voz —
+      Chrome tiene que pedirte el permiso de micrófono una vez desde acá (no se puede pedir
+      durante la reunión).
     </p>
     <script src="popup.js"></script>
   </body>

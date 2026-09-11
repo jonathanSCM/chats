@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
+import { resolveExtensionMeeting } from "@/server/services/extension-meeting";
 
 /**
  * Recibe la transcripción de subtítulos que manda la extensión de Chrome
@@ -64,42 +65,18 @@ export async function POST(req: NextRequest) {
     return withCors(new NextResponse("Unauthorized", { status: 401 }));
   }
 
-  // Si la reunión ya estaba agendada en el sistema (con ese mismo link), se
-  // suma la transcripción ahí -- la más reciente agendada con esa URL, por
-  // si el link de una sala se reutiliza en reuniones distintas con el
-  // tiempo. Si no hay ninguna, es una llamada que nunca se agendó acá
-  // (alguien la abrió directo desde Meet) y se crea una nueva, igual que
-  // hace "Unir el bot ya mismo" con reuniones en vivo sin agendar.
-  const existing = await prisma.meeting.findFirst({
-    where: { organizationId: org.id, meetingUrl, status: { not: "CANCELED" } },
-    orderBy: { scheduledAt: "desc" },
-  });
+  const resolved = await resolveExtensionMeeting({ organizationId: org.id, meetingUrl });
 
-  const meeting = existing
-    ? await prisma.meeting.update({
-        where: { id: existing.id },
-        data: {
-          // No se pisa una transcripción que ya tenga contenido (por ej. si
-          // el bot grabador también corrió en esta misma reunión) -- se
-          // concatena en vez de perder una de las dos fuentes.
-          transcript: existing.transcript ? `${existing.transcript}\n\n${transcript}` : transcript,
-        },
-        select: { id: true },
-      })
-    : await prisma.meeting.create({
-        data: {
-          organizationId: org.id,
-          opportunityId: null,
-          title: "Reunión (extensión de subtítulos)",
-          scheduledAt: new Date(),
-          durationMinutes: 30,
-          meetingUrl,
-          status: "DONE",
-          botEnabled: false,
-          transcript,
-        },
-        select: { id: true },
-      });
+  // No se pisa una transcripción que ya tenga contenido (por ej. si el bot
+  // grabador también corrió en esta misma reunión) -- se concatena en vez
+  // de perder una de las dos fuentes.
+  const meeting = await prisma.meeting.update({
+    where: { id: resolved.id },
+    data: {
+      transcript: resolved.transcript ? `${resolved.transcript}\n\n${transcript}` : transcript,
+    },
+    select: { id: true },
+  });
 
   // Mismo patrón que el webhook del bot grabador: además de guardar el texto
   // en la fila, queda como adjunto .txt descargable.

@@ -34,6 +34,12 @@ model Organization {
   // Se crea recién la primera vez que hace falta (ver getOrCreateOrgCalendar).
   googleCalendarId     String?
   googleCalendarShares String[] @default([]) // correos con los que está compartido (solo lectura)
+  // Token opaco (no cifrado, mismo criterio que CRON_SECRET/BOT_SERVICE_SECRET
+  // — un secreto de portador, no un dato personal) que la extensión de Chrome
+  // de subtítulos pega en su config para autenticarse contra
+  // api/extension/transcript. Se genera desde /dashboard/organization; null
+  // hasta que alguien lo pide por primera vez.
+  meetExtensionToken   String?  @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

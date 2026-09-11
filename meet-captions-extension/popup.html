@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>ProShop CRM — Subtítulos de Meet</title>
+    <style>
+      body {
+        width: 280px;
+        font: 13px/1.4 system-ui, sans-serif;
+        padding: 14px;
+        color: #111827;
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 10px;
+      }
+      label {
+        display: block;
+        font-size: 11px;
+        color: #6b7280;
+        margin-bottom: 4px;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px 8px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 12px;
+        margin-bottom: 10px;
+      }
+      button {
+        width: 100%;
+        padding: 7px;
+        border: 0;
+        border-radius: 6px;
+        background: #111827;
+        color: #fff;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      #status {
+        margin-top: 8px;
+        font-size: 11px;
+        color: #059669;
+        min-height: 14px;
+      }
+      p.help {
+        font-size: 11px;
+        color: #6b7280;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Subtítulos de Meet</h1>
+    <label for="token">Token (Organización → Extensión de subtítulos)</label>
+    <input id="token" type="text" placeholder="mext_..." autocomplete="off" />
+    <button id="save">Guardar</button>
+    <div id="status"></div>
+    <p class="help">
+      Andá a chats.proshop.lat → Organización → "Extensión de subtítulos para Meet", generá el
+      token, y pegalo acá una sola vez. Después entrá a cualquier reunión de Meet normal — la
+      extensión activa los subtítulos sola y manda la transcripción al CRM cuando termine.
+    </p>
+    <script src="popup.js"></script>
+  </body>
+</html>

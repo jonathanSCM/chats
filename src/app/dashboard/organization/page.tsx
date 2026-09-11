@@ -8,6 +8,7 @@ import { InvitePanel } from "./_components/invite-panel";
 import { AiSettingsForm } from "./_components/ai-settings-form";
 import { SharedCalendarForm } from "./_components/shared-calendar-form";
 import { BotAccessMatrix } from "./_components/bot-access-matrix";
+import { MeetExtensionToken } from "./_components/meet-extension-token";
 import { DangerZone } from "./_components/danger-zone";
 
 export default async function OrganizationSettingsPage() {
@@ -85,6 +86,17 @@ export default async function OrganizationSettingsPage() {
           members={vendedores.map((v) => ({ id: v.id, name: v.name ?? "", email: v.email, color: v.color }))}
           initialAccess={new Set(botMembers.map((bm) => `${bm.botId}:${bm.userId}`))}
         />
+      </Card>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Extensión de subtítulos para Meet</CardTitle>
+        <CardDescription className="mb-4">
+          Extensión de Chrome que lee los subtítulos en vivo de Google Meet desde el navegador de
+          quien esté en la reunión — no hace falta que un bot pida entrar ni que nadie lo admita.
+          Función aparte del bot grabador: el bot sigue disponible para cuando sí se necesita audio.
+          Genera este token acá y pégalo una sola vez en la extensión.
+        </CardDescription>
+        <MeetExtensionToken hasToken={Boolean(org.meetExtensionToken)} />
       </Card>
 
       <Card className="mb-6">

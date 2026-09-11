@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "ProShop CRM - Subtítulos de Meet",
+  "version": "1.0.0",
+  "description": "Lee los subtítulos en vivo de Google Meet y los manda al CRM al terminar la reunión. No necesita que ningún bot entre a la llamada.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://meet.google.com/*",
+    "https://chats.proshop.lat/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Subtítulos de Meet — ProShop CRM"
+  }
+}

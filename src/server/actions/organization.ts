@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
@@ -177,4 +178,27 @@ export async function deleteOrganizationAction(
 
   await signOut({ redirectTo: "/login" });
   return { error: null };
+}
+
+/**
+ * Genera (o rota) el token que la extensión de Chrome de subtítulos usa para
+ * mandar transcripciones a api/extension/transcript. Rotar invalida el
+ * token viejo de una — cualquier instalación de la extensión con el token
+ * anterior deja de poder mandar transcripciones hasta que alguien pegue el
+ * nuevo.
+ */
+export async function generateMeetExtensionTokenAction(): Promise<ActionState & { token?: string }> {
+  const session = await requireSession();
+  if (session.user.role !== "OWNER" || !session.user.organizationId) {
+    return { error: "Solo el dueño de la organización puede generar este token" };
+  }
+
+  const token = `mext_${randomBytes(24).toString("hex")}`;
+  await prisma.organization.update({
+    where: { id: session.user.organizationId },
+    data: { meetExtensionToken: token },
+  });
+
+  revalidatePath("/dashboard/organization");
+  return { error: null, token };
 }

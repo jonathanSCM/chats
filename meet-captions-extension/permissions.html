@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>ProShop CRM — Activar micrófono</title>
+    <style>
+      body {
+        font: 14px/1.5 system-ui, sans-serif;
+        max-width: 420px;
+        margin: 60px auto;
+        padding: 0 20px;
+        color: #111827;
+      }
+      button {
+        padding: 10px 18px;
+        border: 0;
+        border-radius: 6px;
+        background: #111827;
+        color: #fff;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #status {
+        margin-top: 14px;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Activar micrófono</h1>
+    <p>
+      Esto se hace una sola vez por navegador. Al aceptar, la extensión de subtítulos de Meet va a
+      poder grabar tu voz además de la de los demás participantes.
+    </p>
+    <button id="grantBtn">Dar permiso de micrófono</button>
+    <div id="status"></div>
+    <script src="permissions.js"></script>
+  </body>
+</html>

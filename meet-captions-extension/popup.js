@@ -19,20 +19,13 @@ chrome.storage.local.get(["micGranted"], ({ micGranted }) => {
   }
 });
 
-micBtn.addEventListener("click", async () => {
-  micBtn.disabled = true;
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach((t) => t.stop()); // no hace falta el stream en sí, solo el permiso
-    chrome.storage.local.set({ micGranted: true });
-    micStatus.textContent = "Listo — micrófono activado.";
-    micStatus.style.color = "#059669";
-  } catch (error) {
-    micStatus.textContent = "No se pudo activar: " + error.message;
-    micStatus.style.color = "#dc2626";
-  } finally {
-    micBtn.disabled = false;
-  }
+// Pedir el permiso directo desde el popup no funciona de forma confiable:
+// el popup se cierra apenas pierde el foco, y eso a veces descarta el
+// diálogo de Chrome antes de que dé tiempo a aceptarlo ("Permission
+// dismissed", confirmado en la práctica). Una pestaña de verdad no tiene
+// ese problema, así que se abre ahí en vez de pedirlo acá.
+micBtn.addEventListener("click", () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("permissions.html") });
 });
 
 const MEETING_URL_RE = /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}/i;

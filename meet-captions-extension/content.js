@@ -138,7 +138,15 @@
   async function sendTranscript(reason) {
     if (sent) return;
     const transcript = currentTranscript().trim();
-    if (transcript.length < 40) return; // muy corto para ser real, no vale la pena mandarlo
+    if (transcript.length < 40) {
+      // Antes esto cortaba en silencio -- en una prueba corta (dos líneas
+      // de "hola, probando") parecía que la extensión no había hecho nada,
+      // cuando en realidad decidió a propósito no mandar algo tan corto.
+      console.log(
+        `[proshop-captions] No se manda (${reason}): transcripción muy corta (${transcript.length} caracteres, mínimo 40). Texto: "${transcript}"`,
+      );
+      return;
+    }
     sent = true;
 
     chrome.storage.local.get(["apiBase", "token"], async ({ apiBase, token }) => {

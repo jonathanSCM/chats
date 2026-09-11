@@ -63,20 +63,18 @@ export function KanbanBoard({
   const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // En vez de una barra de scroll horizontal, el tablero se arrastra
-  // directamente con el mouse (como Trello) -- se agarra de cualquier parte
-  // que no sea una tarjeta (esas ya usan drag nativo para cambiar de etapa)
-  // y se suelta.
+  // En vez de una barra de scroll horizontal, el tablero se arrastra con el
+  // botón DERECHO del mouse -- el izquierdo lo necesitan las tarjetas para
+  // su propio drag nativo (mover de etapa) y su click (abrir detalle), y
+  // como casi todo el tablero es tarjetas, no quedaba espacio "libre" para
+  // agarrar con el izquierdo sin pisar esos dos gestos.
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const panRef = useRef<{ startX: number; startScrollLeft: number } | null>(null);
   const [isPanning, setIsPanning] = useState(false);
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    // Si el mousedown empezó sobre una tarjeta (o cualquier botón), la deja
-    // en paz -- eso ya tiene su propio drag nativo (mover de etapa) y click
-    // (abrir detalle).
-    if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest("button")) return;
+    if (e.button !== 2) return;
+    e.preventDefault();
     const el = boardScrollRef.current;
     if (!el) return;
     panRef.current = { startX: e.clientX, startScrollLeft: el.scrollLeft };
@@ -141,8 +139,10 @@ export function KanbanBoard({
       onPointerMove={handlePointerMove}
       onPointerUp={endPan}
       onPointerLeave={endPan}
+      onContextMenu={(e) => e.preventDefault()}
+      title="Clic derecho + arrastrar para desplazarte a los lados"
       className={`-mx-4 overflow-x-auto pb-2 md:-mx-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-        isPanning ? "cursor-grabbing select-none" : "cursor-grab"
+        isPanning ? "cursor-grabbing select-none" : ""
       }`}
     >
       <div className="flex min-w-max gap-3 px-4 md:px-8">

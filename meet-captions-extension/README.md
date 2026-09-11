@@ -7,13 +7,19 @@ audio real.
 
 ## Cómo funciona
 
-1. Se activa sola al entrar a cualquier reunión de `meet.google.com/xxx-xxxx-xxx`.
-2. Prende los subtítulos de Meet (en español) si no estaban prendidos.
-3. Lee el panel de subtítulos cada 2 segundos y arma líneas `Nombre: lo que dijo`.
-4. Detecta que la reunión terminó (mismo criterio que el bot: el contador de "Personas" baja a 1
+**No graba nada sola.** Hay que activarla a mano en cada reunión que se quiera grabar:
+
+1. Entrá a la reunión de Meet como siempre.
+2. Tocá el ícono de la extensión → "Grabar esta reunión".
+3. Recién ahí prende los subtítulos de Meet (en español) si no estaban prendidos, y aparece el
+   indicador chico abajo a la izquierda ("ProShop CRM — subtítulos: N líneas").
+4. Lee el panel de subtítulos cada 2 segundos y arma líneas `Nombre: lo que dijo`.
+5. Detecta que la reunión terminó (mismo criterio que el bot: el contador de "Personas" baja a 1
    o desaparece) y manda la transcripción a `POST /api/extension/transcript`.
-5. Si se cierra la pestaña antes de detectar el fin, manda lo acumulado hasta ese momento como
-   red de seguridad (`sendBeacon`).
+6. Si se cierra la pestaña antes de detectar el fin, manda lo acumulado hasta ese momento como
+   red de seguridad (`sendBeacon`) — pero solo si se había activado la grabación en el paso 2.
+
+Si no se toca "Grabar esta reunión", esa pestaña de Meet no manda absolutamente nada al CRM.
 
 Si el link de la reunión ya estaba agendado en el CRM, la transcripción se suma a esa reunión.
 Si no, se crea una nueva reunión "(extensión de subtítulos)" — igual que hace "Unir el bot ya
@@ -25,9 +31,9 @@ mismo" con llamadas en vivo sin agendar.
 2. Activá "Modo de programador" (arriba a la derecha).
 3. Tocá "Cargar descomprimida" y seleccioná esta carpeta (`meet-captions-extension/`).
 4. Tocá el ícono de la extensión (arriba a la derecha del navegador) → pegá el token que
-   generás en el CRM en **Organización → "Extensión de subtítulos para Meet"** → Guardar.
-5. Entrá a cualquier reunión de Meet normal. Vas a ver un indicador chico abajo a la izquierda
-   ("ProShop CRM — subtítulos: N líneas") mientras esté grabando.
+   generás en el CRM en **Organización → "Extensión de subtítulos para Meet"** → "Guardar token".
+5. Entrá a una reunión de Meet, tocá el ícono de la extensión de nuevo, y tocá
+   **"Grabar esta reunión"**. Sin este paso no se graba nada.
 
 Cada vendedor que quiera usarla instala la extensión una vez en su propio Chrome y pega el mismo
 token de la organización (no es un token por persona).

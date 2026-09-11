@@ -14,6 +14,15 @@
         font-size: 14px;
         margin: 0 0 10px;
       }
+      h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #6b7280;
+        margin: 14px 0 8px;
+        border-top: 1px solid #e5e7eb;
+        padding-top: 12px;
+      }
       label {
         display: block;
         font-size: 11px;
@@ -31,7 +40,7 @@
       }
       button {
         width: 100%;
-        padding: 7px;
+        padding: 8px;
         border: 0;
         border-radius: 6px;
         background: #111827;
@@ -39,11 +48,36 @@
         font-size: 12px;
         cursor: pointer;
       }
-      #status {
+      button.record {
+        background: #dc2626;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #status,
+      #meetingStatus {
         margin-top: 8px;
         font-size: 11px;
         color: #059669;
         min-height: 14px;
+      }
+      #meetingBox {
+        padding: 10px;
+        background: #f9fafb;
+        border-radius: 8px;
+      }
+      #meetingBox p {
+        margin: 0 0 8px;
+        font-size: 12px;
+      }
+      .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #ef4444;
+        margin-right: 6px;
       }
       p.help {
         font-size: 11px;
@@ -54,14 +88,22 @@
   </head>
   <body>
     <h1>Subtítulos de Meet</h1>
+
+    <div id="meetingBox">
+      <p id="meetingText">Revisando la pestaña actual…</p>
+      <button id="recordBtn" style="display: none">Grabar esta reunión</button>
+      <div id="meetingStatus"></div>
+    </div>
+
+    <h2>Configuración</h2>
     <label for="token">Token (Organización → Extensión de subtítulos)</label>
     <input id="token" type="text" placeholder="mext_..." autocomplete="off" />
-    <button id="save">Guardar</button>
+    <button id="save">Guardar token</button>
     <div id="status"></div>
     <p class="help">
-      Andá a chats.proshop.lat → Organización → "Extensión de subtítulos para Meet", generá el
-      token, y pegalo acá una sola vez. Después entrá a cualquier reunión de Meet normal — la
-      extensión activa los subtítulos sola y manda la transcripción al CRM cuando termine.
+      Generá el token en chats.proshop.lat → Organización → "Extensión de subtítulos para Meet" y
+      pegalo acá una sola vez. Después, en cada reunión que quieras grabar, abrí este ícono y
+      tocá "Grabar esta reunión" — si no lo activás, no se manda nada.
     </p>
     <script src="popup.js"></script>
   </body>

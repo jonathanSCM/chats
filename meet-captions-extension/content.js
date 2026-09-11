@@ -199,7 +199,7 @@
   // que acá el token viaja en el body en vez de en Authorization (el
   // endpoint acepta las dos formas).
   window.addEventListener("pagehide", () => {
-    if (sent) return;
+    if (!started || sent) return;
     const transcript = currentTranscript().trim();
     if (transcript.length < 40) return;
     chrome.storage.local.get(["apiBase", "token"], ({ apiBase, token }) => {
@@ -216,10 +216,24 @@
     if (started) return;
     started = true;
     ensureBadge();
-    await sleep(3000); // le da tiempo a Meet a terminar de cargar la UI de la llamada
+    await sleep(500); // ya está en la llamada hace rato para cuando se activa a mano
     await enableCaptions();
     setInterval(() => void tick(), POLL_MS);
   }
 
-  void start();
+  // No arranca solo: hay que abrir el ícono de la extensión y tocar "Grabar
+  // esta reunión" para cada reunión en la que se quiera usar. Sin eso, esta
+  // pestaña de Meet no manda absolutamente nada -- ni siquiera empieza a
+  // leer subtítulos ni activa el badge.
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === "GET_STATUS") {
+      sendResponse({ onMeeting: true, recording: started, lines: finalizedLines.length });
+      return false;
+    }
+    if (message?.type === "START_RECORDING") {
+      void start().then(() => sendResponse({ ok: true }));
+      return true; // respuesta async
+    }
+    return false;
+  });
 })();

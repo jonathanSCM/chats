@@ -13,13 +13,26 @@ let meetingUrl = null;
 let micStream = null;
 let tabStream = null;
 
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "OFFSCREEN_START") {
-    void startRecording(message.streamId, message.meetingUrl);
+    // Antes esto era "dispara y olvida" -- background.js nunca sabía si la
+    // grabación había arrancado de verdad, así que el popup siempre mostraba
+    // "Audio activado" aunque tabCapture hubiera fallado en silencio.
+    startRecording(message.streamId, message.meetingUrl)
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: String(error) }));
+    return true; // respuesta async
   }
   if (message?.type === "OFFSCREEN_STOP") {
     void stopRecording();
   }
+  if (message?.type === "OFFSCREEN_SET_MIC_ENABLED") {
+    // Pausa/reanuda el track, no para/reinicia el stream -- así no hace
+    // falta renegociar nada del pipeline de grabación (MediaRecorder sigue
+    // corriendo igual, solo que sin audio de mic mientras está muteado).
+    micStream?.getAudioTracks().forEach((t) => (t.enabled = message.enabled));
+  }
+  return false;
 });
 
 async function startRecording(streamId, url) {
@@ -28,11 +41,23 @@ async function startRecording(streamId, url) {
   meetingUrl = url;
   chunks = [];
 
-  tabStream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId },
-    },
-  });
+  // Antes, si esto tiraba error (streamId vencido, otra captura ya activa
+  // sobre la misma pestaña, etc.) la promesa quedaba sin manejar -- todo el
+  // resto de la función nunca corría, mediaRecorder quedaba null, y
+  // stopRecording() más tarde no hacía nada ("audio no me lo guardó" sin
+  // ningún rastro de por qué). Ahora se loguea fuerte para poder
+  // diagnosticarlo desde la consola del offscreen document
+  // (chrome://extensions → "Inspeccionar vistas: offscreen.html").
+  try {
+    tabStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId },
+      },
+    });
+  } catch (error) {
+    console.error("[proshop-captions] No se pudo capturar el audio de la pestaña -- grabación de audio cancelada:", error);
+    throw error; // para que quien llamó (background.js) se entere y avise en el popup
+  }
 
   audioContext = new AudioContext();
   const tabSource = audioContext.createMediaStreamSource(tabStream);

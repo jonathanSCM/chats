@@ -44,6 +44,10 @@ transcribirlo, también queda como `audioTranscript` (con su .txt aparte) — la
 ya existe para el bot grabador: `transcript` (subtítulos, con nombre de quién habló) y
 `audioTranscript` (whisper, sin nombres, tapa los huecos que los subtítulos puedan tener).
 
+Tu micrófono se pausa automáticamente en la grabación cuando te silenciás con el botón de Meet, y
+se reanuda cuando te reactivás — no queda grabando tu audio de fondo mientras la lucecita de Meet
+dice que estás en silencio.
+
 ## Instalación (uso interno, sin publicar en la Chrome Web Store)
 
 1. Abrí `chrome://extensions` en Chrome.

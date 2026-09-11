@@ -82,6 +82,23 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  // ── Silenciar en Meet solo corta lo que se manda a los demás
+  // participantes -- no afecta el getUserMedia aparte que pide esta
+  // extensión, así que sin esto seguiría grabando tu voz aunque la lucecita
+  // de Meet diga que estás en silencio. Meet marca el botón del micrófono
+  // con data-is-muted, y como respaldo (por si cambia en un rediseño) se
+  // mira también el texto del botón: "Activar micrófono" significa que
+  // ahora mismo está apagado (el botón ofrece prenderlo).
+  function isMicMuted() {
+    const el = document.querySelector('[data-is-muted][aria-label*="micrófono" i], [data-is-muted][aria-label*="microphone" i]');
+    if (el) return el.getAttribute("data-is-muted") === "true";
+
+    const fallback = findButtonByName(/micrófono|microphone/i);
+    if (!fallback) return false; // no se encontró el botón -- mejor no cortar el mic por las dudas
+    const label = (fallback.getAttribute("aria-label") || "").trim();
+    return /activar|turn on/i.test(label);
+  }
+
   // ── Activa subtítulos y los pone en español, igual que hace el bot
   // (services captions.ts) pero con DOM plano en vez de Playwright.
   async function enableCaptions() {
@@ -128,11 +145,23 @@
     return { blocks: [], fallback: (region.innerText || "").trim() };
   }
 
+  // Si quien prueba la extensión está solo (ej. reproduciendo un video de
+  // YouTube en la propia llamada para probar), el conteo de participantes
+  // nunca pasa de 1 -- con la versión vieja de esta función eso se
+  // interpretaba como "la reunión terminó" a los ~40s, cortando la
+  // transcripción real mucho antes de tiempo. Ahora solo se dispara si ANTES
+  // hubo más de una persona y DESPUÉS bajó a 1 -- o sea, "todos se fueron",
+  // no "esta reunión nunca tuvo a nadie más".
+  let maxParticipantsSeen = 0;
   function meetingLooksOver() {
     const el = findButtonByName(/personas|people/i);
-    if (!el) return true;
+    if (!el) return true; // el botón desapareció -- Meet ya cerró la UI de la llamada
     const match = (el.textContent || "").match(/\d+/);
-    return match ? Number(match[0]) <= 1 : false;
+    const count = match ? Number(match[0]) : null;
+    if (count === null) return false;
+    if (count > maxParticipantsSeen) maxParticipantsSeen = count;
+    if (maxParticipantsSeen <= 1) return false; // nunca hubo nadie más -- no es "se fueron"
+    return count <= 1;
   }
 
   async function sendTranscript(reason) {
@@ -169,8 +198,19 @@
     });
   }
 
+  let lastMicMuted = null;
+  function checkMicMuteSync() {
+    const muted = isMicMuted();
+    if (muted === lastMicMuted) return;
+    lastMicMuted = muted;
+    // Sin efecto si no hay grabación de audio activa en esta reunión -- el
+    // offscreen document ignora esto si micStream no existe.
+    chrome.runtime.sendMessage({ type: "SET_MIC_ENABLED", enabled: !muted });
+  }
+
   async function tick() {
     ticks += 1;
+    checkMicMuteSync();
     const { blocks, fallback } = readCaptionsPanel();
 
     if (blocks.length > 0) {

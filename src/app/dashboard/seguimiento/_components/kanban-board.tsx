@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Sparkles, AlertTriangle, Bell } from "lucide-react";
 import { updateOpportunityFieldAction } from "@/server/actions/crm";
 import {
@@ -63,47 +63,36 @@ export function KanbanBoard({
   const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Barra de scroll horizontal "espejo", pegada abajo de la pantalla —
-  // mismo patrón que la tabla de Seguimiento: con muchas columnas de etapa
-  // la barra nativa queda al final de las tarjetas, lejos de la vista si
-  // hay que bajar mucho dentro de una columna.
+  // En vez de una barra de scroll horizontal, el tablero se arrastra
+  // directamente con el mouse (como Trello) -- se agarra de cualquier parte
+  // que no sea una tarjeta (esas ya usan drag nativo para cambiar de etapa)
+  // y se suelta.
   const boardScrollRef = useRef<HTMLDivElement>(null);
-  const mirrorScrollRef = useRef<HTMLDivElement>(null);
-  const [contentWidth, setContentWidth] = useState(0);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const syncingRef = useRef<"board" | "mirror" | null>(null);
+  const panRef = useRef<{ startX: number; startScrollLeft: number } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
 
-  useEffect(() => {
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    // Si el mousedown empezó sobre una tarjeta (o cualquier botón), la deja
+    // en paz -- eso ya tiene su propio drag nativo (mover de etapa) y click
+    // (abrir detalle).
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest("button")) return;
     const el = boardScrollRef.current;
     if (!el) return;
-    const measure = () => {
-      setContentWidth(el.scrollWidth);
-      setContainerWidth(el.clientWidth);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [rows]);
-
-  function handleBoardScroll() {
-    if (syncingRef.current === "mirror") {
-      syncingRef.current = null;
-      return;
-    }
-    if (!boardScrollRef.current || !mirrorScrollRef.current) return;
-    syncingRef.current = "board";
-    mirrorScrollRef.current.scrollLeft = boardScrollRef.current.scrollLeft;
+    panRef.current = { startX: e.clientX, startScrollLeft: el.scrollLeft };
+    setIsPanning(true);
   }
 
-  function handleMirrorScroll() {
-    if (syncingRef.current === "board") {
-      syncingRef.current = null;
-      return;
-    }
-    if (!boardScrollRef.current || !mirrorScrollRef.current) return;
-    syncingRef.current = "mirror";
-    boardScrollRef.current.scrollLeft = mirrorScrollRef.current.scrollLeft;
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const pan = panRef.current;
+    const el = boardScrollRef.current;
+    if (!pan || !el) return;
+    el.scrollLeft = pan.startScrollLeft - (e.clientX - pan.startX);
+  }
+
+  function endPan() {
+    panRef.current = null;
+    setIsPanning(false);
   }
 
   function stageOf(row: Row): Stage {
@@ -146,7 +135,16 @@ export function KanbanBoard({
   return (
     <>
     {error && <p className="mb-2 text-xs text-danger">{error}</p>}
-    <div ref={boardScrollRef} onScroll={handleBoardScroll} className="-mx-4 overflow-x-auto pb-2 md:-mx-8">
+    <div
+      ref={boardScrollRef}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={endPan}
+      onPointerLeave={endPan}
+      className={`-mx-4 overflow-x-auto pb-2 md:-mx-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+        isPanning ? "cursor-grabbing select-none" : "cursor-grab"
+      }`}
+    >
       <div className="flex min-w-max gap-3 px-4 md:px-8">
         {ALL_STAGES.map((stage) => {
           // Los vencidos suben solos arriba dentro de cada etapa (scope §9).
@@ -296,17 +294,6 @@ export function KanbanBoard({
         })}
       </div>
     </div>
-
-    {contentWidth > containerWidth && (
-      <div
-        ref={mirrorScrollRef}
-        onScroll={handleMirrorScroll}
-        className="sticky bottom-0 z-20 -mx-4 overflow-x-auto overflow-y-hidden border-t border-border bg-surface md:-mx-8"
-        style={{ height: 16 }}
-      >
-        <div style={{ width: contentWidth, height: 1 }} />
-      </div>
-    )}
     </>
   );
 }

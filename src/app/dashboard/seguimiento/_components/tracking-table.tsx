@@ -106,6 +106,7 @@ export interface Row {
   authorityLevel: string;
   meetings: {
     id: string;
+    title: string | null;
     scheduledAt: string;
     durationMinutes: number;
     status: string;
@@ -736,6 +737,13 @@ export function TrackingTable({
               <TrendingUp size={13} />
             </button>
           </div>
+          <a
+            href="/api/seguimiento/export"
+            title="Descargar los leads activos en un Excel"
+            className="flex items-center gap-1 whitespace-nowrap rounded-md border border-border px-2.5 py-1.5 text-xs text-ink-muted hover:border-accent-dim hover:text-accent"
+          >
+            <FileDown size={14} /> Exportar a Excel
+          </a>
           {!viewingArchived && (
             <Button type="button" onClick={() => setCreating(true)}>
               <Plus size={16} /> Nueva oportunidad
@@ -2072,6 +2080,12 @@ function MeetingsSection({
         <form action={formAction} className="mb-3 space-y-2 rounded-md border border-border p-2.5">
           <input type="hidden" name="opportunityId" value={opportunityId} />
           <input type="hidden" name="scheduledAt" />
+          <Input
+            type="text"
+            name="title"
+            placeholder="Nombre de la reunión (opcional — se arma uno solo si lo dejás vacío)"
+            className="py-1.5 text-xs"
+          />
           <div className="flex gap-2">
             <Input
               type="datetime-local"
@@ -2138,6 +2152,7 @@ function MeetingsSection({
             const pdfAttachment = m.attachments.find((a) => a.mimeType === "application/pdf");
             return (
             <li key={m.id} className="rounded-md border border-border p-2.5">
+              {m.title && <p className="mb-1 text-xs font-medium text-ink">{m.title}</p>}
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <p className="font-mono text-xs text-ink-muted">
                   {new Date(m.scheduledAt).toLocaleString("es", {
@@ -2244,6 +2259,13 @@ function MeetingsSection({
                   className="mb-1.5 space-y-2 rounded-md border border-border bg-surface-2/40 p-2.5"
                 >
                   <input type="hidden" name="scheduledAt" defaultValue={m.scheduledAt} />
+                  <Input
+                    type="text"
+                    name="title"
+                    placeholder="Nombre de la reunión"
+                    defaultValue={m.title ?? ""}
+                    className="py-1.5 text-xs"
+                  />
                   <div className="flex flex-wrap gap-2">
                     <Input
                       type="datetime-local"
@@ -2260,6 +2282,13 @@ function MeetingsSection({
                       className="w-20 py-1.5 text-xs"
                     />
                   </div>
+                  <Input
+                    type="url"
+                    name="meetingUrl"
+                    placeholder="Link de la reunión"
+                    defaultValue={m.meetingUrl ?? ""}
+                    className="py-1.5 text-xs"
+                  />
                   <label className="flex items-center gap-1.5 text-xs text-ink-muted">
                     <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked={m.botEnabled} />
                     Que el bot se una a esta reunión

@@ -388,6 +388,7 @@ const meetingNotesField = z
 
 const createMeetingSchema = z.object({
   opportunityId: z.string().min(1),
+  title: z.string().max(160).optional(),
   scheduledAt: z.string().min(1, "Poné la fecha"),
   durationMinutes: z.coerce.number().int().positive().max(600).optional(),
   meetingUrl: z.string().max(500).optional(),
@@ -405,6 +406,7 @@ export async function createMeetingAction(
 
   const parsed = createMeetingSchema.safeParse({
     opportunityId: formData.get("opportunityId"),
+    title: formData.get("title") || undefined,
     scheduledAt: formData.get("scheduledAt"),
     durationMinutes: formData.get("durationMinutes") || undefined,
     meetingUrl: formData.get("meetingUrl") || undefined,
@@ -473,6 +475,9 @@ export async function createMeetingAction(
     data: {
       organizationId,
       opportunityId: parsed.data.opportunityId,
+      title:
+        parsed.data.title?.trim() ||
+        `Reunión con ${opportunity.contact.fullName || opportunity.contact.phone}`,
       scheduledAt,
       durationMinutes,
       meetingUrl,
@@ -559,12 +564,20 @@ export async function deleteMeetingAction(meetingId: string): Promise<ActionStat
 }
 
 const updateMeetingSchema = z.object({
+  title: z.string().max(160).optional(),
   scheduledAt: z.string().min(1, "Poné la fecha"),
   durationMinutes: z.coerce.number().int().positive().max(600),
+  meetingUrl: z.string().max(500).optional(),
   botEnabled: z.coerce.boolean().optional(),
 });
 
-/** Cambiar fecha/hora, duración o si el bot se une — refleja el cambio en el evento real de Calendar, si lo hay. */
+/**
+ * Cambiar nombre, link, fecha/hora, duración o si el bot se une. El nombre y
+ * el link son solo de nuestra base -- a propósito no se tocan en el evento
+ * real de Calendar (si lo hay), que sigue siendo el que se creó al agendar;
+ * esto es para poder corregir a mano una reunión (por ej. una que agendó el
+ * bot sin link) sin depender de la integración de Calendar para eso.
+ */
 export async function updateMeetingAction(meetingId: string, formData: FormData): Promise<ActionState> {
   const { organizationId, userId, isAdmin } = await requireOrg();
 
@@ -580,8 +593,10 @@ export async function updateMeetingAction(meetingId: string, formData: FormData)
   }
 
   const parsed = updateMeetingSchema.safeParse({
+    title: formData.get("title") || undefined,
     scheduledAt: formData.get("scheduledAt"),
     durationMinutes: formData.get("durationMinutes"),
+    meetingUrl: formData.get("meetingUrl") || undefined,
     botEnabled: formData.has("botEnabled") ? formData.get("botEnabled") : undefined,
   });
   if (!parsed.success) {
@@ -593,6 +608,7 @@ export async function updateMeetingAction(meetingId: string, formData: FormData)
     return { error: "Fecha inválida" };
   }
   const botEnabled = parsed.data.botEnabled ?? false;
+  const meetingUrl = parsed.data.meetingUrl?.trim() || null;
 
   if (meeting.googleEventId) {
     const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { googleCalendarId: true } });
@@ -612,10 +628,18 @@ export async function updateMeetingAction(meetingId: string, formData: FormData)
 
   await prisma.meeting.update({
     where: { id: meetingId },
-    data: { scheduledAt, durationMinutes: parsed.data.durationMinutes, botEnabled },
+    data: {
+      title: parsed.data.title?.trim() || meeting.title,
+      scheduledAt,
+      durationMinutes: parsed.data.durationMinutes,
+      meetingUrl,
+      botEnabled,
+    },
   });
 
-  if (meeting.meetingUrl && botEnabled) {
+  // Con el link nuevo (no el de antes de este guardado) -- si recién ahora
+  // se cargó el link a mano, el bot tiene que empezar a poder unirse.
+  if (meetingUrl && botEnabled) {
     await scheduleMeetingBotJoin(meetingId, scheduledAt);
   } else {
     await cancelMeetingBotJoin(meetingId);

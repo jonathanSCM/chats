@@ -323,6 +323,13 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
                   className="space-y-2 rounded-md border border-border bg-surface-2/40 p-2.5"
                 >
                   <input type="hidden" name="scheduledAt" defaultValue={m.scheduledAt} />
+                  <Input
+                    type="text"
+                    name="title"
+                    placeholder="Nombre de la reunión"
+                    defaultValue={m.title}
+                    className="text-sm"
+                  />
                   <div className="flex flex-wrap gap-2">
                     <Input
                       type="datetime-local"
@@ -339,6 +346,13 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
                       className="w-24 text-sm"
                     />
                   </div>
+                  <Input
+                    type="url"
+                    name="meetingUrl"
+                    placeholder="Link de la reunión"
+                    defaultValue={m.meetingUrl ?? ""}
+                    className="text-sm"
+                  />
                   <label className="flex items-center gap-1.5 text-xs text-ink-muted">
                     <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked={m.botEnabled} />
                     Que el bot se una a esta reunión

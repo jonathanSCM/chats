@@ -227,26 +227,34 @@ export async function deleteAdhocMeetingAction(meetingId: string): Promise<Actio
 }
 
 const updateAdhocMeetingSchema = z.object({
+  title: z.string().max(160).optional(),
   scheduledAt: z.string().min(1, "Poné la fecha"),
   durationMinutes: z.coerce.number().int().positive().max(600),
+  meetingUrl: z.string().max(500).optional(),
   botEnabled: z.coerce.boolean().optional(),
 });
 
-/** Cambiar fecha/hora, duración o si el bot se une — refleja el cambio en el evento real de Calendar, si lo hay. */
+/**
+ * Cambiar nombre, link, fecha/hora, duración o si el bot se une. El nombre y
+ * el link son solo de nuestra base -- a propósito no se tocan en el evento
+ * real de Calendar (si lo hay), que sigue siendo el que se creó al agendar.
+ */
 export async function updateAdhocMeetingAction(meetingId: string, formData: FormData): Promise<ActionState> {
   const { organizationId } = await requireOrg();
 
   const meeting = await prisma.meeting.findUnique({
     where: { id: meetingId },
-    select: { organizationId: true, opportunityId: true, meetingUrl: true, googleEventId: true },
+    select: { organizationId: true, opportunityId: true, title: true, meetingUrl: true, googleEventId: true },
   });
   if (!meeting || meeting.organizationId !== organizationId || meeting.opportunityId !== null) {
     return { error: "Reunión no encontrada" };
   }
 
   const parsed = updateAdhocMeetingSchema.safeParse({
+    title: formData.get("title") || undefined,
     scheduledAt: formData.get("scheduledAt"),
     durationMinutes: formData.get("durationMinutes"),
+    meetingUrl: formData.get("meetingUrl") || undefined,
     botEnabled: formData.has("botEnabled") ? formData.get("botEnabled") : undefined,
   });
   if (!parsed.success) {
@@ -258,6 +266,7 @@ export async function updateAdhocMeetingAction(meetingId: string, formData: Form
     return { error: "Fecha inválida" };
   }
   const botEnabled = parsed.data.botEnabled ?? false;
+  const meetingUrl = parsed.data.meetingUrl?.trim() || null;
 
   if (meeting.googleEventId) {
     const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { googleCalendarId: true } });
@@ -277,10 +286,16 @@ export async function updateAdhocMeetingAction(meetingId: string, formData: Form
 
   await prisma.meeting.update({
     where: { id: meetingId },
-    data: { scheduledAt, durationMinutes: parsed.data.durationMinutes, botEnabled },
+    data: {
+      title: parsed.data.title?.trim() || meeting.title,
+      scheduledAt,
+      durationMinutes: parsed.data.durationMinutes,
+      meetingUrl,
+      botEnabled,
+    },
   });
 
-  if (meeting.meetingUrl && botEnabled) {
+  if (meetingUrl && botEnabled) {
     await scheduleMeetingBotJoin(meetingId, scheduledAt);
   } else {
     await cancelMeetingBotJoin(meetingId);

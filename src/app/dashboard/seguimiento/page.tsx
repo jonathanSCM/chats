@@ -65,6 +65,7 @@ export default async function SeguimientoPage({
         meetings: {
           select: {
             id: true,
+            title: true,
             scheduledAt: true,
             durationMinutes: true,
             status: true,
@@ -136,6 +137,7 @@ export default async function SeguimientoPage({
     sortOrder: o.sortOrder,
     meetings: o.meetings.map((m) => ({
       id: m.id,
+      title: m.title,
       scheduledAt: m.scheduledAt.toISOString(),
       durationMinutes: m.durationMinutes,
       status: m.status,

@@ -5,7 +5,6 @@ import { sendTextMessage } from "@/server/services/whatsapp";
 import { notifyNewMessage } from "@/server/services/push";
 import { OPEN_STAGES } from "@/lib/pipeline";
 import { getMeetingSlots, type MeetingSlot } from "@/lib/meeting-slots";
-import { isGoogleMeetEnabled, getOrCreateOrgCalendar, createMeetEvent } from "@/server/services/google-calendar";
 import { MODELS, runStructured } from "./client";
 
 export const PROMPT_VERSION = "bot-calificacion-v1";
@@ -344,42 +343,22 @@ async function maybeScheduleMeeting(
     if (alreadyScheduled) return;
   }
 
-  // Mejor esfuerzo: si Google Calendar no está configurado o falla, la
-  // reunión igual se guarda (como antes) para que el vendedor mande el
-  // link a mano -- una caída de Calendar nunca debe impedir agendar.
-  let meetingUrl: string | null = null;
-  let googleEventId: string | null = null;
-  if (isGoogleMeetEnabled()) {
-    try {
-      const org = await prisma.organization.findUnique({
-        where: { id: conversation.organizationId },
-        select: { name: true },
-      });
-      const calendarId = await getOrCreateOrgCalendar(conversation.organizationId, org?.name ?? "CRM");
-      const event = await createMeetEvent({
-        calendarId,
-        summary: `Reunión de diagnóstico — ${conversation.contact?.fullName || conversation.contact?.phone || "Lead"}`,
-        scheduledAt: slot.date,
-        durationMinutes: 30,
-      });
-      meetingUrl = event.meetingUrl;
-      googleEventId = event.eventId;
-    } catch (error) {
-      console.error("[qualification-bot] No se pudo crear el evento en Google Calendar:", error);
-    }
-  }
+  // El bot ya no crea el link de Meet -- decisión explícita: la creación de
+  // Calendar/Meet quedó reservada para cuando un vendedor la arma a mano
+  // (ver createMeetingAction en crm.ts). Acá solo se deja agendada la fecha
+  // y el nombre, para que la reunión ya aparezca en el CRM y el vendedor
+  // solo tenga que completar el link.
+  const title = `Reunión de diagnóstico — ${conversation.contact?.fullName || conversation.contact?.phone || "Lead"}`;
 
   await prisma.meeting.create({
     data: {
       organizationId: conversation.organizationId,
       opportunityId,
+      title,
       scheduledAt: slot.date,
-      meetingUrl,
-      googleEventId,
+      meetingUrl: null,
       status: "SCHEDULED",
-      notes: meetingUrl
-        ? "Agendada automáticamente por el bot de calificación, con Google Meet."
-        : "Agendada por el bot de calificación — confirmar horario y mandar el link de Meet al cliente.",
+      notes: "Agendada automáticamente por el bot de calificación. Falta agregar el link de la reunión.",
     },
   });
 
@@ -388,7 +367,7 @@ async function maybeScheduleMeeting(
     organizationId: conversation.organizationId,
     assignedToId: conversation.assignedToId,
     customerLabel: conversation.customerName || conversation.customerPhone,
-    preview: `📅 El bot agendó una reunión para ${slot.label} — confirmá y mandá el link de Meet`,
+    preview: `📅 El bot agendó una reunión para ${slot.label} — falta el link de Meet`,
   }).catch((error) => console.error("[bot] Error notificando reunión agendada:", error));
 }
 

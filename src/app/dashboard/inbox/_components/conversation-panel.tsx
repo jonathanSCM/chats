@@ -13,6 +13,10 @@ import {
   Plus,
   Bot as BotIcon,
   History,
+  Video,
+  Copy,
+  Pencil,
+  Ban,
 } from "lucide-react";
 import {
   addConversationNoteAction,
@@ -25,11 +29,18 @@ import {
   transferConversationAction,
   updateContactAction,
 } from "@/server/actions/conversation-panel";
-import { createOpportunityAction } from "@/server/actions/crm";
+import {
+  createOpportunityAction,
+  updateMeetingAction,
+  cancelMeetingAction,
+  deleteMeetingAction,
+} from "@/server/actions/crm";
+import { createMeetingFromConversationAction } from "@/server/actions/inbox-meetings";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { STAGE_LABEL, SERVICES, type Stage } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
+import { scheduledAtToUtcHidden, utcIsoToLocalInputValue } from "@/lib/datetime-local";
 
 interface PanelData {
   status: "OPEN" | "ON_HOLD" | "CLOSED";
@@ -53,6 +64,15 @@ interface PanelData {
       estimatedValue: number | null;
       nextAction: string | null;
       nextActionAt: string | null;
+      meetings: {
+        id: string;
+        title: string | null;
+        scheduledAt: string;
+        durationMinutes: number;
+        status: string;
+        meetingUrl: string | null;
+        botEnabled: boolean;
+      }[];
     }[];
   } | null;
   notes: {
@@ -405,6 +425,18 @@ export function ConversationPanel({
           </div>
         )}
 
+        {/* Reuniones */}
+        {data.contact && (
+          <MeetingsPanel
+            conversationId={conversationId}
+            meetings={data.contact.opportunities.flatMap((o) => o.meetings)}
+            onChanged={() => {
+              reload();
+              onChanged();
+            }}
+          />
+        )}
+
         {/* Notas internas */}
         <div className="space-y-2 border-t border-border pt-4">
           <Label>
@@ -670,5 +702,289 @@ function ContactForm({
         {isPending ? "Guardando…" : "Guardar contacto"}
       </Button>
     </form>
+  );
+}
+
+type PanelMeeting = NonNullable<PanelData["contact"]>["opportunities"][number]["meetings"][number];
+
+/**
+ * "Añadir reunión" directo desde el chat -- antes solo se podía agendar una
+ * reunión desde Seguimiento (y hacía falta primero agregar el contacto a
+ * seguimiento a mano). Acá alcanza con completar la fecha: si el contacto
+ * todavía no tiene una oportunidad abierta, se crea una sola sin que el
+ * vendedor tenga que hacer ese paso aparte (ver createMeetingFromConversationAction).
+ */
+function MeetingsPanel({
+  conversationId,
+  meetings,
+  onChanged,
+}: {
+  conversationId: string;
+  meetings: PanelMeeting[];
+  onChanged: () => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [withGoogleMeet, setWithGoogleMeet] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [state, formAction] = useActionState(createMeetingFromConversationAction, { error: null });
+  const [handledMessage, setHandledMessage] = useState<string | undefined>(undefined);
+  if (state.message && state.message !== handledMessage) {
+    setHandledMessage(state.message);
+    setAdding(false);
+    onChanged();
+  }
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPending, setEditPending] = useState(false);
+  const [editError, setEditError] = useState<{ id: string; message: string } | null>(null);
+  function handleEditSubmit(id: string, e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    setEditPending(true);
+    setEditError(null);
+    startTransition(async () => {
+      const result = await updateMeetingAction(id, formData);
+      setEditPending(false);
+      if (result.error) setEditError({ id, message: result.error });
+      else {
+        setEditingId(null);
+        onChanged();
+      }
+    });
+  }
+
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
+  function handleCancel(id: string) {
+    if (cancelingId !== id) {
+      setCancelingId(id);
+      setTimeout(() => setCancelingId((c) => (c === id ? null : c)), 3000);
+      return;
+    }
+    setCancelingId(null);
+    startTransition(async () => {
+      await cancelMeetingAction(id);
+      onChanged();
+    });
+  }
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  function handleDelete(id: string) {
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      setTimeout(() => setConfirmDeleteId((c) => (c === id ? null : c)), 3000);
+      return;
+    }
+    setConfirmDeleteId(null);
+    startTransition(async () => {
+      await deleteMeetingAction(id);
+      onChanged();
+    });
+  }
+
+  return (
+    <div className="space-y-2 border-t border-border pt-4">
+      <div className="flex items-center justify-between gap-2">
+        <Label>
+          <Video size={11} className="mr-1 inline" /> Reuniones
+        </Label>
+        {!adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="flex cursor-pointer items-center gap-1 text-[11px] text-accent hover:opacity-80"
+          >
+            <Plus size={11} /> Añadir reunión
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <form action={formAction} className="space-y-2 rounded-md border border-border p-2.5">
+          <input type="hidden" name="conversationId" value={conversationId} />
+          <input type="hidden" name="scheduledAt" />
+          <Input
+            type="text"
+            name="title"
+            placeholder="Nombre de la reunión (opcional)"
+            className="py-1.5 text-xs"
+          />
+          <div className="flex gap-2">
+            <Input
+              type="datetime-local"
+              required
+              className="py-1.5 text-xs"
+              onChange={scheduledAtToUtcHidden}
+            />
+            <Input
+              type="number"
+              name="durationMinutes"
+              placeholder="min"
+              min={1}
+              className="w-20 py-1.5 text-xs"
+            />
+          </div>
+          <label className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+            <input
+              type="checkbox"
+              name="withGoogleMeet"
+              className="h-3.5 w-3.5"
+              checked={withGoogleMeet}
+              onChange={(e) => setWithGoogleMeet(e.target.checked)}
+            />
+            Crear con Google Meet (genera el link automáticamente)
+          </label>
+          <label className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+            <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked />
+            Que el bot se una a esta reunión
+          </label>
+          {withGoogleMeet && (
+            <Input
+              type="text"
+              name="guestEmails"
+              placeholder="Invitados (correos separados por coma)"
+              className="py-1.5 text-xs"
+            />
+          )}
+          <Input
+            type="url"
+            name="meetingUrl"
+            placeholder="o pegá un link de reunión manualmente"
+            className="py-1.5 text-xs"
+          />
+          {state.error && <p className="text-[11px] text-danger">{state.error}</p>}
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" className="text-xs">
+              Guardar reunión
+            </Button>
+            <Button type="button" size="sm" variant="secondary" className="text-xs" onClick={() => setAdding(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {meetings.length === 0 ? (
+        <p className="text-[11px] text-ink-faint">Todavía no hay reuniones registradas.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {meetings.map((m) => (
+            <div key={m.id} className="rounded-md border border-border bg-surface px-2.5 py-2">
+              {m.title && <p className="truncate text-xs font-medium text-ink">{m.title}</p>}
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-ink-muted">
+                <span className="font-mono">
+                  {new Date(m.scheduledAt).toLocaleString("es", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}{" "}
+                  · {m.status}
+                </span>
+                {m.meetingUrl && (
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(m.meetingUrl!)}
+                    title="Copiar link de la reunión"
+                    className="flex cursor-pointer items-center gap-1 rounded border border-border px-1 py-0.5 hover:border-accent-dim hover:text-accent"
+                  >
+                    <Copy size={9} /> Link
+                  </button>
+                )}
+                {m.status !== "CANCELED" && m.status !== "DONE" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(editingId === m.id ? null : m.id)}
+                      className={`flex cursor-pointer items-center gap-1 rounded border border-border px-1 py-0.5 hover:border-accent-dim hover:text-accent ${
+                        editingId === m.id ? "border-accent-dim text-accent" : ""
+                      }`}
+                    >
+                      <Pencil size={9} /> Editar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleCancel(m.id)}
+                      className="flex cursor-pointer items-center gap-1 rounded border border-border px-1 py-0.5 hover:border-danger hover:text-danger disabled:cursor-not-allowed"
+                    >
+                      <Ban size={9} /> {cancelingId === m.id ? "¿Seguro?" : "Cancelar"}
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => handleDelete(m.id)}
+                  className={`ml-auto cursor-pointer disabled:cursor-not-allowed ${
+                    confirmDeleteId === m.id ? "text-danger" : "text-ink-faint hover:text-danger"
+                  }`}
+                  title={confirmDeleteId === m.id ? "¿Seguro? Toca de nuevo" : "Borrar reunión"}
+                >
+                  <Trash2 size={11} />
+                </button>
+              </div>
+
+              {editingId === m.id && (
+                <form
+                  onSubmit={(e) => handleEditSubmit(m.id, e)}
+                  className="mt-1.5 space-y-1.5 rounded-md border border-border bg-surface-2/40 p-2"
+                >
+                  <input type="hidden" name="scheduledAt" defaultValue={m.scheduledAt} />
+                  <Input
+                    type="text"
+                    name="title"
+                    placeholder="Nombre de la reunión"
+                    defaultValue={m.title ?? ""}
+                    className="py-1.5 text-xs"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Input
+                      type="datetime-local"
+                      required
+                      defaultValue={utcIsoToLocalInputValue(m.scheduledAt)}
+                      onChange={scheduledAtToUtcHidden}
+                      className="py-1.5 text-xs"
+                    />
+                    <Input
+                      type="number"
+                      name="durationMinutes"
+                      min={1}
+                      defaultValue={m.durationMinutes}
+                      className="w-20 py-1.5 text-xs"
+                    />
+                  </div>
+                  <Input
+                    type="url"
+                    name="meetingUrl"
+                    placeholder="Link de la reunión"
+                    defaultValue={m.meetingUrl ?? ""}
+                    className="py-1.5 text-xs"
+                  />
+                  <label className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+                    <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked={m.botEnabled} />
+                    Que el bot se una a esta reunión
+                  </label>
+                  {editError?.id === m.id && <p className="text-[11px] text-danger">{editError.message}</p>}
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm" className="text-xs" disabled={editPending}>
+                      {editPending ? "Guardando…" : "Guardar cambios"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="text-xs"
+                      onClick={() => setEditingId(null)}
+                    >
+                      Cancelar edición
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

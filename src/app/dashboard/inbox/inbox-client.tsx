@@ -768,10 +768,12 @@ export function InboxClient({
       setMessages((prev) => [...prev, optimistic]);
 
       const result = await sendInboxMessageAction(selectedId, content);
-      if (result.error) {
-        setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-        setError(result.error);
-      }
+      if (result.error) setError(result.error);
+      // Se saca el mensaje optimista siempre, no solo si falló -- si no,
+      // cuando el envío funciona bien queda para siempre al lado del
+      // mensaje real que trae fetchMessages() (mergeMessages los suma por
+      // id, y el optimista tiene uno distinto: se ve duplicado).
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
       await fetchMessages(selectedId);
       await fetchConversations();
     }
@@ -816,10 +818,8 @@ export function InboxClient({
         setMessages((prev) => [...prev, optimistic]);
 
         const result = await sendInboxLocationAction(conversationId, { latitude, longitude });
-        if (result.error) {
-          setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-          setError(result.error);
-        }
+        if (result.error) setError(result.error);
+        setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
         await fetchMessages(conversationId);
         await fetchConversations();
         setSendingLocation(false);

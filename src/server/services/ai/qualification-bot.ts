@@ -3,7 +3,7 @@ import { prisma } from "@/server/db/client";
 import { decrypt } from "@/lib/crypto";
 import { sendTextMessage } from "@/server/services/whatsapp";
 import { notifyNewMessage } from "@/server/services/push";
-import { isOpenStage } from "@/lib/pipeline";
+import { OPEN_STAGES } from "@/lib/pipeline";
 import { getMeetingSlots, type MeetingSlot } from "@/lib/meeting-slots";
 import { isGoogleMeetEnabled, getOrCreateOrgCalendar, createMeetEvent } from "@/server/services/google-calendar";
 import { MODELS, runStructured } from "./client";
@@ -280,11 +280,19 @@ async function ensureOpportunity(
 ): Promise<string | null> {
   if (!conversation.contact) return null;
 
+  // Antes esto traía CUALQUIER oportunidad del contacto (sin orderBy, así
+  // que Prisma podía devolver cualquiera de varias) y solo evitaba duplicar
+  // si esa, la que sea, estaba abierta. Si un contacto tenía más de una
+  // oportunidad y la que Prisma devolvía primero resultaba estar cerrada
+  // (GANADO/PERDIDO) mientras otra seguía abierta, este chequeo no la veía
+  // y creaba un lead duplicado. Ahora se busca directamente una abierta
+  // entre TODAS las del contacto.
   const existingOpen = await prisma.opportunity.findFirst({
-    where: { contactId: conversation.contact.id, archivedAt: null },
-    select: { id: true, stage: true },
+    where: { contactId: conversation.contact.id, archivedAt: null, stage: { in: OPEN_STAGES } },
+    select: { id: true },
+    orderBy: { createdAt: "desc" },
   });
-  if (existingOpen && isOpenStage(existingOpen.stage)) return existingOpen.id;
+  if (existingOpen) return existingOpen.id;
 
   const needSummary = [result.problema_principal, result.que_quiere_mejorar]
     .filter(Boolean)

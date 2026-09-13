@@ -606,6 +606,24 @@ function ContactForm({
     if (saved) onSaved();
   }, [saved, onSaved]);
 
+  // Campos controlados en vez de defaultValue: un <form action={...}> de
+  // React resetea solos los inputs no controlados cuando la acción termina
+  // bien -- guardaba el dato pero la ficha se veía en blanco después de
+  // "Guardar contacto" (el dato seguía en la base, solo la pantalla se
+  // vaciaba). Se resincronizan cuando `contact` cambia (otro contacto, o
+  // este mismo recargado con los valores ya guardados).
+  const [fullName, setFullName] = useState(contact.fullName ?? "");
+  const [city, setCity] = useState(contact.city ?? "");
+  const [jobTitle, setJobTitle] = useState(contact.jobTitle ?? "");
+  const [email, setEmail] = useState(contact.email ?? "");
+
+  useEffect(() => {
+    setFullName(contact.fullName ?? "");
+    setCity(contact.city ?? "");
+    setJobTitle(contact.jobTitle ?? "");
+    setEmail(contact.email ?? "");
+  }, [contact]);
+
   return (
     <form action={formAction} className="space-y-2 border-t border-border pt-4">
       <Label>Contacto</Label>
@@ -613,26 +631,30 @@ function ContactForm({
 
       <Input
         name="fullName"
-        defaultValue={contact.fullName ?? ""}
+        value={fullName}
+        onChange={(e) => setFullName(e.target.value)}
         placeholder="Nombre"
         className="py-1.5 text-xs"
       />
       <Input
         name="city"
-        defaultValue={contact.city ?? ""}
+        value={city}
+        onChange={(e) => setCity(e.target.value)}
         placeholder="Ciudad"
         className="py-1.5 text-xs"
       />
       <Input
         name="jobTitle"
-        defaultValue={contact.jobTitle ?? ""}
+        value={jobTitle}
+        onChange={(e) => setJobTitle(e.target.value)}
         placeholder="Cargo"
         className="py-1.5 text-xs"
       />
       <Input
         name="email"
         type="email"
-        defaultValue={contact.email ?? ""}
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
         placeholder="Correo"
         className="py-1.5 text-xs"
       />

@@ -11,6 +11,7 @@ import {
   CalendarDays,
   LayoutDashboard,
   Video,
+  UserCircle,
 } from "lucide-react";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
@@ -88,13 +89,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </nav>
 
       <div className="mt-4 border-t border-border pt-4">
-        <div className="mb-2 px-2">
-          <p className="truncate text-sm text-ink">{session?.user.email}</p>
+        <Link
+          href="/dashboard/perfil"
+          className="mb-2 block rounded-md px-2 py-1 transition-colors hover:bg-surface-2/60"
+        >
+          <p className="flex items-center gap-1.5 truncate text-sm text-ink">
+            <UserCircle size={13} className="shrink-0 text-ink-faint" />
+            {session?.user.email}
+          </p>
           <p className="truncate font-mono text-[11px] text-ink-faint">
             {org?.name ?? "Sin organización"}
           </p>
           <ServerClock initialIso={serverNowIso} timeZone={serverTimeZone} />
-        </div>
+        </Link>
         <ThemeToggle />
         <form action={logoutAction}>
           <button

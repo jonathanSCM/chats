@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
-import { enqueueOrReschedule } from "../queue";
+import { enqueue } from "../queue";
 
 export const vexaBotPollPayload = z.object({
   meetingId: z.string(),
@@ -81,9 +81,13 @@ export async function handleVexaBotPoll(rawPayload: unknown): Promise<void> {
 
   if (!entry) {
     // Todavía no aparece en la lista (puede tardar un instante en registrarse) — reintentar.
-    await enqueueOrReschedule({
+    // Job nuevo, sin uniqueKey repetido: este mismo job (el que se está
+    // corriendo ahora mismo) lo marca DONE `processJobs` apenas termina este
+    // handler, así que reprogramarlo con la MISMA uniqueKey pisaría ese
+    // vuelto-a-PENDING con el DONE de acá -- por eso cada vuelta es una fila
+    // aparte en vez de reabrir la anterior.
+    await enqueue({
       type: "vexa_bot_poll",
-      uniqueKey: `vexa-poll-${meetingId}`,
       payload: { meetingId, nativeMeetingId, startedAt },
       runAfter: new Date(Date.now() + POLL_INTERVAL_MS),
     });
@@ -100,9 +104,8 @@ export async function handleVexaBotPoll(rawPayload: unknown): Promise<void> {
         });
       }
     }
-    await enqueueOrReschedule({
+    await enqueue({
       type: "vexa_bot_poll",
-      uniqueKey: `vexa-poll-${meetingId}`,
       payload: { meetingId, nativeMeetingId, startedAt },
       runAfter: new Date(Date.now() + POLL_INTERVAL_MS),
     });

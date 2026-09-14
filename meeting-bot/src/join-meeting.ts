@@ -13,6 +13,12 @@ import { transcribeWithWhisperCpp } from "./transcribe-audio";
 // MEETING_BOT_DEBUG=true si hay que volver a diagnosticar algo a ciegas.
 const DEBUG_ENABLED = process.env.MEETING_BOT_DEBUG === "true";
 const DEBUG_DIR = path.join(process.env.RECORDINGS_DIR || "/tmp/recordings", "debug");
+// Con MEETING_BOT_DEBUG=true, si falla el intento de unirse deja el
+// navegador abierto este rato antes de cerrarlo -- para poder conectarse por
+// VNC (ver x11vnc) y ver/interactuar con la pantalla real en el momento del
+// fallo, en vez de que se cierre solo de inmediato. No afecta el reporte de
+// fallo al CRM, que sale igual apenas ocurre el error.
+const KEEP_OPEN_ON_FAIL_MINUTES = 10;
 // Cada cuánto se fija si quedó solo en la reunión.
 const END_CHECK_INTERVAL_MS = 30_000;
 // Margen sobre la duración esperada antes de cortar por las dudas, aunque
@@ -122,8 +128,14 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
   } catch (error) {
     if (page) await debugScreenshot(page, meetingId, "03-error");
     if (stopRecordingFn) await stopRecordingFn().catch(() => {});
-    await browser.close().catch(() => {});
     await notifyFailure(callbackUrl, meetingId, error instanceof Error ? error.message : String(error));
+    if (DEBUG_ENABLED) {
+      console.log(
+        `[meeting-bot] DEBUG: dejo el navegador abierto ${KEEP_OPEN_ON_FAIL_MINUTES} min más para inspección manual (VNC) antes de cerrarlo.`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, KEEP_OPEN_ON_FAIL_MINUTES * 60_000));
+    }
+    await browser.close().catch(() => {});
     return;
   }
 

@@ -281,11 +281,11 @@ export function TrackingTable({
   const [creating, setCreating] = useState(false);
   const [boardView, setBoardView] = useState<"table" | "kanban" | "analisis">("table");
 
-  // La tabla se arrastra con el botón IZQUIERDO del mouse -- pedido así a
-  // propósito, aunque puede chocar con los controles que también usan el
-  // izquierdo (ordenar columna, editar campo, ir al chat, reordenar filas a
-  // mano): para minimizar eso, el pan no arranca si el mousedown fue sobre
-  // uno de esos controles o sobre una fila en modo de orden manual.
+  // La tabla se arrastra con el botón IZQUIERDO del mouse; reordenar filas a
+  // mano es con el DERECHO (ver TableRow más abajo) -- separar los dos por
+  // botón, en vez de por elemento, es lo que evita que choquen entre sí.
+  // Igual se deja afuera del pan los controles que abren/editan con un
+  // clic (ordenar columna, editar campo, ir al chat).
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const panRef = useRef<{ startX: number; startScrollLeft: number } | null>(null);
   const [isPanningTable, setIsPanningTable] = useState(false);
@@ -294,7 +294,6 @@ export function TrackingTable({
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
     if (target.closest("button, a, select, input, textarea")) return;
-    if (target.closest('tr[draggable="true"]')) return;
     const el = tableScrollRef.current;
     if (!el) return;
     panRef.current = { startX: e.clientX, startScrollLeft: el.scrollLeft };
@@ -867,7 +866,7 @@ export function TrackingTable({
                     onDragStart={() => {
                       dragIdRef.current = row.id;
                     }}
-                    onDropRow={() => handleDrop(row.id)}
+                    onDropRow={handleDrop}
                   />
                 ))}
               </tbody>
@@ -929,9 +928,19 @@ function Th({ children, ai }: { children?: React.ReactNode; ai?: boolean }) {
   );
 }
 
-function Td({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
+function Td({
+  children,
+  className = "",
+  title,
+}: {
+  children?: React.ReactNode;
+  className?: string;
+  title?: string;
+}) {
   return (
-    <td className={`border-b border-border/50 px-3 py-4 align-top ${className}`}>{children}</td>
+    <td title={title} className={`border-b border-border/50 px-3 py-4 align-top ${className}`}>
+      {children}
+    </td>
   );
 }
 
@@ -1058,7 +1067,7 @@ function TableRow({
   onOpen: () => void;
   draggable: boolean;
   onDragStart: () => void;
-  onDropRow: () => void;
+  onDropRow: (targetId: string) => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -1083,19 +1092,40 @@ function TableRow({
     save("stage", nextStage);
   }
 
+  // Reordenar es con clic DERECHO (pedido así a propósito — el izquierdo lo
+  // usa el desplazamiento lateral de toda la tabla, ver tableScrollRef más
+  // arriba). El drag nativo de HTML solo funciona con el botón izquierdo,
+  // así que en vez de eso se captura el puntero desde el mousedown derecho y
+  // se ubica la fila de destino a mano con elementFromPoint al soltar.
+  function handleRowPointerDown(e: React.PointerEvent<HTMLTableRowElement>) {
+    if (!draggable || e.button !== 2) return;
+    e.preventDefault();
+    onDragStart();
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handleRowPointerUp(e: React.PointerEvent<HTMLTableRowElement>) {
+    if (!draggable || e.button !== 2) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    const target = document
+      .elementFromPoint(e.clientX, e.clientY)
+      ?.closest<HTMLElement>("tr[data-row-id]");
+    if (target?.dataset.rowId) onDropRow(target.dataset.rowId);
+  }
+
   return (
     <>
     <tr
-      draggable={draggable}
-      onDragStart={draggable ? onDragStart : undefined}
-      onDragOver={draggable ? (e) => e.preventDefault() : undefined}
-      onDrop={draggable ? onDropRow : undefined}
+      data-row-id={row.id}
+      onPointerDown={handleRowPointerDown}
+      onPointerUp={handleRowPointerUp}
+      onContextMenu={draggable ? (e) => e.preventDefault() : undefined}
       className={`transition-colors hover:bg-surface-2/40 ${isPending ? "opacity-60" : ""} ${
-        draggable ? "cursor-grab active:cursor-grabbing" : ""
+        draggable ? "cursor-default" : ""
       }`}
     >
       {draggable && (
-        <Td className="w-6 px-1 text-ink-faint">
+        <Td className="w-6 px-1 text-ink-faint" title="Clic derecho + arrastrar para reordenar">
           <GripVertical size={14} />
         </Td>
       )}

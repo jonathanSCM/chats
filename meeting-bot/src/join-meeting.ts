@@ -37,6 +37,36 @@ export interface JoinOptions {
 
 const DEFAULT_DISPLAY_NAME = "Asistente ProShop (grabando)";
 
+// Pool chico de combinaciones realistas de viewport + user-agent -- se
+// sortea una por sesión para que no todos los intentos tengan exactamente
+// la misma huella digital (mismo tamaño de ventana, mismo UA). El viewport
+// tiene que entrar dentro de la pantalla virtual de Xvfb (1280x720, ver
+// entrypoint.sh), así que las opciones son todas más chicas que eso.
+const FINGERPRINT_POOL: Array<{ width: number; height: number; userAgent: string }> = [
+  {
+    width: 1264,
+    height: 686,
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+  },
+  {
+    width: 1200,
+    height: 675,
+    userAgent:
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+  },
+  {
+    width: 1220,
+    height: 660,
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+  },
+];
+
+function pickFingerprint() {
+  return FINGERPRINT_POOL[Math.floor(Math.random() * FINGERPRINT_POOL.length)];
+}
+
 /**
  * Orquesta el ciclo completo de una reunión: entrar, avisar que se graba,
  * grabar, detectar el final, y subir el audio. Se llama fire-and-forget
@@ -71,6 +101,7 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
       headless: false, // corre bajo Xvfb (pantalla virtual, ver entrypoint.sh) — no hay pantalla física, pero Meet bloquea el modo headless "de verdad"
       args: ["--use-fake-ui-for-media-stream", "--disable-blink-features=AutomationControlled"],
     });
+    const fingerprint = pickFingerprint();
     context = await browser.newContext({
       permissions: ["camera", "microphone"],
       // Región/idioma real en vez del genérico por defecto de Playwright --
@@ -79,6 +110,12 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
       // pero es gratis y sin riesgo de romper el flujo que ya funciona.
       locale: "es-BO",
       timezoneId: "America/La_Paz",
+      // Viewport y user-agent sorteados de un pool chico (ver
+      // FINGERPRINT_POOL) -- sin esto, todas las sesiones tenían exactamente
+      // el mismo tamaño de ventana y el mismo UA, una huella idéntica y fácil
+      // de agrupar entre intentos.
+      viewport: { width: fingerprint.width, height: fingerprint.height },
+      userAgent: fingerprint.userAgent,
     });
     // Además del flag --disable-blink-features=AutomationControlled de
     // arriba, se tapa también navigator.webdriver a mano (Playwright/Chromium
@@ -86,6 +123,36 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
     // cualquier página, en cada una nueva.
     await context.addInitScript(() => {
       Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+    });
+    // Ruido chico en canvas/audio -- sin esto, al no haber GPU real, todas
+    // las sesiones producen exactamente el mismo fingerprint de canvas/audio
+    // (además de que puedan compartir el mismo renderer de software). Cada
+    // sesión arranca con un offset propio, así que dos lecturas de la misma
+    // sesión siguen siendo consistentes entre sí, pero distintas de otra
+    // sesión -- es lo que un fingerprint real de dispositivo también hace.
+    await context.addInitScript(() => {
+      const noiseSeed = Math.random() * 0.0001;
+      const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
+      HTMLCanvasElement.prototype.toDataURL = function (...args: unknown[]) {
+        const ctx = this.getContext("2d");
+        if (ctx) {
+          const imageData = ctx.getImageData(0, 0, this.width, this.height);
+          for (let i = 0; i < imageData.data.length; i += 4) {
+            imageData.data[i] = Math.min(255, imageData.data[i] + noiseSeed * 10);
+          }
+          ctx.putImageData(imageData, 0, 0);
+        }
+        // @ts-expect-error -- args reenviados tal cual a la función original
+        return origToDataURL.apply(this, args);
+      };
+      const origGetChannelData = AudioBuffer.prototype.getChannelData;
+      AudioBuffer.prototype.getChannelData = function (...args: Parameters<typeof origGetChannelData>) {
+        const data = origGetChannelData.apply(this, args);
+        for (let i = 0; i < data.length; i += 100) {
+          data[i] += noiseSeed * 1e-7;
+        }
+        return data;
+      };
     });
   } catch (error) {
     await browser?.close().catch(() => {});

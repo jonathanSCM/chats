@@ -126,17 +126,24 @@ export async function handleVexaBotPoll(rawPayload: unknown): Promise<void> {
 
   const transcript =
     transcriptData?.segments
-      ?.map((seg) => `${seg.speaker?.trim() || "?"}: ${seg.text.trim()}`)
+      ?.filter((seg) => !isLikelyWhisperHallucination(seg.text))
+      .map((seg) => `${seg.speaker?.trim() || "?"}: ${seg.text.trim()}`)
       .join("\n")
       .trim() || null;
 
   if (transcript) {
+    // Va a `audioTranscript`, no a `transcript` -- ese campo queda
+    // reservado para los subtítulos en vivo de Meet (los manda la extensión
+    // por separado, ver api/extension/transcript, que SUMA a lo que ya
+    // hubiera en vez de pisarlo). Si algún día corren los dos a la vez en la
+    // misma reunión, se complementan en vez de que uno tape al otro -- el
+    // mismo diseño de dos fuentes que ya tenía el bot casero.
     const txtUrl = await saveMediaFile(Buffer.from(transcript, "utf-8"), "text/plain");
     await prisma.meetingAttachment.create({
       data: {
         meetingId,
         url: txtUrl,
-        fileName: "transcripcion.txt",
+        fileName: "transcripcion-audio-whisper.txt",
         mimeType: "text/plain",
         fileSize: Buffer.byteLength(transcript, "utf-8"),
       },
@@ -172,8 +179,26 @@ export async function handleVexaBotPoll(rawPayload: unknown): Promise<void> {
   const failed = Boolean(entry.failure_stage) || entry.status === "failed" || entry.status === "error";
   await prisma.meeting.update({
     where: { id: meetingId },
-    data: { botStatus: failed ? "FAILED" : "DONE", transcript },
+    data: { botStatus: failed ? "FAILED" : "DONE", audioTranscript: transcript },
   });
+}
+
+// Frases que Whisper "inventa" con frecuencia documentada cuando le llega un
+// tramo de audio silencioso o con ruido de fondo -- las aprendió de su
+// entrenamiento con subtítulos de YouTube, no las dijo nadie en la reunión.
+// Filtrarlas de raíz es mejor que dejarlas y que parezca que alguien las dijo.
+const WHISPER_HALLUCINATION_PATTERNS = [
+  /subt[ií]tulos (realizados |hechos )?por la comunidad de amara\.org/i,
+  /subt[ií]tulos por la comunidad de amara\.org/i,
+  /m[aá]s informaci[oó]n (en )?www\./i,
+  /suscr[ií]bete/i,
+  /gracias por ver( el video)?/i,
+  /cc por antarctica films argentina/i,
+];
+
+function isLikelyWhisperHallucination(text: string): boolean {
+  const trimmed = text.trim();
+  return WHISPER_HALLUCINATION_PATTERNS.some((re) => re.test(trimmed));
 }
 
 /** Se agotaron los reintentos del polling (errores repetidos de red/API) — queda visible como fallido. */

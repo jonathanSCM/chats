@@ -25,9 +25,17 @@ export async function GET(
     return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   }
 
+  // Sin el charset explícito, un .txt en UTF-8 real (tildes, ñ) se ve como
+  // "Â¿QuÃ©" al abrirlo -- el navegador/editor que lo recibe no tiene forma
+  // de adivinar la codificación y cae a Latin-1 por default.
+  const contentType = file.contentType ?? "application/octet-stream";
+  const withCharset = contentType.startsWith("text/") && !contentType.includes("charset")
+    ? `${contentType}; charset=utf-8`
+    : contentType;
+
   return new NextResponse(file.body, {
     headers: {
-      "Content-Type": file.contentType ?? "application/octet-stream",
+      "Content-Type": withCharset,
       "Cache-Control": "private, max-age=3600",
     },
   });

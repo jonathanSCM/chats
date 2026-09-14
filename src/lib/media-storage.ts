@@ -73,12 +73,18 @@ export async function saveMediaFile(buffer: Buffer, mimeType: string): Promise<s
 
   if (config) {
     const client = getS3Client(config);
+    // Sin el charset, un .txt en UTF-8 real se ve mal al abrirlo directo
+    // (el navegador/editor que lo reciba no tiene cómo adivinar la
+    // codificación) -- ver también api/media/[fileName]/route.ts.
+    const contentType = mimeType.startsWith("text/") && !mimeType.includes("charset")
+      ? `${mimeType}; charset=utf-8`
+      : mimeType;
     await client.send(
       new PutObjectCommand({
         Bucket: config.bucket,
         Key: `media/${fileName}`,
         Body: buffer,
-        ContentType: mimeType,
+        ContentType: contentType,
       }),
     );
     return `/api/media/${fileName}`;

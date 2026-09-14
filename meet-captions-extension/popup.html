@@ -5,12 +5,15 @@
     <title>ProShop CRM — Subtítulos de Meet</title>
     <style>
       :root {
-        --accent: #4f46e5;
-        --accent-dark: #3730a3;
-        --ink: #111827;
-        --ink-muted: #6b7280;
-        --border: #e5e7eb;
-        --surface: #f9fafb;
+        /* Misma paleta que la web (src/app/globals.css) -- verde-azulado
+           estilo WhatsApp, no el índigo genérico que había antes. */
+        --accent: #00a884;
+        --accent-dark: #00795c;
+        --ink: #111b21;
+        --ink-muted: #667781;
+        --border: #e9edef;
+        --surface: #f0f2f5;
+        --danger: #c62828;
       }
       * {
         box-sizing: border-box;
@@ -64,7 +67,7 @@
         opacity: 0.9;
       }
       button.record {
-        background: #dc2626;
+        background: var(--danger);
       }
       button.secondary {
         background: #fff;
@@ -164,10 +167,10 @@
     <main>
       <div id="meetingBox">
         <p id="meetingText">Revisando la pestaña actual…</p>
-        <button id="recordBtn" style="display: none">Grabar esta reunión</button>
-        <button id="joinAssistantBtn" class="secondary" style="display: none">
+        <button id="joinAssistantBtn" style="display: none">
           Unir al asistente (graba y transcribe él solo)
         </button>
+        <button id="recordBtn" class="secondary" style="display: none">Grabar esta reunión</button>
         <div id="meetingStatus"></div>
       </div>
 

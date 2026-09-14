@@ -3,6 +3,7 @@ import { handleDownloadMedia, markMediaFailed } from "./handlers/download-media"
 import { handleAnalyzeFollowUp } from "./handlers/analyze-follow-up";
 import { handleBotReply } from "./handlers/bot-reply";
 import { handleMeetingBotJoin, markMeetingBotJoinFailed } from "./handlers/meeting-bot-join";
+import { handleVexaBotPoll, markVexaBotPollFailed } from "./handlers/vexa-bot-poll";
 import { handleCleanupMeetingMedia } from "./handlers/cleanup-meeting-media";
 import { handleCoexistenceHistorySync } from "./handlers/coexistence-history-sync";
 import { handleFetchLinkPreview } from "./handlers/fetch-link-preview";
@@ -20,6 +21,7 @@ const handlers: Record<string, JobHandler> = {
   analyze_follow_up: handleAnalyzeFollowUp,
   bot_reply: handleBotReply,
   meeting_bot_join: handleMeetingBotJoin,
+  vexa_bot_poll: handleVexaBotPoll,
   cleanup_meeting_media: handleCleanupMeetingMedia,
   coexistence_history_sync: handleCoexistenceHistorySync,
   fetch_link_preview: handleFetchLinkPreview,
@@ -29,6 +31,7 @@ const onExhausted: Record<string, JobExhaustedHandler> = {
   download_media: markMediaFailed,
   bot_reply: markBotReplyFailed,
   meeting_bot_join: markMeetingBotJoinFailed,
+  vexa_bot_poll: markVexaBotPollFailed,
 };
 
 const BATCH_SIZE = 10;

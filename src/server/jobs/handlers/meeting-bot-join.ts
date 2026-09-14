@@ -1,29 +1,33 @@
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
+import { enqueueOrReschedule } from "../queue";
+import { extractMeetCode } from "@/server/services/meeting-bot";
 
 export const meetingBotJoinPayload = z.object({
   meetingId: z.string(),
 });
 
-function botServiceConfig(): { url: string; secret: string } | null {
-  const url = process.env.BOT_SERVICE_URL;
-  const secret = process.env.BOT_SERVICE_SECRET;
-  if (!url || !secret) return null;
-  return { url, secret };
+function vexaConfig(): { url: string; apiKey: string } | null {
+  const url = process.env.VEXA_API_URL;
+  const apiKey = process.env.VEXA_API_KEY;
+  if (!url || !apiKey) return null;
+  return { url, apiKey };
 }
 
 /**
- * Le avisa al servicio del bot que entre a la reunión. El bot mismo hace
- * todo el resto (unirse, grabar, detectar el final, subir el audio) — este
- * handler solo dispara el `/join` y marca el estado; el resto del ciclo lo
- * cierra el webhook de `api/webhooks/meeting-bot` cuando el audio llega.
+ * Le pide a Vexa (bot de reuniones auto-alojado, ver `meeting-bot.ts`) que
+ * entre a la reunión. Vexa hace todo el resto (unirse, grabar, transcribir)
+ * de forma asíncrona de su lado — este handler solo dispara el `POST /bots`,
+ * marca el estado, y encola el primer tick de `vexa_bot_poll`, que es el que
+ * va siguiendo el progreso y cierra el ciclo (reemplaza al webhook que usaba
+ * el bot casero, que no aplica acá).
  */
 export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
   const { meetingId } = meetingBotJoinPayload.parse(rawPayload);
 
-  const config = botServiceConfig();
+  const config = vexaConfig();
   if (!config) {
-    console.warn("[meeting-bot] BOT_SERVICE_URL/BOT_SERVICE_SECRET no configurados — se omite el job.");
+    console.warn("[meeting-bot] VEXA_API_URL/VEXA_API_KEY no configurados — se omite el job.");
     return;
   }
 
@@ -32,27 +36,25 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
     select: {
       id: true,
       meetingUrl: true,
-      durationMinutes: true,
       status: true,
       organization: { select: { name: true } },
     },
   });
   if (!meeting || !meeting.meetingUrl || meeting.status === "CANCELED") return;
 
-  const appUrl = process.env.NEXTAUTH_URL;
-  if (!appUrl) {
-    throw new Error("NEXTAUTH_URL no está configurada — el bot no tendría a dónde devolver la grabación.");
+  const code = extractMeetCode(meeting.meetingUrl);
+  if (!code) {
+    throw new Error("El link de la reunión no es un link de Google Meet válido.");
   }
 
-  const response = await fetch(`${config.url}/join`, {
+  const response = await fetch(`${config.url}/bots`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.secret}` },
+    headers: { "Content-Type": "application/json", "X-API-Key": config.apiKey },
     body: JSON.stringify({
-      meetingId: meeting.id,
-      meetingUrl: meeting.meetingUrl,
-      expectedDurationMinutes: meeting.durationMinutes,
-      callbackUrl: `${appUrl}/api/webhooks/meeting-bot`,
-      displayName: `Asistente de ${meeting.organization.name}`,
+      platform: "google_meet",
+      native_meeting_id: code,
+      bot_name: `Asistente de ${meeting.organization.name}`,
+      language: "es",
     }),
   });
 
@@ -61,6 +63,13 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
   }
 
   await prisma.meeting.update({ where: { id: meetingId }, data: { botStatus: "JOINING" } });
+
+  await enqueueOrReschedule({
+    type: "vexa_bot_poll",
+    uniqueKey: `vexa-poll-${meetingId}`,
+    payload: { meetingId, nativeMeetingId: code, startedAt: new Date().toISOString() },
+    runAfter: new Date(Date.now() + 15_000),
+  });
 }
 
 /** Se agotaron los reintentos de pedirle al bot que entre — queda visible como fallido. */

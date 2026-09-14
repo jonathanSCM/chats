@@ -2,13 +2,22 @@ import { enqueueOrReschedule, cancelJob, runJobsSoon } from "@/server/jobs";
 import { prisma } from "@/server/db/client";
 
 /**
- * El servicio del bot (Xvfb+Chromium+ffmpeg, `meeting-bot/`) vive aparte,
- * desplegado como otra app en Coolify. Sin estas dos variables, simplemente
- * no se programa el job — el link de Meet se genera igual (Fase 1), solo que
- * nadie entra a grabar.
+ * El bot que se une a las reuniones es Vexa (github.com/Vexa-ai/vexa,
+ * auto-alojado aparte en el mismo servidor) — reemplazó al bot casero
+ * (`meeting-bot/`, Playwright a mano) porque Google Meet empezó a bloquearlo
+ * de forma persistente con una verificación anti-bot explícita, sin importar
+ * los ajustes de fingerprint que se probaron. Sin estas dos variables,
+ * simplemente no se programa el job — el link de Meet se genera igual (Fase
+ * 1), solo que nadie entra a grabar.
  */
 export function isMeetingBotEnabled(): boolean {
-  return Boolean(process.env.BOT_SERVICE_URL && process.env.BOT_SERVICE_SECRET);
+  return Boolean(process.env.VEXA_API_URL && process.env.VEXA_API_KEY);
+}
+
+/** El código de la reunión (lo que va después de "meet.google.com/"). */
+export function extractMeetCode(meetingUrl: string): string | null {
+  const match = meetingUrl.match(/meet\.google\.com\/([a-z0-9-]+)/i);
+  return match ? match[1] : null;
 }
 
 /**
@@ -71,24 +80,29 @@ export async function cancelMeetingBotJoin(meetingId: string): Promise<void> {
 }
 
 /**
- * "Salir de la reunión" a mano — le pega directo al servicio del bot
- * (`POST /stop`), que corta la grabación ahí mismo y sube lo que tenga
- * hasta ese momento (no espera a que la app principal reprocese nada). El
- * `botStatus` lo actualiza el propio bot al terminar de subir, como
- * cualquier fin de reunión normal — acá no se toca a propósito.
+ * "Salir de la reunión" a mano — le pide a Vexa que corte esa sesión ahí
+ * mismo. El `botStatus` final lo deja el próximo tick de `vexa_bot_poll`
+ * (que ya está encolado) al ver que la reunión pasó a un estado terminal —
+ * acá no se toca a propósito, para no pisar una transcripción que todavía se
+ * esté terminando de armar del lado de Vexa.
  */
 export async function stopMeetingBot(meetingId: string): Promise<{ ok: boolean; error?: string }> {
-  const url = process.env.BOT_SERVICE_URL;
-  const secret = process.env.BOT_SERVICE_SECRET;
-  if (!url || !secret) {
+  const url = process.env.VEXA_API_URL;
+  const apiKey = process.env.VEXA_API_KEY;
+  if (!url || !apiKey) {
     return { ok: false, error: "El bot no está configurado en el servidor." };
   }
 
+  const meeting = await prisma.meeting.findUnique({ where: { id: meetingId }, select: { meetingUrl: true } });
+  const code = meeting?.meetingUrl ? extractMeetCode(meeting.meetingUrl) : null;
+  if (!code) {
+    return { ok: false, error: "Esta reunión no tiene un link de Meet válido." };
+  }
+
   try {
-    const response = await fetch(`${url}/stop`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
-      body: JSON.stringify({ meetingId }),
+    const response = await fetch(`${url}/bots/google_meet/${code}`, {
+      method: "DELETE",
+      headers: { "X-API-Key": apiKey },
     });
     if (!response.ok) {
       const detail = response.status === 404 ? "El bot no tiene ninguna sesión activa para esta reunión." : `El servicio del bot respondió ${response.status}.`;

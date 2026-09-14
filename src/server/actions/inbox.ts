@@ -9,6 +9,7 @@ import {
   sendMediaMessage,
   sendTemplateMessage,
   sendLocationMessage,
+  sendReactionMessage,
   googleMapsUrl,
   uploadMedia,
   type OutboundMediaType,
@@ -17,6 +18,8 @@ import { saveMediaFile } from "@/lib/media-storage";
 import { isWhatsAppAudioType, transcodeToOpus } from "@/lib/audio-transcode";
 import { convertWebpToPng } from "@/lib/image-convert";
 import { maybeActivateFreeEntryPoint } from "@/server/services/conversation";
+import { enqueue } from "@/server/jobs";
+import { firstUrl } from "@/lib/urls";
 
 const messageSchema = z.object({ content: z.string().min(1).max(4000) });
 
@@ -51,6 +54,7 @@ async function getOwnedConversation(conversationId: string) {
 export async function sendInboxMessageAction(
   conversationId: string,
   content: string,
+  replyToId?: string,
 ): Promise<{ error: string | null }> {
   const parsed = messageSchema.safeParse({ content });
   if (!parsed.success) {
@@ -68,6 +72,22 @@ export async function sendInboxMessageAction(
     return { error: "WhatsApp no está conectado." };
   }
 
+  // Solo se cita en WhatsApp si el mensaje elegido es de esta misma
+  // conversación y ya tiene externalId -- si no, se manda sin cita en vez
+  // de fallar.
+  let validReplyToId: string | null = null;
+  let replyToExternalId: string | undefined;
+  if (replyToId) {
+    const target = await prisma.message.findUnique({
+      where: { id: replyToId },
+      select: { conversationId: true, externalId: true },
+    });
+    if (target?.conversationId === conversationId) {
+      validReplyToId = replyToId;
+      replyToExternalId = target.externalId ?? undefined;
+    }
+  }
+
   let messageId: string | null;
   try {
     ({ messageId } = await sendTextMessage({
@@ -75,6 +95,7 @@ export async function sendInboxMessageAction(
       accessToken: decrypt(connection.accessToken),
       to: conversation.customerPhone,
       body: parsed.data.content,
+      replyToExternalId,
     }));
   } catch (error) {
     console.error(error);
@@ -83,7 +104,7 @@ export async function sendInboxMessageAction(
 
   const session = await requireSession();
 
-  await prisma.$transaction([
+  const [created] = await prisma.$transaction([
     prisma.message.create({
       data: {
         conversationId,
@@ -91,6 +112,7 @@ export async function sendInboxMessageAction(
         content: parsed.data.content,
         sentById: session.user.id,
         externalId: messageId,
+        replyToId: validReplyToId,
       },
     }),
     prisma.conversation.update({
@@ -104,6 +126,60 @@ export async function sendInboxMessageAction(
     }),
   ]);
   await maybeActivateFreeEntryPoint(conversationId);
+
+  if (firstUrl(parsed.data.content)) {
+    await enqueue({
+      type: "fetch_link_preview",
+      uniqueKey: `fetch_link_preview:${created.id}`,
+      payload: { messageId: created.id },
+    });
+  }
+
+  return { error: null };
+}
+
+const reactionSchema = z.object({ emoji: z.string().max(8) });
+
+/** Emoji vacío saca la reacción que hubiera puesto un vendedor antes. */
+export async function sendInboxReactionAction(
+  conversationId: string,
+  messageId: string,
+  emoji: string,
+): Promise<{ error: string | null }> {
+  const parsed = reactionSchema.safeParse({ emoji });
+  if (!parsed.success) return { error: "Emoji inválido" };
+
+  const conversation = await getOwnedConversation(conversationId);
+  if (!conversation) return { error: "Conversación no encontrada" };
+
+  const connection = conversation.bot.whatsappConnection;
+  if (!connection?.verified) return { error: "WhatsApp no está conectado." };
+
+  const target = await prisma.message.findUnique({
+    where: { id: messageId },
+    select: { conversationId: true, externalId: true },
+  });
+  if (target?.conversationId !== conversationId || !target.externalId) {
+    return { error: "Mensaje no encontrado" };
+  }
+
+  try {
+    await sendReactionMessage({
+      phoneNumberId: connection.phoneNumberId,
+      accessToken: decrypt(connection.accessToken),
+      to: conversation.customerPhone,
+      messageExternalId: target.externalId,
+      emoji: parsed.data.emoji,
+    });
+  } catch (error) {
+    console.error(error);
+    return { error: "No se pudo mandar la reacción." };
+  }
+
+  await prisma.message.update({
+    where: { id: messageId },
+    data: { staffReaction: parsed.data.emoji || null },
+  });
 
   return { error: null };
 }

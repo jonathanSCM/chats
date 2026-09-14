@@ -50,7 +50,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     },
     orderBy: { createdAt: "desc" },
     take: MESSAGE_LIMIT,
-    include: { sentBy: { select: { id: true, name: true, email: true, color: true } } },
+    include: {
+      sentBy: { select: { id: true, name: true, email: true, color: true } },
+      replyTo: { select: { id: true, content: true, role: true, mediaType: true } },
+    },
   });
   const messages = recentDesc.slice().reverse();
   const hasMoreHistory = recentDesc.length === MESSAGE_LIMIT;
@@ -92,6 +95,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       outsideWindow,
       status: conversation.status,
       blocked: conversation.blocked,
+      muted: conversation.muted,
       botPaused: conversation.botPaused,
       aiQualificationEnabled: conversation.bot.aiQualificationEnabled,
       adReferral: conversation.adReferral,
@@ -122,6 +126,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         : null,
       status: m.status,
       errorDetail: m.errorDetail,
+      isVoiceNote: m.isVoiceNote,
+      customerReaction: m.customerReaction,
+      staffReaction: m.staffReaction,
+      linkPreview: m.linkPreviewTitle
+        ? {
+            title: m.linkPreviewTitle,
+            description: m.linkPreviewDescription,
+            imageUrl: m.linkPreviewImageUrl,
+          }
+        : null,
+      replyTo: m.replyTo
+        ? {
+            id: m.replyTo.id,
+            content: m.replyTo.content,
+            role: m.replyTo.role,
+            mediaType: m.replyTo.mediaType,
+          }
+        : null,
     })),
     hasMoreHistory,
   });

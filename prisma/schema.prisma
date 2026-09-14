@@ -282,6 +282,9 @@ model Conversation {
   // abusivo, spam, etc.) sin borrar el historial. Distinto de "archivar"
   // (status CLOSED), que solo la saca de la bandeja del día a día.
   blocked       Boolean  @default(false)
+  // Silenciar solo apaga sonido/notificación push -- a diferencia de
+  // bloquear, los mensajes se siguen recibiendo y mostrando normal.
+  muted         Boolean  @default(false)
 
   // Ventana extendida de Meta para leads que llegan por un anuncio "Click to
   // WhatsApp": si el primer mensaje trae un objeto "referral" y alguien del
@@ -451,6 +454,28 @@ model Message {
   status         MessageStatus @default(SENT) // solo relevante para mensajes salientes (STAFF): confirmación de entrega/lectura de Meta
   errorDetail    String? // motivo legible cuando status es FAILED (ver services/whatsapp.ts describeMessageError)
   createdAt      DateTime      @default(now())
+
+  // Responder citando un mensaje puntual (context.id de WhatsApp). Nullable
+  // y auto-referenciada -- no toda conversación usa esto.
+  replyToId String?
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   Message[] @relation("MessageReplies")
+
+  // Reacciones con emoji -- en un chat 1 a 1 solo hay dos partes que pueden
+  // reaccionar, así que alcanza con dos columnas en vez de una tabla aparte.
+  // Emoji vacío/null = sin reacción (o se sacó la que había).
+  customerReaction String?
+  staffReaction    String?
+
+  // true si Meta marcó este audio como nota de voz (PTT), no un archivo de
+  // audio subido -- distinción solo visual en el inbox.
+  isVoiceNote Boolean @default(false)
+
+  // Preview del primer link en el contenido (og:title/description/image),
+  // completado por un job aparte para no bloquear el webhook ni el envío.
+  linkPreviewTitle       String?
+  linkPreviewDescription String? @db.Text
+  linkPreviewImageUrl    String?
 
   @@index([conversationId])
   @@map("messages")

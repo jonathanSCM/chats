@@ -171,6 +171,26 @@ export async function setConversationBlockedAction(
 }
 
 /**
+ * Silenciar solo apaga sonido/notificación push de esta conversación — a
+ * diferencia de bloquear, los mensajes se siguen recibiendo y mostrando
+ * normal (ver notifyNewMessage en services/push.ts y el polling del inbox).
+ */
+export async function setConversationMutedAction(
+  conversationId: string,
+  muted: boolean,
+): Promise<ActionState> {
+  const access = await requireConversationAccess(conversationId);
+  if (!access) return { error: "Conversación no encontrada" };
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { muted },
+  });
+
+  return { error: null };
+}
+
+/**
  * Pausa el bot en esta conversación puntual sin mandar ningún mensaje —
  * para tomar control en silencio antes de escribir (a diferencia de mandar
  * un mensaje manual, que también pausa el bot pero de paso).

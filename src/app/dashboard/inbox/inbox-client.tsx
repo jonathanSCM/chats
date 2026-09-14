@@ -25,21 +25,30 @@ import {
   Search,
   Smile,
   MapPin,
+  BellOff,
+  Reply,
+  ChevronUp,
+  ChevronDown,
+  Play,
+  Pause,
 } from "lucide-react";
 import {
   sendInboxMessageAction,
   sendInboxAttachmentAction,
   sendInboxLocationAction,
+  sendInboxReactionAction,
 } from "@/server/actions/inbox";
 import {
   deleteMessageAction,
   setConversationStatusAction,
   setConversationBlockedAction,
+  setConversationMutedAction,
   markConversationFromAdAction,
   pauseBotAction,
   resumeBotAction,
 } from "@/server/actions/conversation-panel";
 import { vendorColor } from "@/lib/vendor-color";
+import { firstUrl, URL_REGEX } from "@/lib/urls";
 import { usePushNotifications } from "@/lib/use-push-notifications";
 import { Button } from "@/components/ui/button";
 import { ConversationPanel } from "./_components/conversation-panel";
@@ -63,6 +72,7 @@ interface ConversationSummary {
   lastMessageAt: string;
   status: "OPEN" | "ON_HOLD" | "CLOSED";
   blocked: boolean;
+  muted: boolean;
   bot: BotAccount;
   assignedTo: Vendor | null;
   botActive: boolean;
@@ -105,6 +115,11 @@ interface Message {
   sentBy: Vendor | null;
   status: "SENT" | "DELIVERED" | "READ" | "FAILED";
   errorDetail: string | null;
+  isVoiceNote: boolean;
+  customerReaction: string | null;
+  staffReaction: string | null;
+  linkPreview: { title: string; description: string | null; imageUrl: string | null } | null;
+  replyTo: { id: string; content: string; role: Message["role"]; mediaType: MediaType | null } | null;
 }
 
 function StatusTicks({ status }: { status: Message["status"] }) {
@@ -140,6 +155,10 @@ const mediaPreviewLabel: Record<MediaType, string> = {
   LOCATION: "📍 Ubicación",
 };
 
+// Set corto para reaccionar a un mensaje puntual -- a diferencia de
+// EMOJI_LIST (abajo), que es para escribir en el cuerpo del mensaje.
+const REACTION_EMOJI = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
 const EMOJI_LIST = [
   "😀", "😁", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😍",
   "🥰", "😘", "😋", "😎", "🤩", "🥳", "😢", "😭", "😡", "🤬",
@@ -150,8 +169,6 @@ const EMOJI_LIST = [
   "💚", "💙", "💜", "🖤", "💔", "❤️‍🔥", "✅", "❌", "⚠️", "❓",
   "📌", "📎", "📅", "⏰", "💰", "💳", "📦", "🚚", "🛒", "🏢",
 ];
-
-const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 
 function linkify(text: string, mine: boolean) {
   const parts = text.split(URL_REGEX);
@@ -299,9 +316,7 @@ function MessageMedia({ message }: { message: Message }) {
         <video src={message.mediaUrl} controls className="mb-1.5 max-h-72 w-full rounded-md" />
       );
     case "AUDIO":
-      return (
-        <audio src={message.mediaUrl} controls className="mb-1.5 w-56 max-w-full sm:w-64" />
-      );
+      return <AudioPlayer url={message.mediaUrl} isVoiceNote={message.isVoiceNote} />;
     case "DOCUMENT":
       return (
         <a
@@ -330,6 +345,64 @@ function MessageMedia({ message }: { message: Message }) {
     default:
       return null;
   }
+}
+
+function formatAudioTime(seconds: number): string {
+  if (!Number.isFinite(seconds)) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Reproductor propio en vez del <audio controls> nativo desnudo -- distingue
+ * visualmente una nota de voz (ícono de micrófono) de un audio subido a
+ * mano (ícono de nota musical). El <audio> real sigue existiendo, oculto,
+ * solo para la reproducción/seek de verdad.
+ */
+function AudioPlayer({ url, isVoiceNote }: { url: string; isVoiceNote: boolean }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  return (
+    <div className="mb-1.5 flex w-56 max-w-full items-center gap-2 sm:w-64">
+      <audio
+        ref={audioRef}
+        src={url}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+        className="hidden"
+      />
+      <button
+        type="button"
+        onClick={() => (playing ? audioRef.current?.pause() : audioRef.current?.play())}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/10 hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20"
+      >
+        {playing ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
+      </button>
+      {isVoiceNote ? <Mic size={13} className="shrink-0 opacity-60" /> : <FileText size={13} className="shrink-0 opacity-60" />}
+      <input
+        type="range"
+        min={0}
+        max={duration || 0}
+        value={currentTime}
+        onChange={(e) => {
+          const value = Number(e.target.value);
+          if (audioRef.current) audioRef.current.currentTime = value;
+          setCurrentTime(value);
+        }}
+        className="h-1 flex-1 accent-current"
+      />
+      <span className="w-9 shrink-0 text-right font-mono text-[10px] opacity-70">
+        {formatAudioTime(duration ? duration - currentTime : 0)}
+      </span>
+    </div>
+  );
 }
 
 // Tipos aceptados en el selector de archivos: imágenes, video, audio,
@@ -424,6 +497,14 @@ export function InboxClient({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [height, setHeight] = useState<number | null>(null);
+  // Mensaje al que se está respondiendo citándolo -- se limpia solo después
+  // de mandar, o si se toca la X del banner.
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [reactingToId, setReactingToId] = useState<string | null>(null);
+  const [conversationMuted, setConversationMuted] = useState(false);
+  const [chatSearchOpen, setChatSearchOpen] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
+  const [chatSearchIndex, setChatSearchIndex] = useState(0);
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState<string | null>(null);
@@ -532,6 +613,9 @@ export function InboxClient({
       // aparecer "subido" un instante mientras el servidor procesa la marca
       // de leído — sonaría al simple hecho de cambiar de chat.
       if (c.id === selectedIdRef.current) continue;
+      // Silenciada: se sigue viendo/contando el mensaje, solo no suena ni
+      // manda notificación del sistema.
+      if (c.muted) continue;
 
       hasNewMessage = true;
 
@@ -593,6 +677,7 @@ export function InboxClient({
     setConversationBotId(data.conversation.botId ?? null);
     setConversationStatus(data.conversation.status ?? "OPEN");
     setConversationBlocked(Boolean(data.conversation.blocked));
+    setConversationMuted(Boolean(data.conversation.muted));
     setConversationFromAd(Boolean(data.conversation.adReferral));
     setConversationBotPaused(Boolean(data.conversation.botPaused));
     setConversationAiEnabled(Boolean(data.conversation.aiQualificationEnabled));
@@ -748,7 +833,9 @@ export function InboxClient({
       await sendFile(file, caption);
     } else {
       const content = draft;
+      const replyingTo = replyTo;
       setDraft("");
+      setReplyTo(null);
       const optimistic: Message = {
         id: `optimistic-${Date.now()}`,
         role: "STAFF",
@@ -764,10 +851,17 @@ export function InboxClient({
         sentBy: null,
         status: "SENT",
         errorDetail: null,
+        isVoiceNote: false,
+        customerReaction: null,
+        staffReaction: null,
+        linkPreview: null,
+        replyTo: replyingTo
+          ? { id: replyingTo.id, content: replyingTo.content, role: replyingTo.role, mediaType: replyingTo.mediaType }
+          : null,
       };
       setMessages((prev) => [...prev, optimistic]);
 
-      const result = await sendInboxMessageAction(selectedId, content);
+      const result = await sendInboxMessageAction(selectedId, content, replyingTo?.id);
       if (result.error) setError(result.error);
       // Se saca el mensaje optimista siempre, no solo si falló -- si no,
       // cuando el envío funciona bien queda para siempre al lado del
@@ -814,6 +908,11 @@ export function InboxClient({
           sentBy: null,
           status: "SENT",
           errorDetail: null,
+          isVoiceNote: false,
+          customerReaction: null,
+          staffReaction: null,
+          linkPreview: null,
+          replyTo: null,
         };
         setMessages((prev) => [...prev, optimistic]);
 
@@ -889,6 +988,24 @@ export function InboxClient({
     });
   }
 
+  function handleReact(message: Message, emoji: string) {
+    if (!selectedIdRef.current) return;
+    const mine = message.role === "STAFF" || message.role === "BOT";
+    setReactingToId(null);
+    // Optimista: se actualiza al toque, sin esperar la vuelta de Meta.
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === message.id ? { ...m, [mine ? "staffReaction" : "customerReaction"]: emoji || null } : m,
+      ),
+    );
+    sendInboxReactionAction(selectedIdRef.current, message.id, emoji).then((result) => {
+      if (result.error) {
+        setError(result.error);
+        if (selectedIdRef.current) fetchMessages(selectedIdRef.current);
+      }
+    });
+  }
+
   function handleConversationDeleted() {
     const deletedId = selectedIdRef.current;
     setPanelOpen(false);
@@ -947,6 +1064,16 @@ export function InboxClient({
     });
   }
 
+  function toggleMute() {
+    const id = selectedIdRef.current;
+    if (!id) return;
+    // No es destructivo como archivar/bloquear -- sin doble toque de
+    // confirmación, y sin cerrar el chat ni cambiar de vista.
+    const next = !conversationMuted;
+    setConversationMuted(next);
+    setConversationMutedAction(id, next).then(() => fetchConversations());
+  }
+
   function toggleBot() {
     const id = selectedIdRef.current;
     if (!id) return;
@@ -969,6 +1096,23 @@ export function InboxClient({
   }
 
   const filteredConversations = conversations.filter((c) => matchesSearch(c, searchQuery));
+
+  // Búsqueda dentro del chat abierto -- solo entre lo ya cargado en
+  // pantalla (si hace falta más, subir para cargar historial más viejo).
+  const chatSearchNormalized = chatSearchQuery.trim().toLowerCase();
+  const chatSearchMatches = chatSearchNormalized
+    ? messages.filter((m) => m.content.toLowerCase().includes(chatSearchNormalized)).map((m) => m.id)
+    : [];
+  const clampedChatSearchIndex =
+    chatSearchMatches.length > 0 ? Math.min(chatSearchIndex, chatSearchMatches.length - 1) : 0;
+  const currentChatSearchMatchId = chatSearchMatches[clampedChatSearchIndex] ?? null;
+
+  function goToChatSearchMatch(index: number) {
+    if (chatSearchMatches.length === 0) return;
+    const next = ((index % chatSearchMatches.length) + chatSearchMatches.length) % chatSearchMatches.length;
+    setChatSearchIndex(next);
+    document.getElementById(`msg-${chatSearchMatches[next]}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
 
   return (
     <div
@@ -1252,6 +1396,28 @@ export function InboxClient({
               )}
               <button
                 type="button"
+                onClick={() => setChatSearchOpen((v) => !v)}
+                aria-label="Buscar en esta conversación"
+                title="Buscar en esta conversación"
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface ${
+                  chatSearchOpen ? "text-accent" : "text-ink-muted"
+                }`}
+              >
+                <Search size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={toggleMute}
+                aria-label={conversationMuted ? "Reactivar notificaciones" : "Silenciar"}
+                title={conversationMuted ? "Reactivar notificaciones" : "Silenciar"}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface ${
+                  conversationMuted ? "text-accent" : "text-ink-muted"
+                }`}
+              >
+                {conversationMuted ? <BellOff size={18} /> : <Bell size={18} />}
+              </button>
+              <button
+                type="button"
                 onClick={toggleBlock}
                 aria-label={conversationBlocked ? "Desbloquear" : confirmBlock ? "¿Seguro? Toca de nuevo" : "Bloquear"}
                 title={conversationBlocked ? "Desbloquear" : confirmBlock ? "¿Seguro? Toca de nuevo" : "Bloquear"}
@@ -1288,6 +1454,58 @@ export function InboxClient({
                 <PanelRight size={18} />
               </button>
             </div>
+
+            {chatSearchOpen && (
+              <div className="flex items-center gap-2 border-b border-border bg-surface px-3 py-2">
+                <Search size={14} className="shrink-0 text-ink-faint" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={chatSearchQuery}
+                  onChange={(e) => {
+                    setChatSearchQuery(e.target.value);
+                    setChatSearchIndex(0);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") goToChatSearchMatch(clampedChatSearchIndex + (e.shiftKey ? -1 : 1));
+                    if (e.key === "Escape") setChatSearchOpen(false);
+                  }}
+                  placeholder="Buscar texto en esta conversación…"
+                  className="flex-1 bg-transparent text-xs text-ink outline-none placeholder:text-ink-faint"
+                />
+                {chatSearchNormalized && (
+                  <span className="shrink-0 font-mono text-[11px] text-ink-faint">
+                    {chatSearchMatches.length > 0 ? `${clampedChatSearchIndex + 1} de ${chatSearchMatches.length}` : "0"}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  disabled={chatSearchMatches.length === 0}
+                  onClick={() => goToChatSearchMatch(clampedChatSearchIndex - 1)}
+                  className="shrink-0 text-ink-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronUp size={16} />
+                </button>
+                <button
+                  type="button"
+                  disabled={chatSearchMatches.length === 0}
+                  onClick={() => goToChatSearchMatch(clampedChatSearchIndex + 1)}
+                  className="shrink-0 text-ink-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronDown size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChatSearchOpen(false);
+                    setChatSearchQuery("");
+                  }}
+                  className="shrink-0 text-ink-faint hover:text-ink"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
 
             {conversationBlocked && (
               <div className="flex items-center gap-2 border-b border-danger/30 bg-danger-dim px-4 py-2 text-xs text-danger">
@@ -1342,8 +1560,39 @@ export function InboxClient({
                   );
                 }
 
+                const reaction = mine ? m.staffReaction : m.customerReaction;
+                const otherSideReaction = mine ? m.customerReaction : m.staffReaction;
+                const actionButtons = (
+                  <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 active:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => setReplyTo(m)}
+                      title="Responder citando"
+                      className="rounded-full p-1 text-ink-faint hover:text-accent"
+                    >
+                      <Reply size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReactingToId(reactingToId === m.id ? null : m.id)}
+                      title="Reaccionar"
+                      className="rounded-full p-1 text-ink-faint hover:text-accent"
+                    >
+                      <Smile size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteMessage(m.id)}
+                      title={confirming ? "¿Seguro? Toca de nuevo" : "Borrar mensaje"}
+                      className={`rounded-full p-1 ${confirming ? "text-danger" : "text-ink-faint hover:text-danger"}`}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                );
+
                 return (
-                  <div key={m.id}>
+                  <div key={m.id} id={`msg-${m.id}`}>
                     {showDateDivider && (
                       <div className="my-3 flex justify-center">
                         <span className="rounded-full bg-surface px-3 py-1 text-[11px] font-medium text-ink-muted shadow-sm">
@@ -1352,34 +1601,53 @@ export function InboxClient({
                       </div>
                     )}
                     <div
-                      className={`group flex items-center gap-1.5 ${mine ? "justify-end" : "justify-start"}`}
+                      className={`group relative flex items-center gap-1.5 ${mine ? "justify-end" : "justify-start"}`}
                     >
-                    {mine && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteMessage(m.id)}
-                        title={confirming ? "¿Seguro? Toca de nuevo" : "Borrar mensaje"}
-                        className={`shrink-0 rounded-full p-1 opacity-0 transition-opacity group-hover:opacity-100 active:opacity-100 ${
-                          confirming ? "opacity-100 text-danger" : "text-ink-faint hover:text-danger"
-                        }`}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    )}
+                    {mine && actionButtons}
+                    <div className="relative max-w-[85%] md:max-w-[70%]">
                     <div
-                      className={`max-w-[85%] rounded-lg px-3 py-2 text-sm shadow-sm md:max-w-[70%] ${
+                      className={`rounded-lg px-3 py-2 text-sm shadow-sm ${
                         m.role === "BOT"
                           ? "bg-accent/15 text-ink"
                           : mine
                             ? "bg-[var(--wa-bubble-out)] text-ink"
                             : "bg-surface text-ink"
-                      }`}
+                      } ${currentChatSearchMatchId === m.id ? "ring-2 ring-accent" : ""}`}
                     >
+                      {m.replyTo && (
+                        <div
+                          onClick={() => document.getElementById(`msg-${m.replyTo!.id}`)?.scrollIntoView({ block: "center", behavior: "smooth" })}
+                          className="mb-1.5 cursor-pointer rounded border-l-2 border-accent bg-black/5 px-2 py-1 text-xs opacity-80 dark:bg-white/5"
+                        >
+                          <p className="line-clamp-2 whitespace-pre-wrap break-words">
+                            {m.replyTo.content || mediaPreviewLabel[m.replyTo.mediaType as MediaType] || "Mensaje"}
+                          </p>
+                        </div>
+                      )}
                       <MessageMedia message={m} />
                       {m.content && (
                         <p className="whitespace-pre-wrap break-words">
                           {linkify(m.content, mine)}
                         </p>
+                      )}
+                      {m.linkPreview && (
+                        <a
+                          href={firstUrl(m.content) ?? "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1.5 block overflow-hidden rounded-md border border-black/10 dark:border-white/10"
+                        >
+                          {m.linkPreview.imageUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={m.linkPreview.imageUrl} alt="" className="max-h-40 w-full object-cover" />
+                          )}
+                          <div className="bg-black/5 px-2 py-1.5 dark:bg-white/5">
+                            <p className="line-clamp-1 text-xs font-medium">{m.linkPreview.title}</p>
+                            {m.linkPreview.description && (
+                              <p className="line-clamp-2 text-[11px] opacity-70">{m.linkPreview.description}</p>
+                            )}
+                          </div>
+                        </a>
                       )}
                       <div className="mt-1 flex items-center gap-1.5 text-[10px] opacity-70">
                         {m.viaPhoneApp && (
@@ -1406,18 +1674,44 @@ export function InboxClient({
                         </p>
                       )}
                     </div>
-                      {!mine && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteMessage(m.id)}
-                          title={confirming ? "¿Seguro? Toca de nuevo" : "Borrar mensaje"}
-                          className={`shrink-0 rounded-full p-1 opacity-0 transition-opacity group-hover:opacity-100 active:opacity-100 ${
-                            confirming ? "opacity-100 text-danger" : "text-ink-faint hover:text-danger"
-                          }`}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
+                    {(reaction || otherSideReaction) && (
+                      <div
+                        className={`absolute -bottom-2 flex gap-0.5 ${mine ? "right-1" : "left-1"}`}
+                      >
+                        {otherSideReaction && (
+                          <span className="rounded-full border border-border bg-surface px-1 text-xs shadow-sm">
+                            {otherSideReaction}
+                          </span>
+                        )}
+                        {reaction && (
+                          <span className="rounded-full border border-border bg-surface px-1 text-xs shadow-sm">
+                            {reaction}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {reactingToId === m.id && (
+                      <div
+                        className={`absolute z-10 mt-1 flex gap-1 rounded-full border border-border bg-surface p-1.5 shadow-lg ${
+                          mine ? "right-0" : "left-0"
+                        }`}
+                      >
+                        {REACTION_EMOJI.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => handleReact(m, emoji === reaction ? "" : emoji)}
+                            className={`rounded-full p-1 text-base hover:scale-125 transition-transform ${
+                              emoji === reaction ? "bg-accent/20" : ""
+                            }`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    </div>
+                      {!mine && actionButtons}
                     </div>
                   </div>
                 );
@@ -1438,6 +1732,17 @@ export function InboxClient({
                 <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-surface px-3 py-2 text-xs text-ink-muted">
                   <span className="truncate">📎 {pendingFile.name}</span>
                   <button onClick={() => setPendingFile(null)} className="shrink-0">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              {replyTo && (
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-md border-l-2 border-accent bg-surface px-3 py-2 text-xs text-ink-muted">
+                  <span className="min-w-0 truncate">
+                    Respondiendo a{" "}
+                    {replyTo.content || mediaPreviewLabel[replyTo.mediaType as MediaType] || "mensaje"}
+                  </span>
+                  <button onClick={() => setReplyTo(null)} className="shrink-0">
                     <X size={14} />
                   </button>
                 </div>

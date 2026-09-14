@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
+import { firstUrl } from "@/lib/urls";
 
 // Meta jubila versiones ~2 años después de su salida (v19/v20 ya
 // expiraron a mediados de 2026) — hay que subir esto de vez en cuando.
@@ -47,6 +48,9 @@ const mediaObjectSchema = z.object({
   mime_type: z.string().optional(),
   filename: z.string().optional(),
   caption: z.string().optional(),
+  // Solo lo manda Meta en el objeto "audio": true si es una nota de voz
+  // (PTT), ausente/false si es un archivo de audio subido.
+  voice: z.boolean().optional(),
 });
 
 const inboundSchema = z.object({
@@ -78,11 +82,23 @@ const inboundSchema = z.object({
                   id: z.string(),
                   timestamp: z.string(),
                   type: z.string(),
+                  // Presente cuando este mensaje responde citando a otro --
+                  // "id" es el externalId (wa message id) del citado.
+                  context: z.object({ id: z.string() }).optional(),
                   text: z.object({ body: z.string() }).optional(),
                   image: mediaObjectSchema.optional(),
                   video: mediaObjectSchema.optional(),
                   audio: mediaObjectSchema.optional(),
                   document: mediaObjectSchema.optional(),
+                  // Presente solo cuando type === "reaction" -- no crea un
+                  // mensaje nuevo, actualiza uno ya existente (ver
+                  // parseIncomingReactions más abajo).
+                  reaction: z
+                    .object({
+                      message_id: z.string(),
+                      emoji: z.string().optional(),
+                    })
+                    .optional(),
                   location: z
                     .object({
                       latitude: z.number(),
@@ -169,6 +185,7 @@ export interface ParsedInboundMessage {
     mediaId: string;
     mimeType?: string;
     fileName?: string;
+    isVoiceNote?: boolean;
   } | null;
   // Ubicación compartida por el cliente — no tiene archivo que descargar (a
   // diferencia de `media`), es solo coordenadas + nombre/dirección opcional.
@@ -183,6 +200,9 @@ export interface ParsedInboundMessage {
   fromAd: boolean;
   /** Detalle del anuncio (mismo dato que `fromAd`, pero con lo que se pueda mostrar). */
   adReferral: AdReferralInfo | null;
+  // externalId (wa message id) del mensaje que este cita, si responde a uno
+  // puntual -- null si no es una respuesta.
+  replyToExternalId: string | null;
 }
 
 // Google Maps abre bien un link "?q=lat,lng" sin necesitar ninguna API key.
@@ -238,6 +258,8 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
             }
           : null;
 
+        const replyToExternalId = message.context?.id ?? null;
+
         if (message.type === "text" && message.text?.body) {
           results.push({
             phoneNumberId: phone_number_id,
@@ -249,6 +271,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
             location: null,
             fromAd,
             adReferral,
+            replyToExternalId,
           });
           continue;
         }
@@ -269,6 +292,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
             },
             fromAd,
             adReferral,
+            replyToExternalId,
           });
           continue;
         }
@@ -288,10 +312,12 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
                 mediaId: mediaObj.id,
                 mimeType: mediaObj.mime_type,
                 fileName: mediaObj.filename,
+                isVoiceNote: mediaType === "audio" ? Boolean(mediaObj.voice) : undefined,
               },
               location: null,
               fromAd,
               adReferral,
+              replyToExternalId,
             });
           }
         }
@@ -345,6 +371,39 @@ export function parseStatusUpdates(payload: unknown): ParsedStatusUpdate[] {
             messageId: status.id,
             status: status.status as ParsedStatusUpdate["status"],
             errorDetail: err ? describeMessageError(err.code, err.error_data?.details ?? err.title) : null,
+          });
+        }
+      }
+    }
+  }
+  return results;
+}
+
+export interface ParsedReaction {
+  // externalId (wa message id) del mensaje al que reaccionaron.
+  targetExternalId: string;
+  // Emoji vacío = el cliente sacó la reacción que había puesto antes.
+  emoji: string;
+}
+
+// Reacciones con emoji del cliente sobre un mensaje ya existente -- llegan
+// como `type: "reaction"` dentro del mismo campo "messages" del webhook,
+// mezcladas con los mensajes de texto/media normales. A diferencia de esos,
+// una reacción nunca crea un Message nuevo: actualiza uno que ya existe (ver
+// handleIncomingReaction en conversation.ts).
+export function parseIncomingReactions(payload: unknown): ParsedReaction[] {
+  const parsed = inboundSchema.safeParse(payload);
+  if (!parsed.success) return [];
+
+  const results: ParsedReaction[] = [];
+  for (const entry of parsed.data.entry) {
+    for (const change of entry.changes) {
+      if (!isFieldMatch(change.field, "messages")) continue;
+      for (const message of change.value.messages ?? []) {
+        if (message.type === "reaction" && message.reaction) {
+          results.push({
+            targetExternalId: message.reaction.message_id,
+            emoji: message.reaction.emoji ?? "",
           });
         }
       }
@@ -718,8 +777,11 @@ export async function sendTextMessage(params: {
   accessToken: string;
   to: string;
   body: string;
+  // externalId (wa message id) del mensaje que se está respondiendo, si
+  // corresponde -- Meta lo muestra como una cita en el chat del cliente.
+  replyToExternalId?: string;
 }): Promise<{ messageId: string | null }> {
-  const { phoneNumberId, accessToken, to, body } = params;
+  const { phoneNumberId, accessToken, to, body, replyToExternalId } = params;
 
   const res = await fetch(
     `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
@@ -733,7 +795,51 @@ export async function sendTextMessage(params: {
         messaging_product: "whatsapp",
         to,
         type: "text",
-        text: { body },
+        // preview_url: si el texto tiene un link, el cliente ve una
+        // tarjetita con el preview en su propio WhatsApp -- gratis, Meta ya
+        // lo genera solo del otro lado.
+        text: { body, preview_url: firstUrl(body) !== null },
+        ...(replyToExternalId ? { context: { message_id: replyToExternalId } } : {}),
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`WhatsApp send failed (${res.status}): ${errorBody}`);
+  }
+
+  const data = (await res.json()) as SendMessageResponse;
+  return { messageId: data.messages?.[0]?.id ?? null };
+}
+
+/**
+ * Reaccionar con un emoji a un mensaje del cliente. Un emoji vacío ("") le
+ * saca la reacción que hubiera puesto antes -- así lo define la propia API
+ * de Meta, no es una convención nuestra.
+ */
+export async function sendReactionMessage(params: {
+  phoneNumberId: string;
+  accessToken: string;
+  to: string;
+  messageExternalId: string;
+  emoji: string;
+}): Promise<{ messageId: string | null }> {
+  const { phoneNumberId, accessToken, to, messageExternalId, emoji } = params;
+
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "reaction",
+        reaction: { message_id: messageExternalId, emoji },
       }),
     },
   );

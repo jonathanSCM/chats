@@ -6,6 +6,7 @@ import type {
   ParsedHistoryBatch,
   ParsedContactSync,
   ParsedStatusUpdate,
+  ParsedReaction,
   AdReferralInfo,
 } from "@/server/services/whatsapp";
 import { googleMapsUrl } from "@/server/services/whatsapp";
@@ -13,6 +14,7 @@ import { notifyNewMessage } from "@/server/services/push";
 import { enqueue, enqueueOrReschedule, runJobsSoon } from "@/server/jobs";
 import { decrypt } from "@/lib/crypto";
 import { resolveAdInfo } from "@/server/services/meta-ads";
+import { firstUrl } from "@/lib/urls";
 
 const CONVERSATION_WINDOW_MS = 24 * 60 * 60 * 1000; // ventana de conversación de WhatsApp
 const FREE_ENTRY_POINT_MS = 72 * 60 * 60 * 1000; // gracia extra de Meta para leads de anuncios
@@ -77,6 +79,18 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
     inbound.fromAd ? decrypt(connection.accessToken) : null,
   );
 
+  // Si este mensaje responde citando a otro, se busca por externalId -- si
+  // todavía no lo tenemos (mensaje viejo no sincronizado, o llegó fuera de
+  // orden), se guarda igual pero sin la cita en vez de fallar.
+  const replyToId = inbound.replyToExternalId
+    ? (
+        await prisma.message.findUnique({
+          where: { externalId: inbound.replyToExternalId },
+          select: { id: true },
+        })
+      )?.id ?? null
+    : null;
+
   // El mensaje se guarda de inmediato para que aparezca en la bandeja al
   // instante; el archivo se descarga después en un job (tarda segundos y
   // Meta reintenta el webhook si tardamos en responder).
@@ -99,6 +113,8 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
         mimeType: inbound.media?.mimeType ?? null,
         fileName: inbound.media?.fileName ?? null,
         externalId: inbound.messageId,
+        replyToId,
+        isVoiceNote: inbound.media?.isVoiceNote ?? false,
       },
       select: { id: true },
     });
@@ -127,20 +143,36 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
     });
   }
 
+  if (inbound.text && firstUrl(inbound.text)) {
+    await enqueue({
+      type: "fetch_link_preview",
+      uniqueKey: `fetch_link_preview:${messageId}`,
+      payload: { messageId },
+    });
+  }
+
   const conversation = await prisma.conversation.update({
     where: { id: conversationId },
     data: { lastMessageAt: new Date() },
-    select: { assignedToId: true, customerName: true, customerPhone: true, botPaused: true },
+    select: {
+      assignedToId: true,
+      customerName: true,
+      customerPhone: true,
+      botPaused: true,
+      muted: true,
+    },
   });
 
   const preview = inbound.text ?? (inbound.media ? MEDIA_PREVIEW[inbound.media.type] : "");
-  await notifyNewMessage({
-    conversationId,
-    organizationId: connection.bot.organizationId,
-    assignedToId: conversation.assignedToId,
-    customerLabel: conversation.customerName || conversation.customerPhone,
-    preview,
-  }).catch((error) => console.error("[conversation] Error notificando por push:", error));
+  if (!conversation.muted) {
+    await notifyNewMessage({
+      conversationId,
+      organizationId: connection.bot.organizationId,
+      assignedToId: conversation.assignedToId,
+      customerLabel: conversation.customerName || conversation.customerPhone,
+      preview,
+    }).catch((error) => console.error("[conversation] Error notificando por push:", error));
+  }
 
   // El bot de calificación contesta solo si está habilitado para esta
   // cuenta, ningún humano tomó ya la conversación, y (si hay un teléfono de
@@ -456,6 +488,25 @@ export async function handleStatusUpdate(update: ParsedStatusUpdate): Promise<vo
       status: newStatus,
       ...(newStatus === "FAILED" ? { errorDetail: update.errorDetail } : {}),
     },
+  });
+}
+
+/**
+ * Reacción con emoji del cliente sobre un mensaje que ya existe -- nunca
+ * crea un Message nuevo, solo actualiza `customerReaction` (calcado de
+ * handleStatusUpdate de arriba). Si el mensaje citado todavía no está
+ * sincronizado (raro, pero posible con reintentos de Meta), se ignora.
+ */
+export async function handleIncomingReaction(reaction: ParsedReaction): Promise<void> {
+  const message = await prisma.message.findUnique({
+    where: { externalId: reaction.targetExternalId },
+    select: { id: true },
+  });
+  if (!message) return;
+
+  await prisma.message.update({
+    where: { id: message.id },
+    data: { customerReaction: reaction.emoji || null },
   });
 }
 

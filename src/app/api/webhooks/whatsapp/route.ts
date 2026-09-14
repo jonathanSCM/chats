@@ -4,6 +4,7 @@ import {
   isValidWebhookSignature,
   parseInboundPayload,
   parseStatusUpdates,
+  parseIncomingReactions,
   parseMessageEchoes,
   parseHistoryPayload,
   parseContactSync,
@@ -12,6 +13,7 @@ import {
 import {
   handleIncomingMessage,
   handleStatusUpdate,
+  handleIncomingReaction,
   handlePhoneAppEcho,
   handleHistoryImport,
   handleContactSync,
@@ -84,6 +86,15 @@ export async function POST(req: NextRequest) {
       await handleStatusUpdate(update);
     } catch (error) {
       console.error("[webhook] Error procesando confirmación de entrega/lectura:", error);
+    }
+  }
+
+  const reactions = parseIncomingReactions(payload);
+  for (const reaction of reactions) {
+    try {
+      await handleIncomingReaction(reaction);
+    } catch (error) {
+      console.error("[webhook] Error procesando reacción:", error);
     }
   }
 

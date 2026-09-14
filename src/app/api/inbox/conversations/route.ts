@@ -64,6 +64,7 @@ export async function GET(request: Request) {
         lastMessageAt: c.lastMessageAt,
         status: c.status,
         blocked: c.blocked,
+        muted: c.muted,
         bot: { id: c.bot.id, name: c.bot.name },
         // Para mostrar en la lista si el bot está contestando esta
         // conversación o si escaló y todavía nadie del equipo respondió

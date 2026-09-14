@@ -7,11 +7,10 @@ import { resolveExtensionMeeting } from "@/server/services/extension-meeting";
 /**
  * Recibe la transcripción de subtítulos que manda la extensión de Chrome
  * (content script corriendo en el navegador de quien esté en la reunión de
- * Meet — no un bot separado, ver dashboard/organization). Auth por Bearer
- * token de portador contra Organization.meetExtensionToken, mismo patrón que
- * api/webhooks/meeting-bot con MEETING_BOT_WEBHOOK_SECRET, pero acá el
- * secreto es por organización (no uno solo global) porque cada instalación
- * de la extensión es de un equipo distinto.
+ * Meet — no un bot separado, ver dashboard/extension-authorize). Auth por
+ * Bearer token contra User.meetExtensionToken -- token personal por
+ * vendedor (antes era uno solo por organización), así de paso se sabe quién
+ * grabó cada reunión.
  */
 const bodySchema = z.object({
   meetingUrl: z.string().min(1).max(500),
@@ -57,15 +56,19 @@ export async function POST(req: NextRequest) {
     return withCors(new NextResponse("Unauthorized", { status: 401 }));
   }
 
-  const org = await prisma.organization.findUnique({
+  const user = await prisma.user.findUnique({
     where: { meetExtensionToken: token },
-    select: { id: true },
+    select: { id: true, organizationId: true },
   });
-  if (!org) {
+  if (!user?.organizationId) {
     return withCors(new NextResponse("Unauthorized", { status: 401 }));
   }
 
-  const resolved = await resolveExtensionMeeting({ organizationId: org.id, meetingUrl });
+  const resolved = await resolveExtensionMeeting({
+    organizationId: user.organizationId,
+    meetingUrl,
+    recordedById: user.id,
+  });
 
   // No se pisa una transcripción que ya tenga contenido (por ej. si el bot
   // grabador también corrió en esta misma reunión) -- se concatena en vez

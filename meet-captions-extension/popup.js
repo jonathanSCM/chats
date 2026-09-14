@@ -1,5 +1,10 @@
-const tokenInput = document.getElementById("token");
 const status = document.getElementById("status");
+const loggedOutBox = document.getElementById("loggedOutBox");
+const accountBox = document.getElementById("accountBox");
+const loginBtn = document.getElementById("loginBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+const accountName = document.getElementById("accountName");
+const accountInitial = document.getElementById("accountInitial");
 const meetingText = document.getElementById("meetingText");
 const meetingStatus = document.getElementById("meetingStatus");
 const recordBtn = document.getElementById("recordBtn");
@@ -29,22 +34,47 @@ micBtn.addEventListener("click", () => {
 });
 
 const MEETING_URL_RE = /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}/i;
+const CRM_BASE = "https://chats.proshop.lat";
 
-chrome.storage.local.get(["token"], ({ token }) => {
-  if (token) tokenInput.value = token;
+// Ya no se pega ningún token a mano: se abre el CRM (reusa la sesión ya
+// iniciada ahí, si la hay) y un content script aparte
+// (authorize-bridge.js, ver manifest.json) guarda el token personal solo,
+// apenas esa página lo genera. Acá el popup solo refleja lo que ya haya en
+// storage.
+function renderAccount({ token, userName }) {
+  if (token) {
+    loggedOutBox.style.display = "none";
+    accountBox.style.display = "flex";
+    accountName.textContent = userName || "Conectado";
+    accountInitial.textContent = (userName || "?").trim().charAt(0).toUpperCase();
+  } else {
+    loggedOutBox.style.display = "block";
+    accountBox.style.display = "none";
+  }
+}
+
+chrome.storage.local.get(["token", "userName"], renderAccount);
+
+loginBtn.addEventListener("click", () => {
+  chrome.tabs.create({ url: `${CRM_BASE}/dashboard/extension-authorize` });
 });
 
-document.getElementById("save").addEventListener("click", () => {
-  const token = tokenInput.value.trim();
-  if (!token) {
-    status.textContent = "Pegá el token primero.";
-    status.style.color = "#dc2626";
-    return;
-  }
-  chrome.storage.local.set({ token, apiBase: "https://chats.proshop.lat" }, () => {
-    status.textContent = "Guardado.";
-    status.style.color = "#059669";
+logoutBtn.addEventListener("click", () => {
+  chrome.storage.local.remove(["token", "userName"], () => {
+    renderAccount({ token: null, userName: null });
+    status.textContent = "Sesión cerrada.";
+    status.style.color = "#6b7280";
   });
+});
+
+// Si otra pestaña (la del CRM, recién logueada) guarda el token mientras
+// este popup está abierto, se refleja al toque sin tener que cerrarlo y
+// abrirlo de nuevo.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  if (changes.token || changes.userName) {
+    chrome.storage.local.get(["token", "userName"], renderAccount);
+  }
 });
 
 // Consulta la pestaña activa: si es una reunión de Meet, muestra el botón

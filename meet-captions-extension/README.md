@@ -53,13 +53,15 @@ dice que estás en silencio.
 1. Abrí `chrome://extensions` en Chrome.
 2. Activá "Modo de programador" (arriba a la derecha).
 3. Tocá "Cargar descomprimida" y seleccioná esta carpeta (`meet-captions-extension/`).
-4. Tocá el ícono de la extensión (arriba a la derecha del navegador) → pegá el token que
-   generás en el CRM en **Organización → "Extensión de subtítulos para Meet"** → "Guardar token".
+4. Tocá el ícono de la extensión → "Iniciar sesión con el CRM". Se abre una pestaña al CRM: si
+   ya tenés sesión iniciada ahí (lo normal, se usa a diario), la extensión queda conectada sola,
+   sin generar ni pegar ningún token a mano.
 5. Entrá a una reunión de Meet, tocá el ícono de la extensión de nuevo, y tocá
    **"Grabar esta reunión"**. Sin este paso no se graba nada.
 
-Cada vendedor que quiera usarla instala la extensión una vez en su propio Chrome y pega el mismo
-token de la organización (no es un token por persona).
+Cada vendedor instala la extensión una vez en su propio Chrome e inicia sesión con su propia
+cuenta del CRM — el token es personal (no uno solo por organización como antes), así que cada
+reunión queda registrada con quién la grabó.
 
 ## Por qué este método y no un bot
 

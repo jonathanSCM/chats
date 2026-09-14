@@ -12,15 +12,25 @@ import { prisma } from "@/server/db/client";
 export async function resolveExtensionMeeting(params: {
   organizationId: string;
   meetingUrl: string;
+  // Quién la está grabando (resuelto del token personal de la extensión) --
+  // null si por alguna razón no se pudo identificar.
+  recordedById?: string | null;
 }): Promise<{ id: string; transcript: string | null; audioTranscript: string | null }> {
-  const { organizationId, meetingUrl } = params;
+  const { organizationId, meetingUrl, recordedById = null } = params;
 
   const existing = await prisma.meeting.findFirst({
     where: { organizationId, meetingUrl, status: { not: "CANCELED" } },
     orderBy: { scheduledAt: "desc" },
-    select: { id: true, transcript: true, audioTranscript: true },
+    select: { id: true, transcript: true, audioTranscript: true, recordedById: true },
   });
-  if (existing) return existing;
+  if (existing) {
+    // No se pisa si ya había alguien -- se completa solo si todavía no se
+    // sabía quién la estaba grabando.
+    if (!existing.recordedById && recordedById) {
+      await prisma.meeting.update({ where: { id: existing.id }, data: { recordedById } });
+    }
+    return existing;
+  }
 
   return prisma.meeting.create({
     data: {
@@ -32,6 +42,7 @@ export async function resolveExtensionMeeting(params: {
       meetingUrl,
       status: "DONE",
       botEnabled: false,
+      recordedById,
     },
     select: { id: true, transcript: true, audioTranscript: true },
   });

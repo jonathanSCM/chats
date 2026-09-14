@@ -4,57 +4,72 @@
     <meta charset="utf-8" />
     <title>ProShop CRM — Subtítulos de Meet</title>
     <style>
-      body {
-        width: 280px;
-        font: 13px/1.4 system-ui, sans-serif;
-        padding: 14px;
-        color: #111827;
+      :root {
+        --accent: #4f46e5;
+        --accent-dark: #3730a3;
+        --ink: #111827;
+        --ink-muted: #6b7280;
+        --border: #e5e7eb;
+        --surface: #f9fafb;
       }
-      h1 {
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        width: 288px;
+        margin: 0;
+        font: 13px/1.4 system-ui, sans-serif;
+        color: var(--ink);
+      }
+      header {
+        padding: 14px 16px 12px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+        color: #fff;
+      }
+      header h1 {
         font-size: 14px;
-        margin: 0 0 10px;
+        margin: 0;
+        font-weight: 600;
+      }
+      header p {
+        margin: 2px 0 0;
+        font-size: 11px;
+        opacity: 0.85;
+      }
+      main {
+        padding: 14px 16px 16px;
       }
       h2 {
-        font-size: 11px;
+        font-size: 10.5px;
         text-transform: uppercase;
-        letter-spacing: 0.03em;
-        color: #6b7280;
-        margin: 14px 0 8px;
-        border-top: 1px solid #e5e7eb;
+        letter-spacing: 0.04em;
+        color: var(--ink-muted);
+        margin: 16px 0 8px;
+        border-top: 1px solid var(--border);
         padding-top: 12px;
-      }
-      label {
-        display: block;
-        font-size: 11px;
-        color: #6b7280;
-        margin-bottom: 4px;
-      }
-      input {
-        width: 100%;
-        box-sizing: border-box;
-        padding: 6px 8px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        font-size: 12px;
-        margin-bottom: 10px;
       }
       button {
         width: 100%;
-        padding: 8px;
+        padding: 9px;
         border: 0;
-        border-radius: 6px;
-        background: #111827;
+        border-radius: 8px;
+        background: var(--accent);
         color: #fff;
         font-size: 12px;
+        font-weight: 500;
         cursor: pointer;
+        transition: opacity 0.15s;
+      }
+      button:hover {
+        opacity: 0.9;
       }
       button.record {
         background: #dc2626;
       }
       button.secondary {
-        background: #ffffff;
-        color: #111827;
-        border: 1px solid #d1d5db;
+        background: #fff;
+        color: var(--ink);
+        border: 1px solid var(--border);
         margin-top: 8px;
       }
       button:disabled {
@@ -69,9 +84,10 @@
         min-height: 14px;
       }
       #meetingBox {
-        padding: 10px;
-        background: #f9fafb;
-        border-radius: 8px;
+        padding: 12px;
+        background: var(--surface);
+        border-radius: 10px;
+        border: 1px solid var(--border);
       }
       #meetingBox p {
         margin: 0 0 8px;
@@ -87,38 +103,98 @@
       }
       p.help {
         font-size: 11px;
-        color: #6b7280;
-        margin-top: 10px;
+        color: var(--ink-muted);
+        margin: 8px 0 0;
+        line-height: 1.5;
+      }
+      #accountBox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        margin-bottom: 4px;
+      }
+      #accountBox .avatar {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 600;
+        flex-shrink: 0;
+      }
+      #accountBox .info {
+        flex: 1;
+        min-width: 0;
+      }
+      #accountBox .name {
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #accountBox .sub {
+        font-size: 10.5px;
+        color: var(--ink-muted);
+      }
+      #logoutBtn {
+        width: auto;
+        padding: 4px 8px;
+        font-size: 10.5px;
+        background: transparent;
+        color: var(--ink-muted);
+        border: 1px solid var(--border);
+        border-radius: 6px;
       }
     </style>
   </head>
   <body>
-    <h1>Subtítulos de Meet</h1>
+    <header>
+      <h1>Subtítulos de Meet</h1>
+      <p>ProShop CRM</p>
+    </header>
+    <main>
+      <div id="meetingBox">
+        <p id="meetingText">Revisando la pestaña actual…</p>
+        <button id="recordBtn" style="display: none">Grabar esta reunión</button>
+        <div id="meetingStatus"></div>
+      </div>
 
-    <div id="meetingBox">
-      <p id="meetingText">Revisando la pestaña actual…</p>
-      <button id="recordBtn" style="display: none">Grabar esta reunión</button>
-      <div id="meetingStatus"></div>
-    </div>
+      <h2>Cuenta</h2>
+      <div id="loggedOutBox">
+        <button id="loginBtn">Iniciar sesión con el CRM</button>
+        <p class="help">
+          Se abre una pestaña al CRM — si ya tenés sesión iniciada ahí (lo normal), queda
+          conectado solo. No hace falta generar ni pegar ningún token.
+        </p>
+      </div>
+      <div id="accountBox" style="display: none">
+        <div class="avatar" id="accountInitial">?</div>
+        <div class="info">
+          <div class="name" id="accountName">—</div>
+          <div class="sub">Conectado</div>
+        </div>
+        <button id="logoutBtn">Cerrar sesión</button>
+      </div>
+      <div id="status"></div>
 
-    <h2>Configuración</h2>
-    <label for="token">Token (Organización → Extensión de subtítulos)</label>
-    <input id="token" type="text" placeholder="mext_..." autocomplete="off" />
-    <button id="save">Guardar token</button>
-    <div id="status"></div>
-    <p class="help">
-      Generá el token en chats.proshop.lat → Organización → "Extensión de subtítulos para Meet" y
-      pegalo acá una sola vez. Después, en cada reunión que quieras grabar, abrí este ícono y
-      tocá "Grabar esta reunión" — si no lo activás, no se manda nada.
-    </p>
-
-    <button id="micBtn" class="secondary">Activar micrófono (una sola vez)</button>
-    <div id="micStatus"></div>
-    <p class="help">
-      Sin este paso, la grabación de audio solo capta lo que dicen los demás, no tu propia voz —
-      Chrome tiene que pedirte el permiso de micrófono una vez desde acá (no se puede pedir
-      durante la reunión).
-    </p>
+      <h2>Micrófono</h2>
+      <button id="micBtn" class="secondary">Activar micrófono (una sola vez)</button>
+      <div id="micStatus"></div>
+      <p class="help">
+        Sin este paso, la grabación de audio solo capta lo que dicen los demás, no tu propia voz —
+        Chrome tiene que pedirte el permiso una vez desde acá (no se puede pedir durante la
+        reunión).
+      </p>
+    </main>
     <script src="popup.js"></script>
   </body>
 </html>

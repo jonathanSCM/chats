@@ -73,6 +73,11 @@ model User {
   // (ver src/lib/vendor-color.ts) — así nadie tiene que elegir uno antes de
   // que exista esta opción.
   color          String?
+  // Token personal para que la extensión de subtítulos de Meet sepa quién
+  // sos sin pedirte usuario/contraseña -- se genera solo la primera vez que
+  // entrás a /dashboard/extension-authorize desde la extensión, reusando tu
+  // sesión ya iniciada del CRM (ver src/app/dashboard/extension-authorize).
+  meetExtensionToken String? @unique
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime      @default(now())
@@ -90,6 +95,7 @@ model User {
   ownedOpportunities      Opportunity[]            @relation("OpportunityOwner")
   ownedActivities         Activity[]               @relation("ActivityOwner")
   botAccess               BotMember[]
+  recordedMeetings        Meeting[]                @relation("MeetingRecordedBy")
 
   @@index([organizationId])
   @@map("users")
@@ -860,6 +866,12 @@ model Meeting {
   aiSummary       String?           @db.Text
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
+
+  // Quién grabó esta reunión con la extensión de subtítulos -- null si la
+  // reunión se creó de otra forma (a mano, o el bot). Se completa una sola
+  // vez, la primera persona que manda algo para esta reunión.
+  recordedById String?
+  recordedBy   User?   @relation("MeetingRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
 
   attachments MeetingAttachment[]
 

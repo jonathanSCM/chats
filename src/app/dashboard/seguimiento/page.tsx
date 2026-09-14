@@ -77,6 +77,7 @@ export default async function SeguimientoPage({
             transcript: true,
             audioTranscript: true,
             meetingUrl: true,
+            recordedBy: { select: { id: true, name: true } },
             attachments: {
               select: { id: true, url: true, fileName: true, mimeType: true, fileSize: true },
               orderBy: { createdAt: "asc" },
@@ -149,6 +150,7 @@ export default async function SeguimientoPage({
       transcript: m.transcript ?? "",
       audioTranscript: m.audioTranscript ?? "",
       meetingUrl: m.meetingUrl,
+      recordedByName: m.recordedBy?.name ?? null,
       attachments: m.attachments.map((a) => ({
         id: a.id,
         url: a.url,

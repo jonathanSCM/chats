@@ -16,6 +16,10 @@ import { transcribeAudioViaBotService } from "@/server/services/meeting-bot";
  * document" de la extensión (una página de la extensión, no un content
  * script pegado al origen de meet.google.com), así que no pasa por CORS --
  * host_permissions alcanza, no hace falta manejar OPTIONS acá.
+ *
+ * Auth por Bearer token contra User.meetExtensionToken (token personal, ver
+ * dashboard/extension-authorize) -- antes era un token único por
+ * organización.
  */
 export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
@@ -26,11 +30,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Falta el token o la URL de la reunión" }, { status: 400 });
   }
 
-  const org = await prisma.organization.findUnique({
+  const user = await prisma.user.findUnique({
     where: { meetExtensionToken: token },
-    select: { id: true },
+    select: { id: true, organizationId: true },
   });
-  if (!org) {
+  if (!user?.organizationId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -39,7 +43,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Audio vacío" }, { status: 400 });
   }
 
-  const resolved = await resolveExtensionMeeting({ organizationId: org.id, meetingUrl });
+  const resolved = await resolveExtensionMeeting({
+    organizationId: user.organizationId,
+    meetingUrl,
+    recordedById: user.id,
+  });
 
   const audioUrl = await saveMediaFile(buffer, mimeType);
   await prisma.meetingAttachment.create({

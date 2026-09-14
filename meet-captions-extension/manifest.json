@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ProShop CRM - Subtítulos de Meet",
-  "version": "1.2.1",
-  "description": "Lee los subtítulos en vivo de Google Meet (y opcionalmente graba el audio real para whisper.cpp) y los manda al CRM al terminar la reunión. No necesita que ningún bot entre a la llamada. Solo graba cuando lo activás desde el ícono.",
+  "version": "1.3.0",
+  "description": "Lee los subtítulos en vivo de Google Meet (y opcionalmente graba el audio real para whisper.cpp) y los manda al CRM al terminar la reunión. No necesita que ningún bot entre a la llamada. Solo graba cuando lo activás desde el ícono. Se identifica solo con tu sesión del CRM, sin tokens a mano.",
   "permissions": ["storage", "activeTab", "tabCapture", "offscreen"],
   "host_permissions": [
     "https://meet.google.com/*",
@@ -15,6 +15,11 @@
     {
       "matches": ["https://meet.google.com/*"],
       "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chats.proshop.lat/dashboard/extension-authorize*"],
+      "js": ["authorize-bridge.js"],
       "run_at": "document_idle"
     }
   ],

@@ -8,7 +8,6 @@ import { InvitePanel } from "./_components/invite-panel";
 import { AiSettingsForm } from "./_components/ai-settings-form";
 import { SharedCalendarForm } from "./_components/shared-calendar-form";
 import { BotAccessMatrix } from "./_components/bot-access-matrix";
-import { MeetExtensionToken } from "./_components/meet-extension-token";
 import { DangerZone } from "./_components/danger-zone";
 
 export default async function OrganizationSettingsPage() {
@@ -94,9 +93,9 @@ export default async function OrganizationSettingsPage() {
           Extensión de Chrome que lee los subtítulos en vivo de Google Meet desde el navegador de
           quien esté en la reunión — no hace falta que un bot pida entrar ni que nadie lo admita.
           Función aparte del bot grabador: el bot sigue disponible para cuando sí se necesita audio.
-          Genera este token acá y pégalo una sola vez en la extensión.
+          Cada vendedor se identifica solo, con su propia sesión del CRM — no hace falta generar ni
+          pegar ningún token: instalá la extensión, tocá su ícono y elegí &quot;Iniciar sesión&quot;.
         </CardDescription>
-        <MeetExtensionToken hasToken={Boolean(org.meetExtensionToken)} />
       </Card>
 
       <Card className="mb-6">

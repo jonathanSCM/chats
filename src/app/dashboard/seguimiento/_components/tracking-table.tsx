@@ -118,6 +118,7 @@ export interface Row {
     transcript: string;
     audioTranscript: string;
     meetingUrl: string | null;
+    recordedByName: string | null;
     attachments: MeetingAttachmentInfo[];
   }[];
   archived: boolean;
@@ -2182,7 +2183,16 @@ function MeetingsSection({
             const pdfAttachment = m.attachments.find((a) => a.mimeType === "application/pdf");
             return (
             <li key={m.id} className="rounded-md border border-border p-2.5">
-              {m.title && <p className="mb-1 text-xs font-medium text-ink">{m.title}</p>}
+              {m.title && (
+                <p className="mb-1 text-xs font-medium text-ink">
+                  {m.title}
+                  {m.recordedByName && (
+                    <span className="ml-1.5 font-normal text-ink-faint">
+                      · grabada por {m.recordedByName}
+                    </span>
+                  )}
+                </p>
+              )}
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <p className="font-mono text-xs text-ink-muted">
                   {new Date(m.scheduledAt).toLocaleString("es", {

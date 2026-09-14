@@ -39,7 +39,7 @@ app.post("/join", (req, res) => {
     return;
   }
 
-  const { meetingId, meetingUrl, expectedDurationMinutes, callbackUrl } = req.body ?? {};
+  const { meetingId, meetingUrl, expectedDurationMinutes, callbackUrl, displayName } = req.body ?? {};
   if (typeof meetingId !== "string" || typeof meetingUrl !== "string" || typeof callbackUrl !== "string") {
     res.status(400).send("Faltan meetingId/meetingUrl/callbackUrl");
     return;
@@ -61,6 +61,7 @@ app.post("/join", (req, res) => {
       meetingUrl,
       expectedDurationMinutes: typeof expectedDurationMinutes === "number" ? expectedDurationMinutes : 30,
       callbackUrl,
+      displayName: typeof displayName === "string" ? displayName : undefined,
     },
     controller.signal,
   )

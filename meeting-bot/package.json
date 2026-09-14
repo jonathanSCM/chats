@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/server.ts",
-    "login": "tsx src/manual-login.ts",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {

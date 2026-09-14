@@ -29,7 +29,13 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
 
   const meeting = await prisma.meeting.findUnique({
     where: { id: meetingId },
-    select: { id: true, meetingUrl: true, durationMinutes: true, status: true },
+    select: {
+      id: true,
+      meetingUrl: true,
+      durationMinutes: true,
+      status: true,
+      organization: { select: { name: true } },
+    },
   });
   if (!meeting || !meeting.meetingUrl || meeting.status === "CANCELED") return;
 
@@ -46,6 +52,7 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
       meetingUrl: meeting.meetingUrl,
       expectedDurationMinutes: meeting.durationMinutes,
       callbackUrl: `${appUrl}/api/webhooks/meeting-bot`,
+      displayName: `Asistente de ${meeting.organization.name}`,
     }),
   });
 

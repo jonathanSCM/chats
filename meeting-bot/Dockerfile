@@ -58,12 +58,11 @@ RUN npx playwright install --with-deps chromium
 
 COPY . .
 
-# Perfil persistente de Chrome (sesión de la cuenta del bot ya logueada,
-# cargada una vez con `npm run login`) y carpeta de grabaciones temporales.
-# Montar /data como volumen en Coolify — si no, la sesión se pierde en cada
-# redeploy y hay que volver a loguearse a mano.
-RUN mkdir -p /data/chrome-profile /tmp/recordings
-ENV CHROME_PROFILE_DIR=/data/chrome-profile
+# Carpeta de grabaciones temporales -- el bot ya no mantiene ningún perfil
+# de Chrome persistente (cada reunión abre un navegador nuevo y descartable,
+# ver join-meeting.ts), así que no hace falta ningún volumen montado para
+# esto: perder el contenedor no pierde nada que haga falta recuperar.
+RUN mkdir -p /tmp/recordings
 ENV RECORDINGS_DIR=/tmp/recordings
 ENV PULSE_MONITOR_SOURCE=virtual_sink.monitor
 ENV DISPLAY=:99

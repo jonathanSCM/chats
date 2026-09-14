@@ -96,9 +96,39 @@ model User {
   ownedActivities         Activity[]               @relation("ActivityOwner")
   botAccess               BotMember[]
   recordedMeetings        Meeting[]                @relation("MeetingRecordedBy")
+  googleCalendarAccount   GoogleCalendarAccount?
+  ownedMeetings           Meeting[]                @relation("MeetingGoogleCalendarOwner")
 
   @@index([organizationId])
   @@map("users")
+}
+
+/**
+ * Cuenta de Google Calendar personal de un usuario, conectada a mano desde
+ * "Mi Perfil" -- reemplaza (cuando existe) al calendario compartido del bot
+ * (GOOGLE_BOT_REFRESH_TOKEN, ver google-calendar.ts) para ese usuario
+ * puntual: sus reuniones se crean/editan directo en SU "primary", no en un
+ * calendario secundario de la organización. Los campos `watch*` guardan la
+ * suscripción a notificaciones push de Calendar (calendar.events.watch) que
+ * habilita el sync en la otra dirección (Google → CRM).
+ */
+model GoogleCalendarAccount {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  googleEmail     String
+  accessToken     String    @db.Text
+  refreshToken    String    @db.Text
+  tokenExpiresAt  DateTime
+  watchChannelId  String?
+  watchResourceId String?
+  watchToken      String?
+  watchExpiresAt  DateTime?
+  syncToken       String?   @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("google_calendar_accounts")
 }
 
 // ─── Tokens de un solo uso (reset de password, verificación de email) ──
@@ -856,6 +886,13 @@ model Meeting {
   guestEmails     String[]          @default([]) // invitados por correo — si la reunión se creó con Google Meet, Calendar les manda la invitación real
   botEnabled      Boolean           @default(true) // si además de haber link, se quiere que el bot se una a grabar
   googleEventId   String? // id del evento real en Calendar — sin esto no se puede editar la hora ni cancelarlo después
+  // A qué usuario le pertenece el evento cuando se creó en SU calendario
+  // personal (GoogleCalendarAccount) en vez del calendario compartido del
+  // bot -- null en ese segundo caso (el de siempre). Necesario para saber
+  // con qué cuenta hay que hablarle a Calendar al editar/cancelar, y para
+  // que el sync Google → CRM sepa a qué Meeting le pega cada evento.
+  googleCalendarOwnerId String?
+  googleCalendarOwner   User?   @relation("MeetingGoogleCalendarOwner", fields: [googleCalendarOwnerId], references: [id], onDelete: SetNull)
   status          MeetingStatus     @default(SCHEDULED)
   botStatus       MeetingBotStatus?
   botJoinedAt     DateTime? // cuándo el bot quedó admitido de verdad en la llamada

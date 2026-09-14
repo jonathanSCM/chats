@@ -12,6 +12,12 @@ import {
   isGoogleMeetEnabled,
 } from "@/server/services/google-calendar";
 import {
+  createUserMeetEvent,
+  updateUserMeetEvent,
+  cancelUserMeetEvent,
+  hasGoogleCalendarConnected,
+} from "@/server/services/google-calendar-user";
+import {
   scheduleMeetingBotJoin,
   scheduleMeetingBotJoinNow,
   cancelMeetingBotJoin,
@@ -31,7 +37,7 @@ const PATH = "/dashboard/reuniones";
 async function requireOrg() {
   const session = await requireSession();
   if (!session.user.organizationId) throw new Error("Sin organización");
-  return { organizationId: session.user.organizationId };
+  return { organizationId: session.user.organizationId, userId: session.user.id };
 }
 
 const createAdhocMeetingSchema = z.object({
@@ -48,7 +54,7 @@ export async function createAdhocMeetingAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { organizationId } = await requireOrg();
+  const { organizationId, userId } = await requireOrg();
 
   const parsed = createAdhocMeetingSchema.safeParse({
     title: formData.get("title"),
@@ -76,24 +82,43 @@ export async function createAdhocMeetingAction(
   const durationMinutes = parsed.data.durationMinutes ?? 30;
   let meetingUrl = parsed.data.meetingUrl || null;
   let googleEventId: string | null = null;
+  let googleCalendarOwnerId: string | null = null;
   const botEnabled = parsed.data.botEnabled ?? true;
 
   if (!meetingUrl && parsed.data.withGoogleMeet) {
-    if (!isGoogleMeetEnabled()) {
-      return { error: "Google Meet no está configurado en el servidor. Contactá al administrador." };
-    }
+    // Si quien crea la reunión conectó su propio Google Calendar (Mi
+    // Perfil), el evento nace ahí -- así le queda en SU agenda de verdad, no
+    // solo en un calendario secundario compartido que nadie mira desde su
+    // Google normal. Si no lo conectó, sigue igual que siempre.
+    const useOwnCalendar = await hasGoogleCalendarConnected(userId);
     try {
-      const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { name: true } });
-      const calendarId = await getOrCreateOrgCalendar(organizationId, org.name);
-      const event = await createMeetEvent({
-        calendarId,
-        summary: parsed.data.title,
-        scheduledAt,
-        durationMinutes,
-        attendeeEmails: guestEmailsResult.emails,
-      });
-      meetingUrl = event.meetingUrl;
-      googleEventId = event.eventId;
+      if (useOwnCalendar) {
+        const event = await createUserMeetEvent({
+          userId,
+          summary: parsed.data.title,
+          scheduledAt,
+          durationMinutes,
+          attendeeEmails: guestEmailsResult.emails,
+        });
+        meetingUrl = event.meetingUrl;
+        googleEventId = event.eventId;
+        googleCalendarOwnerId = userId;
+      } else {
+        if (!isGoogleMeetEnabled()) {
+          return { error: "Google Meet no está configurado en el servidor. Contactá al administrador." };
+        }
+        const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { name: true } });
+        const calendarId = await getOrCreateOrgCalendar(organizationId, org.name);
+        const event = await createMeetEvent({
+          calendarId,
+          summary: parsed.data.title,
+          scheduledAt,
+          durationMinutes,
+          attendeeEmails: guestEmailsResult.emails,
+        });
+        meetingUrl = event.meetingUrl;
+        googleEventId = event.eventId;
+      }
     } catch (error) {
       return { error: error instanceof Error ? error.message : "No se pudo crear el evento en Google Calendar." };
     }
@@ -108,6 +133,7 @@ export async function createAdhocMeetingAction(
       durationMinutes,
       meetingUrl,
       googleEventId,
+      googleCalendarOwnerId,
       guestEmails: guestEmailsResult.emails,
       botEnabled,
       status: "SCHEDULED",
@@ -204,7 +230,7 @@ export async function deleteAdhocMeetingAction(meetingId: string): Promise<Actio
 
   const meeting = await prisma.meeting.findUnique({
     where: { id: meetingId },
-    select: { organizationId: true, opportunityId: true, attachments: true, googleEventId: true },
+    select: { organizationId: true, opportunityId: true, attachments: true, googleEventId: true, googleCalendarOwnerId: true },
   });
   if (!meeting || meeting.organizationId !== organizationId || meeting.opportunityId !== null) {
     return { error: "Reunión no encontrada" };
@@ -214,9 +240,13 @@ export async function deleteAdhocMeetingAction(meetingId: string): Promise<Actio
   await Promise.all(meeting.attachments.map((a) => deleteMediaFile(a.url)));
   await cancelMeetingBotJoin(meetingId);
   if (meeting.googleEventId) {
-    const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { googleCalendarId: true } });
-    if (org?.googleCalendarId) {
-      await cancelMeetEvent({ calendarId: org.googleCalendarId, eventId: meeting.googleEventId }).catch(() => {});
+    if (meeting.googleCalendarOwnerId) {
+      await cancelUserMeetEvent({ userId: meeting.googleCalendarOwnerId, eventId: meeting.googleEventId }).catch(() => {});
+    } else {
+      const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { googleCalendarId: true } });
+      if (org?.googleCalendarId) {
+        await cancelMeetEvent({ calendarId: org.googleCalendarId, eventId: meeting.googleEventId }).catch(() => {});
+      }
     }
   }
 
@@ -244,7 +274,7 @@ export async function updateAdhocMeetingAction(meetingId: string, formData: Form
 
   const meeting = await prisma.meeting.findUnique({
     where: { id: meetingId },
-    select: { organizationId: true, opportunityId: true, title: true, meetingUrl: true, googleEventId: true },
+    select: { organizationId: true, opportunityId: true, title: true, meetingUrl: true, googleEventId: true, googleCalendarOwnerId: true },
   });
   if (!meeting || meeting.organizationId !== organizationId || meeting.opportunityId !== null) {
     return { error: "Reunión no encontrada" };
@@ -269,18 +299,27 @@ export async function updateAdhocMeetingAction(meetingId: string, formData: Form
   const meetingUrl = parsed.data.meetingUrl?.trim() || null;
 
   if (meeting.googleEventId) {
-    const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { googleCalendarId: true } });
-    if (org?.googleCalendarId) {
-      try {
-        await updateMeetEvent({
-          calendarId: org.googleCalendarId,
+    try {
+      if (meeting.googleCalendarOwnerId) {
+        await updateUserMeetEvent({
+          userId: meeting.googleCalendarOwnerId,
           eventId: meeting.googleEventId,
           scheduledAt,
           durationMinutes: parsed.data.durationMinutes,
         });
-      } catch (error) {
-        return { error: error instanceof Error ? error.message : "No se pudo actualizar el evento en Google Calendar." };
+      } else {
+        const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { googleCalendarId: true } });
+        if (org?.googleCalendarId) {
+          await updateMeetEvent({
+            calendarId: org.googleCalendarId,
+            eventId: meeting.googleEventId,
+            scheduledAt,
+            durationMinutes: parsed.data.durationMinutes,
+          });
+        }
       }
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : "No se pudo actualizar el evento en Google Calendar." };
     }
   }
 
@@ -312,16 +351,20 @@ export async function cancelAdhocMeetingAction(meetingId: string): Promise<Actio
 
   const meeting = await prisma.meeting.findUnique({
     where: { id: meetingId },
-    select: { organizationId: true, opportunityId: true, googleEventId: true },
+    select: { organizationId: true, opportunityId: true, googleEventId: true, googleCalendarOwnerId: true },
   });
   if (!meeting || meeting.organizationId !== organizationId || meeting.opportunityId !== null) {
     return { error: "Reunión no encontrada" };
   }
 
   if (meeting.googleEventId) {
-    const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { googleCalendarId: true } });
-    if (org?.googleCalendarId) {
-      await cancelMeetEvent({ calendarId: org.googleCalendarId, eventId: meeting.googleEventId }).catch(() => {});
+    if (meeting.googleCalendarOwnerId) {
+      await cancelUserMeetEvent({ userId: meeting.googleCalendarOwnerId, eventId: meeting.googleEventId }).catch(() => {});
+    } else {
+      const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { googleCalendarId: true } });
+      if (org?.googleCalendarId) {
+        await cancelMeetEvent({ calendarId: org.googleCalendarId, eventId: meeting.googleEventId }).catch(() => {});
+      }
     }
   }
 

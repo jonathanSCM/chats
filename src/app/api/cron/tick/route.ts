@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { processJobs } from "@/server/jobs";
+import { renewExpiringGoogleCalendarWatches } from "@/server/services/google-calendar-user";
 
 /**
  * Latido de la cola. Lo invoca una Scheduled Task de Coolify cada minuto:
@@ -29,6 +30,13 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await processJobs();
+
+  // Barato la mayoría de los ticks (sin cuentas por vencer, es un SELECT
+  // vacío) -- no vale la pena un job aparte solo para esto.
+  await renewExpiringGoogleCalendarWatches().catch((error) => {
+    console.error("[cron] Error renovando suscripciones de Google Calendar:", error);
+  });
+
   return NextResponse.json(result);
 }
 

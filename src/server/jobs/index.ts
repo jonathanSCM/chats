@@ -4,6 +4,7 @@ import { handleAnalyzeFollowUp } from "./handlers/analyze-follow-up";
 import { handleBotReply } from "./handlers/bot-reply";
 import { handleMeetingBotJoin, markMeetingBotJoinFailed } from "./handlers/meeting-bot-join";
 import { handleVexaBotPoll, markVexaBotPollFailed } from "./handlers/vexa-bot-poll";
+import { handleGoogleCalendarSync } from "./handlers/google-calendar-sync";
 import { handleCleanupMeetingMedia } from "./handlers/cleanup-meeting-media";
 import { handleCoexistenceHistorySync } from "./handlers/coexistence-history-sync";
 import { handleFetchLinkPreview } from "./handlers/fetch-link-preview";
@@ -22,6 +23,7 @@ const handlers: Record<string, JobHandler> = {
   bot_reply: handleBotReply,
   meeting_bot_join: handleMeetingBotJoin,
   vexa_bot_poll: handleVexaBotPoll,
+  google_calendar_sync: handleGoogleCalendarSync,
   cleanup_meeting_media: handleCleanupMeetingMedia,
   coexistence_history_sync: handleCoexistenceHistorySync,
   fetch_link_preview: handleFetchLinkPreview,

@@ -25,6 +25,16 @@ Si el link de la reunión ya estaba agendado en el CRM, la transcripción se sum
 Si no, se crea una nueva reunión **"Reunión Extensión"** — igual que hace "Unir el bot ya mismo"
 con llamadas en vivo sin agendar, pero con un nombre distinto para que se distinga de un vistazo.
 
+## O unir al asistente grabador, sin ir a la web
+
+El mismo ícono tiene una segunda opción, independiente de "Grabar esta reunión": **"Unir al
+asistente"**. En vez de grabar en tu propio navegador, le avisa al bot grabador (`meeting-bot/`)
+para que entre a esta misma reunión ya mismo — mismo efecto que "Unir el bot ya mismo" en
+`/dashboard/reuniones`, pero sin salir de Meet ni pegar el link a mano. Como usa el mismo
+`resolveExtensionMeeting` que los subtítulos, si usás las dos opciones en la misma reunión todo
+queda junto en una sola reunión del CRM, no duplicado. Necesita haber iniciado sesión (el botón no
+aparece si todavía no conectaste tu cuenta).
+
 ## Audio real (para whisper.cpp) — opcional, además de los subtítulos
 
 Al tocar "Grabar esta reunión" también se intenta grabar el audio real (lo que dicen los demás

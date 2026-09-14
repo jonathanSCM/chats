@@ -8,6 +8,7 @@ const accountInitial = document.getElementById("accountInitial");
 const meetingText = document.getElementById("meetingText");
 const meetingStatus = document.getElementById("meetingStatus");
 const recordBtn = document.getElementById("recordBtn");
+const joinAssistantBtn = document.getElementById("joinAssistantBtn");
 const micBtn = document.getElementById("micBtn");
 const micStatus = document.getElementById("micStatus");
 
@@ -91,6 +92,8 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       meetingText.textContent = "No se pudo conectar con la reunión — recargá la pestaña de Meet e intentá de nuevo.";
       return;
     }
+    const meetingUrl = tab.url.match(MEETING_URL_RE)[0];
+
     if (response.recording) {
       meetingText.innerHTML = '<span class="dot"></span>Grabando esta reunión (' + response.lines + " líneas).";
       recordBtn.style.display = "none";
@@ -99,7 +102,6 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       recordBtn.style.display = "block";
       recordBtn.addEventListener("click", () => {
         recordBtn.disabled = true;
-        const meetingUrl = tab.url.match(MEETING_URL_RE)[0];
 
         chrome.tabs.sendMessage(tab.id, { type: "START_RECORDING" }, () => {
           meetingText.innerHTML = '<span class="dot"></span>Grabando esta reunión.';
@@ -120,5 +122,41 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
         });
       });
     }
+
+    // Segunda opción, independiente de "Grabar esta reunión": en vez de
+    // grabar acá mismo, le pide al asistente (el bot que ya usa
+    // Seguimiento/Reuniones) que entre a esta reunión ya mismo -- así no
+    // hace falta ir a la web, pegar el link y tocar "Unir el bot ya mismo"
+    // a mano. Requiere haber iniciado sesión (necesita el token personal).
+    chrome.storage.local.get(["token", "apiBase"], ({ token, apiBase }) => {
+      if (!token) return; // sin sesión iniciada, ni mostrar el botón -- evita un error confuso
+      joinAssistantBtn.style.display = "block";
+
+      joinAssistantBtn.addEventListener("click", () => {
+        joinAssistantBtn.disabled = true;
+        const base = (apiBase || "https://chats.proshop.lat").replace(/\/$/, "");
+
+        fetch(`${base}/api/extension/join-bot`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ meetingUrl }),
+        })
+          .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+          .then(({ ok, data }) => {
+            if (!ok) {
+              status.textContent = data?.error || "No se pudo avisar al asistente.";
+              status.style.color = "#dc2626";
+              joinAssistantBtn.disabled = false;
+              return;
+            }
+            joinAssistantBtn.textContent = "Asistente avisado — va a pedir unirse en un momento";
+          })
+          .catch(() => {
+            status.textContent = "No se pudo conectar con el CRM.";
+            status.style.color = "#dc2626";
+            joinAssistantBtn.disabled = false;
+          });
+      });
+    });
   });
 });

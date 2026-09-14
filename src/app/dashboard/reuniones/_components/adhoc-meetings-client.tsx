@@ -12,12 +12,15 @@ import {
   stopMeetingBotAction,
   generateMeetingSummaryPdfAction,
   updateAdhocMeetingAction,
+  renameAdhocMeetingAction,
   cancelAdhocMeetingAction,
 } from "@/server/actions/adhoc-meetings";
 import { scheduledAtToUtcHidden, utcIsoToLocalInputValue } from "@/lib/datetime-local";
 import { BOT_STATUS_CONFIG } from "@/lib/meeting-bot-status";
 import { MeetingAttachments, type MeetingAttachmentInfo } from "@/components/meeting-attachments";
 import { PdfViewerModal } from "@/components/pdf-viewer-modal";
+import { EditableTitle } from "@/components/editable-title";
+import { SidePanel } from "@/components/side-panel";
 
 export interface AdhocMeetingRow {
   id: string;
@@ -129,6 +132,14 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
     });
   }
 
+  function handleRename(id: string, title: string) {
+    startTransition(async () => {
+      await renameAdhocMeetingAction(id, title);
+    });
+  }
+
+  const [detailId, setDetailId] = useState<string | null>(null);
+
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   function handleCancelMeeting(id: string) {
     if (cancelingId !== id) {
@@ -233,187 +244,229 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
           {meetings.map((m) => {
             const botConfig = m.botStatus ? BOT_STATUS_CONFIG[m.botStatus] : null;
             const BotIcon = botConfig?.icon;
-            const pdfAttachment = m.attachments.find((a) => a.mimeType === "application/pdf");
             return (
-            <Card key={m.id} className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-medium text-ink">{m.title}</p>
-                <span className="ml-auto rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-ink-muted">
-                  {STATUS_LABEL[m.status] ?? m.status}
-                </span>
-                {botConfig && BotIcon && (
-                  <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10px] ${botConfig.className}`}>
-                    <BotIcon size={10} className={m.botStatus === "JOINING" || m.botStatus === "TRANSCRIBING" ? "animate-spin" : ""} />
-                    {botConfig.label}
+              <Card key={m.id} className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <EditableTitle
+                    value={m.title}
+                    onSave={(v) => handleRename(m.id, v)}
+                    disabled={isPending}
+                    className="flex-1 text-base font-semibold text-ink"
+                  />
+                  <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-ink-muted">
+                    {STATUS_LABEL[m.status] ?? m.status}
                   </span>
-                )}
-                {botConfig?.canStop && (
-                  <button
-                    type="button"
-                    disabled={isPending || stoppingId === m.id}
-                    onClick={() => handleStop(m.id)}
-                    title="Sacar al bot de la reunión ahora"
-                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-danger hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <PhoneOff size={11} /> {stoppingId === m.id ? "Deteniendo…" : "Detener bot"}
-                  </button>
-                )}
-                {(m.transcript || m.audioTranscript) && !pdfAttachment && (
-                  <button
-                    type="button"
-                    disabled={isPending || actionPendingId === m.id}
-                    onClick={() => handleGenerateSummary(m.id)}
-                    title="Generar un resumen ejecutivo en PDF a partir de la transcripción"
-                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <FileDown size={11} /> {actionPendingId === m.id ? "Generando…" : "Generar resumen (PDF)"}
-                  </button>
-                )}
-                {pdfAttachment && (
-                  <button
-                    type="button"
-                    onClick={() => setViewingPdf({ url: pdfAttachment.url, title: `Resumen — ${m.title}` })}
-                    title="Ver el resumen en PDF"
-                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent"
-                  >
-                    <FileDown size={11} /> Ver PDF
-                  </button>
-                )}
-                {m.status !== "CANCELED" && m.status !== "DONE" && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(editingId === m.id ? null : m.id)}
-                      title="Editar fecha, duración o si el bot se une"
-                      className={`flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:border-accent-dim hover:text-accent ${
-                        editingId === m.id ? "border-accent-dim text-accent" : "text-ink-muted"
-                      }`}
-                    >
-                      <Pencil size={11} /> Editar
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() => handleCancelMeeting(m.id)}
-                      title={cancelingId === m.id ? "¿Seguro? Tocá de nuevo" : "Cancelar reunión"}
-                      className={`flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] disabled:cursor-not-allowed ${
-                        cancelingId === m.id ? "border-danger text-danger" : "text-ink-muted hover:border-danger hover:text-danger"
-                      }`}
-                    >
-                      <Ban size={11} /> {cancelingId === m.id ? "¿Seguro?" : "Cancelar"}
-                    </button>
-                  </>
-                )}
+                  {botConfig && BotIcon && (
+                    <span className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10px] ${botConfig.className}`}>
+                      <BotIcon size={10} className={m.botStatus === "JOINING" || m.botStatus === "TRANSCRIBING" ? "animate-spin" : ""} />
+                      {botConfig.label}
+                    </span>
+                  )}
+                </div>
                 <button
                   type="button"
-                  disabled={isPending}
-                  onClick={() => handleDelete(m.id)}
-                  title={confirmDeleteId === m.id ? "¿Seguro? Tocá de nuevo" : "Borrar reunión"}
-                  className={`cursor-pointer disabled:cursor-not-allowed ${
-                    confirmDeleteId === m.id ? "text-danger" : "text-ink-faint hover:text-danger"
-                  }`}
+                  onClick={() => setDetailId(m.id)}
+                  className="flex w-full cursor-pointer items-center gap-1.5 text-left font-mono text-sm text-ink-muted hover:text-accent"
                 >
-                  <Trash2 size={13} />
+                  <Clock size={14} className="shrink-0 text-ink-faint" />
+                  {timeLabel(m.scheduledAt)} · {m.durationMinutes} min
                 </button>
-              </div>
-
-              {editingId === m.id && (
-                <form
-                  onSubmit={(e) => handleEditSubmit(m.id, e)}
-                  className="space-y-2 rounded-md border border-border bg-surface-2/40 p-2.5"
-                >
-                  <input type="hidden" name="scheduledAt" defaultValue={m.scheduledAt} />
-                  <Input
-                    type="text"
-                    name="title"
-                    placeholder="Nombre de la reunión"
-                    defaultValue={m.title}
-                    className="text-sm"
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    <Input
-                      type="datetime-local"
-                      required
-                      defaultValue={utcIsoToLocalInputValue(m.scheduledAt)}
-                      onChange={scheduledAtToUtcHidden}
-                      className="text-sm"
-                    />
-                    <Input
-                      type="number"
-                      name="durationMinutes"
-                      min={1}
-                      defaultValue={m.durationMinutes}
-                      className="w-24 text-sm"
-                    />
-                  </div>
-                  <Input
-                    type="url"
-                    name="meetingUrl"
-                    placeholder="Link de la reunión"
-                    defaultValue={m.meetingUrl ?? ""}
-                    className="text-sm"
-                  />
-                  <label className="flex items-center gap-1.5 text-xs text-ink-muted">
-                    <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked={m.botEnabled} />
-                    Que el bot se una a esta reunión
-                  </label>
-                  {editError?.id === m.id && <p className="text-xs text-danger">{editError.message}</p>}
-                  <div className="flex gap-2">
-                    <Button type="submit" size="sm" disabled={editPending}>
-                      {editPending ? "Guardando…" : "Guardar cambios"}
-                    </Button>
-                    <Button type="button" size="sm" variant="secondary" onClick={() => setEditingId(null)}>
-                      Cancelar edición
-                    </Button>
-                  </div>
-                </form>
-              )}
-
-              {stopError?.id === m.id && <p className="text-xs text-danger">{stopError.message}</p>}
-              {actionError?.id === m.id && <p className="text-xs text-danger">{actionError.message}</p>}
-
-              <div className="flex flex-wrap items-center gap-3 text-xs text-ink-muted">
-                <span className="flex items-center gap-1">
-                  <Clock size={12} className="text-ink-faint" /> {timeLabel(m.scheduledAt)} ·{" "}
-                  {m.durationMinutes} min
-                </span>
-                {m.meetingUrl && (
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText(m.meetingUrl!)}
-                    title="Copiar link de la reunión"
-                    className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:border-accent-dim hover:text-accent"
-                  >
-                    <Copy size={11} /> Link
-                  </button>
-                )}
-                {!m.meetingUrl && (
-                  <span className="flex items-center gap-1 text-ink-faint">
-                    <Video size={12} /> Sin link
-                  </span>
-                )}
-              </div>
-
-              {m.botJoinedAt && (
-                <p className="font-mono text-[10px] text-ink-faint">
-                  Grabó de {new Date(m.botJoinedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}{" "}
-                  a{" "}
-                  {m.botLeftAt
-                    ? new Date(m.botLeftAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })
-                    : "ahora"}
-                  {m.botLeftAt &&
-                    ` (${Math.round((new Date(m.botLeftAt).getTime() - new Date(m.botJoinedAt).getTime()) / 60_000)}m)`}
-                </p>
-              )}
-
-              {m.notes && <p className="whitespace-pre-wrap text-xs leading-relaxed text-ink-muted">{m.notes}</p>}
-
-              <MeetingAttachments meetingId={m.id} attachments={m.attachments} editable disabled={isPending} />
-            </Card>
+              </Card>
             );
           })}
         </div>
       )}
+
+      {detailId && (() => {
+        const m = meetings.find((x) => x.id === detailId);
+        if (!m) return null;
+        const botConfig = m.botStatus ? BOT_STATUS_CONFIG[m.botStatus] : null;
+        const BotIcon = botConfig?.icon;
+        const pdfAttachment = m.attachments.find((a) => a.mimeType === "application/pdf");
+        return (
+          <SidePanel
+            onClose={() => setDetailId(null)}
+            header={
+              <>
+                <EditableTitle
+                  value={m.title}
+                  onSave={(v) => handleRename(m.id, v)}
+                  disabled={isPending}
+                  className="font-display text-lg font-semibold text-ink"
+                />
+                <p className="mt-1 flex items-center gap-1.5 font-mono text-[13px] text-ink-faint">
+                  <Clock size={13} /> {timeLabel(m.scheduledAt)} · {m.durationMinutes} min
+                </p>
+              </>
+            }
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-ink-muted">
+                {STATUS_LABEL[m.status] ?? m.status}
+              </span>
+              {botConfig && BotIcon && (
+                <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10px] ${botConfig.className}`}>
+                  <BotIcon size={10} className={m.botStatus === "JOINING" || m.botStatus === "TRANSCRIBING" ? "animate-spin" : ""} />
+                  {botConfig.label}
+                </span>
+              )}
+              {botConfig?.canStop && (
+                <button
+                  type="button"
+                  disabled={isPending || stoppingId === m.id}
+                  onClick={() => handleStop(m.id)}
+                  title="Sacar al bot de la reunión ahora"
+                  className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-danger hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <PhoneOff size={11} /> {stoppingId === m.id ? "Deteniendo…" : "Detener bot"}
+                </button>
+              )}
+              {(m.transcript || m.audioTranscript) && !pdfAttachment && (
+                <button
+                  type="button"
+                  disabled={isPending || actionPendingId === m.id}
+                  onClick={() => handleGenerateSummary(m.id)}
+                  title="Generar un resumen ejecutivo en PDF a partir de la transcripción"
+                  className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <FileDown size={11} /> {actionPendingId === m.id ? "Generando…" : "Generar resumen (PDF)"}
+                </button>
+              )}
+              {pdfAttachment && (
+                <button
+                  type="button"
+                  onClick={() => setViewingPdf({ url: pdfAttachment.url, title: `Resumen — ${m.title}` })}
+                  title="Ver el resumen en PDF"
+                  className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent"
+                >
+                  <FileDown size={11} /> Ver PDF
+                </button>
+              )}
+              {m.meetingUrl && (
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(m.meetingUrl!)}
+                  title="Copiar link de la reunión"
+                  className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:border-accent-dim hover:text-accent"
+                >
+                  <Copy size={11} /> Link
+                </button>
+              )}
+              {!m.meetingUrl && (
+                <span className="flex items-center gap-1 text-ink-faint">
+                  <Video size={12} /> Sin link
+                </span>
+              )}
+            </div>
+
+            {m.status !== "CANCELED" && m.status !== "DONE" && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(editingId === m.id ? null : m.id)}
+                    title="Editar fecha, duración o si el bot se une"
+                    className={`flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:border-accent-dim hover:text-accent ${
+                      editingId === m.id ? "border-accent-dim text-accent" : "text-ink-muted"
+                    }`}
+                  >
+                    <Pencil size={11} /> Editar fecha/link/bot
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => handleCancelMeeting(m.id)}
+                    title={cancelingId === m.id ? "¿Seguro? Tocá de nuevo" : "Cancelar reunión"}
+                    className={`flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] disabled:cursor-not-allowed ${
+                      cancelingId === m.id ? "border-danger text-danger" : "text-ink-muted hover:border-danger hover:text-danger"
+                    }`}
+                  >
+                    <Ban size={11} /> {cancelingId === m.id ? "¿Seguro?" : "Cancelar"}
+                  </button>
+                </div>
+
+                {editingId === m.id && (
+                  <form
+                    onSubmit={(e) => handleEditSubmit(m.id, e)}
+                    className="space-y-2 rounded-md border border-border bg-surface-2/40 p-2.5"
+                  >
+                    <input type="hidden" name="scheduledAt" defaultValue={m.scheduledAt} />
+                    <input type="hidden" name="title" value={m.title} />
+                    <div className="flex flex-wrap gap-2">
+                      <Input
+                        type="datetime-local"
+                        required
+                        defaultValue={utcIsoToLocalInputValue(m.scheduledAt)}
+                        onChange={scheduledAtToUtcHidden}
+                        className="text-sm"
+                      />
+                      <Input
+                        type="number"
+                        name="durationMinutes"
+                        min={1}
+                        defaultValue={m.durationMinutes}
+                        className="w-24 text-sm"
+                      />
+                    </div>
+                    <Input
+                      type="url"
+                      name="meetingUrl"
+                      placeholder="Link de la reunión"
+                      defaultValue={m.meetingUrl ?? ""}
+                      className="text-sm"
+                    />
+                    <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+                      <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked={m.botEnabled} />
+                      Que el bot se una a esta reunión
+                    </label>
+                    {editError?.id === m.id && <p className="text-xs text-danger">{editError.message}</p>}
+                    <div className="flex gap-2">
+                      <Button type="submit" size="sm" disabled={editPending}>
+                        {editPending ? "Guardando…" : "Guardar cambios"}
+                      </Button>
+                      <Button type="button" size="sm" variant="secondary" onClick={() => setEditingId(null)}>
+                        Cancelar edición
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {stopError?.id === m.id && <p className="text-xs text-danger">{stopError.message}</p>}
+            {actionError?.id === m.id && <p className="text-xs text-danger">{actionError.message}</p>}
+
+            {m.botJoinedAt && (
+              <p className="font-mono text-[10px] text-ink-faint">
+                Grabó de {new Date(m.botJoinedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}{" "}
+                a{" "}
+                {m.botLeftAt
+                  ? new Date(m.botLeftAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })
+                  : "ahora"}
+                {m.botLeftAt &&
+                  ` (${Math.round((new Date(m.botLeftAt).getTime() - new Date(m.botJoinedAt).getTime()) / 60_000)}m)`}
+              </p>
+            )}
+
+            {m.notes && <p className="whitespace-pre-wrap text-xs leading-relaxed text-ink-muted">{m.notes}</p>}
+
+            <MeetingAttachments meetingId={m.id} attachments={m.attachments} editable disabled={isPending} />
+
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => handleDelete(m.id)}
+              title={confirmDeleteId === m.id ? "¿Seguro? Tocá de nuevo" : "Borrar reunión"}
+              className={`flex cursor-pointer items-center gap-1 text-xs disabled:cursor-not-allowed ${
+                confirmDeleteId === m.id ? "text-danger" : "text-ink-faint hover:text-danger"
+              }`}
+            >
+              <Trash2 size={13} /> {confirmDeleteId === m.id ? "¿Seguro? Tocá de nuevo" : "Borrar reunión"}
+            </button>
+          </SidePanel>
+        );
+      })()}
+
       {viewingPdf && (
         <PdfViewerModal url={viewingPdf.url} title={viewingPdf.title} onClose={() => setViewingPdf(null)} />
       )}

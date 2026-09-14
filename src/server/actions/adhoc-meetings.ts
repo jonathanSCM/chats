@@ -345,6 +345,34 @@ export async function updateAdhocMeetingAction(meetingId: string, formData: Form
   return { error: null, message: "Reunión actualizada." };
 }
 
+/**
+ * Solo el nombre -- a diferencia de updateAdhocMeetingAction (que además
+ * pide fecha/duración) esto se usa para el renombrado rápido en la lista, sin
+ * abrir el formulario completo, y sin la restricción de "no se puede editar
+ * si ya está cancelada/realizada" (renombrar para identificarla después,
+ * ej. "Reunión Extensión" -> "Reunión con Juanito", tiene sentido en
+ * cualquier estado).
+ */
+export async function renameAdhocMeetingAction(meetingId: string, title: string): Promise<ActionState> {
+  const { organizationId } = await requireOrg();
+
+  const trimmed = title.trim();
+  if (!trimmed) return { error: "Poné un nombre" };
+  if (trimmed.length > 160) return { error: "Nombre muy largo" };
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    select: { organizationId: true, opportunityId: true },
+  });
+  if (!meeting || meeting.organizationId !== organizationId || meeting.opportunityId !== null) {
+    return { error: "Reunión no encontrada" };
+  }
+
+  await prisma.meeting.update({ where: { id: meetingId }, data: { title: trimmed } });
+  revalidatePath(PATH);
+  return { error: null };
+}
+
 /** Cancela la reunión (no la borra) — si tiene evento de Calendar, lo cancela y avisa a los invitados. */
 export async function cancelAdhocMeetingAction(meetingId: string): Promise<ActionState> {
   const { organizationId } = await requireOrg();

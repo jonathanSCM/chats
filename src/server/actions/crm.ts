@@ -536,6 +536,35 @@ export async function updateMeetingNotesAction(
   return { error: null };
 }
 
+/**
+ * Solo el nombre -- para el renombrado rápido en la lista (ej. "Reunión
+ * Extensión" -> "Reunión con Juanito"), sin el formulario completo de
+ * updateMeetingAction y sin su restricción de "no editable si ya está
+ * cancelada/realizada" (identificarla mejor después tiene sentido siempre).
+ */
+export async function renameMeetingAction(meetingId: string, title: string): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const trimmed = title.trim();
+  if (!trimmed) return { error: "Poné un nombre" };
+  if (trimmed.length > 160) return { error: "Nombre muy largo" };
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    include: { opportunity: { select: { assignedToId: true } } },
+  });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+  if (meeting.opportunity && !canEditOpportunity(meeting.opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  await prisma.meeting.update({ where: { id: meetingId }, data: { title: trimmed } });
+  revalidatePath(PATH);
+  return { error: null };
+}
+
 export async function deleteMeetingAction(meetingId: string): Promise<ActionState> {
   const { organizationId, userId, isAdmin } = await requireOrg();
 

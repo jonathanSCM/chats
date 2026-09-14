@@ -10,11 +10,20 @@ import { prisma } from "@/server/db/client";
  * sincronización en las dos direcciones vía `calendar.events.watch`.
  */
 
+/**
+ * Cliente OAuth SEPARADO del que usa el bot compartido (google-calendar.ts,
+ * GOOGLE_CLIENT_ID/SECRET) -- ese es de tipo "Escritorio" (flujo por
+ * localhost, ver scripts/get-google-refresh-token.ts) y Google no deja
+ * agregarle una URI de redirección web de verdad. Este es de tipo
+ * "Aplicación web", con /api/oauth/google-calendar/callback autorizado.
+ */
 function requireGoogleClientCreds(): { clientId: string; clientSecret: string } {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    throw new Error("Google no está configurado en el servidor (faltan GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET).");
+    throw new Error(
+      "Google Calendar (por usuario) no está configurado en el servidor (faltan GOOGLE_CALENDAR_CLIENT_ID/GOOGLE_CALENDAR_CLIENT_SECRET).",
+    );
   }
   return { clientId, clientSecret };
 }
@@ -28,7 +37,9 @@ function redirectUri(): string {
 const SCOPES = ["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/userinfo.email"];
 
 export function isGoogleCalendarOAuthEnabled(): boolean {
-  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.NEXTAUTH_URL);
+  return Boolean(
+    process.env.GOOGLE_CALENDAR_CLIENT_ID && process.env.GOOGLE_CALENDAR_CLIENT_SECRET && process.env.NEXTAUTH_URL,
+  );
 }
 
 /**

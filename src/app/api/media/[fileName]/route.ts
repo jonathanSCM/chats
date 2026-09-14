@@ -6,7 +6,7 @@ import { readMediaFileFromS3 } from "@/lib/media-storage";
 // conversaciones). Requiere sesión: son archivos de clientes, no algo que
 // deba quedar público en internet solo porque conocés la URL.
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ fileName: string }> },
 ) {
   const session = await auth();
@@ -33,10 +33,21 @@ export async function GET(
     ? `${contentType}; charset=utf-8`
     : contentType;
 
-  return new NextResponse(file.body, {
-    headers: {
-      "Content-Type": withCharset,
-      "Cache-Control": "private, max-age=3600",
-    },
-  });
+  const headers: Record<string, string> = {
+    "Content-Type": withCharset,
+    "Cache-Control": "private, max-age=3600",
+  };
+
+  // El navegador decide por MIME si abre el archivo inline o lo descarga --
+  // para audio/video eso significa reproducirlo en la pestaña, sin ninguna
+  // opción visible de guardarlo. `?download=nombre.ext` (link explícito de
+  // "Descargar", ver meeting-attachments.tsx) fuerza el diálogo de guardar
+  // con el nombre real del adjunto en vez del uuid interno.
+  const downloadName = req.nextUrl.searchParams.get("download");
+  if (downloadName) {
+    const safeName = downloadName.replace(/[^\w.\- ]/g, "_");
+    headers["Content-Disposition"] = `attachment; filename="${safeName}"`;
+  }
+
+  return new NextResponse(file.body, { headers });
 }

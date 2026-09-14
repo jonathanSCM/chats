@@ -1,8 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { FileText, Paperclip, Trash2 } from "lucide-react";
+import { Download, FileText, Paperclip, Trash2 } from "lucide-react";
 import { addMeetingAttachmentAction, deleteMeetingAttachmentAction } from "@/server/actions/crm";
+
+/** URL de descarga forzada (Content-Disposition: attachment) — ver api/media/[fileName]/route.ts. */
+function downloadUrl(a: Pick<MeetingAttachmentInfo, "url" | "fileName">): string {
+  const separator = a.url.includes("?") ? "&" : "?";
+  return `${a.url}${separator}download=${encodeURIComponent(a.fileName)}`;
+}
 
 export interface MeetingAttachmentInfo {
   id: string;
@@ -74,30 +80,43 @@ export function MeetingAttachments({
       {attachments.length > 0 && (
         <ul className="mb-1.5 space-y-1">
           {attachments.map((a) => (
-            <li key={a.id} className="flex items-center gap-1.5 text-[11px]">
-              <FileText size={11} className="shrink-0 text-ink-faint" />
-              <a
-                href={a.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="truncate text-accent hover:underline"
-                title={a.fileName}
-              >
-                {a.fileName}
-              </a>
-              <span className="shrink-0 text-ink-faint">({formatFileSize(a.fileSize)})</span>
-              {editable && (
-                <button
-                  type="button"
-                  disabled={disabled || isPending}
-                  onClick={() => handleDeleteAttachment(a.id)}
-                  className={`ml-auto shrink-0 cursor-pointer disabled:cursor-not-allowed ${
-                    confirmDeleteId === a.id ? "text-danger" : "text-ink-faint hover:text-danger"
-                  }`}
-                  title={confirmDeleteId === a.id ? "¿Seguro? Toca de nuevo" : "Borrar archivo"}
+            <li key={a.id} className="space-y-1">
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <FileText size={11} className="shrink-0 text-ink-faint" />
+                <a
+                  href={a.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="truncate text-accent hover:underline"
+                  title={a.fileName}
                 >
-                  <Trash2 size={11} />
-                </button>
+                  {a.fileName}
+                </a>
+                <span className="shrink-0 text-ink-faint">({formatFileSize(a.fileSize)})</span>
+                <a
+                  href={downloadUrl(a)}
+                  className="shrink-0 text-ink-faint hover:text-accent"
+                  title="Descargar"
+                >
+                  <Download size={11} />
+                </a>
+                {editable && (
+                  <button
+                    type="button"
+                    disabled={disabled || isPending}
+                    onClick={() => handleDeleteAttachment(a.id)}
+                    className={`ml-auto shrink-0 cursor-pointer disabled:cursor-not-allowed ${
+                      confirmDeleteId === a.id ? "text-danger" : "text-ink-faint hover:text-danger"
+                    }`}
+                    title={confirmDeleteId === a.id ? "¿Seguro? Toca de nuevo" : "Borrar archivo"}
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                )}
+              </div>
+              {a.mimeType.startsWith("audio/") && (
+                // eslint-disable-next-line jsx-a11y/media-has-caption -- grabación de reunión, no hay pista de subtítulos que adjuntar acá
+                <audio controls preload="none" src={a.url} className="h-8 w-full max-w-sm" />
               )}
             </li>
           ))}

@@ -193,8 +193,34 @@ async function waitForAdmission(page: Page, signal: AbortSignal): Promise<void> 
   await Promise.race([
     inCallIndicator.waitFor({ timeout: 10 * 60_000 }),
     abortPromise(signal, "Se pidió detener el bot mientras esperaba que lo admitieran."),
+    detectNavigatedAway(page),
   ]);
   console.log("[meeting-bot] Ya está adentro de la reunión.");
+}
+
+/**
+ * Mientras espera que lo admitan, Meet puede navegar la pestaña a otro lado
+ * por su cuenta (link vencido, la reunión ya terminó, o Google detectó el
+ * navegador automatizado y lo redirigió) -- confirmado con una captura real
+ * en producción: la pestaña terminó en la página de marketing de Meet
+ * (workspace.google.com), no en la llamada. Antes esto no se detectaba, así
+ * que `waitForAdmission` se quedaba esperando el contador de "Personas" los
+ * 10 minutos completos sin ninguna chance de encontrarlo, sin avisar el
+ * motivo real. Se revisa la URL cada 2s -- en cuanto deja de estar en
+ * meet.google.com, se corta con un error claro en vez de agotar el tiempo.
+ */
+async function detectNavigatedAway(page: Page): Promise<never> {
+  for (;;) {
+    await page.waitForTimeout(2_000);
+    if (page.isClosed()) {
+      throw new Error("La pestaña de la reunión se cerró mientras esperaba que lo admitieran.");
+    }
+    if (!page.url().startsWith("https://meet.google.com/")) {
+      throw new Error(
+        `Google sacó la pestaña de la reunión mientras esperaba que lo admitieran (terminó en ${page.url()}) -- probablemente el link venció, la reunión ya terminó, o Google marcó el navegador como automatizado.`,
+      );
+    }
+  }
 }
 
 function abortPromise(signal: AbortSignal, message: string): Promise<never> {

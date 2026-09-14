@@ -281,18 +281,20 @@ export function TrackingTable({
   const [creating, setCreating] = useState(false);
   const [boardView, setBoardView] = useState<"table" | "kanban" | "analisis">("table");
 
-  // En vez de una barra de scroll horizontal, la tabla se arrastra con el
-  // botón DERECHO del mouse -- el izquierdo lo usan casi todas las celdas
-  // (ordenar columna, editar campo, ir al chat, reordenar filas a mano), así
-  // que agarrar con el izquierdo terminaba disparando esos gestos en vez de
-  // desplazar la tabla.
+  // La tabla se arrastra con el botón IZQUIERDO del mouse -- pedido así a
+  // propósito, aunque puede chocar con los controles que también usan el
+  // izquierdo (ordenar columna, editar campo, ir al chat, reordenar filas a
+  // mano): para minimizar eso, el pan no arranca si el mousedown fue sobre
+  // uno de esos controles o sobre una fila en modo de orden manual.
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const panRef = useRef<{ startX: number; startScrollLeft: number } | null>(null);
   const [isPanningTable, setIsPanningTable] = useState(false);
 
   function handleTablePointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (e.button !== 2) return;
-    e.preventDefault();
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("button, a, select, input, textarea")) return;
+    if (target.closest('tr[draggable="true"]')) return;
     const el = tableScrollRef.current;
     if (!el) return;
     panRef.current = { startX: e.clientX, startScrollLeft: el.scrollLeft };
@@ -788,10 +790,8 @@ export function TrackingTable({
           onPointerMove={handleTablePointerMove}
           onPointerUp={endTablePan}
           onPointerLeave={endTablePan}
-          onContextMenu={(e) => e.preventDefault()}
-          title="Clic derecho + arrastrar para desplazarte a los lados"
           className={`-mx-4 overflow-x-auto md:-mx-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-            isPanningTable ? "cursor-grabbing select-none" : ""
+            isPanningTable ? "cursor-grabbing select-none" : "cursor-grab"
           }`}
         >
           <div className="min-w-max px-4 md:px-8">

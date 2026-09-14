@@ -164,6 +164,114 @@
     return count <= 1;
   }
 
+  // ── Panel de clasificación al cortar: no bloquea nada -- si se ignora, la
+  // reunión queda igual que hoy (sin opportunityId). Vive en la misma
+  // pestaña de Meet (mismo origen que sendTranscript, así que el fetch()
+  // sale como si lo hiciera meet.google.com, sujeto a las mismas reglas de
+  // CORS que ya resolvieron transcript/route.ts).
+  function getStoredAuth() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(["apiBase", "token"], ({ apiBase, token }) => {
+        resolve({ base: (apiBase || "https://chats.proshop.lat").replace(/\/$/, ""), token });
+      });
+    });
+  }
+
+  function showClassifyPanel() {
+    if (document.getElementById("proshop-classify-panel")) return;
+
+    const panel = document.createElement("div");
+    panel.id = "proshop-classify-panel";
+    panel.style.cssText =
+      "position:fixed;bottom:16px;right:16px;z-index:999999;width:300px;background:#fff;" +
+      "color:#111b21;font:13px/1.4 system-ui,sans-serif;border-radius:12px;" +
+      "box-shadow:0 8px 24px rgba(0,0,0,.25);padding:14px;";
+    panel.innerHTML = `
+      <div style="font-weight:600;margin-bottom:8px;">¿A qué cliente fue esta reunión?</div>
+      <input id="ps-search" placeholder="Buscar cliente..." style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #e9edef;border-radius:6px;font:inherit;margin-bottom:6px;" />
+      <div id="ps-results" style="max-height:140px;overflow:auto;"></div>
+      <div id="ps-new" style="display:none;margin-top:8px;">
+        <input id="ps-new-name" placeholder="Nombre" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #e9edef;border-radius:6px;font:inherit;margin-bottom:6px;" />
+        <input id="ps-new-phone" placeholder="Teléfono" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #e9edef;border-radius:6px;font:inherit;margin-bottom:6px;" />
+        <button id="ps-new-save" style="width:100%;padding:7px;border:0;border-radius:6px;background:#00a884;color:#fff;font:inherit;cursor:pointer;">Crear y vincular</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button id="ps-new-toggle" style="flex:1;padding:6px;border:1px solid #e9edef;border-radius:6px;background:#fff;font:inherit;cursor:pointer;">Cliente nuevo</button>
+        <button id="ps-dismiss" style="flex:1;padding:6px;border:1px solid #e9edef;border-radius:6px;background:#fff;font:inherit;cursor:pointer;">Ahora no</button>
+      </div>
+    `;
+    document.body.appendChild(panel);
+
+    const close = () => panel.remove();
+    panel.querySelector("#ps-dismiss").addEventListener("click", close);
+    panel.querySelector("#ps-new-toggle").addEventListener("click", () => {
+      const el = panel.querySelector("#ps-new");
+      el.style.display = el.style.display === "none" ? "block" : "none";
+    });
+
+    let debounceTimer = null;
+    panel.querySelector("#ps-search").addEventListener("input", (e) => {
+      clearTimeout(debounceTimer);
+      const q = e.target.value.trim();
+      const resultsEl = panel.querySelector("#ps-results");
+      if (q.length < 2) {
+        resultsEl.innerHTML = "";
+        return;
+      }
+      debounceTimer = setTimeout(async () => {
+        const { base, token } = await getStoredAuth();
+        if (!token) return;
+        try {
+          const res = await fetch(`${base}/api/extension/opportunities/search?q=${encodeURIComponent(q)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          resultsEl.innerHTML = "";
+          for (const r of data.results || []) {
+            const item = document.createElement("div");
+            item.textContent = `${r.title} — ${r.contactName}`;
+            item.style.cssText = "padding:7px 8px;border-radius:6px;cursor:pointer;font-size:12.5px;";
+            item.addEventListener("mouseenter", () => (item.style.background = "#f0f2f5"));
+            item.addEventListener("mouseleave", () => (item.style.background = "transparent"));
+            item.addEventListener("click", async () => {
+              await postClassify({ opportunityId: r.id });
+              close();
+            });
+            resultsEl.appendChild(item);
+          }
+        } catch {
+          // best-effort -- si falla la búsqueda, el panel sigue disponible para reintentar.
+        }
+      }, 300);
+    });
+
+    panel.querySelector("#ps-new-save").addEventListener("click", async () => {
+      const name = panel.querySelector("#ps-new-name").value.trim();
+      const phone = panel.querySelector("#ps-new-phone").value.trim();
+      if (!phone) return;
+      await postClassify({ newContactName: name, newContactPhone: phone, newOpportunityTitle: name });
+      close();
+    });
+
+    async function postClassify(extra) {
+      const { base, token } = await getStoredAuth();
+      if (!token) return;
+      try {
+        await fetch(`${base}/api/extension/meetings/classify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ meetingUrl, ...extra }),
+        });
+      } catch (error) {
+        console.error("[proshop-captions] No se pudo clasificar la reunión:", error);
+      }
+    }
+
+    // Se cierra solo a los 45s si nadie lo toca -- no hay que dejarlo
+    // colgado en pantalla para siempre en una reunión que ya terminó.
+    setTimeout(close, 45_000);
+  }
+
   async function sendTranscript(reason) {
     if (sent) return;
     const transcript = currentTranscript().trim();
@@ -230,6 +338,7 @@
           // offscreen document, si existe, revisa que haya algo grabando
           // antes de hacer nada).
           chrome.runtime.sendMessage({ type: "STOP_AUDIO_CAPTURE" });
+          showClassifyPanel();
         }
       } else {
         consecutiveEndSignals = 0;

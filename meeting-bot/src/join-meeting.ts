@@ -194,8 +194,27 @@ async function waitForAdmission(page: Page, signal: AbortSignal): Promise<void> 
     inCallIndicator.waitFor({ timeout: 10 * 60_000 }),
     abortPromise(signal, "Se pidió detener el bot mientras esperaba que lo admitieran."),
     detectNavigatedAway(page),
+    detectJoinRejected(page),
   ]);
   console.log("[meeting-bot] Ya está adentro de la reunión.");
+}
+
+/**
+ * Distinto del caso de arriba: acá Meet NO navega a otro dominio, se queda
+ * en la misma URL de la reunión pero muestra "No podés unirte a esta
+ * videollamada" / "You can't join this video call" -- confirmado con una
+ * captura real. Pasa cuando la reunión tiene la seguridad configurada para
+ * rechazar de entrada a cualquier invitado anónimo (sin ofrecer siquiera la
+ * sala de espera) -- es una configuración de Meet/Workspace de esa reunión
+ * puntual, no algo que el bot pueda resolver solo.
+ */
+async function detectJoinRejected(page: Page): Promise<never> {
+  await page.getByText(/no pod[eé]s unirte a esta videollamada|you can't join this video call/i).waitFor({
+    timeout: 10 * 60_000,
+  });
+  throw new Error(
+    "Meet rechazó de entrada al bot ('No podés unirte a esta videollamada') -- la reunión no deja pedir acceso a invitados anónimos. Hay que revisar la configuración de acceso de esa reunión/Workspace, esto no lo resuelve el bot.",
+  );
 }
 
 /**

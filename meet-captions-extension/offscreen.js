@@ -13,6 +13,27 @@ let meetingUrl = null;
 let micStream = null;
 let tabStream = null;
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * chrome.storage.local.get() puede devolver un objeto con "storage"
+ * undefined en una carrera puntual del navegador (visto en producción, sin
+ * que hubiera un reload de la extensión de por medio) -- unos reintentos
+ * cortos alcanzan para los casos transitorios sin demorar mucho el envío
+ * cuando todo anda bien.
+ */
+async function getStorageWithRetry(keys, attempts = 3, delayMs = 300) {
+  for (let i = 0; i < attempts; i++) {
+    if (chrome.storage?.local) {
+      return chrome.storage.local.get(keys);
+    }
+    if (i < attempts - 1) await sleep(delayMs);
+  }
+  throw new Error("chrome.storage.local no está disponible");
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "OFFSCREEN_START") {
     // Antes esto era "dispara y olvida" -- background.js nunca sabía si la
@@ -107,7 +128,22 @@ async function stopRecording() {
   chunks = [];
   console.log(`[proshop-captions] Grabación terminada (${blob.size} bytes). Subiendo…`);
 
-  const { apiBase, token } = await chrome.storage.local.get(["apiBase", "token"]);
+  // Una vez se vio chrome.storage devolver undefined acá mismo, sin que se
+  // hubiera recargado la extensión de por medio -- pinta a una carrera
+  // puntual del navegador, no a un problema de lógica. Como el audio ya
+  // está grabado y solo vive en memoria (se pierde si esto falla), vale la
+  // pena reintentar un par de veces antes de darlo por perdido.
+  let stored;
+  try {
+    stored = await getStorageWithRetry(["apiBase", "token"]);
+  } catch (error) {
+    console.error(
+      "[proshop-captions] chrome.storage no respondió después de reintentar -- se pierde esta grabación:",
+      error,
+    );
+    return;
+  }
+  const { apiBase, token } = stored;
   if (!token) {
     console.warn("[proshop-captions] Sin token configurado -- no se manda el audio.");
     return;

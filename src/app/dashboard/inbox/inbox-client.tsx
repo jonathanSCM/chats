@@ -1241,8 +1241,9 @@ export function InboxClient({
             <Avatar id={c.id} label={c.customerName || c.customerPhone} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-sm font-medium text-ink">
-                  {c.customerName || c.customerPhone}
+                <span className="flex min-w-0 items-center gap-1 truncate text-sm font-medium text-ink">
+                  <span className="truncate">{c.customerName || c.customerPhone}</span>
+                  {c.muted && <BellOff size={11} className="shrink-0 text-ink-faint" />}
                 </span>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {c.unreadCount > 0 && (

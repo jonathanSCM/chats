@@ -19,6 +19,13 @@ const bodySchema = z.object({
   // fin de la reunión) no permite mandar headers custom -- para ese caso el
   // token viaja acá en vez de en Authorization.
   token: z.string().optional(),
+  // El bot de Vexa (parche de subtítulos de Meet) manda esto cada ~20s
+  // durante toda la reunión para tener el texto al día en vivo -- sin
+  // `final`, cada una de esas llamadas guardaba un .txt nuevo (uno por
+  // reunión larga terminaba con decenas de adjuntos). Ausente/true (el caso
+  // de la extensión, que solo llama una vez al final) sigue guardando el
+  // adjunto como siempre; `false` solo actualiza el texto en la reunión.
+  final: z.boolean().optional(),
 });
 
 // El content script de la extensión corre pegado al origen de la propia
@@ -48,7 +55,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return withCors(new NextResponse("Datos inválidos", { status: 400 }));
   }
-  const { meetingUrl, transcript } = parsed.data;
+  const { meetingUrl, transcript, final } = parsed.data;
 
   const token =
     req.headers.get("authorization")?.replace("Bearer ", "").trim() || parsed.data.token;
@@ -72,27 +79,36 @@ export async function POST(req: NextRequest) {
 
   // No se pisa una transcripción que ya tenga contenido (por ej. si el bot
   // grabador también corrió en esta misma reunión) -- se concatena en vez
-  // de perder una de las dos fuentes.
+  // de perder una de las dos fuentes. El llamador (extensión, o el parche de
+  // subtítulos del bot de Vexa) manda solo texto NUEVO en cada llamada, no
+  // todo lo acumulado de nuevo -- si mandara todo de nuevo cada vez, esto
+  // se duplicaría en cascada con cada actualización.
+  const newTranscriptValue = resolved.transcript ? `${resolved.transcript}\n\n${transcript}` : transcript;
   const meeting = await prisma.meeting.update({
     where: { id: resolved.id },
-    data: {
-      transcript: resolved.transcript ? `${resolved.transcript}\n\n${transcript}` : transcript,
-    },
+    data: { transcript: newTranscriptValue },
     select: { id: true },
   });
 
-  // Mismo patrón que el webhook del bot grabador: además de guardar el texto
-  // en la fila, queda como adjunto .txt descargable.
-  const txtUrl = await saveMediaFile(Buffer.from(transcript, "utf-8"), "text/plain");
-  await prisma.meetingAttachment.create({
-    data: {
-      meetingId: meeting.id,
-      url: txtUrl,
-      fileName: "transcripcion-subtitulos.txt",
-      mimeType: "text/plain",
-      fileSize: Buffer.byteLength(transcript, "utf-8"),
-    },
-  });
+  // El parche de subtítulos del bot manda una actualización cada ~20s
+  // durante toda la reunión (final=false) para tener el texto al día en
+  // vivo -- sin este chequeo, una reunión larga terminaba con un adjunto
+  // .txt nuevo por cada actualización. Solo se guarda el adjunto al final
+  // (final ausente/true, el caso de siempre de la extensión, o final=true
+  // explícito), y con el texto COMPLETO acumulado hasta ese momento, no
+  // solo el pedacito nuevo de esta última llamada.
+  if (final !== false) {
+    const txtUrl = await saveMediaFile(Buffer.from(newTranscriptValue, "utf-8"), "text/plain");
+    await prisma.meetingAttachment.create({
+      data: {
+        meetingId: meeting.id,
+        url: txtUrl,
+        fileName: "transcripcion-subtitulos.txt",
+        mimeType: "text/plain",
+        fileSize: Buffer.byteLength(newTranscriptValue, "utf-8"),
+      },
+    });
+  }
 
   return withCors(NextResponse.json({ ok: true, meetingId: meeting.id }));
 }

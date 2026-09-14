@@ -65,7 +65,22 @@ export async function joinAndRecord(options: JoinOptions, signal: AbortSignal): 
       headless: false, // corre bajo Xvfb (pantalla virtual, ver entrypoint.sh) — no hay pantalla física, pero Meet bloquea el modo headless "de verdad"
       args: ["--use-fake-ui-for-media-stream", "--disable-blink-features=AutomationControlled"],
     });
-    context = await browser.newContext({ permissions: ["camera", "microphone"] });
+    context = await browser.newContext({
+      permissions: ["camera", "microphone"],
+      // Región/idioma real en vez del genérico por defecto de Playwright --
+      // una de varias señales que Google puede mirar para distinguir un
+      // navegador automatizado de uno real. No garantiza nada por sí solo,
+      // pero es gratis y sin riesgo de romper el flujo que ya funciona.
+      locale: "es-BO",
+      timezoneId: "America/La_Paz",
+    });
+    // Además del flag --disable-blink-features=AutomationControlled de
+    // arriba, se tapa también navigator.webdriver a mano (Playwright/Chromium
+    // a veces lo deja en true igual) -- se corre ANTES de que cargue
+    // cualquier página, en cada una nueva.
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+    });
   } catch (error) {
     await browser?.close().catch(() => {});
     await notifyFailure(callbackUrl, meetingId, `No se pudo abrir el navegador: ${error}`);

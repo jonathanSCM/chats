@@ -168,6 +168,8 @@ interface Props {
   members: Member[];
   currentUserId: string;
   isAdmin: boolean;
+  /** Solo true si el usuario actual conectó su propio Google Calendar en Mi Perfil -- el calendario compartido de la organización está fuera de servicio (token vencido). */
+  canCreateGoogleMeet: boolean;
   viewingArchived: boolean;
   /** `?estado=todos` — muestra también Ganado/Perdido/En pausa (ocultos por defecto). */
   viewingAllStages: boolean;
@@ -272,6 +274,7 @@ export function TrackingTable({
   members,
   currentUserId,
   isAdmin,
+  canCreateGoogleMeet,
   viewingArchived,
   viewingAllStages,
   openId,
@@ -914,6 +917,7 @@ export function TrackingTable({
           isAdmin={isAdmin}
           members={members}
           editable={canEdit(detail, currentUserId, isAdmin)}
+          canCreateGoogleMeet={canCreateGoogleMeet}
           onClose={closeDetail}
         />
       )}
@@ -1553,6 +1557,7 @@ function DetailPanel({
   isAdmin,
   members,
   editable,
+  canCreateGoogleMeet,
   onClose,
 }: {
   row: Row;
@@ -1560,6 +1565,7 @@ function DetailPanel({
   isAdmin: boolean;
   members: Member[];
   editable: boolean;
+  canCreateGoogleMeet: boolean;
   onClose: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -1771,6 +1777,7 @@ function DetailPanel({
             meetings={row.meetings}
             editable={editable}
             disabled={locked}
+            canCreateGoogleMeet={canCreateGoogleMeet}
           />
 
           <div className="rounded-lg border border-accent-dim/40 bg-accent/5 p-3">
@@ -2006,13 +2013,16 @@ function MeetingsSection({
   meetings,
   editable,
   disabled,
+  canCreateGoogleMeet,
 }: {
   opportunityId: string;
   meetings: Row["meetings"];
   editable: boolean;
   disabled: boolean;
+  canCreateGoogleMeet: boolean;
 }) {
   const [adding, setAdding] = useState(false);
+  const [withGoogleMeet, setWithGoogleMeet] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [state, formAction] = useActionState(createMeetingAction, { error: null });
   const [handledMessage, setHandledMessage] = useState<string | undefined>(undefined);
@@ -2143,10 +2153,30 @@ function MeetingsSection({
               className="w-20 py-1.5 text-xs"
             />
           </div>
+          {canCreateGoogleMeet && (
+            <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+              <input
+                type="checkbox"
+                name="withGoogleMeet"
+                className="h-3.5 w-3.5"
+                checked={withGoogleMeet}
+                onChange={(e) => setWithGoogleMeet(e.target.checked)}
+              />
+              Crear con Google Meet (en tu calendario, genera el link automáticamente)
+            </label>
+          )}
           <label className="flex items-center gap-1.5 text-xs text-ink-muted">
             <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked />
             Que el bot se una a esta reunión (grabe y transcriba)
           </label>
+          {canCreateGoogleMeet && withGoogleMeet && (
+            <Input
+              type="text"
+              name="guestEmails"
+              placeholder="Invitados (correos separados por coma) — Calendar les manda la invitación"
+              className="py-1.5 text-xs"
+            />
+          )}
           <Input
             type="url"
             name="meetingUrl"

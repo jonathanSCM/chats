@@ -10,6 +10,7 @@ import {
   type LossReason,
 } from "@/lib/pipeline";
 import { getAiSpendToday } from "@/server/actions/crm";
+import { hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
 import { TrackingTable } from "./_components/tracking-table";
 
 export default async function SeguimientoPage({
@@ -103,6 +104,7 @@ export default async function SeguimientoPage({
     }),
     getAiSpendToday(organizationId),
   ]);
+  const canCreateGoogleMeet = await hasGoogleCalendarConnected(session.user.id);
 
   const rows = opportunities.map((o) => ({
     id: o.id,
@@ -186,6 +188,7 @@ export default async function SeguimientoPage({
         members={members.map((m) => ({ id: m.id, name: m.name || m.email, color: m.color }))}
         currentUserId={session.user.id}
         isAdmin={isAdmin}
+        canCreateGoogleMeet={canCreateGoogleMeet}
         viewingArchived={viewingArchived}
         viewingAllStages={viewingAllStages}
         openId={openId}

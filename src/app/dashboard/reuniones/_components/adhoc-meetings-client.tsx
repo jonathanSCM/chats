@@ -180,8 +180,18 @@ function LinkClientSection({ meetingId, disabled }: { meetingId: string; disable
   );
 }
 
-export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] }) {
+export function AdhocMeetingsClient({
+  meetings,
+  openId,
+  canCreateGoogleMeet,
+}: {
+  meetings: AdhocMeetingRow[];
+  openId?: string | null;
+  /** Solo true si ESTE usuario conectó su propio Google Calendar en Mi Perfil -- el calendario compartido de la organización está fuera de servicio (token vencido), así que sin esto no hay forma de que "Crear con Google Meet" funcione. */
+  canCreateGoogleMeet: boolean;
+}) {
   const [adding, setAdding] = useState(false);
+  const [withGoogleMeet, setWithGoogleMeet] = useState(false);
   const [state, formAction] = useActionState(createAdhocMeetingAction, { error: null });
   const [handledMessage, setHandledMessage] = useState<string | undefined>(undefined);
   if (state.message && state.message !== handledMessage) {
@@ -260,6 +270,18 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
   }
 
   const [detailId, setDetailId] = useState<string | null>(null);
+  // Al entrar desde un link con ?open=<id> (ej. desde el calendario) --
+  // abre esa reunión sola. `checkedOpenId` evita reabrirla si el usuario ya
+  // la cerró a mano, y deja detectar el caso "ya no existe acá" (se borró,
+  // o se vinculó a un cliente y pasó a Seguimiento) para avisar en vez de
+  // quedarse en silencio en la lista general.
+  const [checkedOpenId, setCheckedOpenId] = useState(false);
+  if (openId && !checkedOpenId) {
+    const match = meetings.find((m) => m.id === openId);
+    setCheckedOpenId(true);
+    if (match) setDetailId(openId);
+  }
+  const openIdNotFound = Boolean(openId && checkedOpenId && !meetings.some((m) => m.id === openId) && detailId !== openId);
 
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   function handleCancelMeeting(id: string) {
@@ -294,6 +316,13 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
         </form>
       </Card>
 
+      {openIdNotFound && (
+        <Card className="border-warning/40 bg-warning-dim text-sm text-warning">
+          Esa reunión ya no está disponible acá — puede haberse borrado, o vinculado a un cliente
+          y pasado a verse desde su ficha en Seguimiento.
+        </Card>
+      )}
+
       <div className="flex items-center justify-between">
         <p className="font-mono text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
           Reuniones internas
@@ -324,10 +353,30 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
               <Input type="datetime-local" required className="text-sm" onChange={scheduledAtToUtcHidden} />
               <Input type="number" name="durationMinutes" placeholder="min" min={1} className="w-24 text-sm" />
             </div>
+            {canCreateGoogleMeet && (
+              <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+                <input
+                  type="checkbox"
+                  name="withGoogleMeet"
+                  className="h-3.5 w-3.5"
+                  checked={withGoogleMeet}
+                  onChange={(e) => setWithGoogleMeet(e.target.checked)}
+                />
+                Crear con Google Meet (en tu calendario, genera el link automáticamente)
+              </label>
+            )}
             <label className="flex items-center gap-1.5 text-xs text-ink-muted">
               <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked />
               Que el bot se una a esta reunión (grabe y transcriba)
             </label>
+            {canCreateGoogleMeet && withGoogleMeet && (
+              <Input
+                type="text"
+                name="guestEmails"
+                placeholder="Invitados (correos separados por coma) — Calendar les manda la invitación"
+                className="text-sm"
+              />
+            )}
             <Input type="url" name="meetingUrl" placeholder="Pegá el link de la reunión (Meet, Zoom, etc.)" className="text-sm" />
             {state.error && <p className="text-xs text-danger">{state.error}</p>}
             <Button type="submit" size="sm">

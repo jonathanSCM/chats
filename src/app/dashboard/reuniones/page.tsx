@@ -1,11 +1,19 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
+import { hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
 import { AdhocMeetingsClient } from "./_components/adhoc-meetings-client";
 
-export default async function ReunionesPage() {
+export default async function ReunionesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ open?: string }>;
+}) {
   const session = await auth();
   if (!session?.user.organizationId) redirect("/dashboard");
+
+  const { open } = await searchParams;
+  const canCreateGoogleMeet = await hasGoogleCalendarConnected(session.user.id);
 
   const meetings = await prisma.meeting.findMany({
     where: { organizationId: session.user.organizationId, opportunityId: null },
@@ -58,7 +66,7 @@ export default async function ReunionesPage() {
         reunión de emergencia que necesite grabarse.
       </p>
 
-      <AdhocMeetingsClient meetings={rows} />
+      <AdhocMeetingsClient meetings={rows} openId={open ?? null} canCreateGoogleMeet={canCreateGoogleMeet} />
     </div>
   );
 }

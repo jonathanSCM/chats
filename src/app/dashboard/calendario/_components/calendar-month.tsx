@@ -251,7 +251,7 @@ export function CalendarMonth({
                       m.opportunityId
                         ? `/dashboard/seguimiento?open=${m.opportunityId}`
                         : m.isInternal
-                          ? "/dashboard/reuniones"
+                          ? `/dashboard/reuniones?open=${m.id}`
                           : "/dashboard/seguimiento"
                     }
                     className="font-medium text-ink hover:text-accent"

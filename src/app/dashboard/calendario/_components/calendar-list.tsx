@@ -111,7 +111,7 @@ function MeetingCard({ m }: { m: MeetingRow }) {
             m.opportunityId
               ? `/dashboard/seguimiento?open=${m.opportunityId}`
               : m.isInternal
-                ? "/dashboard/reuniones"
+                ? `/dashboard/reuniones?open=${m.id}`
                 : "/dashboard/seguimiento"
           }
           className="truncate font-medium text-ink hover:text-accent"

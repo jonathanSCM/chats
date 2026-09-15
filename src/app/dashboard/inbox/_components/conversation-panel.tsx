@@ -83,6 +83,7 @@ interface PanelData {
   }[];
   team: { id: string; name: string }[];
   history: { label: string; at: string; actor: string }[];
+  canCreateGoogleMeet: boolean;
 }
 
 const STATUS_LABEL = {
@@ -430,6 +431,7 @@ export function ConversationPanel({
           <MeetingsPanel
             conversationId={conversationId}
             meetings={data.contact.opportunities.flatMap((o) => o.meetings)}
+            canCreateGoogleMeet={data.canCreateGoogleMeet}
             onChanged={() => {
               reload();
               onChanged();
@@ -717,13 +719,16 @@ type PanelMeeting = NonNullable<PanelData["contact"]>["opportunities"][number]["
 function MeetingsPanel({
   conversationId,
   meetings,
+  canCreateGoogleMeet,
   onChanged,
 }: {
   conversationId: string;
   meetings: PanelMeeting[];
+  canCreateGoogleMeet: boolean;
   onChanged: () => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const [withGoogleMeet, setWithGoogleMeet] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [state, formAction] = useActionState(createMeetingFromConversationAction, { error: null });
   const [handledMessage, setHandledMessage] = useState<string | undefined>(undefined);
@@ -822,10 +827,30 @@ function MeetingsPanel({
               className="w-20 py-1.5 text-xs"
             />
           </div>
+          {canCreateGoogleMeet && (
+            <label className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+              <input
+                type="checkbox"
+                name="withGoogleMeet"
+                className="h-3.5 w-3.5"
+                checked={withGoogleMeet}
+                onChange={(e) => setWithGoogleMeet(e.target.checked)}
+              />
+              Crear con Google Meet (en tu calendario, genera el link automáticamente)
+            </label>
+          )}
           <label className="flex items-center gap-1.5 text-[11px] text-ink-muted">
             <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked />
             Que el bot se una a esta reunión
           </label>
+          {canCreateGoogleMeet && withGoogleMeet && (
+            <Input
+              type="text"
+              name="guestEmails"
+              placeholder="Invitados (correos separados por coma)"
+              className="py-1.5 text-xs"
+            />
+          )}
           <Input
             type="url"
             name="meetingUrl"

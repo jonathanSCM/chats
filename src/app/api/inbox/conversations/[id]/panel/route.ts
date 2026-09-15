@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { isOpenStage, STAGE_LABEL, type Stage } from "@/lib/pipeline";
+import { hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
 
 const CONVERSATION_STATUS_LABEL: Record<string, string> = {
   OPEN: "Reabierta",
@@ -82,10 +83,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const team = await prisma.user.findMany({
-    where: { organizationId },
+    // SYSTEM son cuentas técnicas sin dueño humano -- no deben poder
+    // aparecer como destino de transferencia de la conversación.
+    where: { organizationId, role: { not: "SYSTEM" } },
     select: { id: true, name: true, email: true },
     orderBy: { name: "asc" },
   });
+  const canCreateGoogleMeet = await hasGoogleCalendarConnected(session.user.id);
 
   // Historial: los movimientos del lead, uniendo lo que ya audita la propia
   // Conversation (archivar, bloquear, transferir) con lo que audita cada
@@ -189,5 +193,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     })),
     team: team.map((u) => ({ id: u.id, name: u.name || u.email })),
     history,
+    canCreateGoogleMeet,
   });
 }

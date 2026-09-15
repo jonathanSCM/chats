@@ -2013,7 +2013,6 @@ function MeetingsSection({
   disabled: boolean;
 }) {
   const [adding, setAdding] = useState(false);
-  const [withGoogleMeet, setWithGoogleMeet] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [state, formAction] = useActionState(createMeetingAction, { error: null });
   const [handledMessage, setHandledMessage] = useState<string | undefined>(undefined);
@@ -2145,31 +2144,13 @@ function MeetingsSection({
             />
           </div>
           <label className="flex items-center gap-1.5 text-xs text-ink-muted">
-            <input
-              type="checkbox"
-              name="withGoogleMeet"
-              className="h-3.5 w-3.5"
-              checked={withGoogleMeet}
-              onChange={(e) => setWithGoogleMeet(e.target.checked)}
-            />
-            Crear con Google Meet (genera el link automáticamente)
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-ink-muted">
             <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked />
             Que el bot se una a esta reunión (grabe y transcriba)
           </label>
-          {withGoogleMeet && (
-            <Input
-              type="text"
-              name="guestEmails"
-              placeholder="Invitados (correos separados por coma) — Calendar les manda la invitación"
-              className="py-1.5 text-xs"
-            />
-          )}
           <Input
             type="url"
             name="meetingUrl"
-            placeholder="o pegá un link de reunión manualmente"
+            placeholder="Pegá el link de la reunión (Meet, Zoom, etc.)"
             className="py-1.5 text-xs"
           />
           <textarea

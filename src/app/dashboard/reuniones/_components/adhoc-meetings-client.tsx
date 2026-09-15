@@ -182,7 +182,6 @@ function LinkClientSection({ meetingId, disabled }: { meetingId: string; disable
 
 export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] }) {
   const [adding, setAdding] = useState(false);
-  const [withGoogleMeet, setWithGoogleMeet] = useState(false);
   const [state, formAction] = useActionState(createAdhocMeetingAction, { error: null });
   const [handledMessage, setHandledMessage] = useState<string | undefined>(undefined);
   if (state.message && state.message !== handledMessage) {
@@ -326,28 +325,10 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
               <Input type="number" name="durationMinutes" placeholder="min" min={1} className="w-24 text-sm" />
             </div>
             <label className="flex items-center gap-1.5 text-xs text-ink-muted">
-              <input
-                type="checkbox"
-                name="withGoogleMeet"
-                className="h-3.5 w-3.5"
-                checked={withGoogleMeet}
-                onChange={(e) => setWithGoogleMeet(e.target.checked)}
-              />
-              Crear con Google Meet (genera el link automáticamente)
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-ink-muted">
               <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked />
               Que el bot se una a esta reunión (grabe y transcriba)
             </label>
-            {withGoogleMeet && (
-              <Input
-                type="text"
-                name="guestEmails"
-                placeholder="Invitados (correos separados por coma) — Calendar les manda la invitación"
-                className="text-sm"
-              />
-            )}
-            <Input type="url" name="meetingUrl" placeholder="o pegá un link de reunión manualmente" className="text-sm" />
+            <Input type="url" name="meetingUrl" placeholder="Pegá el link de la reunión (Meet, Zoom, etc.)" className="text-sm" />
             {state.error && <p className="text-xs text-danger">{state.error}</p>}
             <Button type="submit" size="sm">
               Crear reunión

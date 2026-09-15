@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
 import { resolveExtensionMeeting } from "@/server/services/extension-meeting";
+import { attemptAutoLinkMeeting } from "@/server/services/meeting-link";
 
 /**
  * Recibe la transcripción de subtítulos que manda la extensión de Chrome
@@ -107,6 +108,12 @@ export async function POST(req: NextRequest) {
         mimeType: "text/plain",
         fileSize: Buffer.byteLength(newTranscriptValue, "utf-8"),
       },
+    });
+    // Recién con el texto completo (no un pedacito a mitad de reunión) tiene
+    // sentido intentar reconocer quién habló -- best-effort, no bloquea la
+    // respuesta si falla.
+    await attemptAutoLinkMeeting(meeting.id).catch((error) => {
+      console.error(`[extension/transcript] No se pudo auto-vincular la reunión ${meeting.id}:`, error);
     });
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
-import { Plus, X, Copy, Trash2, Clock, Video, Zap, PhoneOff, FileDown, Pencil, Ban } from "lucide-react";
+import { useActionState, useRef, useState, useTransition } from "react";
+import { Plus, X, Copy, Trash2, Clock, Video, Zap, PhoneOff, FileDown, Pencil, Ban, Search, UserPlus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,10 @@ import {
   updateAdhocMeetingAction,
   renameAdhocMeetingAction,
   cancelAdhocMeetingAction,
+  searchClientsForMeetingAction,
+  linkMeetingToOpportunityAction,
+  createClientAndLinkMeetingAction,
+  type ClientSearchResult,
 } from "@/server/actions/adhoc-meetings";
 import { scheduledAtToUtcHidden, utcIsoToLocalInputValue } from "@/lib/datetime-local";
 import { BOT_STATUS_CONFIG } from "@/lib/meeting-bot-status";
@@ -57,6 +61,122 @@ function timeLabel(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/**
+ * Buscador + "crear cliente nuevo" para vincular una reunión suelta a un
+ * cliente -- vive en el panel de detalle, separado del componente principal
+ * porque tiene su propio estado de búsqueda/formulario que no le interesa
+ * al resto de la lista.
+ */
+function LinkClientSection({ meetingId, disabled }: { meetingId: string; disabled: boolean }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<ClientSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleQueryChange(value: string) {
+    setQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (value.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      setSearching(true);
+      startTransition(async () => {
+        const found = await searchClientsForMeetingAction(value);
+        setResults(found);
+        setSearching(false);
+      });
+    }, 300);
+  }
+
+  function handleLink(opportunityId: string) {
+    setError(null);
+    startTransition(async () => {
+      const result = await linkMeetingToOpportunityAction(meetingId, opportunityId);
+      if (result.error) setError(result.error);
+    });
+  }
+
+  function handleCreate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    setError(null);
+    startTransition(async () => {
+      const result = await createClientAndLinkMeetingAction(meetingId, formData);
+      if (result.error) setError(result.error);
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <Search size={13} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-faint" />
+        <Input
+          type="text"
+          placeholder="Buscar cliente por nombre o teléfono…"
+          value={query}
+          disabled={disabled || isPending}
+          onChange={(e) => handleQueryChange(e.target.value)}
+          className="pl-8 text-sm"
+        />
+      </div>
+
+      {searching && <p className="text-xs text-ink-faint">Buscando…</p>}
+      {!searching && results.length > 0 && (
+        <ul className="space-y-1">
+          {results.map((r) => (
+            <li key={r.id}>
+              <button
+                type="button"
+                disabled={disabled || isPending}
+                onClick={() => handleLink(r.id)}
+                className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5 text-left text-xs hover:border-accent-dim hover:bg-accent-dim/10 disabled:cursor-not-allowed"
+              >
+                <span className="truncate font-medium text-ink">{r.title}</span>
+                <span className="shrink-0 text-ink-faint">{r.contactName}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!searching && query.trim().length >= 2 && results.length === 0 && (
+        <p className="text-xs text-ink-faint">Sin resultados.</p>
+      )}
+
+      {creating ? (
+        <form onSubmit={handleCreate} className="animate-fade-up space-y-2 rounded-lg border border-border bg-surface-2/60 p-3">
+          <Input type="text" name="contactName" placeholder="Nombre del cliente" className="text-sm" />
+          <Input type="text" name="contactPhone" placeholder="Teléfono" required className="text-sm" />
+          <Input type="text" name="opportunityTitle" placeholder="Título de la oportunidad (opcional)" className="text-sm" />
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" disabled={isPending}>
+              {isPending ? "Creando…" : "Crear y vincular"}
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={() => setCreating(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <button
+          type="button"
+          disabled={disabled || isPending}
+          onClick={() => setCreating(true)}
+          className={`${PILL_BUTTON} border-border text-ink-muted hover:border-accent-dim hover:text-accent`}
+        >
+          <UserPlus size={11} /> Cliente nuevo
+        </button>
+      )}
+
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </div>
+  );
 }
 
 export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] }) {
@@ -342,6 +462,10 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
                   </span>
                 )}
               </div>
+            </PanelSection>
+
+            <PanelSection label="Cliente" delay={20}>
+              <LinkClientSection meetingId={m.id} disabled={isPending} />
             </PanelSection>
 
             <PanelSection label="Acciones" delay={40}>

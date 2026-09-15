@@ -403,3 +403,118 @@ export async function cancelAdhocMeetingAction(meetingId: string): Promise<Actio
   revalidatePath("/dashboard/calendario");
   return { error: null, message: "Reunión cancelada." };
 }
+
+export interface ClientSearchResult {
+  id: string;
+  title: string;
+  contactName: string;
+}
+
+/**
+ * Buscador para "Vincular a un cliente" en el panel de una reunión suelta --
+ * mismo criterio que la búsqueda equivalente de la extensión
+ * (api/extension/opportunities/search), pero por sesión en vez de por
+ * meetExtensionToken porque esto lo llama la propia UI del CRM.
+ */
+export async function searchClientsForMeetingAction(query: string): Promise<ClientSearchResult[]> {
+  const { organizationId } = await requireOrg();
+  const q = query.trim();
+  if (q.length < 2) return [];
+
+  const opportunities = await prisma.opportunity.findMany({
+    where: {
+      organizationId,
+      archivedAt: null,
+      OR: [
+        { title: { contains: q, mode: "insensitive" } },
+        { contact: { fullName: { contains: q, mode: "insensitive" } } },
+        { contact: { phone: { contains: q } } },
+      ],
+    },
+    select: { id: true, title: true, contact: { select: { fullName: true, phone: true } } },
+    orderBy: { updatedAt: "desc" },
+    take: 8,
+  });
+
+  return opportunities.map((o) => ({
+    id: o.id,
+    title: o.title,
+    contactName: o.contact.fullName || o.contact.phone,
+  }));
+}
+
+/** Vincula la reunión a un cliente ya existente -- deja de listarse como "suelta" y pasa a verse en la ficha de ese cliente. */
+export async function linkMeetingToOpportunityAction(meetingId: string, opportunityId: string): Promise<ActionState> {
+  const { organizationId } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    select: { organizationId: true, opportunityId: true },
+  });
+  if (!meeting || meeting.organizationId !== organizationId || meeting.opportunityId !== null) {
+    return { error: "Reunión no encontrada" };
+  }
+
+  const opportunity = await prisma.opportunity.findUnique({ where: { id: opportunityId }, select: { organizationId: true } });
+  if (!opportunity || opportunity.organizationId !== organizationId) {
+    return { error: "Cliente no encontrado" };
+  }
+
+  await prisma.meeting.update({ where: { id: meetingId }, data: { opportunityId } });
+  revalidatePath(PATH);
+  revalidatePath("/dashboard/seguimiento");
+  return { error: null, message: "Reunión vinculada." };
+}
+
+const createClientAndLinkSchema = z.object({
+  contactName: z.string().max(200).optional(),
+  contactPhone: z.string().min(1, "Poné el teléfono").max(50),
+  opportunityTitle: z.string().max(200).optional(),
+});
+
+/** Crea un cliente nuevo (Contact + Opportunity) y vincula la reunión de una -- mismo patrón que usa el popup de la extensión al cortar una reunión. */
+export async function createClientAndLinkMeetingAction(
+  meetingId: string,
+  formData: FormData,
+): Promise<ActionState> {
+  const { organizationId, userId } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    select: { organizationId: true, opportunityId: true },
+  });
+  if (!meeting || meeting.organizationId !== organizationId || meeting.opportunityId !== null) {
+    return { error: "Reunión no encontrada" };
+  }
+
+  const parsed = createClientAndLinkSchema.safeParse({
+    contactName: formData.get("contactName") || undefined,
+    contactPhone: formData.get("contactPhone"),
+    opportunityTitle: formData.get("opportunityTitle") || undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  const phone = parsed.data.contactPhone.trim();
+  const contact = await prisma.contact.upsert({
+    where: { organizationId_phone: { organizationId, phone } },
+    create: { organizationId, phone, fullName: parsed.data.contactName?.trim() || null, source: "Reunión" },
+    update: {},
+  });
+
+  const opportunity = await prisma.opportunity.create({
+    data: {
+      organizationId,
+      contactId: contact.id,
+      title: parsed.data.opportunityTitle?.trim() || parsed.data.contactName?.trim() || "Cliente nuevo",
+      assignedToId: userId,
+    },
+  });
+
+  await prisma.meeting.update({ where: { id: meetingId }, data: { opportunityId: opportunity.id } });
+
+  revalidatePath(PATH);
+  revalidatePath("/dashboard/seguimiento");
+  return { error: null, message: "Cliente creado y reunión vinculada." };
+}

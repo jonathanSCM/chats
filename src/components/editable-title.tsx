@@ -33,6 +33,7 @@ export function EditableTitle({
         autoFocus
         value={draft}
         disabled={disabled}
+        onClick={(e) => e.stopPropagation()}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           if (cancelledRef.current) {
@@ -63,14 +64,17 @@ export function EditableTitle({
     <button
       type="button"
       disabled={disabled}
-      onClick={() => setEditing(true)}
-      title="Click para cambiar el nombre"
-      className={`group flex min-w-0 items-center gap-1.5 text-left disabled:cursor-not-allowed ${className ?? ""}`}
+      onClick={(e) => {
+        // La tarjeta que la contiene suele abrir el detalle al tocarla en
+        // cualquier lado -- esto no debe también abrirlo, solo editar.
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      title="Cambiar el nombre"
+      className={`flex min-w-0 items-center gap-1.5 text-left disabled:cursor-not-allowed ${className ?? ""}`}
     >
       <span className="truncate">{value || placeholder}</span>
-      {!disabled && (
-        <Pencil size={12} className="shrink-0 text-ink-faint opacity-0 group-hover:opacity-100" />
-      )}
+      {!disabled && <Pencil size={12} className="shrink-0 text-ink-faint" />}
     </button>
   );
 }

@@ -25,7 +25,7 @@ import { MeetingAttachments, type MeetingAttachmentInfo } from "@/components/mee
 import { PdfViewerModal } from "@/components/pdf-viewer-modal";
 import { EditableTitle } from "@/components/editable-title";
 import { SidePanel, PanelSection } from "@/components/side-panel";
-import { panelAccent, PILL_BUTTON } from "@/lib/meeting-panel-ui";
+import { panelAccent, PILL_BUTTON, hasMeetingEnded } from "@/lib/meeting-panel-ui";
 
 export interface AdhocMeetingRow {
   id: string;
@@ -62,6 +62,7 @@ function timeLabel(iso: string): string {
     minute: "2-digit",
   });
 }
+
 
 /**
  * Buscador + "crear cliente nuevo" para vincular una reunión suelta a un
@@ -369,8 +370,9 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
             return (
               <Card
                 key={m.id}
+                onClick={() => setDetailId(m.id)}
                 style={{ borderLeftColor: panelAccent(m.botStatus), borderLeftWidth: 3 }}
-                className="flex items-start justify-between gap-3"
+                className="flex cursor-pointer items-start justify-between gap-3"
               >
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <EditableTitle
@@ -379,17 +381,13 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
                     disabled={isPending}
                     className="text-base font-semibold text-ink"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setDetailId(m.id)}
-                    className="flex cursor-pointer items-center gap-1.5 text-left font-mono text-sm text-ink-muted hover:text-accent"
-                  >
+                  <p className="flex items-center gap-1.5 font-mono text-sm text-ink-muted">
                     <Clock size={14} className="shrink-0 text-ink-faint" />
                     {timeLabel(m.scheduledAt)} · {m.durationMinutes} min
-                  </button>
+                  </p>
                 </div>
 
-                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                <div className="flex shrink-0 flex-col items-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                   <div className="flex flex-wrap items-center justify-end gap-1.5">
                     <span className="rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-ink-muted">
                       {STATUS_LABEL[m.status] ?? m.status}
@@ -521,7 +519,7 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
               {actionError?.id === m.id && <p className="text-xs text-danger">{actionError.message}</p>}
             </PanelSection>
 
-            {m.status !== "CANCELED" && m.status !== "DONE" && (
+            {!hasMeetingEnded(m) && (
               <PanelSection label="Cuándo / link / bot" delay={80}>
                 <div className="flex flex-wrap gap-2">
                   <button

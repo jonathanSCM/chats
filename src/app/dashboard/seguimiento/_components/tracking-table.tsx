@@ -50,7 +50,7 @@ import { MeetingAttachments, type MeetingAttachmentInfo } from "@/components/mee
 import { PdfViewerModal } from "@/components/pdf-viewer-modal";
 import { EditableTitle } from "@/components/editable-title";
 import { SidePanel, PanelSection } from "@/components/side-panel";
-import { panelAccent, PILL_BUTTON } from "@/lib/meeting-panel-ui";
+import { panelAccent, PILL_BUTTON, hasMeetingEnded } from "@/lib/meeting-panel-ui";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input, Label, Select } from "@/components/ui/input";
@@ -2196,8 +2196,9 @@ function MeetingsSection({
             return (
               <li
                 key={m.id}
+                onClick={() => setDetailMeetingId(m.id)}
                 style={{ borderLeftColor: panelAccent(m.botStatus), borderLeftWidth: 3 }}
-                className="flex items-start justify-between gap-2 rounded-md border border-border p-2.5"
+                className="flex cursor-pointer items-start justify-between gap-2 rounded-md border border-border p-2.5"
               >
                 <div className="min-w-0 flex-1 space-y-1">
                   <EditableTitle
@@ -2210,11 +2211,7 @@ function MeetingsSection({
                   {m.recordedByName && (
                     <p className="text-[11px] text-ink-faint">grabada por {m.recordedByName}</p>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setDetailMeetingId(m.id)}
-                    className="flex cursor-pointer items-center gap-1.5 text-left font-mono text-xs text-ink-muted hover:text-accent"
-                  >
+                  <p className="flex items-center gap-1.5 font-mono text-xs text-ink-muted">
                     {new Date(m.scheduledAt).toLocaleString("es", {
                       day: "2-digit",
                       month: "2-digit",
@@ -2222,10 +2219,10 @@ function MeetingsSection({
                       minute: "2-digit",
                     })}{" "}
                     · {m.status}
-                  </button>
+                  </p>
                 </div>
 
-                <div className="flex shrink-0 flex-col items-end gap-1">
+                <div className="flex shrink-0 flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
                   {botConfig && BotIcon && (
                     <span
                       data-active={live}
@@ -2353,7 +2350,7 @@ function MeetingsSection({
               {actionError?.id === m.id && <p className="text-xs text-danger">{actionError.message}</p>}
             </PanelSection>
 
-            {editable && m.status !== "CANCELED" && m.status !== "DONE" && (
+            {editable && !hasMeetingEnded(m) && (
               <PanelSection label="Cuándo / link / bot" delay={80}>
                 <div className="flex flex-wrap gap-2">
                   <button

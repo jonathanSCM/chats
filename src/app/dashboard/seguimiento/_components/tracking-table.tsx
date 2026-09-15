@@ -2192,39 +2192,62 @@ function MeetingsSection({
           {meetings.map((m) => {
             const botConfig = m.botStatus ? BOT_STATUS_CONFIG[m.botStatus] : null;
             const BotIcon = botConfig?.icon;
+            const live = m.botStatus === "JOINING" || m.botStatus === "RECORDING";
             return (
-              <li key={m.id} className="space-y-1 rounded-md border border-border p-2.5">
-                <div className="flex items-center gap-1.5">
+              <li
+                key={m.id}
+                style={{ borderLeftColor: panelAccent(m.botStatus), borderLeftWidth: 3 }}
+                className="flex items-start justify-between gap-2 rounded-md border border-border p-2.5"
+              >
+                <div className="min-w-0 flex-1 space-y-1">
                   <EditableTitle
                     value={m.title ?? ""}
                     onSave={(v) => handleRenameMeeting(m.id, v)}
                     disabled={disabled || !editable}
                     placeholder="Reunión sin nombre"
-                    className="flex-1 text-sm font-medium text-ink"
+                    className="text-sm font-medium text-ink"
                   />
+                  {m.recordedByName && (
+                    <p className="text-[11px] text-ink-faint">grabada por {m.recordedByName}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setDetailMeetingId(m.id)}
+                    className="flex cursor-pointer items-center gap-1.5 text-left font-mono text-xs text-ink-muted hover:text-accent"
+                  >
+                    {new Date(m.scheduledAt).toLocaleString("es", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    · {m.status}
+                  </button>
+                </div>
+
+                <div className="flex shrink-0 flex-col items-end gap-1">
                   {botConfig && BotIcon && (
-                    <span className={`flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${botConfig.className}`}>
+                    <span
+                      data-active={live}
+                      className={`corner-brackets flex items-center gap-1 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${botConfig.className}`}
+                    >
+                      {live && <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-current" />}
                       <BotIcon size={9} className={m.botStatus === "JOINING" || m.botStatus === "TRANSCRIBING" ? "animate-spin" : ""} />
                       {botConfig.label}
                     </span>
                   )}
+                  {botConfig?.canStop && (
+                    <button
+                      type="button"
+                      disabled={isPending || stoppingId === m.id}
+                      onClick={() => handleStopBot(m.id)}
+                      title="Sacar al bot de la reunión ahora"
+                      className={`${PILL_BUTTON} border-danger/30 px-2 py-0.5 text-[10px] text-danger hover:border-danger hover:bg-danger/10`}
+                    >
+                      <PhoneOff size={9} /> {stoppingId === m.id ? "Deteniendo…" : "Detener bot"}
+                    </button>
+                  )}
                 </div>
-                {m.recordedByName && (
-                  <p className="text-[11px] text-ink-faint">grabada por {m.recordedByName}</p>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setDetailMeetingId(m.id)}
-                  className="flex w-full cursor-pointer items-center gap-1.5 text-left font-mono text-xs text-ink-muted hover:text-accent"
-                >
-                  {new Date(m.scheduledAt).toLocaleString("es", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}{" "}
-                  · {m.status}
-                </button>
               </li>
             );
           })}

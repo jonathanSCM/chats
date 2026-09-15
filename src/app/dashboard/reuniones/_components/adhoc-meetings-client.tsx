@@ -245,33 +245,58 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
           {meetings.map((m) => {
             const botConfig = m.botStatus ? BOT_STATUS_CONFIG[m.botStatus] : null;
             const BotIcon = botConfig?.icon;
+            const live = m.botStatus === "JOINING" || m.botStatus === "RECORDING";
             return (
-              <Card key={m.id} className="space-y-1.5">
-                <div className="flex items-center gap-2">
+              <Card
+                key={m.id}
+                style={{ borderLeftColor: panelAccent(m.botStatus), borderLeftWidth: 3 }}
+                className="flex items-start justify-between gap-3"
+              >
+                <div className="min-w-0 flex-1 space-y-1.5">
                   <EditableTitle
                     value={m.title}
                     onSave={(v) => handleRename(m.id, v)}
                     disabled={isPending}
-                    className="flex-1 text-base font-semibold text-ink"
+                    className="text-base font-semibold text-ink"
                   />
-                  <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-ink-muted">
-                    {STATUS_LABEL[m.status] ?? m.status}
-                  </span>
-                  {botConfig && BotIcon && (
-                    <span className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10px] ${botConfig.className}`}>
-                      <BotIcon size={10} className={m.botStatus === "JOINING" || m.botStatus === "TRANSCRIBING" ? "animate-spin" : ""} />
-                      {botConfig.label}
+                  <button
+                    type="button"
+                    onClick={() => setDetailId(m.id)}
+                    className="flex cursor-pointer items-center gap-1.5 text-left font-mono text-sm text-ink-muted hover:text-accent"
+                  >
+                    <Clock size={14} className="shrink-0 text-ink-faint" />
+                    {timeLabel(m.scheduledAt)} · {m.durationMinutes} min
+                  </button>
+                </div>
+
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    <span className="rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-ink-muted">
+                      {STATUS_LABEL[m.status] ?? m.status}
                     </span>
+                    {botConfig && BotIcon && (
+                      <span
+                        data-active={live}
+                        className={`corner-brackets flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10px] ${botConfig.className}`}
+                      >
+                        {live && <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-current" />}
+                        <BotIcon size={10} className={m.botStatus === "JOINING" || m.botStatus === "TRANSCRIBING" ? "animate-spin" : ""} />
+                        {botConfig.label}
+                      </span>
+                    )}
+                  </div>
+                  {botConfig?.canStop && (
+                    <button
+                      type="button"
+                      disabled={isPending || stoppingId === m.id}
+                      onClick={() => handleStop(m.id)}
+                      title="Sacar al bot de la reunión ahora"
+                      className={`${PILL_BUTTON} border-danger/30 text-danger hover:border-danger hover:bg-danger/10`}
+                    >
+                      <PhoneOff size={11} /> {stoppingId === m.id ? "Deteniendo…" : "Detener bot"}
+                    </button>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setDetailId(m.id)}
-                  className="flex w-full cursor-pointer items-center gap-1.5 text-left font-mono text-sm text-ink-muted hover:text-accent"
-                >
-                  <Clock size={14} className="shrink-0 text-ink-faint" />
-                  {timeLabel(m.scheduledAt)} · {m.durationMinutes} min
-                </button>
               </Card>
             );
           })}

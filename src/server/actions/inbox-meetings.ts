@@ -7,6 +7,7 @@ import { requireBotAccess } from "@/server/auth/guards";
 import { OPEN_STAGES } from "@/lib/pipeline";
 import { parseGuestEmails } from "@/lib/guest-emails";
 import { createMeetEvent, getOrCreateOrgCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
+import { createUserMeetEvent, hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
 import { scheduleMeetingBotJoin } from "@/server/services/meeting-bot";
 import type { ActionState } from "./types";
 
@@ -95,10 +96,32 @@ export async function createMeetingFromConversationAction(
   const durationMinutes = parsed.data.durationMinutes ?? 30;
   let meetingUrl = parsed.data.meetingUrl?.trim() || null;
   let googleEventId: string | null = null;
+  let googleCalendarOwnerId: string | null = null;
   const botEnabled = parsed.data.botEnabled ?? true;
   const title = parsed.data.title?.trim() || `Reunión con ${contact.fullName || contact.phone}`;
 
-  if (!meetingUrl && parsed.data.withGoogleMeet) {
+  // Mismo criterio que crm.ts/adhoc-meetings.ts: si quien crea la reunión
+  // conectó su Google Calendar personal, se refleja ahí sin importar si
+  // pegó un link propio, generó uno nuevo, o ninguna de las dos.
+  const useOwnCalendar = await hasGoogleCalendarConnected(session.user.id);
+  if (useOwnCalendar) {
+    try {
+      const event = await createUserMeetEvent({
+        userId: session.user.id,
+        summary: title,
+        scheduledAt,
+        durationMinutes,
+        attendeeEmails: guestEmailsResult.emails,
+        existingMeetingUrl: meetingUrl,
+        generateMeetLink: Boolean(parsed.data.withGoogleMeet) && !meetingUrl,
+      });
+      if (event.meetingUrl) meetingUrl = event.meetingUrl;
+      googleEventId = event.eventId;
+      googleCalendarOwnerId = session.user.id;
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : "No se pudo crear el evento en Google Calendar." };
+    }
+  } else if (!meetingUrl && parsed.data.withGoogleMeet) {
     if (!isGoogleMeetEnabled()) {
       return { error: "Google Meet no está configurado en el servidor. Contactá al administrador." };
     }
@@ -131,6 +154,7 @@ export async function createMeetingFromConversationAction(
       durationMinutes,
       meetingUrl,
       googleEventId,
+      googleCalendarOwnerId,
       guestEmails: guestEmailsResult.emails,
       botEnabled,
       status: "SCHEDULED",

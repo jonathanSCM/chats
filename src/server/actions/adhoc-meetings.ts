@@ -85,40 +85,48 @@ export async function createAdhocMeetingAction(
   let googleCalendarOwnerId: string | null = null;
   const botEnabled = parsed.data.botEnabled ?? true;
 
-  if (!meetingUrl && parsed.data.withGoogleMeet) {
-    // Si quien crea la reunión conectó su propio Google Calendar (Mi
-    // Perfil), el evento nace ahí -- así le queda en SU agenda de verdad, no
-    // solo en un calendario secundario compartido que nadie mira desde su
-    // Google normal. Si no lo conectó, sigue igual que siempre.
-    const useOwnCalendar = await hasGoogleCalendarConnected(userId);
+  // Si quien crea la reunión conectó su Google Calendar personal (Mi
+  // Perfil), TODA reunión que cree se refleja ahí -- tenga un link propio ya
+  // pegado (se usa tal cual, sin pedirle a Calendar que genere uno nuevo),
+  // "Crear con Google Meet" tildado sin link (ahí sí genera uno), o ninguna
+  // de las dos (reunión sin videollamada, igual queda agendada en su
+  // calendario). Si no conectó el suyo, sigue el comportamiento de antes:
+  // solo si tildó "Crear con Google Meet", usando el calendario compartido
+  // de la organización.
+  const useOwnCalendar = await hasGoogleCalendarConnected(userId);
+  if (useOwnCalendar) {
     try {
-      if (useOwnCalendar) {
-        const event = await createUserMeetEvent({
-          userId,
-          summary: parsed.data.title,
-          scheduledAt,
-          durationMinutes,
-          attendeeEmails: guestEmailsResult.emails,
-        });
-        meetingUrl = event.meetingUrl;
-        googleEventId = event.eventId;
-        googleCalendarOwnerId = userId;
-      } else {
-        if (!isGoogleMeetEnabled()) {
-          return { error: "Google Meet no está configurado en el servidor. Contactá al administrador." };
-        }
-        const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { name: true } });
-        const calendarId = await getOrCreateOrgCalendar(organizationId, org.name);
-        const event = await createMeetEvent({
-          calendarId,
-          summary: parsed.data.title,
-          scheduledAt,
-          durationMinutes,
-          attendeeEmails: guestEmailsResult.emails,
-        });
-        meetingUrl = event.meetingUrl;
-        googleEventId = event.eventId;
-      }
+      const event = await createUserMeetEvent({
+        userId,
+        summary: parsed.data.title,
+        scheduledAt,
+        durationMinutes,
+        attendeeEmails: guestEmailsResult.emails,
+        existingMeetingUrl: meetingUrl,
+        generateMeetLink: Boolean(parsed.data.withGoogleMeet) && !meetingUrl,
+      });
+      if (event.meetingUrl) meetingUrl = event.meetingUrl;
+      googleEventId = event.eventId;
+      googleCalendarOwnerId = userId;
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : "No se pudo crear el evento en Google Calendar." };
+    }
+  } else if (!meetingUrl && parsed.data.withGoogleMeet) {
+    if (!isGoogleMeetEnabled()) {
+      return { error: "Google Meet no está configurado en el servidor. Contactá al administrador." };
+    }
+    try {
+      const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { name: true } });
+      const calendarId = await getOrCreateOrgCalendar(organizationId, org.name);
+      const event = await createMeetEvent({
+        calendarId,
+        summary: parsed.data.title,
+        scheduledAt,
+        durationMinutes,
+        attendeeEmails: guestEmailsResult.emails,
+      });
+      meetingUrl = event.meetingUrl;
+      googleEventId = event.eventId;
     } catch (error) {
       return { error: error instanceof Error ? error.message : "No se pudo crear el evento en Google Calendar." };
     }

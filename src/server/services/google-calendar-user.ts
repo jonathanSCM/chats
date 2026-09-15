@@ -137,22 +137,35 @@ export async function hasGoogleCalendarConnected(userId: string): Promise<boolea
 }
 
 export interface CreatedUserMeetEvent {
-  meetingUrl: string;
+  meetingUrl: string | null;
   eventId: string;
 }
 
+/**
+ * Crea el evento en el calendario PERSONAL del usuario -- siempre que esté
+ * conectado, sin importar cómo haya quedado la reunión: con un link propio
+ * ya pegado a mano (`existingMeetingUrl`, se usa tal cual, sin pedirle a
+ * Calendar que genere uno nuevo), con "Crear con Google Meet" tildado y sin
+ * link (`generateMeetLink`, ahí sí genera uno), o sin ninguna de las dos
+ * (reunión sin videollamada -- igual se refleja en el calendario, solo que
+ * sin conferenceData).
+ */
 export async function createUserMeetEvent({
   userId,
   summary,
   scheduledAt,
   durationMinutes,
   attendeeEmails,
+  existingMeetingUrl,
+  generateMeetLink,
 }: {
   userId: string;
   summary: string;
   scheduledAt: Date;
   durationMinutes: number;
   attendeeEmails?: string[];
+  existingMeetingUrl?: string | null;
+  generateMeetLink?: boolean;
 }): Promise<CreatedUserMeetEvent> {
   const client = await getCalendarClientForUser(userId);
   if (!client) throw new Error("Este usuario no tiene Google Calendar conectado.");
@@ -160,22 +173,24 @@ export async function createUserMeetEvent({
 
   const res = await client.calendar.events.insert({
     calendarId: "primary",
-    conferenceDataVersion: 1,
+    conferenceDataVersion: generateMeetLink && !existingMeetingUrl ? 1 : undefined,
     sendUpdates: attendeeEmails?.length ? "all" : "none",
     requestBody: {
       summary,
       start: { dateTime: scheduledAt.toISOString() },
       end: { dateTime: endAt.toISOString() },
-      conferenceData: {
-        createRequest: { requestId: randomUUID(), conferenceSolutionKey: { type: "hangoutsMeet" } },
-      },
+      location: existingMeetingUrl ?? undefined,
+      conferenceData:
+        generateMeetLink && !existingMeetingUrl
+          ? { createRequest: { requestId: randomUUID(), conferenceSolutionKey: { type: "hangoutsMeet" } } }
+          : undefined,
       attendees: attendeeEmails?.map((email) => ({ email })),
     },
   });
 
-  const meetingUrl = res.data.hangoutLink;
   const eventId = res.data.id;
-  if (!meetingUrl || !eventId) throw new Error("Google Calendar no devolvió el evento creado.");
+  if (!eventId) throw new Error("Google Calendar no devolvió el evento creado.");
+  const meetingUrl = existingMeetingUrl ?? res.data.hangoutLink ?? null;
   return { meetingUrl, eventId };
 }
 

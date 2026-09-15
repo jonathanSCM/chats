@@ -319,7 +319,39 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
               adReferral,
               replyToExternalId,
             });
+            continue;
           }
+        }
+
+        // Tipo que no manejamos como mensaje real (típicamente "unsupported"
+        // -- Meta documenta que el primer mensaje tras tocar un anuncio
+        // Click-to-WhatsApp en un número con Coexistence a veces llega así,
+        // sin contenido legible, en vez del "text" normal). Log temporal
+        // para confirmar en vivo qué está pasando en este número.
+        if (message.type !== "text" && message.type !== "location") {
+          console.log(
+            `[webhook] Mensaje tipo "${message.type}" sin manejar de ${message.from}` +
+              (fromAd ? " -- TRAÍA referral de anuncio" : " -- sin referral"),
+          );
+        }
+
+        // Aunque no haya contenido que mostrar, si trajo el dato del
+        // anuncio no hay que perderlo -- se manda igual, sin texto/media/
+        // ubicación, para que handleIncomingMessage registre la atribución
+        // en la Conversation sin crear un mensaje vacío en la bandeja.
+        if (fromAd) {
+          results.push({
+            phoneNumberId: phone_number_id,
+            from: message.from,
+            customerName,
+            messageId: message.id,
+            text: null,
+            media: null,
+            location: null,
+            fromAd,
+            adReferral,
+            replyToExternalId,
+          });
         }
       }
     }

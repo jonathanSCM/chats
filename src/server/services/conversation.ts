@@ -79,6 +79,12 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
     inbound.fromAd ? decrypt(connection.accessToken) : null,
   );
 
+  // Mensaje sin contenido real (ver whatsapp.ts: tipos que Meta no nos deja
+  // leer, típicamente el primer mensaje tras un anuncio en un número con
+  // Coexistence) -- ya se registró la atribución de arriba, no hace falta
+  // (ni conviene) dejar una burbuja vacía en la bandeja.
+  if (!inbound.text && !inbound.media && !inbound.location) return;
+
   // Si este mensaje responde citando a otro, se busca por externalId -- si
   // todavía no lo tenemos (mensaje viejo no sincronizado, o llegó fuera de
   // orden), se guarda igual pero sin la cita en vez de fallar.

@@ -4,24 +4,33 @@ import { exchangeGoogleCalendarCode } from "@/server/services/google-calendar-us
 
 const PROFILE_PATH = "/dashboard/perfil";
 
+// NEXTAUTH_URL como base en vez de req.url -- detrás del proxy de Coolify,
+// req.url a veces resuelve al origen interno del contenedor (0.0.0.0:3000)
+// en vez del dominio público, y el navegador del usuario no puede resolver
+// esa dirección.
+function redirectTo(path: string): NextResponse {
+  const base = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  return NextResponse.redirect(new URL(path, base));
+}
+
 export async function GET(req: NextRequest) {
   const session = await requireSession();
   const code = req.nextUrl.searchParams.get("code");
   const error = req.nextUrl.searchParams.get("error");
 
   if (error) {
-    return NextResponse.redirect(new URL(`${PROFILE_PATH}?calendarError=${encodeURIComponent(error)}`, req.url));
+    return redirectTo(`${PROFILE_PATH}?calendarError=${encodeURIComponent(error)}`);
   }
   if (!code) {
-    return NextResponse.redirect(new URL(`${PROFILE_PATH}?calendarError=sin_codigo`, req.url));
+    return redirectTo(`${PROFILE_PATH}?calendarError=sin_codigo`);
   }
 
   try {
     await exchangeGoogleCalendarCode(code, session.user.id);
   } catch (e) {
     const message = e instanceof Error ? e.message : "error_desconocido";
-    return NextResponse.redirect(new URL(`${PROFILE_PATH}?calendarError=${encodeURIComponent(message)}`, req.url));
+    return redirectTo(`${PROFILE_PATH}?calendarError=${encodeURIComponent(message)}`);
   }
 
-  return NextResponse.redirect(new URL(`${PROFILE_PATH}?calendarConnected=1`, req.url));
+  return redirectTo(`${PROFILE_PATH}?calendarConnected=1`);
 }

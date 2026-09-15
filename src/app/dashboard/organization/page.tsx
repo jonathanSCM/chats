@@ -18,7 +18,9 @@ export default async function OrganizationSettingsPage() {
   const [org, members, invites, bots, botMembers] = await Promise.all([
     prisma.organization.findUniqueOrThrow({ where: { id: session.user.organizationId } }),
     prisma.user.findMany({
-      where: { organizationId: session.user.organizationId },
+      // SYSTEM son cuentas técnicas (ej. el bot de subtítulos) sin dueño
+      // humano -- no son equipo, no se muestran acá.
+      where: { organizationId: session.user.organizationId, role: { not: "SYSTEM" } },
       select: { id: true, name: true, email: true, role: true, color: true },
       orderBy: { createdAt: "asc" },
     }),

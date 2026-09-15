@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
       where: { opportunityId: { in: opportunityIds }, status: "DONE" },
       select: { opportunityId: true },
     }),
-    prisma.user.findMany({ where: { organizationId }, select: { id: true, name: true, email: true } }),
+    prisma.user.findMany({ where: { organizationId, role: { not: "SYSTEM" } }, select: { id: true, name: true, email: true } }),
   ]);
   const memberById = new Map(members.map((m) => [m.id, m.name || m.email]));
 

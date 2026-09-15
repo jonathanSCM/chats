@@ -95,7 +95,9 @@ export default async function SeguimientoPage({
       take: 300,
     }),
     prisma.user.findMany({
-      where: { organizationId },
+      // SYSTEM son cuentas técnicas sin dueño humano -- no deben poder
+      // aparecer como "responsable" asignable de una oportunidad.
+      where: { organizationId, role: { not: "SYSTEM" } },
       select: { id: true, name: true, email: true, color: true },
       orderBy: { createdAt: "asc" },
     }),

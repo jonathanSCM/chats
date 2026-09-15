@@ -16,6 +16,12 @@ enum UserRole {
   SUPERADMIN // dueño de la plataforma, ve todo
   OWNER // dueño de la organización/cliente
   MEMBER // usuario dentro de la organización del cliente
+  // Cuenta técnica sin dueño humano (ej. el bot de subtítulos autenticando
+  // contra api/extension/transcript vía meetExtensionToken) -- existe como
+  // User solo por necesidad de auth, nunca debe verse como vendedor
+  // asignable ni contarse en el equipo comercial. No se ofrece en los
+  // formularios de invitación/cambio de rol (ver team.ts, roleSchema).
+  SYSTEM
 }
 
 model Organization {

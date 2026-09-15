@@ -20,7 +20,8 @@ import { BOT_STATUS_CONFIG } from "@/lib/meeting-bot-status";
 import { MeetingAttachments, type MeetingAttachmentInfo } from "@/components/meeting-attachments";
 import { PdfViewerModal } from "@/components/pdf-viewer-modal";
 import { EditableTitle } from "@/components/editable-title";
-import { SidePanel } from "@/components/side-panel";
+import { SidePanel, PanelSection } from "@/components/side-panel";
+import { panelAccent, PILL_BUTTON } from "@/lib/meeting-panel-ui";
 
 export interface AdhocMeetingRow {
   id: string;
@@ -286,99 +287,115 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
         return (
           <SidePanel
             onClose={() => setDetailId(null)}
+            accent={panelAccent(m.botStatus)}
             header={
               <>
                 <EditableTitle
                   value={m.title}
                   onSave={(v) => handleRename(m.id, v)}
                   disabled={isPending}
-                  className="font-display text-lg font-semibold text-ink"
+                  className="font-display text-2xl font-semibold tracking-tight text-ink"
                 />
-                <p className="mt-1 flex items-center gap-1.5 font-mono text-[13px] text-ink-faint">
-                  <Clock size={13} /> {timeLabel(m.scheduledAt)} · {m.durationMinutes} min
+                <p className="mt-1.5 flex items-center gap-1.5 font-mono text-[13px] text-ink-faint">
+                  <Clock size={13} className="text-accent" /> {timeLabel(m.scheduledAt)} · {m.durationMinutes} min
                 </p>
               </>
             }
           >
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-ink-muted">
-                {STATUS_LABEL[m.status] ?? m.status}
-              </span>
-              {botConfig && BotIcon && (
-                <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10px] ${botConfig.className}`}>
-                  <BotIcon size={10} className={m.botStatus === "JOINING" || m.botStatus === "TRANSCRIBING" ? "animate-spin" : ""} />
-                  {botConfig.label}
+            <PanelSection label="Estado">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-surface-2 px-2.5 py-1 font-mono text-[10px] text-ink-muted">
+                  {STATUS_LABEL[m.status] ?? m.status}
                 </span>
-              )}
-              {botConfig?.canStop && (
-                <button
-                  type="button"
-                  disabled={isPending || stoppingId === m.id}
-                  onClick={() => handleStop(m.id)}
-                  title="Sacar al bot de la reunión ahora"
-                  className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-danger hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <PhoneOff size={11} /> {stoppingId === m.id ? "Deteniendo…" : "Detener bot"}
-                </button>
-              )}
-              {(m.transcript || m.audioTranscript) && !pdfAttachment && (
-                <button
-                  type="button"
-                  disabled={isPending || actionPendingId === m.id}
-                  onClick={() => handleGenerateSummary(m.id)}
-                  title="Generar un resumen ejecutivo en PDF a partir de la transcripción"
-                  className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <FileDown size={11} /> {actionPendingId === m.id ? "Generando…" : "Generar resumen (PDF)"}
-                </button>
-              )}
-              {pdfAttachment && (
-                <button
-                  type="button"
-                  onClick={() => setViewingPdf({ url: pdfAttachment.url, title: `Resumen — ${m.title}` })}
-                  title="Ver el resumen en PDF"
-                  className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent"
-                >
-                  <FileDown size={11} /> Ver PDF
-                </button>
-              )}
-              {m.meetingUrl && (
-                <button
-                  type="button"
-                  onClick={() => navigator.clipboard.writeText(m.meetingUrl!)}
-                  title="Copiar link de la reunión"
-                  className="flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:border-accent-dim hover:text-accent"
-                >
-                  <Copy size={11} /> Link
-                </button>
-              )}
-              {!m.meetingUrl && (
-                <span className="flex items-center gap-1 text-ink-faint">
-                  <Video size={12} /> Sin link
-                </span>
-              )}
-            </div>
+                {botConfig && BotIcon && (
+                  <span
+                    data-active={m.botStatus === "JOINING" || m.botStatus === "RECORDING" || m.botStatus === "TRANSCRIBING"}
+                    className={`corner-brackets flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[10px] ${botConfig.className}`}
+                  >
+                    <BotIcon size={10} className={m.botStatus === "JOINING" || m.botStatus === "TRANSCRIBING" ? "animate-spin" : ""} />
+                    {botConfig.label}
+                  </span>
+                )}
+              </div>
+            </PanelSection>
+
+            <PanelSection label="Acciones" delay={40}>
+              <div className="flex flex-wrap gap-2">
+                {botConfig?.canStop && (
+                  <button
+                    type="button"
+                    disabled={isPending || stoppingId === m.id}
+                    onClick={() => handleStop(m.id)}
+                    title="Sacar al bot de la reunión ahora"
+                    className={`${PILL_BUTTON} border-danger/30 text-danger hover:border-danger hover:bg-danger/10`}
+                  >
+                    <PhoneOff size={11} /> {stoppingId === m.id ? "Deteniendo…" : "Detener bot"}
+                  </button>
+                )}
+                {(m.transcript || m.audioTranscript) && !pdfAttachment && (
+                  <button
+                    type="button"
+                    disabled={isPending || actionPendingId === m.id}
+                    onClick={() => handleGenerateSummary(m.id)}
+                    title="Generar un resumen ejecutivo en PDF a partir de la transcripción"
+                    className={`${PILL_BUTTON} border-accent-dim/40 bg-accent-dim/10 text-accent hover:bg-accent-dim/20`}
+                  >
+                    <FileDown size={11} /> {actionPendingId === m.id ? "Generando…" : "Generar resumen (PDF)"}
+                  </button>
+                )}
+                {pdfAttachment && (
+                  <button
+                    type="button"
+                    onClick={() => setViewingPdf({ url: pdfAttachment.url, title: `Resumen — ${m.title}` })}
+                    title="Ver el resumen en PDF"
+                    className={`${PILL_BUTTON} border-accent-dim/40 bg-accent-dim/10 text-accent hover:bg-accent-dim/20`}
+                  >
+                    <FileDown size={11} /> Ver PDF
+                  </button>
+                )}
+                {m.meetingUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(m.meetingUrl!)}
+                    title="Copiar link de la reunión"
+                    className={`${PILL_BUTTON} border-border text-ink-muted hover:border-accent-dim hover:text-accent`}
+                  >
+                    <Copy size={11} /> Link
+                  </button>
+                ) : (
+                  <span className="flex items-center gap-1.5 rounded-full border border-dashed border-border px-2.5 py-1 text-[11px] text-ink-faint">
+                    <Video size={11} /> Sin link
+                  </span>
+                )}
+              </div>
+              {stopError?.id === m.id && <p className="text-xs text-danger">{stopError.message}</p>}
+              {actionError?.id === m.id && <p className="text-xs text-danger">{actionError.message}</p>}
+            </PanelSection>
 
             {m.status !== "CANCELED" && m.status !== "DONE" && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
+              <PanelSection label="Cuándo / link / bot" delay={80}>
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => setEditingId(editingId === m.id ? null : m.id)}
                     title="Editar fecha, duración o si el bot se une"
-                    className={`flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:border-accent-dim hover:text-accent ${
-                      editingId === m.id ? "border-accent-dim text-accent" : "text-ink-muted"
+                    className={`${PILL_BUTTON} ${
+                      editingId === m.id
+                        ? "border-accent-dim bg-accent-dim/10 text-accent"
+                        : "border-border text-ink-muted hover:border-accent-dim hover:text-accent"
                     }`}
                   >
-                    <Pencil size={11} /> Editar fecha/link/bot
+                    <Pencil size={11} /> Editar
                   </button>
                   <button
                     type="button"
                     disabled={isPending}
                     onClick={() => handleCancelMeeting(m.id)}
                     title={cancelingId === m.id ? "¿Seguro? Tocá de nuevo" : "Cancelar reunión"}
-                    className={`flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] disabled:cursor-not-allowed ${
-                      cancelingId === m.id ? "border-danger text-danger" : "text-ink-muted hover:border-danger hover:text-danger"
+                    className={`${PILL_BUTTON} ${
+                      cancelingId === m.id
+                        ? "border-danger bg-danger/10 text-danger"
+                        : "border-border text-ink-muted hover:border-danger hover:text-danger"
                     }`}
                   >
                     <Ban size={11} /> {cancelingId === m.id ? "¿Seguro?" : "Cancelar"}
@@ -388,7 +405,7 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
                 {editingId === m.id && (
                   <form
                     onSubmit={(e) => handleEditSubmit(m.id, e)}
-                    className="space-y-2 rounded-md border border-border bg-surface-2/40 p-2.5"
+                    className="animate-fade-up space-y-2 rounded-lg border border-border bg-surface-2/60 p-3"
                   >
                     <input type="hidden" name="scheduledAt" defaultValue={m.scheduledAt} />
                     <input type="hidden" name="title" value={m.title} />
@@ -430,34 +447,39 @@ export function AdhocMeetingsClient({ meetings }: { meetings: AdhocMeetingRow[] 
                     </div>
                   </form>
                 )}
-              </div>
+              </PanelSection>
             )}
-
-            {stopError?.id === m.id && <p className="text-xs text-danger">{stopError.message}</p>}
-            {actionError?.id === m.id && <p className="text-xs text-danger">{actionError.message}</p>}
 
             {m.botJoinedAt && (
-              <p className="font-mono text-[10px] text-ink-faint">
-                Grabó de {new Date(m.botJoinedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}{" "}
-                a{" "}
-                {m.botLeftAt
-                  ? new Date(m.botLeftAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })
-                  : "ahora"}
-                {m.botLeftAt &&
-                  ` (${Math.round((new Date(m.botLeftAt).getTime() - new Date(m.botJoinedAt).getTime()) / 60_000)}m)`}
-              </p>
+              <PanelSection label="Grabación" delay={120}>
+                <p className="font-mono text-xs text-ink-muted">
+                  {new Date(m.botJoinedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}
+                  {" → "}
+                  {m.botLeftAt
+                    ? new Date(m.botLeftAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })
+                    : "ahora"}
+                  {m.botLeftAt &&
+                    ` (${Math.round((new Date(m.botLeftAt).getTime() - new Date(m.botJoinedAt).getTime()) / 60_000)} min)`}
+                </p>
+              </PanelSection>
             )}
 
-            {m.notes && <p className="whitespace-pre-wrap text-xs leading-relaxed text-ink-muted">{m.notes}</p>}
+            {m.notes && (
+              <PanelSection label="Notas" delay={160}>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">{m.notes}</p>
+              </PanelSection>
+            )}
 
-            <MeetingAttachments meetingId={m.id} attachments={m.attachments} editable disabled={isPending} />
+            <PanelSection label="Adjuntos" delay={200}>
+              <MeetingAttachments meetingId={m.id} attachments={m.attachments} editable disabled={isPending} />
+            </PanelSection>
 
             <button
               type="button"
               disabled={isPending}
               onClick={() => handleDelete(m.id)}
               title={confirmDeleteId === m.id ? "¿Seguro? Tocá de nuevo" : "Borrar reunión"}
-              className={`flex cursor-pointer items-center gap-1 text-xs disabled:cursor-not-allowed ${
+              className={`flex cursor-pointer items-center gap-1.5 border-t border-border pt-3 text-xs transition-colors disabled:cursor-not-allowed ${
                 confirmDeleteId === m.id ? "text-danger" : "text-ink-faint hover:text-danger"
               }`}
             >

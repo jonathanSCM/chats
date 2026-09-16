@@ -64,10 +64,23 @@ export async function getLinkPreview(rawUrl: string): Promise<LinkPreview | null
       redirect: "follow",
       headers: { "User-Agent": "Mozilla/5.0 (compatible; ProShopCRM-LinkPreview/1.0)" },
     });
-    if (!res.ok || !res.body) return null;
+    // Un link compartido en el chat casi nunca es HTML (imagen, PDF, 404,
+    // redirect roto, etc.) -- devolver sin consumir/cancelar el body en esos
+    // casos deja el stream de la respuesta (y su descompresión gzip) sin
+    // drenar. Bajo tráfico real esto se acumula rápido (confirmado en
+    // producción: "MaxListenersExceededWarning: 11 drain listeners added to
+    // [Gzip]") y degrada el servidor entero, no solo esta función.
+    if (!res.ok) {
+      await res.body?.cancel().catch(() => {});
+      return null;
+    }
+    if (!res.body) return null;
 
     const contentType = res.headers.get("content-type") ?? "";
-    if (!contentType.includes("text/html")) return null;
+    if (!contentType.includes("text/html")) {
+      await res.body.cancel().catch(() => {});
+      return null;
+    }
 
     // Se lee de a pedazos y se corta apenas se pasa el tope -- evita traer
     // páginas enormes solo para leer las meta tags del <head>.

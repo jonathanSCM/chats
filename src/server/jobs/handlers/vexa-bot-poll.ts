@@ -150,6 +150,28 @@ export async function handleVexaBotPoll(rawPayload: unknown): Promise<void> {
     });
   }
 
+  // Los subtítulos en vivo de Meet (campo `transcript`, sumados durante la
+  // reunión vía api/extension/transcript o el parche del bot) quedaban solo
+  // en la base -- se usaban para el resumen en PDF, pero nadie podía verlos
+  // ni bajarlos directo. Ahora, igual que con el de Whisper arriba, se
+  // guardan como adjunto propio si hay algo que guardar.
+  const meetingForCaptions = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    select: { transcript: true },
+  });
+  if (meetingForCaptions?.transcript) {
+    const captionsUrl = await saveMediaFile(Buffer.from(meetingForCaptions.transcript, "utf-8"), "text/plain");
+    await prisma.meetingAttachment.create({
+      data: {
+        meetingId,
+        url: captionsUrl,
+        fileName: "subtitulos-meet.txt",
+        mimeType: "text/plain",
+        fileSize: Buffer.byteLength(meetingForCaptions.transcript, "utf-8"),
+      },
+    });
+  }
+
   const recording = transcriptData?.recordings?.[transcriptData.recordings.length - 1];
   if (recording?.playback_url?.audio) {
     try {

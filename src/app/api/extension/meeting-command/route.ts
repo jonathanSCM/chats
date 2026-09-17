@@ -60,6 +60,15 @@ export async function POST(req: NextRequest) {
     return withCors(new NextResponse("Unauthorized", { status: 401 }));
   }
 
+  // Diagnostico temporal del parche del bot (ver beacon() en apply-patch.js):
+  // window.logBot resultó no sonar en producción, así que el parche manda
+  // estos avisos directo acá para poder ver en los logs del servidor qué
+  // paso a paso llega a ejecutarse -- solo se loguea, no toca nada más.
+  if (command.startsWith("debug:")) {
+    console.log(`[meet-bot-debug] ${meetingUrl}: ${command.slice(6)}`);
+    return withCors(NextResponse.json({ ok: true, reply: "" }));
+  }
+
   // A diferencia de resolveExtensionMeeting (api/extension/transcript), acá
   // NO se crea una reunión si no existe -- un comando sin una reunión de bot
   // real detrás no tiene nada que ejecutar.

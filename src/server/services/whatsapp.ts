@@ -124,6 +124,7 @@ const inboundSchema = z.object({
                       video_url: z.string().optional(),
                       thumbnail_url: z.string().optional(),
                       ctwa_clid: z.string().optional(),
+                      source_url: z.string().optional(),
                     })
                     .optional(),
                 }),
@@ -169,6 +170,7 @@ export interface AdReferralInfo {
   body: string | null;
   mediaUrl: string | null;
   ctwaClid: string | null;
+  sourceUrl: string | null;
   adName?: string | null;
   campaignName?: string | null;
   adsetName?: string | null;
@@ -255,6 +257,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
                 message.referral.thumbnail_url ??
                 null,
               ctwaClid: message.referral.ctwa_clid ?? null,
+              sourceUrl: message.referral.source_url ?? null,
             }
           : null;
 

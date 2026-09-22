@@ -44,6 +44,7 @@ import {
   setConversationBlockedAction,
   setConversationMutedAction,
   markConversationFromAdAction,
+  getAdInsightsAction,
   pauseBotAction,
   resumeBotAction,
 } from "@/server/actions/conversation-panel";
@@ -98,6 +99,19 @@ interface AdReferralInfo {
   adName?: string | null;
   campaignName?: string | null;
   adsetName?: string | null;
+}
+
+interface AdInsights {
+  campaignName: string | null;
+  adsetName: string | null;
+  adName: string | null;
+  spend: string | null;
+  impressions: string | null;
+  reach: string | null;
+  clicks: string | null;
+  ctr: string | null;
+  cpc: string | null;
+  cpm: string | null;
 }
 
 interface Message {
@@ -486,6 +500,17 @@ export function InboxClient({
   const [conversationBlocked, setConversationBlocked] = useState(false);
   const [conversationFromAd, setConversationFromAd] = useState(false);
   const [adReferralData, setAdReferralData] = useState<AdReferralInfo | null>(null);
+  const [adInsights, setAdInsights] = useState<AdInsights | null>(null);
+  const [adInsightsLoading, setAdInsightsLoading] = useState(false);
+  const [adInsightsError, setAdInsightsError] = useState<string | null>(null);
+
+  // Se pide a mano (botón), no en cada poll de fetchMessages -- limpiar acá,
+  // atado solo a cambiar de conversación, evita que quede pegado el
+  // rendimiento del chat anterior.
+  useEffect(() => {
+    setAdInsights(null);
+    setAdInsightsError(null);
+  }, [selectedId]);
   const [conversationBotPaused, setConversationBotPaused] = useState(false);
   const [conversationAiEnabled, setConversationAiEnabled] = useState(false);
   const [conversationBotId, setConversationBotId] = useState<string | null>(null);
@@ -1095,6 +1120,21 @@ export function InboxClient({
     });
   }
 
+  function fetchAdInsights() {
+    const id = selectedIdRef.current;
+    if (!id) return;
+    setAdInsightsLoading(true);
+    setAdInsightsError(null);
+    getAdInsightsAction(id).then((result) => {
+      setAdInsightsLoading(false);
+      if (result.error) {
+        setAdInsightsError(result.error);
+        return;
+      }
+      setAdInsights(result.insights ?? null);
+    });
+  }
+
   const filteredConversations = conversations.filter((c) => matchesSearch(c, searchQuery));
 
   // Búsqueda dentro del chat abierto -- solo entre lo ya cargado en
@@ -1355,11 +1395,61 @@ export function InboxClient({
                   <p className="truncate font-mono text-xs text-ink-faint">{customerPhone}</p>
                 )}
                 {conversationFromAd && adReferralData?.headline && (
-                  <p className="truncate text-xs text-accent">
-                    📢 {adReferralData.headline}
-                    {adReferralData.adName && ` · ${adReferralData.adName}`}
-                    {adReferralData.campaignName && ` · ${adReferralData.campaignName}`}
+                  <p className="flex items-center gap-1.5 truncate text-xs text-accent">
+                    <span className="truncate">
+                      📢 {adReferralData.headline}
+                      {adReferralData.adName && ` · ${adReferralData.adName}`}
+                      {adReferralData.campaignName && ` · ${adReferralData.campaignName}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={fetchAdInsights}
+                      disabled={adInsightsLoading}
+                      title="Traer inversión, impresiones, alcance, clics, CTR, CPC y CPM de este anuncio desde Meta"
+                      className="shrink-0 cursor-pointer font-mono text-[10px] text-ink-faint underline decoration-dotted hover:text-accent disabled:cursor-default"
+                    >
+                      {adInsightsLoading ? "cargando…" : "ver rendimiento"}
+                    </button>
                   </p>
+                )}
+                {adInsightsError && (
+                  <p className="text-xs text-danger">{adInsightsError}</p>
+                )}
+                {adInsights && (
+                  <dl className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 rounded-md border border-border bg-surface-2 p-2 font-mono text-[11px] sm:grid-cols-5">
+                    <div>
+                      <dt className="text-ink-faint">Inversión</dt>
+                      <dd className="text-ink">{adInsights.spend ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-faint">Impresiones</dt>
+                      <dd className="text-ink">{adInsights.impressions ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-faint">Alcance</dt>
+                      <dd className="text-ink">{adInsights.reach ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-faint">Clics</dt>
+                      <dd className="text-ink">{adInsights.clicks ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-faint">CTR</dt>
+                      <dd className="text-ink">{adInsights.ctr ? `${adInsights.ctr}%` : "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-faint">CPC</dt>
+                      <dd className="text-ink">{adInsights.cpc ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-faint">CPM</dt>
+                      <dd className="text-ink">{adInsights.cpm ?? "—"}</dd>
+                    </div>
+                    <div className="col-span-2 sm:col-span-2">
+                      <dt className="text-ink-faint">Conjunto de anuncios</dt>
+                      <dd className="truncate text-ink">{adInsights.adsetName ?? "—"}</dd>
+                    </div>
+                  </dl>
                 )}
               </div>
               {conversationAiEnabled && conversationBotPaused && (

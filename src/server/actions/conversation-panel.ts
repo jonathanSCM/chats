@@ -5,6 +5,8 @@ import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { audit } from "@/server/services/audit";
 import { deleteMediaFile } from "@/lib/media-storage";
+import { decrypt } from "@/lib/crypto";
+import { resolveAdInsights, type AdInsights } from "@/server/services/meta-ads";
 import type { ActionState } from "./types";
 
 /**
@@ -139,6 +141,42 @@ export async function markConversationFromAdAction(conversationId: string): Prom
   });
 
   return { error: null, message: "Marcado como venido de un anuncio — 72h de gracia activas." };
+}
+
+/**
+ * Rendimiento real del anuncio que originó esta conversación (inversión,
+ * impresiones, alcance, clics, CTR, CPC, CPM vía Marketing API Insights) --
+ * a pedido, no se trae solo al abrir el chat, porque cuenta contra el
+ * límite de llamadas de Meta y no hace falta en la mayoría de los casos.
+ */
+export async function getAdInsightsAction(
+  conversationId: string,
+): Promise<ActionState & { insights?: AdInsights }> {
+  const access = await requireConversationAccess(conversationId);
+  if (!access) return { error: "Conversación no encontrada" };
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: {
+      adReferralData: true,
+      bot: { select: { whatsappConnection: { select: { accessToken: true } } } },
+    },
+  });
+  const sourceId = (conversation?.adReferralData as { sourceId?: string | null } | null)?.sourceId;
+  const accessToken = conversation?.bot.whatsappConnection?.accessToken;
+  if (!sourceId || !accessToken) {
+    return { error: "Esta conversación no tiene un anuncio de Meta asociado." };
+  }
+
+  const insights = await resolveAdInsights(sourceId, decrypt(accessToken));
+  if (!insights) {
+    return {
+      error:
+        "No se pudo traer el rendimiento desde Meta — puede que el token no tenga ads_read, o que el anuncio todavía no tenga actividad registrada.",
+    };
+  }
+
+  return { error: null, insights };
 }
 
 /**

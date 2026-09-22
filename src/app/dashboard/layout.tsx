@@ -43,7 +43,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
     : null;
 
   const serverNowIso = new Date().toISOString();
-  const serverTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Antes usaba el huso horario del SO del servidor (UTC en producción, sin
+  // relación con dónde está el negocio) -- ahora muestra la hora en la zona
+  // horaria configurada de la organización (Organization.timezone, ver
+  // "Horario de citas" en Organización), con Bolivia como default sensato
+  // para cuando todavía no hay organización (login, superadmin sin org).
+  const serverTimeZone = org?.timezone || "America/La_Paz";
 
   // Mismo contenido para el sidebar de escritorio y el drawer de móvil.
   const navContent = (

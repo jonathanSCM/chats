@@ -6,6 +6,7 @@ import { RenameOrgForm } from "./_components/rename-org-form";
 import { MembersList } from "./_components/members-list";
 import { InvitePanel } from "./_components/invite-panel";
 import { AiSettingsForm } from "./_components/ai-settings-form";
+import { BookingSettingsForm } from "./_components/booking-settings-form";
 import { BotAccessMatrix } from "./_components/bot-access-matrix";
 import { DangerZone } from "./_components/danger-zone";
 
@@ -56,6 +57,21 @@ export default async function OrganizationSettingsPage() {
           Cuánto contexto de la conversación recibe el asesor al analizar un cliente.
         </CardDescription>
         <AiSettingsForm currentLimit={org.aiMessageLimit} />
+      </Card>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Horario de citas</CardTitle>
+        <CardDescription className="mb-4">
+          Cuándo puede el bot de calificación ofrecer una reunión por WhatsApp.
+        </CardDescription>
+        <BookingSettingsForm
+          currentTimezone={org.timezone}
+          currentDays={org.bookingDays}
+          currentStartHour={org.bookingStartHour}
+          currentEndHour={org.bookingEndHour}
+          currentDurationMinutes={org.bookingDurationMinutes}
+          currentLeadHours={org.bookingLeadHours}
+        />
       </Card>
 
       <Card className="mb-6">

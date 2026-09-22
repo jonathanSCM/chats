@@ -46,6 +46,16 @@ model Organization {
   // api/extension/transcript. Se genera desde /dashboard/organization; null
   // hasta que alguien lo pide por primera vez.
   meetExtensionToken   String?  @unique
+  // Horario habilitado para que el bot de calificación ofrezca reuniones --
+  // configurable desde /dashboard/organization. Reemplaza la variable de
+  // entorno MEETING_SLOT_HOURS, que era una sola franja fija para todas las
+  // organizaciones sin importar el negocio. Ver server/services/availability.ts.
+  timezone               String @default("America/La_Paz")
+  bookingDays            Int[]  @default([1, 2, 3, 4, 5]) // 0=domingo ... 6=sábado
+  bookingStartHour       Int    @default(9)
+  bookingEndHour         Int    @default(18)
+  bookingDurationMinutes Int    @default(30)
+  bookingLeadHours       Int    @default(4) // anticipación mínima antes de poder ofrecer un horario
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

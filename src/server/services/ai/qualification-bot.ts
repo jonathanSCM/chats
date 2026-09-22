@@ -4,7 +4,7 @@ import { decrypt } from "@/lib/crypto";
 import { sendTextMessage } from "@/server/services/whatsapp";
 import { notifyNewMessage } from "@/server/services/push";
 import { OPEN_STAGES } from "@/lib/pipeline";
-import { getMeetingSlots, type MeetingSlot } from "@/lib/meeting-slots";
+import { getAvailableSlots, hasSchedulingConflict, type MeetingSlot } from "@/server/services/availability";
 import { MODELS, runStructured } from "./client";
 
 export const PROMPT_VERSION = "bot-calificacion-v1";
@@ -343,6 +343,19 @@ async function maybeScheduleMeeting(
     if (alreadyScheduled) return;
   }
 
+  // Entre que se ofreció esta franja (buildInput, turnos atrás) y que el
+  // cliente la eligió ahora, otro lead pudo haber tomado el mismo horario
+  // -- se re-chequea justo acá, no solo al armar las franjas ofrecidas. No
+  // se bloquea la creación (el bot ya le confirmó el horario al cliente en
+  // el mensaje que se acaba de mandar, no hay forma de "desdecirlo"): se
+  // crea igual, pero marcada bien visible para que un vendedor la resuelva
+  // a mano en vez de quedar un choque silencioso en el calendario.
+  const org = await prisma.organization.findUniqueOrThrow({
+    where: { id: conversation.organizationId },
+    select: { bookingDurationMinutes: true },
+  });
+  const conflict = await hasSchedulingConflict(conversation.organizationId, slot.date, org.bookingDurationMinutes);
+
   // El bot ya no crea el link de Meet -- decisión explícita: la creación de
   // Calendar/Meet quedó reservada para cuando un vendedor la arma a mano
   // (ver createMeetingAction en crm.ts). Acá solo se deja agendada la fecha
@@ -358,7 +371,9 @@ async function maybeScheduleMeeting(
       scheduledAt: slot.date,
       meetingUrl: null,
       status: "SCHEDULED",
-      notes: "Agendada automáticamente por el bot de calificación. Falta agregar el link de la reunión.",
+      notes: conflict
+        ? "⚠️ Posible choque de horario: otra reunión ya ocupaba esta franja cuando se confirmó. Revisar y reagendar si hace falta. Agendada automáticamente por el bot de calificación."
+        : "Agendada automáticamente por el bot de calificación. Falta agregar el link de la reunión.",
     },
   });
 
@@ -367,7 +382,9 @@ async function maybeScheduleMeeting(
     organizationId: conversation.organizationId,
     assignedToId: conversation.assignedToId,
     customerLabel: conversation.customerName || conversation.customerPhone,
-    preview: `📅 El bot agendó una reunión para ${slot.label} — falta el link de Meet`,
+    preview: conflict
+      ? `⚠️ El bot agendó una reunión para ${slot.label}, pero choca con otra — revisar`
+      : `📅 El bot agendó una reunión para ${slot.label} — falta el link de Meet`,
   }).catch((error) => console.error("[bot] Error notificando reunión agendada:", error));
 }
 
@@ -473,7 +490,7 @@ export async function runQualificationTurn(conversationId: string): Promise<void
     return;
   }
 
-  const slots = getMeetingSlots();
+  const slots = await getAvailableSlots(conversation.organizationId);
   const input = await buildInput(conversation, slots);
 
   const result = await runStructured({

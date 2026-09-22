@@ -72,6 +72,59 @@ export async function updateAiSettingsAction(
   return { error: null, message: "Configuración de IA actualizada." };
 }
 
+// Mismo criterio de límites razonables que aiSettingsSchema de arriba: da un
+// mensaje de error claro antes de guardar, no un 500 silencioso.
+const bookingSettingsSchema = z
+  .object({
+    timezone: z.string().min(1, "Requerido").max(60),
+    bookingDays: z
+      .array(z.coerce.number().int().min(0).max(6))
+      .min(1, "Elegí al menos un día"),
+    bookingStartHour: z.coerce.number().int().min(0).max(23),
+    bookingEndHour: z.coerce.number().int().min(1).max(24),
+    bookingDurationMinutes: z.coerce.number().int().min(10).max(240),
+    bookingLeadHours: z.coerce.number().int().min(0).max(168),
+  })
+  .refine((d) => d.bookingEndHour > d.bookingStartHour, {
+    message: "La hora de fin debe ser posterior a la de inicio",
+    path: ["bookingEndHour"],
+  });
+
+/**
+ * Horario habilitado para que el bot de calificación ofrezca reuniones (ver
+ * server/services/availability.ts) — antes era una variable de entorno fija
+ * para todas las organizaciones, ahora es esto.
+ */
+export async function updateBookingSettingsAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireSession();
+  if (session.user.role !== "OWNER" || !session.user.organizationId) {
+    return { error: "Solo el dueño de la organización puede cambiar este dato" };
+  }
+
+  const parsed = bookingSettingsSchema.safeParse({
+    timezone: formData.get("timezone"),
+    bookingDays: formData.getAll("bookingDays"),
+    bookingStartHour: formData.get("bookingStartHour"),
+    bookingEndHour: formData.get("bookingEndHour"),
+    bookingDurationMinutes: formData.get("bookingDurationMinutes"),
+    bookingLeadHours: formData.get("bookingLeadHours"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  await prisma.organization.update({
+    where: { id: session.user.organizationId },
+    data: parsed.data,
+  });
+
+  revalidatePath("/dashboard/organization");
+  return { error: null, message: "Horario de citas actualizado." };
+}
+
 const shareCalendarSchema = z.object({ email: z.email("Correo inválido") });
 
 /**

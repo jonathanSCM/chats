@@ -55,21 +55,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input, Label, Select } from "@/components/ui/input";
 import {
-  ALL_STAGES,
-  STAGE_LABEL,
-  STAGE_COLOR,
-  STAGE_CRITERIA,
   PRIORITY_COLOR,
   SERVICES,
-  isOpenStage,
   hasCompleteNextAction,
   missingForStage,
   ALL_LOSS_REASONS,
   LOSS_REASON_LABEL,
-  type Stage,
   type Priority,
   type LossReason,
 } from "@/lib/pipeline";
+import type { PipelineStage } from "@/server/services/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 import { scheduledAtToUtcHidden, utcIsoToLocalInputValue } from "@/lib/datetime-local";
 import { BOT_STATUS_CONFIG } from "@/lib/meeting-bot-status";
@@ -87,7 +82,7 @@ export interface Row {
   leadSource: string;
   service: string;
   need: string;
-  stage: Stage;
+  stage: PipelineStage;
   estimatedValue: number | null;
   expectedCloseDate: string | null;
   updatedAt: string;
@@ -164,6 +159,8 @@ interface Member {
 
 interface Props {
   rows: Row[];
+  /** Etapas del pipeline de la organización, ordenadas — reemplaza el viejo ALL_STAGES fijo. */
+  stages: PipelineStage[];
   contacts: { id: string; label: string }[];
   members: Member[];
   currentUserId: string;
@@ -175,8 +172,8 @@ interface Props {
   viewingAllStages: boolean;
   /** Si viene de `?open=<id>` (ej. desde el botón del inbox), abre ese cliente ni bien carga. */
   openId?: string;
-  /** Click-through desde el Dashboard: preseleccionan filtros al cargar. */
-  initialStage?: Stage;
+  /** Click-through desde el Dashboard: preseleccionan filtros al cargar (id de PipelineStage). */
+  initialStage?: string;
   initialQuickFilter?: string;
   initialAssignee?: string;
   initialSource?: string;
@@ -226,7 +223,7 @@ function sortValue(row: Row, field: SortField): number | string {
     case "client":
       return row.client.toLowerCase();
     case "stage":
-      return row.stage;
+      return row.stage.order;
     case "leadScore":
       return row.leadScore ?? -1;
     case "priority":
@@ -270,6 +267,7 @@ const money = new Intl.NumberFormat("es", {
 
 export function TrackingTable({
   rows,
+  stages,
   contacts,
   members,
   currentUserId,
@@ -337,7 +335,7 @@ export function TrackingTable({
     }
   }
   const [query, setQuery] = useState("");
-  const [stageFilter, setStageFilter] = useState<Stage | "">(initialStage ?? "");
+  const [stageFilter, setStageFilter] = useState<string>(initialStage ?? "");
   const [priorityFilter, setPriorityFilter] = useState<Priority | "">("");
   // Filtra por "Fecha de próxima acción" (nextActionAt) — pedido explícito
   // del scope: es el campo que de verdad usa el equipo para planear el
@@ -440,7 +438,7 @@ export function TrackingTable({
 
   const filtered = orderedRows
     .filter((r) => {
-      if (stageFilter && r.stage !== stageFilter) return false;
+      if (stageFilter && r.stage.id !== stageFilter) return false;
       if (priorityFilter && r.priority !== priorityFilter) return false;
       if (assigneeFilter && r.assignedTo?.id !== assigneeFilter) return false;
       if (serviceFilter && r.service !== serviceFilter) return false;
@@ -461,11 +459,11 @@ export function TrackingTable({
         // que el servidor calcula solo sobre etapas abiertas — si acá no se
         // filtra igual, con "Ver ganados/perdidos/pausados" activo el chip
         // muestra más filas de las que decía la tarjeta.
-        if (quickFilter === "alta" && (!isOpenStage(r.stage) || r.priority !== "ALTA")) return false;
-        if (quickFilter === "sin_accion" && (!isOpenStage(r.stage) || hasCompleteNextAction(r)))
+        if (quickFilter === "alta" && (r.stage.role !== null || r.priority !== "ALTA")) return false;
+        if (quickFilter === "sin_accion" && (r.stage.role !== null || hasCompleteNextAction(r)))
           return false;
         if (quickFilter === "hoy" && d !== todayStr) return false;
-        if (quickFilter === "vencidos" && !(isOpenStage(r.stage) && d && d < todayStr)) return false;
+        if (quickFilter === "vencidos" && !(r.stage.role === null && d && d < todayStr)) return false;
         if (quickFilter === "semana" && !(d && d >= todayStr && d <= weekAheadStr)) return false;
         if (quickFilter === "atencion" && !alerts.get(r.id)?.reasons.length) return false;
       }
@@ -561,13 +559,13 @@ export function TrackingTable({
         />
         <Select
           value={stageFilter}
-          onChange={(e) => setStageFilter(e.target.value as Stage | "")}
+          onChange={(e) => setStageFilter(e.target.value)}
           className="w-full py-1.5 text-sm sm:w-48"
         >
           <option value="">Todos los estados</option>
-          {ALL_STAGES.map((s) => (
-            <option key={s} value={s} title={STAGE_CRITERIA[s]}>
-              {STAGE_LABEL[s]}
+          {stages.map((s) => (
+            <option key={s.id} value={s.id} title={s.criteria}>
+              {s.label}
             </option>
           ))}
         </Select>
@@ -784,7 +782,7 @@ export function TrackingTable({
       )}
 
       {rows.length > 0 && boardView === "kanban" && (
-        <KanbanBoard rows={filtered} currentUserId={currentUserId} isAdmin={isAdmin} onOpen={setDetail} />
+        <KanbanBoard rows={filtered} stages={stages} currentUserId={currentUserId} isAdmin={isAdmin} onOpen={setDetail} />
       )}
 
       {boardView === "analisis" && <AnalysisView isAdmin={isAdmin} />}
@@ -866,6 +864,7 @@ export function TrackingTable({
                   <TableRow
                     key={row.id}
                     row={row}
+                    stages={stages}
                     alert={alerts.get(row.id) ?? { reasons: [], severity: null }}
                     aiEnabled={ai.enabled}
                     editable={canEdit(row, currentUserId, isAdmin)}
@@ -1061,6 +1060,7 @@ function NextActionCell({
 
 function TableRow({
   row,
+  stages,
   alert,
   aiEnabled,
   editable,
@@ -1070,6 +1070,7 @@ function TableRow({
   onDropRow,
 }: {
   row: Row;
+  stages: PipelineStage[];
   alert: DerivedAlert;
   aiEnabled: boolean;
   editable: boolean;
@@ -1090,15 +1091,16 @@ function TableRow({
     });
   }
 
-  function handleStageChange(nextStage: string) {
-    const missing = missingForStage(nextStage as Stage, row);
+  function handleStageChange(nextStageId: string) {
+    const nextStage = stages.find((s) => s.id === nextStageId);
+    const missing = missingForStage(nextStage?.requiresProposalFields ?? false, row);
     if (
       missing.length > 0 &&
       !window.confirm(`Todavía falta ${missing.join(", ")}. ¿Deseas avanzar igualmente?`)
     ) {
       return;
     }
-    save("stage", nextStage);
+    save("stage", nextStageId);
   }
 
   // Reordenar es con clic DERECHO (pedido así a propósito — el izquierdo lo
@@ -1207,16 +1209,16 @@ function TableRow({
 
       <Td>
         <Select
-          value={row.stage}
+          value={row.stage.id}
           disabled={locked}
           onChange={(e) => handleStageChange(e.target.value)}
-          title={STAGE_CRITERIA[row.stage]}
+          title={row.stage.criteria}
           className="w-40 py-1.5 text-xs font-semibold"
-          style={{ color: STAGE_COLOR[row.stage] }}
+          style={{ color: row.stage.color }}
         >
-          {ALL_STAGES.map((s) => (
-            <option key={s} value={s} title={STAGE_CRITERIA[s]}>
-              {STAGE_LABEL[s]}
+          {stages.map((s) => (
+            <option key={s.id} value={s.id} title={s.criteria}>
+              {s.label}
             </option>
           ))}
         </Select>
@@ -1746,7 +1748,7 @@ function DetailPanel({
             )}
           </Field>
 
-          {row.stage === "PERDIDO" && editable && (
+          {row.stage.role === "LOST" && editable && (
             <Field label="Motivo de la pérdida">
               <div className="space-y-1.5">
                 <Select

@@ -2,7 +2,7 @@ import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
-import { STAGE_LABEL, LOSS_REASON_LABEL, type Stage, type Priority, type LossReason } from "@/lib/pipeline";
+import { LOSS_REASON_LABEL, type Priority, type LossReason } from "@/lib/pipeline";
 
 /**
  * Exporta los leads activos (no archivados) de la organización a un .xlsx
@@ -19,6 +19,7 @@ export async function GET() {
   const opportunities = await prisma.opportunity.findMany({
     where: { organizationId, archivedAt: null },
     include: {
+      stage: { select: { label: true } },
       contact: { select: { fullName: true, phone: true, city: true, source: true } },
       assignedTo: { select: { name: true, email: true } },
       meetings: {
@@ -64,7 +65,7 @@ export async function GET() {
       source: o.contact.source || "",
       service: o.serviceInterest || "",
       need: o.needSummary || o.title,
-      stage: STAGE_LABEL[o.stage as Stage] ?? o.stage,
+      stage: o.stage.label,
       priority: (o.priority as Priority | null) || "",
       estimatedValue: o.estimatedValue ? Number(o.estimatedValue) : "",
       nextAction: o.nextAction || "",

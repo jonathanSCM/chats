@@ -1,58 +1,107 @@
+import type { PipelineStageRole } from "@/generated/prisma/enums";
+
 /**
  * Etapas del pipeline comercial de ProShop: representan el trabajo pendiente
  * y avanzan con evidencia, no simplemente porque hubo actividad.
+ *
+ * Desde la migración a pipeline configurable por organización, las etapas
+ * viven en la tabla PipelineStage (ver prisma/schema.prisma y
+ * src/server/services/pipeline.ts para cargarlas/derivar OPEN/HIDDEN/etc.
+ * por organización). Lo que queda acá es SOLO la semilla que usa cada
+ * organización nueva (migración de backfill y admin/create-org-form) — no
+ * es la fuente de verdad en runtime.
  */
-export type Stage =
-  | "POR_CALIFICAR"
-  | "ENTREVISTA"
-  | "DIAGNOSTICO"
-  | "PRESENTAR_SOLUCION"
-  | "PROPUESTA"
-  | "DECISION"
-  | "GANADO"
-  | "EN_PAUSA_NUTRIR"
-  | "PERDIDO";
-
-export const STAGE_LABEL: Record<Stage, string> = {
-  POR_CALIFICAR: "POR CALIFICAR",
-  ENTREVISTA: "ENTREVISTA",
-  DIAGNOSTICO: "DIAGNÓSTICO",
-  PRESENTAR_SOLUCION: "PRESENTAR SOLUCIÓN",
-  PROPUESTA: "PROPUESTA",
-  DECISION: "DECISIÓN",
-  GANADO: "GANADO",
-  EN_PAUSA_NUTRIR: "EN PAUSA / NUTRIR",
-  PERDIDO: "PERDIDO",
-};
-
-export const ALL_STAGES: Stage[] = [
-  "POR_CALIFICAR",
-  "ENTREVISTA",
-  "DIAGNOSTICO",
-  "PRESENTAR_SOLUCION",
-  "PROPUESTA",
-  "DECISION",
-  "GANADO",
-  "EN_PAUSA_NUTRIR",
-  "PERDIDO",
+export const DEFAULT_PIPELINE_STAGES: {
+  order: number;
+  label: string;
+  color: string;
+  criteria: string;
+  role: PipelineStageRole | null;
+  isDefaultEntry: boolean;
+  requiresProposalFields: boolean;
+}[] = [
+  {
+    order: 1,
+    label: "POR CALIFICAR",
+    color: "#64748b",
+    criteria: "Lead recién llegado; filtro inicial por WhatsApp o llamada.",
+    role: null,
+    isDefaultEntry: true,
+    requiresProposalFields: false,
+  },
+  {
+    order: 2,
+    label: "ENTREVISTA",
+    color: "#0891b2",
+    criteria: "Reunión de levantamiento para entender empresa, proceso, problema e impacto.",
+    role: null,
+    isDefaultEntry: false,
+    requiresProposalFields: false,
+  },
+  {
+    order: 3,
+    label: "DIAGNÓSTICO",
+    color: "#ca8a04",
+    criteria: "Trabajo interno de ProShop para analizar el caso y definir recomendación.",
+    role: null,
+    isDefaultEntry: false,
+    requiresProposalFields: false,
+  },
+  {
+    order: 4,
+    label: "PRESENTAR SOLUCIÓN",
+    color: "#ea580c",
+    criteria: "Reunión con cliente/decisor para mostrar diagnóstico y solución propuesta.",
+    role: null,
+    isDefaultEntry: false,
+    requiresProposalFields: false,
+  },
+  {
+    order: 5,
+    label: "PROPUESTA",
+    color: "#2563eb",
+    criteria: "Preparar/presentar alcance, tiempos, inversión y condiciones.",
+    role: null,
+    isDefaultEntry: false,
+    requiresProposalFields: true,
+  },
+  {
+    order: 6,
+    label: "DECISIÓN",
+    color: "#db2777",
+    criteria: "Seguimiento, objeciones, cambios, negociación y decisión final.",
+    role: null,
+    isDefaultEntry: false,
+    requiresProposalFields: false,
+  },
+  {
+    order: 7,
+    label: "GANADO",
+    color: "#059669",
+    criteria: "Aceptación, firma, pago o inicio del trabajo.",
+    role: "WON",
+    isDefaultEntry: false,
+    requiresProposalFields: false,
+  },
+  {
+    order: 8,
+    label: "EN PAUSA / NUTRIR",
+    color: "#78716c",
+    criteria: "Sin actividad por ahora; se retoma más adelante.",
+    role: "NURTURE",
+    isDefaultEntry: false,
+    requiresProposalFields: false,
+  },
+  {
+    order: 9,
+    label: "PERDIDO",
+    color: "#dc2626",
+    criteria: "No se concretó. Registrar el motivo para aprender de ello.",
+    role: "LOST",
+    isDefaultEntry: false,
+    requiresProposalFields: false,
+  },
 ];
-
-/** Sigue en juego: necesita próximo paso y entra en los conteos/KPIs. */
-export const OPEN_STAGES: Stage[] = [
-  "POR_CALIFICAR",
-  "ENTREVISTA",
-  "DIAGNOSTICO",
-  "PRESENTAR_SOLUCION",
-  "PROPUESTA",
-  "DECISION",
-];
-
-/** Fuera del flujo principal: no aparecen por defecto en Seguimiento comercial. */
-export const HIDDEN_BY_DEFAULT_STAGES: Stage[] = ["GANADO", "PERDIDO", "EN_PAUSA_NUTRIR"];
-
-export function isOpenStage(stage: Stage): boolean {
-  return OPEN_STAGES.includes(stage);
-}
 
 /**
  * Regla dura del scope: toda oportunidad activa debe tener próxima
@@ -70,12 +119,16 @@ export function hasCompleteNextAction(row: {
 
 /**
  * Scope §15: al pasar a Propuesta, avisar (no bloquear) si falta
- * información mínima para que la propuesta tenga sentido. Solo aplica
- * al entrar a PROPUESTA — el resto de las etapas no piden nada extra
- * todavía (el PDF solo da este ejemplo puntual).
+ * información mínima para que la propuesta tenga sentido. Versión pura
+ * (client-safe, sin tocar Prisma): recibe directamente el
+ * `requiresProposalFields` de la PipelineStage destino en vez del objeto
+ * completo — así lo puede llamar tanto el cliente (tracking-table.tsx,
+ * kanban-board.tsx) como el servidor
+ * (src/server/services/pipeline.ts:missingForStage, que sí toma la
+ * PipelineStage resuelta y delega acá).
  */
 export function missingForStage(
-  stage: Stage,
+  requiresProposalFields: boolean,
   row: {
     need: string;
     aiRecommendation: string;
@@ -85,7 +138,7 @@ export function missingForStage(
     assignedTo: unknown;
   },
 ): string[] {
-  if (stage !== "PROPUESTA") return [];
+  if (!requiresProposalFields) return [];
   const missing: string[] = [];
   if (!row.need.trim()) missing.push("necesidad identificada");
   if (!row.aiRecommendation.trim()) missing.push("solución definida");
@@ -94,31 +147,9 @@ export function missingForStage(
   return missing;
 }
 
-/** Qué significa cada etapa y cuándo corresponde usarla — tooltip por etapa. */
-export const STAGE_CRITERIA: Record<Stage, string> = {
-  POR_CALIFICAR: "Lead recién llegado; filtro inicial por WhatsApp o llamada.",
-  ENTREVISTA: "Reunión de levantamiento para entender empresa, proceso, problema e impacto.",
-  DIAGNOSTICO: "Trabajo interno de ProShop para analizar el caso y definir recomendación.",
-  PRESENTAR_SOLUCION: "Reunión con cliente/decisor para mostrar diagnóstico y solución propuesta.",
-  PROPUESTA: "Preparar/presentar alcance, tiempos, inversión y condiciones.",
-  DECISION: "Seguimiento, objeciones, cambios, negociación y decisión final.",
-  GANADO: "Aceptación, firma, pago o inicio del trabajo.",
-  EN_PAUSA_NUTRIR: "Sin actividad por ahora; se retoma más adelante.",
-  PERDIDO: "No se concretó. Registrar el motivo para aprender de ello.",
-};
-
-/** Color por estado, de frío a caliente, para leer la tabla/Kanban de un vistazo. */
-export const STAGE_COLOR: Record<Stage, string> = {
-  POR_CALIFICAR: "#64748b",
-  ENTREVISTA: "#0891b2",
-  DIAGNOSTICO: "#ca8a04",
-  PRESENTAR_SOLUCION: "#ea580c",
-  PROPUESTA: "#2563eb",
-  DECISION: "#db2777",
-  GANADO: "#059669",
-  EN_PAUSA_NUTRIR: "#78716c",
-  PERDIDO: "#dc2626",
-};
+// STAGE_CRITERIA / STAGE_COLOR: movidos a la tabla PipelineStage
+// (columnas `criteria`/`color`, cargadas vía getOrgStages()); ver
+// DEFAULT_PIPELINE_STAGES arriba para la semilla de una organización nueva.
 
 export type Priority = "ALTA" | "MEDIA" | "BAJA";
 

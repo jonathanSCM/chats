@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
-import { STAGE_LABEL, type Stage } from "@/lib/pipeline";
 import { audit } from "@/server/services/audit";
 import { MODELS, runStructured } from "./client";
 
@@ -193,7 +192,7 @@ interface OpportunityContext {
   id: string;
   organizationId: string;
   title: string;
-  stage: Stage;
+  stage: { label: string };
   serviceInterest: string | null;
   needSummary: string | null;
   lastUpdate: string | null;
@@ -322,7 +321,7 @@ Ciudad: ${opportunity.contact.city ?? "(no registrada)"}
 OPORTUNIDAD
 Registrada el: ${opportunity.createdAt.toISOString().slice(0, 10)}
 Servicio de interés: ${opportunity.serviceInterest ?? "(sin definir)"}
-Estado actual: ${STAGE_LABEL[opportunity.stage]}
+Estado actual: ${opportunity.stage.label}
 Necesidad / contexto: ${opportunity.needSummary ?? opportunity.title}
 Valor estimado: ${opportunity.estimatedValue ? String(opportunity.estimatedValue) : "(sin cotizar)"}
 Última actualización del vendedor: ${opportunity.lastUpdate ?? "(sin registrar)"}
@@ -349,7 +348,10 @@ ${conversationText}`;
 export async function analyzeFollowUp(opportunityId: string): Promise<FollowUpResult> {
   const opportunity = await prisma.opportunity.findUnique({
     where: { id: opportunityId },
-    include: { contact: { select: { fullName: true, phone: true, city: true } } },
+    include: {
+      contact: { select: { fullName: true, phone: true, city: true } },
+      stage: { select: { label: true } },
+    },
   });
   if (!opportunity) throw new Error("Oportunidad no encontrada");
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
+import { getOrgStages, defaultEntryStage } from "@/server/services/pipeline";
 import {
   createMeetEvent,
   updateMeetEvent,
@@ -511,10 +512,14 @@ export async function createClientAndLinkMeetingAction(
     update: {},
   });
 
+  const entryStage = defaultEntryStage(await getOrgStages(organizationId));
+  if (!entryStage) return { error: "La organización todavía no tiene etapas de pipeline configuradas" };
+
   const opportunity = await prisma.opportunity.create({
     data: {
       organizationId,
       contactId: contact.id,
+      stageId: entryStage.id,
       title: parsed.data.opportunityTitle?.trim() || parsed.data.contactName?.trim() || "Cliente nuevo",
       assignedToId: userId,
     },

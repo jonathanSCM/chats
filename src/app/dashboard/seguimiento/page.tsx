@@ -1,14 +1,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
-import {
-  isOpenStage,
-  hasCompleteNextAction,
-  HIDDEN_BY_DEFAULT_STAGES,
-  type Stage,
-  type Priority,
-  type LossReason,
-} from "@/lib/pipeline";
+import { hasCompleteNextAction, type Priority, type LossReason } from "@/lib/pipeline";
+import { getOrgStages } from "@/server/services/pipeline";
 import { getAiSpendToday } from "@/server/actions/crm";
 import { hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
 import { TrackingTable } from "./_components/tracking-table";
@@ -48,6 +42,11 @@ export default async function SeguimientoPage({
   const organizationId = session.user.organizationId;
   const isAdmin = session.user.role === "OWNER" || session.user.role === "SUPERADMIN";
 
+  const stages = await getOrgStages(organizationId);
+  // Fuera del flujo principal (antes HIDDEN_BY_DEFAULT_STAGES): las 3
+  // etapas con role no-null (ganado/perdido/nutrir).
+  const hiddenStageIds = stages.filter((s) => s.role !== null).map((s) => s.id);
+
   // Todo el equipo ve la misma cartera — lo que carga el admin lo puede
   // tomar cualquier vendedor. La edición queda restringida en el servidor
   // (canEditOpportunity) a quien la tiene asignada, o al admin.
@@ -58,9 +57,10 @@ export default async function SeguimientoPage({
         archivedAt: viewingArchived ? { not: null } : null,
         ...(viewingArchived || viewingAllStages
           ? {}
-          : { stage: { notIn: HIDDEN_BY_DEFAULT_STAGES } }),
+          : { stageId: { notIn: hiddenStageIds } }),
       },
       include: {
+        stage: true,
         contact: { select: { id: true, fullName: true, phone: true, city: true, source: true } },
         assignedTo: { select: { id: true, name: true, email: true, color: true } },
         meetings: {
@@ -115,7 +115,7 @@ export default async function SeguimientoPage({
     leadSource: o.contact.source ?? "",
     service: o.serviceInterest ?? "",
     need: o.needSummary ?? o.title,
-    stage: o.stage as Stage,
+    stage: o.stage,
     estimatedValue: o.estimatedValue ? Number(o.estimatedValue) : null,
     expectedCloseDate: o.expectedCloseDate?.toISOString() ?? null,
     updatedAt: o.updatedAt.toISOString(),
@@ -170,7 +170,7 @@ export default async function SeguimientoPage({
 
   // Los cuatro indicadores que el equipo lleva arriba de la planilla — ahora
   // orientados a la acción pendiente, no a la cotización.
-  const open = rows.filter((r) => isOpenStage(r.stage));
+  const open = rows.filter((r) => r.stage.role === null);
   const todayStr = new Date().toISOString().slice(0, 10);
   const overdue = open.filter((r) => r.nextActionAt && r.nextActionAt.slice(0, 10) < todayStr);
   const withoutNextAction = open.filter((r) => !hasCompleteNextAction(r));
@@ -184,6 +184,7 @@ export default async function SeguimientoPage({
 
       <TrackingTable
         rows={rows}
+        stages={stages}
         contacts={contacts.map((c) => ({ id: c.id, label: c.fullName || c.phone }))}
         members={members.map((m) => ({ id: m.id, name: m.name || m.email, color: m.color }))}
         currentUserId={session.user.id}
@@ -192,7 +193,7 @@ export default async function SeguimientoPage({
         viewingArchived={viewingArchived}
         viewingAllStages={viewingAllStages}
         openId={openId}
-        initialStage={initialStage as Stage | undefined}
+        initialStage={initialStage}
         initialQuickFilter={initialQuickFilter}
         initialAssignee={initialAssignee}
         initialSource={initialSource}

@@ -7,6 +7,7 @@ import { prisma } from "@/server/db/client";
 import { signIn } from "@/server/auth";
 import { uniqueOrgSlug } from "@/lib/slugify";
 import { getClientIp, rateLimit, rateLimitMessage } from "@/lib/rate-limit";
+import { DEFAULT_PIPELINE_STAGES } from "@/lib/pipeline";
 import type { ActionState } from "./types";
 
 const signupSchema = z.object({
@@ -60,6 +61,20 @@ export async function signupAction(
 
   await prisma.$transaction(async (tx) => {
     const org = await tx.organization.create({ data: { name: companyName, slug } });
+    // Mismo seed que admin.ts:createOrganizationAction — toda organización
+    // nueva arranca con las 9 etapas de siempre del pipeline comercial.
+    await tx.pipelineStage.createMany({
+      data: DEFAULT_PIPELINE_STAGES.map((s) => ({
+        organizationId: org.id,
+        label: s.label,
+        color: s.color,
+        criteria: s.criteria,
+        order: s.order,
+        role: s.role,
+        isDefaultEntry: s.isDefaultEntry,
+        requiresProposalFields: s.requiresProposalFields,
+      })),
+    });
 
     await tx.user.create({
       data: { email, passwordHash, name, role: "OWNER", organizationId: org.id },

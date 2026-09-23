@@ -38,7 +38,7 @@ import {
 import { createMeetingFromConversationAction } from "@/server/actions/inbox-meetings";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
-import { STAGE_LABEL, SERVICES, type Stage } from "@/lib/pipeline";
+import { SERVICES } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 import { scheduledAtToUtcHidden, utcIsoToLocalInputValue } from "@/lib/datetime-local";
 
@@ -59,7 +59,7 @@ interface PanelData {
     opportunities: {
       id: string;
       title: string;
-      stage: Stage;
+      stage: string;
       open: boolean;
       estimatedValue: number | null;
       nextAction: string | null;
@@ -406,7 +406,7 @@ export function ConversationPanel({
                   >
                     <p className="truncate text-xs font-medium text-ink">{o.title}</p>
                     <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-ink-muted">
-                      <span>{STAGE_LABEL[o.stage]}</span>
+                      <span>{o.stage}</span>
                       {o.estimatedValue !== null && (
                         <span className="font-mono">{money.format(o.estimatedValue)}</span>
                       )}

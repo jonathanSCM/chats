@@ -25,79 +25,80 @@ enum UserRole {
 }
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  suspended Boolean  @default(false) // desactivada por el superadmin (ej. impago, abuso)
+  id                     String   @id @default(cuid())
+  name                   String
+  slug                   String   @unique
+  suspended              Boolean  @default(false) // desactivada por el superadmin (ej. impago, abuso)
   // Cuántos mensajes recientes de WhatsApp se le mandan al asesor IA por
   // análisis (ajustable por el dueño en /dashboard/organization). Más
   // mensajes = más contexto pero más costo por análisis.
-  aiMessageLimit Int      @default(25)
+  aiMessageLimit         Int      @default(25)
   // Calendario secundario de Google (no el "primary" de la cuenta
   // compartida de todo el bot) donde se crean las reuniones de ESTA
   // organización — separa a cada cliente de la plataforma para poder
   // compartir el calendario sin filtrar reuniones entre organizaciones.
   // Se crea recién la primera vez que hace falta (ver getOrCreateOrgCalendar).
-  googleCalendarId     String?
-  googleCalendarShares String[] @default([]) // correos con los que está compartido (solo lectura)
+  googleCalendarId       String?
+  googleCalendarShares   String[] @default([]) // correos con los que está compartido (solo lectura)
   // Token opaco (no cifrado, mismo criterio que CRON_SECRET/BOT_SERVICE_SECRET
   // — un secreto de portador, no un dato personal) que la extensión de Chrome
   // de subtítulos pega en su config para autenticarse contra
   // api/extension/transcript. Se genera desde /dashboard/organization; null
   // hasta que alguien lo pide por primera vez.
-  meetExtensionToken   String?  @unique
+  meetExtensionToken     String?  @unique
   // Horario habilitado para que el bot de calificación ofrezca reuniones --
   // configurable desde /dashboard/organization. Reemplaza la variable de
   // entorno MEETING_SLOT_HOURS, que era una sola franja fija para todas las
   // organizaciones sin importar el negocio. Ver server/services/availability.ts.
-  timezone               String @default("America/La_Paz")
-  bookingDays            Int[]  @default([1, 2, 3, 4, 5]) // 0=domingo ... 6=sábado
-  bookingStartHour       Int    @default(9)
-  bookingEndHour         Int    @default(18)
-  bookingDurationMinutes Int    @default(30)
-  bookingLeadHours       Int    @default(4) // anticipación mínima antes de poder ofrecer un horario
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  timezone               String   @default("America/La_Paz")
+  bookingDays            Int[]    @default([1, 2, 3, 4, 5]) // 0=domingo ... 6=sábado
+  bookingStartHour       Int      @default(9)
+  bookingEndHour         Int      @default(18)
+  bookingDurationMinutes Int      @default(30)
+  bookingLeadHours       Int      @default(4) // anticipación mínima antes de poder ofrecer un horario
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
-  users          User[]
-  bots           Bot[]
-  invites        OrganizationInvite[]
-  knowledgeItems KnowledgeItem[]
-  companies      Company[]
-  contacts       Contact[]
-  opportunities  Opportunity[]
-  activities     Activity[]
-  meetings       Meeting[]
-  aiAnalyses     AiAnalysis[]
+  users                  User[]
+  bots                   Bot[]
+  invites                OrganizationInvite[]
+  knowledgeItems         KnowledgeItem[]
+  companies              Company[]
+  contacts               Contact[]
+  opportunities          Opportunity[]
+  activities             Activity[]
+  meetings               Meeting[]
+  aiAnalyses             AiAnalysis[]
   metaAttributionTouches MetaAttributionTouch[]
+  pipelineStages         PipelineStage[]
 
   @@map("organizations")
 }
 
 model User {
-  id             String        @id @default(cuid())
-  email          String        @unique
-  passwordHash   String?
-  name           String?
+  id                 String        @id @default(cuid())
+  email              String        @unique
+  passwordHash       String?
+  name               String?
   // MEMBER, no OWNER: el default debe ser el rol menos privilegiado. Los dos
   // flujos que crean usuarios (signup.ts, team.ts) siempre pasan `role`
   // explícito, así que esto solo protege un camino futuro que lo olvide.
-  role           UserRole      @default(MEMBER)
-  emailVerified  DateTime?
+  role               UserRole      @default(MEMBER)
+  emailVerified      DateTime?
   // Color fijo para identificar al vendedor de un vistazo (asignaciones,
   // avatares, notas). Si es null, se deriva un color determinístico del id
   // (ver src/lib/vendor-color.ts) — así nadie tiene que elegir uno antes de
   // que exista esta opción.
-  color          String?
+  color              String?
   // Token personal para que la extensión de subtítulos de Meet sepa quién
   // sos sin pedirte usuario/contraseña -- se genera solo la primera vez que
   // entrás a /dashboard/extension-authorize desde la extensión, reusando tu
   // sesión ya iniciada del CRM (ver src/app/dashboard/extension-authorize).
-  meetExtensionToken String? @unique
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  meetExtensionToken String?       @unique
+  organizationId     String?
+  organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
@@ -195,23 +196,23 @@ model OrganizationInvite {
 // ─── Bots ───────────────────────────────────────────────────────
 
 model Bot {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  name           String
-  status         BotStatus    @default(DRAFT)
+  id                     String       @id @default(cuid())
+  organizationId         String
+  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name                   String
+  status                 BotStatus    @default(DRAFT)
   // Independiente de `status` (que solo indica si el número está
   // conectado): habilita que el bot de IA conteste solo los primeros
   // mensajes de un lead siguiendo la guía de calificación de la Base de
   // Conocimiento. Apagado por defecto — opt-in explícito por cuenta.
-  aiQualificationEnabled Boolean  @default(false)
+  aiQualificationEnabled Boolean      @default(false)
   // Modo de prueba: si tiene valor, el bot SOLO contesta conversaciones con
   // este teléfono exacto (aunque aiQualificationEnabled esté activo) — para
   // probar en producción sin arriesgar leads reales. Vacío/null = responde
   // a todos.
   aiTestPhone            String?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
 
   whatsappConnection WhatsAppConnection?
   conversations      Conversation[]
@@ -369,8 +370,8 @@ model Conversation {
 
   notes ConversationNote[]
 
-  messages Message[]
-  reads    ConversationRead[]
+  messages               Message[]
+  reads                  ConversationRead[]
   metaAttributionTouches MetaAttributionTouch[]
 
   @@index([botId])
@@ -398,8 +399,8 @@ model MetaAttributionTouch {
   opportunityId  String?
   opportunity    Opportunity?  @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
 
-  sourcePlatform String @default("meta")
-  sourceChannel  String @default("whatsapp")
+  sourcePlatform String  @default("meta")
+  sourceChannel  String  @default("whatsapp")
   ctwaClid       String?
   sourceId       String? // ad_id crudo del webhook (referral.source_id)
   sourceType     String?
@@ -456,9 +457,9 @@ model ConversationRead {
 }
 
 enum ConversationStatus {
-  OPEN    // el cliente espera respuesta o el tema sigue vivo
+  OPEN // el cliente espera respuesta o el tema sigue vivo
   ON_HOLD // pausada a propósito, se retoma después
-  CLOSED  // atendida; no aparece en la bandeja del día a día
+  CLOSED // atendida; no aparece en la bandeja del día a día
 }
 
 // Nota interna del equipo: no se envía a WhatsApp. Equivale a la columna
@@ -667,9 +668,9 @@ model Contact {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  conversations Conversation[]
-  opportunities Opportunity[]
-  activities    Activity[]
+  conversations          Conversation[]
+  opportunities          Opportunity[]
+  activities             Activity[]
   metaAttributionTouches MetaAttributionTouch[]
 
   // El teléfono identifica al contacto dentro de la organización: es la
@@ -679,20 +680,33 @@ model Contact {
   @@map("contacts")
 }
 
-// Etapas del embudo (manual §7). Cada una debería tener criterios claros de
-// entrada y salida documentados en la base de conocimiento.
-// Estados tal como los usa el equipo en su planilla de seguimiento, no los
-// del manual: si el sistema no habla su idioma, no lo usan.
-enum OpportunityStage {
-  POR_CALIFICAR
-  ENTREVISTA
-  DIAGNOSTICO
-  PRESENTAR_SOLUCION
-  PROPUESTA
-  DECISION
-  GANADO
-  EN_PAUSA_NUTRIR
-  PERDIDO
+// Etapas del embudo (manual §7), ahora configurables por organización (ver
+// PipelineStage) en vez de un enum fijo global. `role` marca las 3 etapas
+// con lógica de negocio real atada a su identidad (ganado/perdido/nutrir);
+// el resto son etapas intermedias editables sin comportamiento especial.
+enum PipelineStageRole {
+  WON
+  LOST
+  NURTURE
+}
+
+model PipelineStage {
+  id                     String             @id @default(cuid())
+  organizationId         String
+  organization           Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  label                  String
+  color                  String
+  criteria               String             @default("")
+  order                  Int
+  // null = etapa intermedia editable; no-null = una de las 3 etapas
+  // protegidas con lógica propia (ver crm.ts updateOpportunityFieldAction).
+  role                   PipelineStageRole?
+  isDefaultEntry         Boolean            @default(false) // dónde caen los leads nuevos
+  requiresProposalFields Boolean            @default(false) // reemplaza el chequeo hardcodeado de stage === "PROPUESTA" en missingForStage()
+  opportunities          Opportunity[]
+
+  @@unique([organizationId, order])
+  @@map("pipeline_stages")
 }
 
 enum Priority {
@@ -730,19 +744,20 @@ model Opportunity {
   assignedToId   String?
   assignedTo     User?        @relation("OpportunityOwner", fields: [assignedToId], references: [id], onDelete: SetNull)
 
-  title             String
-  stage             OpportunityStage @default(POR_CALIFICAR)
-  serviceInterest   String?
-  estimatedValue    Decimal?         @db.Decimal(12, 2)
-  currency          String           @default("USD")
-  probability       Int? // 0-100
+  title           String
+  stageId         String
+  stage           PipelineStage @relation(fields: [stageId], references: [id])
+  serviceInterest String?
+  estimatedValue  Decimal?      @db.Decimal(12, 2)
+  currency        String        @default("USD")
+  probability     Int? // 0-100
 
   // Archivar saca al cliente de la vista principal sin borrar nada (a
   // diferencia de "Quitar del seguimiento", que sí elimina). sortOrder es
   // el orden manual que el equipo arma arrastrando filas; se usa como orden
   // por defecto cuando no hay ninguna columna ordenada.
-  archivedAt DateTime?
-  sortOrder  Int       @default(0)
+  archivedAt        DateTime?
+  sortOrder         Int       @default(0)
   expectedCloseDate DateTime?
 
   // Calificación (manual §9): score 0-100 con el desglose que lo justifica.
@@ -753,21 +768,21 @@ model Opportunity {
   leadScoreBreakdown Json? // { empresaEnMarcha, dolorConcreto, impacto, decisor, capacidadInversion, encajeProshop, urgencia }
   leadScoreCoverage  Int? // % de la información necesaria que ya se conoce
   leadScoreUpdatedAt DateTime?
-  aiPainPoint        String?   @db.Text // dolor principal, una frase
-  aiMissingInfo      String?   @db.Text // qué falta saber, hasta 3 puntos
-  aiNextQuestion     String?   @db.Text // la siguiente pregunta que debería hacer el vendedor
-  aiAlerts           String?   @db.Text // contradicciones o datos poco confiables a revisar
-  priority       Priority?
-  needSummary    String?    @db.Text
+  aiPainPoint        String?    @db.Text // dolor principal, una frase
+  aiMissingInfo      String?    @db.Text // qué falta saber, hasta 3 puntos
+  aiNextQuestion     String?    @db.Text // la siguiente pregunta que debería hacer el vendedor
+  aiAlerts           String?    @db.Text // contradicciones o datos poco confiables a revisar
+  priority           Priority?
+  needSummary        String?    @db.Text
   // Texto libre que el equipo mantiene por cliente ("no contesta hace una
   // semana", "pidió más tiempo"): la columna que más usan de su planilla.
-  lastUpdate     String?    @db.Text
-  nextContactAt  DateTime?
-  needStatus     DataStatus @default(UNKNOWN)
-  budgetRange    String?
-  budgetStatus   DataStatus @default(UNKNOWN)
-  urgency        String?
-  authorityLevel String?
+  lastUpdate         String?    @db.Text
+  nextContactAt      DateTime?
+  needStatus         DataStatus @default(UNKNOWN)
+  budgetRange        String?
+  budgetStatus       DataStatus @default(UNKNOWN)
+  urgency            String?
+  authorityLevel     String?
 
   // Regla dura del manual (§45): toda oportunidad activa debe tener
   // próximo paso. Se valida en la aplicación, no en la base, para poder
@@ -777,26 +792,26 @@ model Opportunity {
 
   // Salidas del asesor IA. Se guardan aparte de lo que escribe la persona
   // para poder distinguir siempre quién dijo qué (manual §28).
-  aiRecommendation    String?   @db.Text
-  aiSuggestedMessage  String?   @db.Text
-  aiReviewedAt        DateTime?
+  aiRecommendation   String?   @db.Text
+  aiSuggestedMessage String?   @db.Text
+  aiReviewedAt       DateTime?
   // Resumen vivo que la propia IA mantiene y reescribe en cada análisis: lo
   // importante que aprendió del cliente a lo largo de toda la conversación,
   // no solo de la ventana de mensajes recientes que se le manda cada vez.
-  aiMemory            String?   @db.Text
-  aiMemoryUpdatedAt   DateTime?
+  aiMemory           String?   @db.Text
+  aiMemoryUpdatedAt  DateTime?
 
-  proposalSentAt DateTime?
-  wonAt          DateTime?
+  proposalSentAt       DateTime?
+  wonAt                DateTime?
   // Cuándo se le avisó a Meta (Conversions API) que este lead terminó en
   // venta -- evita mandarlo dos veces. Meta no ofrece deduplicación propia
   // para estos eventos, así que esto es lo único que la evita. LEGACY: el
   // código nuevo usa purchaseEventSentAt/purchaseEventId en su lugar; este
   // campo se deja tal cual (ya tiene datos en producción), no se toca.
   metaConversionSentAt DateTime?
-  lostAt         DateTime?
-  lostReason     String?
-  lostReasonCategory LossReason?
+  lostAt               DateTime?
+  lostReason           String?
+  lostReasonCategory   LossReason?
 
   // Calificación (Meta Ads §Regla 2): se marca la primera vez que la
   // oportunidad pasa de POR_CALIFICAR a ENTREVISTA. Es solo informativo --
@@ -812,14 +827,14 @@ model Opportunity {
   purchaseEventSentAt  DateTime?
   purchaseEventId      String?
 
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  activities Activity[]
-  meetings   Meeting[]
+  activities             Activity[]
+  meetings               Meeting[]
   metaAttributionTouches MetaAttributionTouch[]
 
-  @@index([organizationId, stage])
+  @@index([organizationId, stageId])
   @@index([contactId])
   @@map("opportunities")
 }
@@ -889,36 +904,36 @@ enum MeetingBotStatus {
 }
 
 model Meeting {
-  id              String            @id @default(cuid())
-  organizationId  String
-  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  opportunityId   String?
-  opportunity     Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
-  title           String? // solo se usa cuando opportunityId es null (reunión suelta/ad-hoc)
-  scheduledAt     DateTime
-  durationMinutes Int               @default(30)
-  meetingUrl      String?
-  location        String?
-  guestEmails     String[]          @default([]) // invitados por correo — si la reunión se creó con Google Meet, Calendar les manda la invitación real
-  botEnabled      Boolean           @default(true) // si además de haber link, se quiere que el bot se una a grabar
-  googleEventId   String? // id del evento real en Calendar — sin esto no se puede editar la hora ni cancelarlo después
+  id                    String            @id @default(cuid())
+  organizationId        String
+  organization          Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  opportunityId         String?
+  opportunity           Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  title                 String? // solo se usa cuando opportunityId es null (reunión suelta/ad-hoc)
+  scheduledAt           DateTime
+  durationMinutes       Int               @default(30)
+  meetingUrl            String?
+  location              String?
+  guestEmails           String[]          @default([]) // invitados por correo — si la reunión se creó con Google Meet, Calendar les manda la invitación real
+  botEnabled            Boolean           @default(true) // si además de haber link, se quiere que el bot se una a grabar
+  googleEventId         String? // id del evento real en Calendar — sin esto no se puede editar la hora ni cancelarlo después
   // A qué usuario le pertenece el evento cuando se creó en SU calendario
   // personal (GoogleCalendarAccount) en vez del calendario compartido del
   // bot -- null en ese segundo caso (el de siempre). Necesario para saber
   // con qué cuenta hay que hablarle a Calendar al editar/cancelar, y para
   // que el sync Google → CRM sepa a qué Meeting le pega cada evento.
   googleCalendarOwnerId String?
-  googleCalendarOwner   User?   @relation("MeetingGoogleCalendarOwner", fields: [googleCalendarOwnerId], references: [id], onDelete: SetNull)
-  status          MeetingStatus     @default(SCHEDULED)
-  botStatus       MeetingBotStatus?
-  botJoinedAt     DateTime? // cuándo el bot quedó admitido de verdad en la llamada
-  botLeftAt       DateTime? // cuándo terminó de grabar y subió el audio
-  transcript      String?           @db.Text // de subtítulos en vivo, con nombre de quién habló — separado de `notes`
-  audioTranscript String?           @db.Text // whisper.cpp local sobre el audio completo, sin nombres — complementa transcript cuando los subtítulos tienen huecos o fallaron
-  notes           String?           @db.Text // texto cargado a mano por el vendedor, nunca lo pisa el bot
-  aiSummary       String?           @db.Text
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  googleCalendarOwner   User?             @relation("MeetingGoogleCalendarOwner", fields: [googleCalendarOwnerId], references: [id], onDelete: SetNull)
+  status                MeetingStatus     @default(SCHEDULED)
+  botStatus             MeetingBotStatus?
+  botJoinedAt           DateTime? // cuándo el bot quedó admitido de verdad en la llamada
+  botLeftAt             DateTime? // cuándo terminó de grabar y subió el audio
+  transcript            String?           @db.Text // de subtítulos en vivo, con nombre de quién habló — separado de `notes`
+  audioTranscript       String?           @db.Text // whisper.cpp local sobre el audio completo, sin nombres — complementa transcript cuando los subtítulos tienen huecos o fallaron
+  notes                 String?           @db.Text // texto cargado a mano por el vendedor, nunca lo pisa el bot
+  aiSummary             String?           @db.Text
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
   // Quién grabó esta reunión con la extensión de subtítulos -- null si la
   // reunión se creó de otra forma (a mano, o el bot). Se completa una sola

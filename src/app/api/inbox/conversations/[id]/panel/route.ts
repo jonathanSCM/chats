@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
-import { isOpenStage, STAGE_LABEL, type Stage } from "@/lib/pipeline";
 import { hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
 
 const CONVERSATION_STATUS_LABEL: Record<string, string> = {
@@ -34,7 +33,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
             select: {
               id: true,
               title: true,
-              stage: true,
+              stage: { select: { id: true, label: true, role: true } },
               estimatedValue: true,
               nextAction: true,
               nextActionAt: true,
@@ -138,8 +137,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       else if (log.action === "unassign") label = "Liberada (sin asignar)";
     } else if (log.entityType === "Opportunity") {
       if (log.action === "stage_change") {
-        const stage = after?.stage as Stage | undefined;
-        label = stage ? `Pasó a "${STAGE_LABEL[stage]}"` : "Cambió de etapa";
+        // Desde esta migración, `after.stage` ya guarda directamente el
+        // label de la PipelineStage (ver crm.ts:updateOpportunityFieldAction).
+        // Los registros de ANTES de la migración guardan el nombre viejo
+        // del enum fijo (ej. "POR_CALIFICAR") — se muestra tal cual, es
+        // historial y no vale la pena traducirlo.
+        const stage = after?.stage as string | undefined;
+        label = stage ? `Pasó a "${stage}"` : "Cambió de etapa";
       } else if (log.action === "reassign") {
         const assignedToId = after?.assignedToId as string | null;
         label = assignedToId ? `Oportunidad asignada a ${nameFor(assignedToId)}` : "Oportunidad sin asignar";
@@ -166,8 +170,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
           opportunities: conversation.contact.opportunities.map((o) => ({
             id: o.id,
             title: o.title,
-            stage: o.stage,
-            open: isOpenStage(o.stage as Stage),
+            stage: o.stage.label,
+            open: o.stage.role === null,
             estimatedValue: o.estimatedValue ? Number(o.estimatedValue) : null,
             nextAction: o.nextAction,
             nextActionAt: o.nextActionAt?.toISOString() ?? null,

@@ -3,19 +3,11 @@
 import { useRef, useState, useTransition } from "react";
 import { Sparkles, AlertTriangle, Bell } from "lucide-react";
 import { updateOpportunityFieldAction } from "@/server/actions/crm";
-import {
-  ALL_STAGES,
-  STAGE_LABEL,
-  STAGE_COLOR,
-  STAGE_CRITERIA,
-  PRIORITY_COLOR,
-  hasCompleteNextAction,
-  missingForStage,
-  type Stage,
-} from "@/lib/pipeline";
+import { PRIORITY_COLOR, hasCompleteNextAction, missingForStage } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 import { deriveAlerts, urgencyRank } from "@/lib/opportunity-alerts";
 import type { Row } from "./tracking-table";
+import type { PipelineStage } from "@/server/services/pipeline";
 
 function dateShort(iso: string | null): string {
   if (!iso) return "";
@@ -45,11 +37,14 @@ function dueBadge(iso: string | null): { text: string; color: string } | null {
 
 export function KanbanBoard({
   rows,
+  stages,
   currentUserId,
   isAdmin,
   onOpen,
 }: {
   rows: Row[];
+  /** Etapas de la organización, ordenadas — cada una es una columna. */
+  stages: PipelineStage[];
   currentUserId: string;
   isAdmin: boolean;
   onOpen: (row: Row) => void;
@@ -58,9 +53,10 @@ export function KanbanBoard({
   const todayStr = new Date().toISOString().slice(0, 10);
   // Copia local para mover la tarjeta al instante al soltarla, sin esperar
   // la vuelta del servidor — mismo patrón que el orden manual de la tabla.
-  const [localStage, setLocalStage] = useState<Record<string, Stage>>({});
+  // Guarda el id de la PipelineStage destino.
+  const [localStage, setLocalStage] = useState<Record<string, string>>({});
   const dragIdRef = useRef<string | null>(null);
-  const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // El tablero se arrastra con el botón IZQUIERDO del mouse -- pedido así a
@@ -92,24 +88,25 @@ export function KanbanBoard({
     setIsPanning(false);
   }
 
-  function stageOf(row: Row): Stage {
-    return localStage[row.id] ?? row.stage;
+  function stageIdOf(row: Row): string {
+    return localStage[row.id] ?? row.stage.id;
   }
 
   function canEdit(row: Row): boolean {
     return isAdmin || row.assignedTo?.id === currentUserId;
   }
 
-  function handleDrop(stage: Stage) {
+  function handleDrop(stageId: string) {
     setDragOverStage(null);
     const id = dragIdRef.current;
     dragIdRef.current = null;
     if (!id) return;
 
     const row = rows.find((r) => r.id === id);
-    if (!row || !canEdit(row) || stageOf(row) === stage) return;
+    if (!row || !canEdit(row) || stageIdOf(row) === stageId) return;
 
-    const missing = missingForStage(stage, row);
+    const targetStage = stages.find((s) => s.id === stageId);
+    const missing = missingForStage(targetStage?.requiresProposalFields ?? false, row);
     if (
       missing.length > 0 &&
       !window.confirm(`Todavía falta ${missing.join(", ")}. ¿Deseas avanzar igualmente?`)
@@ -117,13 +114,13 @@ export function KanbanBoard({
       return;
     }
 
-    const previousStage = stageOf(row);
-    setLocalStage((prev) => ({ ...prev, [id]: stage }));
+    const previousStageId = stageIdOf(row);
+    setLocalStage((prev) => ({ ...prev, [id]: stageId }));
     setError(null);
     startTransition(async () => {
-      const result = await updateOpportunityFieldAction(id, "stage", stage);
+      const result = await updateOpportunityFieldAction(id, "stage", stageId);
       if (result.error) {
-        setLocalStage((prev) => ({ ...prev, [id]: previousStage }));
+        setLocalStage((prev) => ({ ...prev, [id]: previousStageId }));
         setError(result.error);
       }
     });
@@ -143,10 +140,10 @@ export function KanbanBoard({
       }`}
     >
       <div className="flex min-w-max gap-3 px-4 md:px-8">
-        {ALL_STAGES.map((stage) => {
+        {stages.map((stage) => {
           // Los vencidos suben solos arriba dentro de cada etapa (scope §9).
           const cards = rows
-            .filter((r) => stageOf(r) === stage)
+            .filter((r) => stageIdOf(r) === stage.id)
             .sort((a, b) => {
               const ra = urgencyRank(a, todayStr);
               const rb = urgencyRank(b, todayStr);
@@ -157,30 +154,30 @@ export function KanbanBoard({
             });
           return (
             <div
-              key={stage}
+              key={stage.id}
               onDragOver={(e) => {
                 e.preventDefault();
-                setDragOverStage(stage);
+                setDragOverStage(stage.id);
               }}
-              onDragLeave={() => setDragOverStage((s) => (s === stage ? null : s))}
+              onDragLeave={() => setDragOverStage((s) => (s === stage.id ? null : s))}
               onDrop={(e) => {
                 e.preventDefault();
-                handleDrop(stage);
+                handleDrop(stage.id);
               }}
               className={`flex w-64 shrink-0 flex-col rounded-lg border bg-surface-2/40 transition-colors ${
-                dragOverStage === stage ? "border-accent-dim bg-accent/5" : "border-border"
+                dragOverStage === stage.id ? "border-accent-dim bg-accent/5" : "border-border"
               }`}
             >
               <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
                 <span
                   className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: STAGE_COLOR[stage] }}
+                  style={{ backgroundColor: stage.color }}
                 />
                 <p
                   className="flex-1 truncate font-mono text-[11px] font-semibold uppercase tracking-wide text-ink-muted"
-                  title={STAGE_CRITERIA[stage]}
+                  title={stage.criteria}
                 >
-                  {STAGE_LABEL[stage]}
+                  {stage.label}
                 </p>
                 <span className="font-mono text-[11px] text-ink-faint">{cards.length}</span>
               </div>

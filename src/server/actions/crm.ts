@@ -5,7 +5,8 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { audit } from "@/server/services/audit";
-import { ALL_STAGES, OPEN_STAGES, ALL_LOSS_REASONS, type Stage, type LossReason } from "@/lib/pipeline";
+import { ALL_LOSS_REASONS, type LossReason } from "@/lib/pipeline";
+import { getOrgStages, defaultEntryStage, type PipelineStage } from "@/server/services/pipeline";
 import { analyzeFollowUp } from "@/server/services/ai/follow-up";
 import { isAiEnabled, isWithinBudget, spentToday } from "@/server/services/ai/client";
 import { saveMediaFile, deleteMediaFile } from "@/lib/media-storage";
@@ -112,10 +113,14 @@ export async function createOpportunityAction(
     contactId = contact.id;
   }
 
+  const entryStage = defaultEntryStage(await getOrgStages(organizationId));
+  if (!entryStage) return { error: "La organización todavía no tiene etapas de pipeline configuradas" };
+
   const created = await prisma.opportunity.create({
     data: {
       organizationId,
       contactId,
+      stageId: entryStage.id,
       title: parsed.data.title,
       serviceInterest: parsed.data.serviceInterest ?? null,
       estimatedValue: parsed.data.estimatedValue ?? null,
@@ -135,7 +140,7 @@ export async function createOpportunityAction(
     action: "create",
     userId,
     organizationId,
-    after: { title: created.title, stage: created.stage },
+    after: { title: created.title, stage: entryStage.label },
   });
 
   revalidatePath(PATH);
@@ -147,7 +152,10 @@ export async function createOpportunityAction(
  * el equipo ya trabaja en su planilla: se corrige el dato en su lugar.
  */
 const fieldSchema = z.discriminatedUnion("field", [
-  z.object({ field: z.literal("stage"), value: z.enum(ALL_STAGES as [Stage, ...Stage[]]) }),
+  // El valor de "stage" ahora es el id de una PipelineStage de la propia
+  // organización (etapas configurables) — se valida perteneciendo a la
+  // organización más abajo, no contra una lista fija.
+  z.object({ field: z.literal("stage"), value: z.string().min(1) }),
   z.object({ field: z.literal("priority"), value: z.enum(["ALTA", "MEDIA", "BAJA"]) }),
   z.object({ field: z.literal("serviceInterest"), value: z.string().max(160) }),
   z.object({ field: z.literal("needSummary"), value: z.string().max(5000) }),
@@ -178,7 +186,10 @@ export async function updateOpportunityFieldAction(
   const parsed = fieldSchema.safeParse({ field, value });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Valor inválido" };
 
-  const opportunity = await prisma.opportunity.findUnique({ where: { id: opportunityId } });
+  const opportunity = await prisma.opportunity.findUnique({
+    where: { id: opportunityId },
+    include: { stage: true },
+  });
   if (!opportunity || opportunity.organizationId !== organizationId) {
     return { error: "Cliente no encontrado" };
   }
@@ -191,15 +202,20 @@ export async function updateOpportunityFieldAction(
 
   const now = new Date();
   const data: Record<string, unknown> = {};
+  // Solo se resuelve cuando field === "stage" (ver case de abajo); se usa
+  // después del update para el reporte a Meta y para la auditoría.
+  let targetStage: PipelineStage | null = null;
 
   switch (parsed.data.field) {
     case "stage": {
-      const stage = parsed.data.value;
-      data.stage = stage;
-      data.wonAt = stage === "GANADO" ? now : null;
-      data.lostAt = stage === "PERDIDO" ? now : null;
+      const stages = await getOrgStages(organizationId);
+      targetStage = stages.find((s) => s.id === parsed.data.value) ?? null;
+      if (!targetStage) return { error: "Etapa inválida" };
+      data.stageId = targetStage.id;
+      data.wonAt = targetStage.role === "WON" ? now : null;
+      data.lostAt = targetStage.role === "LOST" ? now : null;
       // "Propuesta" es la etapa que representa preparar/mandar la cotización.
-      if (stage === "PROPUESTA" && !opportunity.proposalSentAt) data.proposalSentAt = now;
+      if (targetStage.requiresProposalFields && !opportunity.proposalSentAt) data.proposalSentAt = now;
       break;
     }
     case "nextContactAt":
@@ -252,7 +268,7 @@ export async function updateOpportunityFieldAction(
 
   await prisma.opportunity.update({ where: { id: opportunityId }, data });
 
-  if (parsed.data.field === "stage" && parsed.data.value === "GANADO" && opportunity.stage !== "GANADO") {
+  if (parsed.data.field === "stage" && targetStage?.role === "WON" && opportunity.stage.role !== "WON") {
     void reportOpportunityWon(opportunityId).catch((error) =>
       console.error(`[crm] Error reportando la venta ${opportunityId} a Meta:`, error),
     );
@@ -260,15 +276,15 @@ export async function updateOpportunityFieldAction(
 
   // Solo se auditan los cambios de estado y de dueño: son los que después
   // explican el embudo. Auditar cada tecleo de una nota solo generaría ruido.
-  if (parsed.data.field === "stage") {
+  if (parsed.data.field === "stage" && targetStage) {
     await audit({
       entityType: "Opportunity",
       entityId: opportunityId,
       action: "stage_change",
       userId,
       organizationId,
-      before: { stage: opportunity.stage },
-      after: { stage: parsed.data.value },
+      before: { stage: opportunity.stage.label, stageId: opportunity.stage.id },
+      after: { stage: targetStage.label, stageId: targetStage.id },
     });
   } else if (parsed.data.field === "assignedToId") {
     await audit({
@@ -305,7 +321,7 @@ export async function deleteOpportunityAction(opportunityId: string): Promise<Ac
     action: "delete",
     userId,
     organizationId,
-    before: { title: opportunity.title, stage: opportunity.stage },
+    before: { title: opportunity.title, stageId: opportunity.stageId },
   });
 
   revalidatePath(PATH);
@@ -876,7 +892,7 @@ export async function countWithoutNextContact(organizationId: string): Promise<n
   return prisma.opportunity.count({
     where: {
       organizationId,
-      stage: { in: OPEN_STAGES },
+      stage: { role: null },
       nextContactAt: null,
     },
   });

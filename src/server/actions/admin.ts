@@ -6,6 +6,7 @@ import { prisma } from "@/server/db/client";
 import { requireSession, HttpError } from "@/server/auth/guards";
 import { uniqueOrgSlug } from "@/lib/slugify";
 import { generateToken } from "@/lib/tokens";
+import { DEFAULT_PIPELINE_STAGES } from "@/lib/pipeline";
 import { sendMail } from "@/server/services/mailer";
 import { inviteEmail } from "@/server/services/email-templates";
 import type { ActionState } from "./types";
@@ -52,6 +53,21 @@ export async function createOrganizationAction(
 
   const org = await prisma.$transaction(async (tx) => {
     const newOrg = await tx.organization.create({ data: { name: parsed.data.companyName, slug } });
+    // Pipeline comercial: toda organización nueva arranca con las mismas 9
+    // etapas de siempre (ver DEFAULT_PIPELINE_STAGES) — configurables
+    // después, pero el punto de partida es igual para todos.
+    await tx.pipelineStage.createMany({
+      data: DEFAULT_PIPELINE_STAGES.map((s) => ({
+        organizationId: newOrg.id,
+        label: s.label,
+        color: s.color,
+        criteria: s.criteria,
+        order: s.order,
+        role: s.role,
+        isDefaultEntry: s.isDefaultEntry,
+        requiresProposalFields: s.requiresProposalFields,
+      })),
+    });
     await tx.organizationInvite.create({
       data: {
         organizationId: newOrg.id,

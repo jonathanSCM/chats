@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { deriveAlerts } from "@/lib/opportunity-alerts";
-import { hasCompleteNextAction, isOpenStage, OPEN_STAGES, ALL_LOSS_REASONS, type Stage } from "@/lib/pipeline";
+import { hasCompleteNextAction, ALL_LOSS_REASONS } from "@/lib/pipeline";
+import { getOrgStages, openStages, wonStage, type PipelineStage } from "@/server/services/pipeline";
 
 /**
  * Métricas del Dashboard (scope §1-8): KPIs, funnel con conversión,
@@ -18,6 +19,34 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
   const organizationId = session.user.organizationId;
+  const stages = await getOrgStages(organizationId);
+  const stageById = new Map(stages.map((s) => [s.id, s]));
+  // Compatibilidad con AuditLog de ANTES de esta migración: esas filas
+  // guardan el nombre viejo del enum fijo en `after.stage` (ej.
+  // "POR_CALIFICAR"), no un stageId — se resuelve por posición (mismo
+  // orden 1-9 que sembró la migración para cada organización).
+  const LEGACY_STAGE_KEYS = [
+    "POR_CALIFICAR",
+    "ENTREVISTA",
+    "DIAGNOSTICO",
+    "PRESENTAR_SOLUCION",
+    "PROPUESTA",
+    "DECISION",
+    "GANADO",
+    "EN_PAUSA_NUTRIR",
+    "PERDIDO",
+  ];
+  const stageByOrder = new Map(stages.map((s) => [s.order, s]));
+  function resolveHistoricalStageId(raw: unknown): string | null {
+    if (!raw || typeof raw !== "object") return null;
+    const rec = raw as Record<string, unknown>;
+    if (typeof rec.stageId === "string" && stageById.has(rec.stageId)) return rec.stageId;
+    if (typeof rec.stage === "string") {
+      const idx = LEGACY_STAGE_KEYS.indexOf(rec.stage);
+      if (idx !== -1) return stageByOrder.get(idx + 1)?.id ?? null;
+    }
+    return null;
+  }
 
   const { searchParams } = req.nextUrl;
   const from = searchParams.get("from");
@@ -43,7 +72,8 @@ export async function GET(req: NextRequest) {
     },
     select: {
       id: true,
-      stage: true,
+      stageId: true,
+      stage: { select: { id: true, role: true } },
       priority: true,
       leadScore: true,
       nextAction: true,
@@ -88,7 +118,7 @@ export async function GET(req: NextRequest) {
   let perdidas = 0;
 
   for (const o of opportunities) {
-    const open = isOpenStage(o.stage as Stage);
+    const open = o.stage.role === null;
     if (open) {
       activas += 1;
       if (o.nextActionAt && o.nextActionAt.toISOString().slice(0, 10) < todayStr) vencidas += 1;
@@ -113,7 +143,7 @@ export async function GET(req: NextRequest) {
   for (const o of opportunities) {
     const alert = deriveAlerts(
       {
-        stage: o.stage as Stage,
+        stage: o.stage,
         priority: o.priority as "ALTA" | "MEDIA" | "BAJA" | null,
         leadScore: o.leadScore,
         nextAction: o.nextAction ?? "",
@@ -128,28 +158,35 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Funnel + conversión entre etapas ────────────────────────────────
-  const funnelStages: Stage[] = [...OPEN_STAGES, "GANADO"];
-  const reachedByOpportunity = new Map<string, Set<Stage>>();
+  const won = wonStage(stages);
+  const funnelStages: PipelineStage[] = [...openStages(stages), ...(won ? [won] : [])];
+  const reachedByOpportunity = new Map<string, Set<string>>();
   const auditedIds = new Set<string>();
   for (const ev of stageEvents) {
     auditedIds.add(ev.entityId);
-    const after = (ev.after as { stage?: string } | null)?.stage as Stage | undefined;
+    const after = resolveHistoricalStageId(ev.after);
     if (!after) continue;
-    const set = reachedByOpportunity.get(ev.entityId) ?? new Set<Stage>();
+    const set = reachedByOpportunity.get(ev.entityId) ?? new Set<string>();
     set.add(after);
     reachedByOpportunity.set(ev.entityId, set);
   }
   for (const o of opportunities) {
     if (auditedIds.has(o.id)) continue;
-    const set = reachedByOpportunity.get(o.id) ?? new Set<Stage>();
-    set.add(o.stage as Stage);
+    const set = reachedByOpportunity.get(o.id) ?? new Set<string>();
+    set.add(o.stageId);
     reachedByOpportunity.set(o.id, set);
   }
   const funnel = funnelStages.map((stage, i) => {
-    const count = [...reachedByOpportunity.values()].filter((set) => set.has(stage)).length;
+    const count = [...reachedByOpportunity.values()].filter((set) => set.has(stage.id)).length;
     const prevCount =
-      i === 0 ? null : [...reachedByOpportunity.values()].filter((set) => set.has(funnelStages[i - 1])).length;
-    return { stage, count, conversionFromPrev: prevCount && prevCount > 0 ? count / prevCount : null };
+      i === 0
+        ? null
+        : [...reachedByOpportunity.values()].filter((set) => set.has(funnelStages[i - 1].id)).length;
+    return {
+      stage: { id: stage.id, label: stage.label, color: stage.color },
+      count,
+      conversionFromPrev: prevCount && prevCount > 0 ? count / prevCount : null,
+    };
   });
 
   // ── Rendimiento por vendedor ─────────────────────────────────────────
@@ -162,7 +199,7 @@ export async function GET(req: NextRequest) {
     const key = o.assignedToId ?? "unassigned";
     const entry =
       byVendor.get(key) ?? { activas: 0, vencidos: 0, reuniones: 0, propuestas: 0, ganados: 0, perdidos: 0 };
-    if (isOpenStage(o.stage as Stage)) {
+    if (o.stage.role === null) {
       entry.activas += 1;
       if (o.nextActionAt && o.nextActionAt.toISOString().slice(0, 10) < todayStr) entry.vencidos += 1;
     }
@@ -225,6 +262,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     kpis: { activas, vencidas, sinProximaAccion, altaPrioridad, ganadas, tasaConversion, estancadas },
     funnel,
+    wonStageId: won?.id ?? null,
     vendorPerformance,
     sources: bySourcePerformance,
     lossReasons,

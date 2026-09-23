@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireBotAccess } from "@/server/auth/guards";
-import { OPEN_STAGES } from "@/lib/pipeline";
+import { getOrgStages, defaultEntryStage } from "@/server/services/pipeline";
 import { parseGuestEmails } from "@/lib/guest-emails";
 import { createMeetEvent, getOrCreateOrgCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
 import { createUserMeetEvent, hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
@@ -77,15 +77,18 @@ export async function createMeetingFromConversationAction(
   // las oportunidades del contacto, no solo la primera que devuelva Prisma
   // (ese era justo el bug que causaba leads duplicados).
   let opportunity = await prisma.opportunity.findFirst({
-    where: { contactId: contact.id, archivedAt: null, stage: { in: OPEN_STAGES } },
+    where: { contactId: contact.id, archivedAt: null, stage: { role: null } },
     select: { id: true },
     orderBy: { createdAt: "desc" },
   });
   if (!opportunity) {
+    const entryStage = defaultEntryStage(await getOrgStages(bot.organizationId));
+    if (!entryStage) return { error: "La organización todavía no tiene etapas de pipeline configuradas" };
     opportunity = await prisma.opportunity.create({
       data: {
         organizationId: bot.organizationId,
         contactId: contact.id,
+        stageId: entryStage.id,
         title: contact.fullName || contact.phone || "Nuevo lead",
         assignedToId: isAdmin ? null : session.user.id,
       },

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { resolveExtensionMeeting } from "@/server/services/extension-meeting";
 import { audit } from "@/server/services/audit";
+import { getOrgStages, defaultEntryStage } from "@/server/services/pipeline";
 
 /**
  * Lo que llama el panel que la extensión muestra al cortar una reunión (ver
@@ -75,10 +76,14 @@ export async function POST(req: NextRequest) {
       update: {},
     });
 
+    const entryStage = defaultEntryStage(await getOrgStages(organizationId));
+    if (!entryStage) return withCors(new NextResponse("Organización sin etapas de pipeline configuradas", { status: 500 }));
+
     const opportunity = await prisma.opportunity.create({
       data: {
         organizationId,
         contactId: contact.id,
+        stageId: entryStage.id,
         title: newOpportunityTitle?.trim() || newContactName?.trim() || "Cliente nuevo",
         assignedToId: userId,
       },
@@ -90,7 +95,7 @@ export async function POST(req: NextRequest) {
       action: "create",
       userId,
       organizationId,
-      after: { title: opportunity.title, stage: opportunity.stage },
+      after: { title: opportunity.title, stage: entryStage.label },
     });
 
     await prisma.meeting.update({ where: { id: resolved.id }, data: { opportunityId: opportunity.id } });

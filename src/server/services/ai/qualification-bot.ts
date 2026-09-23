@@ -3,7 +3,7 @@ import { prisma } from "@/server/db/client";
 import { decrypt } from "@/lib/crypto";
 import { sendTextMessage, sendInteractiveListMessage, type InteractiveListRow } from "@/server/services/whatsapp";
 import { notifyNewMessage } from "@/server/services/push";
-import { OPEN_STAGES } from "@/lib/pipeline";
+import { getOrgStages, defaultEntryStage } from "@/server/services/pipeline";
 import { getAvailableDays, getAvailableSlots, hasSchedulingConflict, formatSlotLabel } from "@/server/services/availability";
 import { MODELS, runStructured } from "./client";
 
@@ -262,6 +262,17 @@ ${conversationText}`;
  * createOpportunityAction en actions/crm.ts, para que aparezca en
  * Seguimiento sin tocar el pipeline existente.
  */
+/**
+ * El modelo a veces devuelve un string no-vacío pero sin contenido real
+ * (comillas sueltas tipo `""`, backticks) en vez de dejarlo realmente
+ * vacío -- eso pasa de largo un `||` en JS y termina como título de la
+ * oportunidad. Filtra esos casos para que sí caiga al fallback.
+ */
+function cleanAiText(value: string | null | undefined): string {
+  const trimmed = (value ?? "").trim();
+  return /^["'`]*$/.test(trimmed) ? "" : trimmed;
+}
+
 async function ensureOpportunity(
   conversation: ConversationForBot,
   result: QualificationResult,
@@ -276,7 +287,7 @@ async function ensureOpportunity(
   // y creaba un lead duplicado. Ahora se busca directamente una abierta
   // entre TODAS las del contacto.
   const existingOpen = await prisma.opportunity.findFirst({
-    where: { contactId: conversation.contact.id, archivedAt: null, stage: { in: OPEN_STAGES } },
+    where: { contactId: conversation.contact.id, archivedAt: null, stage: { role: null } },
     select: { id: true },
     orderBy: { createdAt: "desc" },
   });
@@ -286,11 +297,16 @@ async function ensureOpportunity(
     .filter(Boolean)
     .join(" — ") || result.memoria;
 
+  const stages = await getOrgStages(conversation.organizationId);
+  const entryStage = defaultEntryStage(stages);
+  if (!entryStage) return null;
+
   const created = await prisma.opportunity.create({
     data: {
       organizationId: conversation.organizationId,
       contactId: conversation.contact.id,
-      title: result.a_que_se_dedica || conversation.contact.fullName || "Lead calificado por el bot",
+      stageId: entryStage.id,
+      title: cleanAiText(result.a_que_se_dedica) || conversation.contact.fullName || "Lead calificado por el bot",
       needSummary,
       needStatus: "CONFIRMED",
       authorityLevel: result.rol_contacto || conversation.contact.jobTitle || null,
@@ -418,17 +434,22 @@ export async function confirmMeetingSlot(conversationId: string, isoDate: string
   let opportunityId: string | null = null;
   if (conversation.contact) {
     const existingOpen = await prisma.opportunity.findFirst({
-      where: { contactId: conversation.contact.id, archivedAt: null, stage: { in: OPEN_STAGES } },
+      where: { contactId: conversation.contact.id, archivedAt: null, stage: { role: null } },
       select: { id: true },
       orderBy: { createdAt: "desc" },
     });
-    opportunityId = existingOpen
-      ? existingOpen.id
-      : (
+    if (existingOpen) {
+      opportunityId = existingOpen.id;
+    } else {
+      const stages = await getOrgStages(conversation.organizationId);
+      const entryStage = defaultEntryStage(stages);
+      if (entryStage) {
+        opportunityId = (
           await prisma.opportunity.create({
             data: {
               organizationId: conversation.organizationId,
               contactId: conversation.contact.id,
+              stageId: entryStage.id,
               title: conversation.contact.fullName || "Lead calificado por el bot",
               needSummary: conversation.botMemory ?? "",
               needStatus: "CONFIRMED",
@@ -439,6 +460,8 @@ export async function confirmMeetingSlot(conversationId: string, isoDate: string
             select: { id: true },
           })
         ).id;
+      }
+    }
   }
 
   // El modelo puede repetir el turno, o el cliente puede volver a tocar la

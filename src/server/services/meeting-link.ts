@@ -1,5 +1,5 @@
 import { prisma } from "@/server/db/client";
-import { isOpenStage, type Stage } from "@/lib/pipeline";
+import { isOpenStage } from "@/server/services/pipeline";
 
 // Nombres que el bot/la extensión ponen cuando no identificó a quién habló
 // -- no sirven como pista de a qué cliente corresponde la reunión.
@@ -55,9 +55,9 @@ export async function attemptAutoLinkMeeting(meetingId: string): Promise<void> {
   const [contactId] = matchedContactIds;
   const opportunities = await prisma.opportunity.findMany({
     where: { contactId, archivedAt: null },
-    select: { id: true, stage: true },
+    select: { id: true, stage: { select: { role: true } } },
   });
-  const openOnes = opportunities.filter((o) => isOpenStage(o.stage as Stage));
+  const openOnes = opportunities.filter((o) => isOpenStage(o.stage));
   if (openOnes.length !== 1) return;
 
   await prisma.meeting.update({ where: { id: meetingId }, data: { opportunityId: openOnes[0].id } });

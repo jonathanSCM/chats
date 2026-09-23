@@ -1,4 +1,5 @@
-import { isOpenStage, hasCompleteNextAction, type Stage, type Priority } from "./pipeline";
+import { hasCompleteNextAction, type Priority } from "./pipeline";
+import type { PipelineStageRole } from "@/generated/prisma/enums";
 
 /**
  * Alertas derivadas sin gastar presupuesto de IA (punto 14 del scope de
@@ -21,7 +22,9 @@ const HOT_LEAD_STALE_DAYS = 7;
 const HOT_LEAD_SCORE = 70;
 
 interface AlertableRow {
-  stage: Stage;
+  // Antes `Stage` (union fija); ahora basta con el rol resuelto de la
+  // PipelineStage de la organización (null = etapa intermedia abierta).
+  stage: { role: PipelineStageRole | null };
   priority: Priority | null;
   leadScore: number | null;
   nextAction: string;
@@ -63,7 +66,7 @@ export function urgencyRank(
 }
 
 export function deriveAlerts(row: AlertableRow, todayStr: string): DerivedAlert {
-  if (!isOpenStage(row.stage)) return { reasons: [], severity: null };
+  if (row.stage.role !== null) return { reasons: [], severity: null };
 
   const reasons: string[] = [];
 

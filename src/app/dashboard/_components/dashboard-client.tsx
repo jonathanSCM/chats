@@ -6,14 +6,7 @@ import { Loader2, CalendarDays } from "lucide-react";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, Thead, Th, Td, Tr } from "@/components/ui/table";
 import { Input, Select } from "@/components/ui/input";
-import {
-  STAGE_LABEL,
-  STAGE_COLOR,
-  LOSS_REASON_LABEL,
-  SERVICES,
-  type Stage,
-  type LossReason,
-} from "@/lib/pipeline";
+import { LOSS_REASON_LABEL, SERVICES, type LossReason } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 
 interface UpcomingMeeting {
@@ -35,7 +28,13 @@ interface Metrics {
     tasaConversion: number | null;
     estancadas: number;
   };
-  funnel: { stage: Stage; count: number; conversionFromPrev: number | null }[];
+  funnel: {
+    stage: { id: string; label: string; color: string };
+    count: number;
+    conversionFromPrev: number | null;
+  }[];
+  /** Id de la PipelineStage con role WON de la organización, para el click-through "Ganadas". */
+  wonStageId: string | null;
   vendorPerformance: {
     id: string;
     name: string;
@@ -213,7 +212,11 @@ export function DashboardClient({
             <Stat
               label="Ganadas"
               value={String(data.kpis.ganadas)}
-              href={seguimientoHref({ estado: "todos", stage: "GANADO" })}
+              href={
+                data.wonStageId
+                  ? seguimientoHref({ estado: "todos", stage: data.wonStageId })
+                  : seguimientoHref({ estado: "todos" })
+              }
             />
             <Stat label="Tasa de conversión" value={pct(data.kpis.tasaConversion)} />
           </div>
@@ -226,17 +229,17 @@ export function DashboardClient({
                   const first = data.funnel[0]?.count || 1;
                   return (
                     <Link
-                      key={f.stage}
-                      href={seguimientoHref({ estado: "todos", stage: f.stage })}
+                      key={f.stage.id}
+                      href={seguimientoHref({ estado: "todos", stage: f.stage.id })}
                       className="flex items-center gap-2 rounded px-1 py-0.5 text-xs transition-colors hover:bg-surface-2/60"
                     >
-                      <span className="w-32 shrink-0 truncate text-ink-muted">{STAGE_LABEL[f.stage]}</span>
+                      <span className="w-32 shrink-0 truncate text-ink-muted">{f.stage.label}</span>
                       <div className="h-4 flex-1 overflow-hidden rounded bg-surface-2">
                         <div
                           className="h-full rounded"
                           style={{
                             width: `${Math.max(4, (f.count / first) * 100)}%`,
-                            backgroundColor: STAGE_COLOR[f.stage],
+                            backgroundColor: f.stage.color,
                           }}
                         />
                       </div>

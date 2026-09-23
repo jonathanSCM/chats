@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, Thead, Th, Td, Tr } from "@/components/ui/table";
-import { STAGE_LABEL, STAGE_COLOR, type Stage } from "@/lib/pipeline";
 
 const money = new Intl.NumberFormat("es", {
   style: "currency",
@@ -13,7 +12,7 @@ const money = new Intl.NumberFormat("es", {
 });
 
 interface FunnelEntry {
-  stage: Stage;
+  stage: { id: string; label: string; color: string };
   count: number;
   conversionFromPrev: number | null;
 }
@@ -42,9 +41,10 @@ interface AnalyticsData {
   ganadoTotal: number;
   ticketPromedio: number;
   forecastPorMes: { mes: string; valor: number }[];
-  valuePerStage: { stage: Stage; valor: number }[];
-  avgDaysPerStage: { stage: Stage; avgDays: number | null; sampleSize: number }[];
+  valuePerStage: { stage: string; color: string; valor: number }[];
+  avgDaysPerStage: { stage: string; color: string; avgDays: number | null; sampleSize: number }[];
   funnel: FunnelEntry[];
+  forecastBarColor: string;
   historyStartsAt: string | null;
   vendorComparison: VendorRow[] | null;
   campaignReport: CampaignRow[];
@@ -131,7 +131,7 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
                     className="h-full rounded"
                     style={{
                       width: `${Math.max(4, (m.valor / maxForecastMes) * 100)}%`,
-                      backgroundColor: STAGE_COLOR.PROPUESTA,
+                      backgroundColor: data.forecastBarColor,
                     }}
                   />
                 </div>
@@ -149,13 +149,13 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
         <div className="space-y-2">
           {data.valuePerStage.map((s) => (
             <div key={s.stage} className="flex items-center gap-2 text-xs">
-              <span className="w-36 shrink-0 truncate text-ink-muted">{STAGE_LABEL[s.stage]}</span>
+              <span className="w-36 shrink-0 truncate text-ink-muted">{s.stage}</span>
               <div className="h-4 flex-1 overflow-hidden rounded bg-surface-2">
                 <div
                   className="h-full rounded"
                   style={{
                     width: `${s.valor > 0 ? Math.max(4, (s.valor / maxValuePerStage) * 100) : 0}%`,
-                    backgroundColor: STAGE_COLOR[s.stage],
+                    backgroundColor: s.color,
                   }}
                 />
               </div>
@@ -176,7 +176,7 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
         <div className="space-y-2">
           {data.avgDaysPerStage.map((s) => (
             <div key={s.stage} className="flex items-center gap-2 text-xs">
-              <span className="w-36 shrink-0 truncate text-ink-muted">{STAGE_LABEL[s.stage]}</span>
+              <span className="w-36 shrink-0 truncate text-ink-muted">{s.stage}</span>
               {s.avgDays === null ? (
                 <span className="text-ink-faint">Sin datos suficientes todavía</span>
               ) : (
@@ -186,7 +186,7 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
                       className="h-full rounded"
                       style={{
                         width: `${Math.max(4, (s.avgDays / maxAvgDays) * 100)}%`,
-                        backgroundColor: STAGE_COLOR[s.stage],
+                        backgroundColor: s.color,
                       }}
                     />
                   </div>
@@ -211,14 +211,14 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
         )}
         <div className="space-y-2">
           {data.funnel.map((f) => (
-            <div key={f.stage} className="flex items-center gap-2 text-xs">
-              <span className="w-36 shrink-0 truncate text-ink-muted">{STAGE_LABEL[f.stage]}</span>
+            <div key={f.stage.id} className="flex items-center gap-2 text-xs">
+              <span className="w-36 shrink-0 truncate text-ink-muted">{f.stage.label}</span>
               <div className="h-4 flex-1 overflow-hidden rounded bg-surface-2">
                 <div
                   className="h-full rounded"
                   style={{
                     width: `${firstFunnelCount > 0 ? Math.max(4, (f.count / firstFunnelCount) * 100) : 0}%`,
-                    backgroundColor: STAGE_COLOR[f.stage],
+                    backgroundColor: f.stage.color,
                   }}
                 />
               </div>

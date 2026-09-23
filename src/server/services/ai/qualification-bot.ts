@@ -1,13 +1,16 @@
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { decrypt } from "@/lib/crypto";
-import { sendTextMessage } from "@/server/services/whatsapp";
+import { sendTextMessage, sendInteractiveListMessage, type InteractiveListRow } from "@/server/services/whatsapp";
 import { notifyNewMessage } from "@/server/services/push";
 import { OPEN_STAGES } from "@/lib/pipeline";
-import { getAvailableSlots, hasSchedulingConflict, type MeetingSlot } from "@/server/services/availability";
+import { getAvailableDays, getAvailableSlots, hasSchedulingConflict, formatSlotLabel } from "@/server/services/availability";
 import { MODELS, runStructured } from "./client";
 
-export const PROMPT_VERSION = "bot-calificacion-v1";
+// v2: se saca "reunion_elegida" del esquema -- el horario ya no se elige
+// interpretando texto libre, se ofrece por lista de WhatsApp y se resuelve
+// directo por el id de la opción (ver sendDayList/sendHourList/confirmMeetingSlot).
+export const PROMPT_VERSION = "bot-calificacion-v2";
 
 // Tope duro independiente de lo que devuelva el modelo: si después de esta
 // cantidad de mensajes del bot todavía no se pudo calificar, se escala solo
@@ -26,10 +29,6 @@ const resultSchema = z.object({
   rol_contacto: z.string(),
   empresa_funcionando: z.enum(["SI", "NO", "DESCONOCIDO"]),
   listo_para_agendar: z.boolean(),
-  // Cuál de las franjas ofrecidas en el input (A/B/C) eligió el cliente
-  // este turno. "" si todavía no corresponde ofrecer horarios, o si el
-  // cliente no eligió ninguna.
-  reunion_elegida: z.enum(["", "A", "B", "C"]),
   debe_escalar: z.boolean(),
   motivo_escalar: z.string(), // "" si no aplica
   memoria: z.string(),
@@ -49,7 +48,6 @@ const jsonSchema = {
     "rol_contacto",
     "empresa_funcionando",
     "listo_para_agendar",
-    "reunion_elegida",
     "debe_escalar",
     "motivo_escalar",
     "memoria",
@@ -75,16 +73,10 @@ const jsonSchema = {
     listo_para_agendar: {
       type: "boolean",
       description:
-        "true solo cuando ya hay empresa real + problema real + posible mejora con tecnología, y " +
-        "corresponde ofrecer o confirmar la reunión de diagnóstico.",
-    },
-    reunion_elegida: {
-      type: "string",
-      enum: ["", "A", "B", "C"],
-      description:
-        "Si en la CONVERSACIÓN el cliente ya eligió una de las FRANJAS DISPONIBLES ofrecidas más abajo, " +
-        "la letra de esa franja (A, B o C). \"\" si todavía no se ofrecieron franjas, o el cliente no " +
-        "eligió ninguna todavía.",
+        "true solo cuando ya hay empresa real + problema real + posible mejora con tecnología, y el " +
+        "cliente ya dijo que sí quiere agendar la reunión de diagnóstico. El sistema (no vos) manda " +
+        "aparte una lista de WhatsApp con los días y horarios reales para que el cliente elija tocando " +
+        "una opción -- no hace falta que menciones fechas ni horarios en tu respuesta.",
     },
     debe_escalar: {
       type: "boolean",
@@ -138,10 +130,13 @@ Reglas duras, siempre:
 - Si el cliente pide hablar con una persona, se queja, o hace algo que esta guía no cubre, pon
   debe_escalar en true y deja de insistir con preguntas.
 - Primero invita a la reunión de diagnóstico en general (sin mencionar horarios) y espera a que el
-  cliente acepte. Recién cuando el cliente ya dijo que sí quiere agendar, ofrécele las FRANJAS
-  DISPONIBLES de abajo en tu "respuesta" (con palabras naturales, ej. "lunes a las 10 o miércoles a las
-  3pm, ¿cuál te queda mejor?"), y marca en "reunion_elegida" la que el cliente elija apenas la mencione.
-- No inventes ni ofrezcas ningún horario que no esté en FRANJAS DISPONIBLES.
+  cliente acepte. Cuando el cliente ya dijo que sí quiere agendar, poné "listo_para_agendar" en true y
+  tu "respuesta" es solo una frase corta de transición (ej. "Perfecto 😊 Te paso los horarios
+  disponibles 👇") -- el sistema manda aparte, automáticamente, la lista real de días y horarios para
+  que el cliente elija tocando una opción. Nunca inventes ni menciones un día u horario específico vos
+  mismo, ni le pidas al cliente que escriba una hora -- de eso se encarga la lista que manda el sistema.
+- Si el cliente ya recibió la lista de horarios y todavía no tocó ninguna opción (sigue escribiendo
+  texto), seguí la charla con naturalidad sin repetir la invitación a cada rato.
 - El guion exacto de preguntas, cuándo agendar, cuándo no agendar, y el estilo de conversación están en
   la GUÍA DE CALIFICACIÓN y el TONO de la Base de Conocimiento de abajo — síguelos al pie de la letra.
   Si no hay ninguna guía cargada, usa como referencia general: entender a qué se dedica la empresa, qué
@@ -152,6 +147,7 @@ Reglas duras, siempre:
 interface ConversationForBot {
   id: string;
   organizationId: string;
+  timezone: string;
   botPaused: boolean;
   botMemory: string | null;
   assignedToId: string | null;
@@ -164,7 +160,7 @@ interface ConversationForBot {
   contact: { id: string; fullName: string | null; phone: string; jobTitle: string | null } | null;
 }
 
-async function loadConversation(conversationId: string): Promise<ConversationForBot | null> {
+export async function loadConversation(conversationId: string): Promise<ConversationForBot | null> {
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
@@ -177,6 +173,7 @@ async function loadConversation(conversationId: string): Promise<ConversationFor
   return {
     id: conversation.id,
     organizationId: conversation.bot.organizationId,
+    timezone: conversation.bot.organization.timezone,
     botPaused: conversation.botPaused,
     botMemory: conversation.botMemory,
     assignedToId: conversation.assignedToId,
@@ -195,7 +192,7 @@ async function loadConversation(conversationId: string): Promise<ConversationFor
  * tono (Base de Conocimiento), la memoria acumulada y la conversación
  * reciente. Mismo patrón que buildInput() en follow-up.ts.
  */
-async function buildInput(conversation: ConversationForBot, slots: MeetingSlot[]): Promise<string> {
+async function buildInput(conversation: ConversationForBot): Promise<string> {
   const [knowledge, recentMessages] = await Promise.all([
     prisma.knowledgeItem.findMany({
       where: { organizationId: conversation.organizationId, active: true },
@@ -235,11 +232,6 @@ async function buildInput(conversation: ConversationForBot, slots: MeetingSlot[]
         .join("\n")
     : "(Sin mensajes previos — es el primer mensaje de esta conversación.)";
 
-  const letters = ["A", "B", "C"] as const;
-  const slotsText = slots
-    .map((slot, i) => `${letters[i]}) ${slot.label}`)
-    .join("\n");
-
   // Mismo criterio de orden que buildInput() en follow-up.ts: lo fijo por
   // organización (fecha, guía, tono) primero para que el cache automático de
   // OpenAI lo reconozca como el mismo prefijo entre turnos y conversaciones
@@ -259,9 +251,6 @@ Teléfono: ${conversation.customerPhone}
 
 MEMORIA ANTERIOR (resumen acumulado de esta conversación — actualízala, no la ignores)
 ${conversation.botMemory ?? "(Todavía no hay memoria — es el primer turno.)"}
-
-FRANJAS DISPONIBLES para la reunión de diagnóstico (solo ofrécelas si el cliente ya aceptó agendar)
-${slotsText}
 
 CONVERSACIÓN DE WHATSAPP (más reciente al final)
 ${conversationText}`;
@@ -314,80 +303,6 @@ async function ensureOpportunity(
   return created.id;
 }
 
-/**
- * Si el cliente eligió una franja este turno, crea la Meeting (sin link de
- * Meet todavía — eso lo manda el vendedor a mano, igual que hoy) y avisa
- * al equipo para que confirme el horario real.
- */
-async function maybeScheduleMeeting(
-  conversation: ConversationForBot,
-  result: QualificationResult,
-  slots: MeetingSlot[],
-  opportunityId: string | null,
-): Promise<void> {
-  if (!result.reunion_elegida) return;
-
-  const index = { A: 0, B: 1, C: 2 }[result.reunion_elegida];
-  const slot = slots[index];
-  if (!slot) return;
-
-  // El modelo puede volver a devolver "reunion_elegida" en un turno
-  // posterior (el cliente reconfirma el horario, o simplemente lo repite)
-  // -- sin este chequeo, cada turno así crea otra Meeting duplicada para
-  // la misma oportunidad.
-  if (opportunityId) {
-    const alreadyScheduled = await prisma.meeting.findFirst({
-      where: { opportunityId, status: { not: "CANCELED" } },
-      select: { id: true },
-    });
-    if (alreadyScheduled) return;
-  }
-
-  // Entre que se ofreció esta franja (buildInput, turnos atrás) y que el
-  // cliente la eligió ahora, otro lead pudo haber tomado el mismo horario
-  // -- se re-chequea justo acá, no solo al armar las franjas ofrecidas. No
-  // se bloquea la creación (el bot ya le confirmó el horario al cliente en
-  // el mensaje que se acaba de mandar, no hay forma de "desdecirlo"): se
-  // crea igual, pero marcada bien visible para que un vendedor la resuelva
-  // a mano en vez de quedar un choque silencioso en el calendario.
-  const org = await prisma.organization.findUniqueOrThrow({
-    where: { id: conversation.organizationId },
-    select: { bookingDurationMinutes: true },
-  });
-  const conflict = await hasSchedulingConflict(conversation.organizationId, slot.date, org.bookingDurationMinutes);
-
-  // El bot ya no crea el link de Meet -- decisión explícita: la creación de
-  // Calendar/Meet quedó reservada para cuando un vendedor la arma a mano
-  // (ver createMeetingAction en crm.ts). Acá solo se deja agendada la fecha
-  // y el nombre, para que la reunión ya aparezca en el CRM y el vendedor
-  // solo tenga que completar el link.
-  const title = `Reunión de diagnóstico — ${conversation.contact?.fullName || conversation.contact?.phone || "Lead"}`;
-
-  await prisma.meeting.create({
-    data: {
-      organizationId: conversation.organizationId,
-      opportunityId,
-      title,
-      scheduledAt: slot.date,
-      meetingUrl: null,
-      status: "SCHEDULED",
-      notes: conflict
-        ? "⚠️ Posible choque de horario: otra reunión ya ocupaba esta franja cuando se confirmó. Revisar y reagendar si hace falta. Agendada automáticamente por el bot de calificación."
-        : "Agendada automáticamente por el bot de calificación. Falta agregar el link de la reunión.",
-    },
-  });
-
-  await notifyNewMessage({
-    conversationId: conversation.id,
-    organizationId: conversation.organizationId,
-    assignedToId: conversation.assignedToId,
-    customerLabel: conversation.customerName || conversation.customerPhone,
-    preview: conflict
-      ? `⚠️ El bot agendó una reunión para ${slot.label}, pero choca con otra — revisar`
-      : `📅 El bot agendó una reunión para ${slot.label} — falta el link de Meet`,
-  }).catch((error) => console.error("[bot] Error notificando reunión agendada:", error));
-}
-
 async function sendAndSave(conversation: ConversationForBot, text: string): Promise<void> {
   const { messageId } = await sendTextMessage({
     phoneNumberId: conversation.phoneNumberId,
@@ -405,6 +320,187 @@ async function sendAndSave(conversation: ConversationForBot, text: string): Prom
       data: { lastMessageAt: new Date() },
     }),
   ]);
+}
+
+async function sendListAndSave(
+  conversation: ConversationForBot,
+  params: { bodyText: string; buttonText: string; sectionTitle: string; rows: InteractiveListRow[] },
+  recordedAs: string,
+): Promise<void> {
+  const { messageId } = await sendInteractiveListMessage({
+    phoneNumberId: conversation.phoneNumberId,
+    accessToken: decrypt(conversation.accessToken),
+    to: conversation.customerPhone,
+    ...params,
+  });
+
+  await prisma.$transaction([
+    prisma.message.create({
+      data: { conversationId: conversation.id, role: "BOT", content: recordedAs, externalId: messageId },
+    }),
+    prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { lastMessageAt: new Date() },
+    }),
+  ]);
+}
+
+/**
+ * Primer paso del agendamiento por lista de WhatsApp: ofrece los días con
+ * hueco real (no horarios sueltos, para no repetir el mismo día varias
+ * veces -- ver getAvailableDays). Lo dispara runQualificationTurn en
+ * cuanto el modelo marca "listo_para_agendar"; el segundo paso (elegir
+ * hora) y el tercero (confirmar) llegan por la respuesta del cliente a la
+ * lista, no por otro turno del modelo -- ver handleIncomingMessage en
+ * conversation.ts, que intercepta los ids "day:"/"slot:" antes de
+ * encolar el turno normal del bot.
+ */
+export async function sendDayList(conversationId: string): Promise<void> {
+  const conversation = await loadConversation(conversationId);
+  if (!conversation) return;
+
+  const days = await getAvailableDays(conversation.organizationId, 8);
+  if (days.length === 0) {
+    await sendAndSave(
+      conversation,
+      "Mmm, por ahora no tengo ningún horario libre para ofrecerte 🙏 Te paso con alguien del equipo para coordinar directamente.",
+    );
+    await escalate(conversation, "No hay horarios disponibles para ofrecer al lead.");
+    return;
+  }
+
+  const rows: InteractiveListRow[] = days.map((day) => ({ id: `day:${day.dateKey}`, title: day.label.slice(0, 24) }));
+  await sendListAndSave(
+    conversation,
+    { bodyText: "¿Qué día te queda mejor para la reunión?", buttonText: "Ver días", sectionTitle: "Días disponibles", rows },
+    `[Lista de días] ${days.map((d) => d.label).join(" · ")}`,
+  );
+}
+
+/** Segundo paso: el cliente eligió un día -- ofrece los horarios de ESE día puntual. */
+export async function sendHourList(conversationId: string, dateKey: string): Promise<void> {
+  const conversation = await loadConversation(conversationId);
+  if (!conversation) return;
+
+  const slots = await getAvailableSlots(conversation.organizationId, 8, 30, dateKey);
+  if (slots.length === 0) {
+    // Puede pasar: alguien más tomó el último hueco de ese día entre que se
+    // ofreció la lista de días y que el cliente tocó una opción.
+    await sendAndSave(
+      conversation,
+      "Uy, se me ocuparon justo los horarios de ese día 🙈 ¿Probamos con otro? Decime cuál y te muestro.",
+    );
+    return;
+  }
+
+  const rows: InteractiveListRow[] = slots.map((slot) => ({ id: `slot:${slot.date.toISOString()}`, title: slot.label.slice(0, 24) }));
+  await sendListAndSave(
+    conversation,
+    { bodyText: "Perfecto 👍 Estos son los horarios libres ese día.", buttonText: "Ver horarios", sectionTitle: "Horarios disponibles", rows },
+    `[Lista de horarios] ${slots.map((s) => s.label).join(" · ")}`,
+  );
+}
+
+/**
+ * Tercer paso: el cliente eligió un horario puntual -- crea la reunión de
+ * verdad. El contacto normalmente ya tiene una Opportunity abierta
+ * (ensureOpportunity la crea apenas "listo_para_agendar"), pero si por
+ * algún motivo no la tiene (ej. retomó una charla vieja), se crea una acá
+ * para no perder la reunión.
+ */
+export async function confirmMeetingSlot(conversationId: string, isoDate: string): Promise<void> {
+  const conversation = await loadConversation(conversationId);
+  if (!conversation) return;
+
+  const slotDate = new Date(isoDate);
+  if (Number.isNaN(slotDate.getTime())) return;
+
+  let opportunityId: string | null = null;
+  if (conversation.contact) {
+    const existingOpen = await prisma.opportunity.findFirst({
+      where: { contactId: conversation.contact.id, archivedAt: null, stage: { in: OPEN_STAGES } },
+      select: { id: true },
+      orderBy: { createdAt: "desc" },
+    });
+    opportunityId = existingOpen
+      ? existingOpen.id
+      : (
+          await prisma.opportunity.create({
+            data: {
+              organizationId: conversation.organizationId,
+              contactId: conversation.contact.id,
+              title: conversation.contact.fullName || "Lead calificado por el bot",
+              needSummary: conversation.botMemory ?? "",
+              needStatus: "CONFIRMED",
+              aiMemory: conversation.botMemory,
+              aiMemoryUpdatedAt: conversation.botMemory ? new Date() : null,
+              assignedToId: null,
+            },
+            select: { id: true },
+          })
+        ).id;
+  }
+
+  // El modelo puede repetir el turno, o el cliente puede volver a tocar la
+  // lista vieja -- sin este chequeo, cada vez así crearía otra Meeting
+  // duplicada para la misma oportunidad.
+  if (opportunityId) {
+    const alreadyScheduled = await prisma.meeting.findFirst({
+      where: { opportunityId, status: { not: "CANCELED" } },
+      select: { id: true },
+    });
+    if (alreadyScheduled) {
+      await sendAndSave(conversation, "Ya tenés una reunión agendada 👍 Cualquier cambio, escribime por acá y lo vemos.");
+      return;
+    }
+  }
+
+  // Entre que se ofreció esta franja (sendHourList, turnos atrás) y que el
+  // cliente la eligió ahora, otro lead pudo haber tomado el mismo horario
+  // -- se re-chequea justo acá, no solo al armar la lista. No se bloquea
+  // la creación (no hay forma de "desdecir" la lista que ya se mandó): se
+  // crea igual, pero marcada bien visible para que un vendedor la resuelva
+  // a mano en vez de quedar un choque silencioso en el calendario.
+  const org = await prisma.organization.findUniqueOrThrow({
+    where: { id: conversation.organizationId },
+    select: { bookingDurationMinutes: true },
+  });
+  const conflict = await hasSchedulingConflict(conversation.organizationId, slotDate, org.bookingDurationMinutes);
+  const label = formatSlotLabel(slotDate, conversation.timezone);
+
+  // El bot ya no crea el link de Meet -- decisión explícita: la creación de
+  // Calendar/Meet quedó reservada para cuando un vendedor la arma a mano
+  // (ver createMeetingAction en crm.ts). Acá solo se deja agendada la fecha
+  // y el nombre, para que la reunión ya aparezca en el CRM y el vendedor
+  // solo tenga que completar el link.
+  const title = `Reunión de diagnóstico — ${conversation.contact?.fullName || conversation.contact?.phone || "Lead"}`;
+
+  await prisma.meeting.create({
+    data: {
+      organizationId: conversation.organizationId,
+      opportunityId,
+      title,
+      scheduledAt: slotDate,
+      durationMinutes: org.bookingDurationMinutes,
+      meetingUrl: null,
+      status: "SCHEDULED",
+      notes: conflict
+        ? "⚠️ Posible choque de horario: otra reunión ya ocupaba esta franja cuando se confirmó. Revisar y reagendar si hace falta. Agendada automáticamente por el bot de calificación."
+        : "Agendada automáticamente por el bot de calificación. Falta agregar el link de la reunión.",
+    },
+  });
+
+  await sendAndSave(conversation, `Listo, quedó agendada para el ${label} 🙌 En breve te paso el link de la reunión.`);
+
+  await notifyNewMessage({
+    conversationId: conversation.id,
+    organizationId: conversation.organizationId,
+    assignedToId: conversation.assignedToId,
+    customerLabel: conversation.customerName || conversation.customerPhone,
+    preview: conflict
+      ? `⚠️ El bot agendó una reunión para ${label}, pero choca con otra — revisar`
+      : `📅 El bot agendó una reunión para ${label} — falta el link de Meet`,
+  }).catch((error) => console.error("[bot] Error notificando reunión agendada:", error));
 }
 
 /**
@@ -490,8 +586,7 @@ export async function runQualificationTurn(conversationId: string): Promise<void
     return;
   }
 
-  const slots = await getAvailableSlots(conversation.organizationId);
-  const input = await buildInput(conversation, slots);
+  const input = await buildInput(conversation);
 
   const result = await runStructured({
     organizationId: conversation.organizationId,
@@ -524,8 +619,18 @@ export async function runQualificationTurn(conversationId: string): Promise<void
     data: { botMemory: result.memoria },
   });
 
-  if (result.listo_para_agendar || result.reunion_elegida) {
+  if (result.listo_para_agendar) {
     const opportunityId = await ensureOpportunity(conversation, result);
-    await maybeScheduleMeeting(conversation, result, slots, opportunityId);
+    // No repetir la lista de días si ya hay una reunión agendada para esta
+    // oportunidad -- el cliente puede seguir escribiendo con
+    // "listo_para_agendar" en true varios turnos seguidos aunque ya haya
+    // confirmado un horario (ver confirmMeetingSlot en conversation.ts).
+    const alreadyScheduled =
+      opportunityId &&
+      (await prisma.meeting.findFirst({
+        where: { opportunityId, status: { not: "CANCELED" } },
+        select: { id: true },
+      }));
+    if (!alreadyScheduled) await sendDayList(conversationId);
   }
 }

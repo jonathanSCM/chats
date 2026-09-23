@@ -15,6 +15,7 @@ import { enqueue, enqueueOrReschedule, runJobsSoon } from "@/server/jobs";
 import { decrypt } from "@/lib/crypto";
 import { resolveAdInfo } from "@/server/services/meta-ads";
 import { getAvailableSlots } from "@/server/services/availability";
+import { sendHourList, confirmMeetingSlot } from "@/server/services/ai/qualification-bot";
 import { getZonedParts } from "@/lib/timezone";
 import { firstUrl } from "@/lib/urls";
 
@@ -180,6 +181,21 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
       customerLabel: conversation.customerName || conversation.customerPhone,
       preview,
     }).catch((error) => console.error("[conversation] Error notificando por push:", error));
+  }
+
+  // Respuesta a la lista de agendamiento real del bot de calificación (ver
+  // sendDayList/sendHourList/confirmMeetingSlot en qualification-bot.ts) --
+  // se resuelve directo por el id de la opción, sin pasar por la IA para
+  // interpretar cuál era (a diferencia de cuando el cliente escribe texto
+  // libre). No dispara bot_reply para este mismo mensaje: la respuesta ya
+  // sale de acá.
+  if (inbound.interactiveReply?.id.startsWith("day:")) {
+    await sendHourList(conversationId, inbound.interactiveReply.id.slice("day:".length));
+    return;
+  }
+  if (inbound.interactiveReply?.id.startsWith("slot:")) {
+    await confirmMeetingSlot(conversationId, inbound.interactiveReply.id.slice("slot:".length));
+    return;
   }
 
   // Respuesta a la lista de prueba de horarios (ver sendTestAvailabilityListAction

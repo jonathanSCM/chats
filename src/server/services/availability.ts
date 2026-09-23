@@ -13,6 +13,12 @@ export interface AvailableDay {
   dateKey: string; // "2026-09-24", en el huso de la organización -- id estable para ofrecerlo en una lista
 }
 
+/** Mismo formato que usan los labels de arriba -- para mostrarle a alguien un instante puntual ya elegido, en el huso de la organización (no el del servidor). */
+export function formatSlotLabel(date: Date, timeZone: string): string {
+  const parts = getZonedParts(date, timeZone);
+  return `${DAY_LABEL[parts.weekday]} ${parts.day}/${String(parts.month).padStart(2, "0")}, ${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+}
+
 interface BookingSettings {
   timezone: string;
   bookingDays: number[];

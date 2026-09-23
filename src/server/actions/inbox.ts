@@ -20,7 +20,7 @@ import { saveMediaFile } from "@/lib/media-storage";
 import { isWhatsAppAudioType, transcodeToOpus } from "@/lib/audio-transcode";
 import { convertWebpToPng } from "@/lib/image-convert";
 import { maybeActivateFreeEntryPoint } from "@/server/services/conversation";
-import { getAvailableSlots } from "@/server/services/availability";
+import { getAvailableDays } from "@/server/services/availability";
 import { enqueue } from "@/server/jobs";
 import { firstUrl } from "@/lib/urls";
 
@@ -468,12 +468,14 @@ export async function sendTemplateMessageAction(
 }
 
 /**
- * Botón de prueba, escondido en el panel -- manda los horarios libres
- * reales (getAvailableSlots) como lista nativa de WhatsApp en vez de
- * texto, para ver cómo se ve y probar el envío antes de engancharlo al
- * bot de calificación (ver plan "Listas de WhatsApp para agendar").
- * Todavía no interpreta la respuesta del cliente si toca una opción --
- * eso es la segunda mitad, deliberadamente no incluida acá.
+ * Botón de prueba, escondido en el panel -- primer paso del flujo de
+ * agendar: manda los días con hueco real (getAvailableDays) como lista
+ * nativa de WhatsApp. Cuando el cliente elige un día, handleIncomingMessage
+ * / handleTestBookingReply (conversation.ts) detecta la respuesta por el
+ * id ("testday:...") y manda una segunda lista con los horarios de ESE
+ * día -- todavía no crea una reunión real al final, solo confirma en el
+ * chat, a propósito, mientras se prueba el flujo antes de engancharlo al
+ * bot de calificación de verdad (ver plan "Listas de WhatsApp para agendar").
  */
 export async function sendTestAvailabilityListAction(conversationId: string): Promise<{ error: string | null }> {
   const conversation = await getOwnedConversation(conversationId);
@@ -484,14 +486,17 @@ export async function sendTestAvailabilityListAction(conversationId: string): Pr
     return { error: "WhatsApp no está conectado." };
   }
 
-  const slots = await getAvailableSlots(conversation.bot.organizationId, 8);
-  if (slots.length === 0) {
-    return { error: "No hay horarios libres para ofrecer (revisá el horario habilitado en Organización)." };
+  // Primer paso del flujo de dos listas (día -> hora, ver
+  // handleTestBookingReply en conversation.ts): se ofrecen días con hueco,
+  // no horarios sueltos -- así no se repite el mismo día ocho veces.
+  const days = await getAvailableDays(conversation.bot.organizationId, 8);
+  if (days.length === 0) {
+    return { error: "No hay días libres para ofrecer (revisá el horario habilitado en Organización)." };
   }
 
-  const rows: InteractiveListRow[] = slots.map((slot) => ({
-    id: slot.date.toISOString(),
-    title: slot.label.slice(0, 24),
+  const rows: InteractiveListRow[] = days.map((day) => ({
+    id: `testday:${day.dateKey}`,
+    title: day.label.slice(0, 24),
   }));
 
   let messageId: string | null;
@@ -500,9 +505,9 @@ export async function sendTestAvailabilityListAction(conversationId: string): Pr
       phoneNumberId: connection.phoneNumberId,
       accessToken: decrypt(connection.accessToken),
       to: conversation.customerPhone,
-      bodyText: "🧪 Prueba: estos son los horarios disponibles para agendar una reunión.",
-      buttonText: "Ver horarios",
-      sectionTitle: "Horarios disponibles",
+      bodyText: "🧪 Prueba: ¿qué día te viene mejor para la reunión?",
+      buttonText: "Ver días",
+      sectionTitle: "Días disponibles",
       rows,
     }));
   } catch (error) {
@@ -516,7 +521,7 @@ export async function sendTestAvailabilityListAction(conversationId: string): Pr
       data: {
         conversationId,
         role: "STAFF",
-        content: `🧪 [Prueba] Lista de horarios enviada: ${slots.map((s) => s.label).join(" · ")}`,
+        content: `🧪 [Prueba] Lista de días enviada: ${days.map((d) => d.label).join(" · ")}`,
         sentById: session.user.id,
         externalId: messageId,
       },

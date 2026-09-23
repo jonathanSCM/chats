@@ -1506,8 +1506,8 @@ export function InboxClient({
                 type="button"
                 onClick={sendTestAvailabilityList}
                 disabled={testListSending}
-                aria-label="Prueba interna: mandar lista de horarios libres"
-                title="Prueba interna: manda los horarios libres como lista de WhatsApp (no visible para el cliente en ningún otro lado, solo para probar el envío)"
+                aria-label="Prueba interna: agendar por WhatsApp (día → hora)"
+                title="Prueba interna: manda una lista de días con hueco; al elegir uno, manda los horarios de ese día. Real de punta a punta (recibe la respuesta), pero todavía no crea una reunión al confirmar."
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-faint/40 transition-colors hover:bg-surface hover:text-ink-muted disabled:opacity-50"
               >
                 <FlaskConical size={16} />

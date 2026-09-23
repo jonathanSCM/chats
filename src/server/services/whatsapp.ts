@@ -127,6 +127,18 @@ const inboundSchema = z.object({
                       source_url: z.string().optional(),
                     })
                     .optional(),
+                  // Presente solo cuando el cliente toca una opción de una
+                  // lista o un botón que nosotros mandamos -- el "id" es
+                  // justo el que le pusimos a esa fila al enviarla, así que
+                  // vuelve sin ambigüedad (a diferencia de interpretar texto
+                  // libre con IA).
+                  interactive: z
+                    .object({
+                      type: z.string(),
+                      list_reply: z.object({ id: z.string(), title: z.string() }).optional(),
+                      button_reply: z.object({ id: z.string(), title: z.string() }).optional(),
+                    })
+                    .optional(),
                 }),
               )
               .optional(),
@@ -205,6 +217,8 @@ export interface ParsedInboundMessage {
   // externalId (wa message id) del mensaje que este cita, si responde a uno
   // puntual -- null si no es una respuesta.
   replyToExternalId: string | null;
+  /** Si el cliente tocó una opción de una lista o un botón que mandamos -- null si este mensaje no es eso. */
+  interactiveReply: { id: string; title: string } | null;
 }
 
 // Google Maps abre bien un link "?q=lat,lng" sin necesitar ninguna API key.
@@ -275,6 +289,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
             fromAd,
             adReferral,
             replyToExternalId,
+            interactiveReply: null,
           });
           continue;
         }
@@ -296,7 +311,31 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
             fromAd,
             adReferral,
             replyToExternalId,
+            interactiveReply: null,
           });
+          continue;
+        }
+
+        if (message.type === "interactive" && message.interactive) {
+          const reply = message.interactive.list_reply ?? message.interactive.button_reply;
+          if (reply) {
+            results.push({
+              phoneNumberId: phone_number_id,
+              from: message.from,
+              customerName,
+              messageId: message.id,
+              // Se guarda igual como si el cliente hubiera escrito el título
+              // -- así el mensaje se ve normal en la bandeja aunque haya
+              // sido un toque, no texto tipeado.
+              text: reply.title,
+              media: null,
+              location: null,
+              fromAd,
+              adReferral,
+              replyToExternalId,
+              interactiveReply: { id: reply.id, title: reply.title },
+            });
+          }
           continue;
         }
 
@@ -321,6 +360,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
               fromAd,
               adReferral,
               replyToExternalId,
+              interactiveReply: null,
             });
             continue;
           }
@@ -354,6 +394,7 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
             fromAd,
             adReferral,
             replyToExternalId,
+            interactiveReply: null,
           });
         }
       }

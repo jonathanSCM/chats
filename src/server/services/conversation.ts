@@ -9,11 +9,13 @@ import type {
   ParsedReaction,
   AdReferralInfo,
 } from "@/server/services/whatsapp";
-import { googleMapsUrl } from "@/server/services/whatsapp";
+import { googleMapsUrl, sendInteractiveListMessage, sendTextMessage, type InteractiveListRow } from "@/server/services/whatsapp";
 import { notifyNewMessage } from "@/server/services/push";
 import { enqueue, enqueueOrReschedule, runJobsSoon } from "@/server/jobs";
 import { decrypt } from "@/lib/crypto";
 import { resolveAdInfo } from "@/server/services/meta-ads";
+import { getAvailableSlots } from "@/server/services/availability";
+import { getZonedParts } from "@/lib/timezone";
 import { firstUrl } from "@/lib/urls";
 
 const CONVERSATION_WINDOW_MS = 24 * 60 * 60 * 1000; // ventana de conversación de WhatsApp
@@ -180,6 +182,16 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
     }).catch((error) => console.error("[conversation] Error notificando por push:", error));
   }
 
+  // Respuesta a la lista de prueba de horarios (ver sendTestAvailabilityListAction
+  // en inbox.ts) -- se identifica por el prefijo del id, no por el contenido
+  // del mensaje, así que no hay ambigüedad con nada que escriba un cliente
+  // real. No dispara el bot de calificación normal: es un flujo aparte,
+  // deliberadamente, mientras se prueba antes de engancharlo de verdad.
+  if (inbound.interactiveReply?.id.startsWith("testday:") || inbound.interactiveReply?.id.startsWith("testslot:")) {
+    await handleTestBookingReply(conversationId, connection, inbound.interactiveReply.id);
+    return;
+  }
+
   // El bot de calificación contesta solo si está habilitado para esta
   // cuenta, ningún humano tomó ya la conversación, y (si hay un teléfono de
   // prueba cargado) el mensaje viene de ese número. Se reprograma (no se
@@ -206,6 +218,95 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
     // lo despierta.
     setTimeout(() => runJobsSoon(), BOT_DEBOUNCE_MS + 500);
   }
+}
+
+/**
+ * Segundo tramo del flujo de prueba: el cliente ya tocó una opción de la
+ * primera lista (un día) o de la segunda (un horario dentro de ese día).
+ * Distingue cuál por el prefijo del id -- "testday:" manda la lista de
+ * horarios de ese día puntual (getAvailableSlots con onlyDateKey), y
+ * "testslot:" solo confirma en el chat (todavía no crea una Meeting real,
+ * a propósito, mientras esto sigue siendo una prueba).
+ */
+async function handleTestBookingReply(
+  conversationId: string,
+  connection: { phoneNumberId: string; accessToken: string; bot: { organizationId: string } },
+  interactiveId: string,
+): Promise<void> {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { customerPhone: true },
+  });
+  if (!conversation) return;
+
+  const accessToken = decrypt(connection.accessToken);
+
+  if (interactiveId.startsWith("testday:")) {
+    const dateKey = interactiveId.slice("testday:".length);
+    const slots = await getAvailableSlots(connection.bot.organizationId, 8, 30, dateKey);
+    if (slots.length === 0) {
+      const { messageId } = await sendTextMessage({
+        phoneNumberId: connection.phoneNumberId,
+        accessToken,
+        to: conversation.customerPhone,
+        body: "🧪 Ups, ese día ya no tiene horarios libres -- esto puede pasar si alguien más lo tomó justo ahora.",
+      });
+      await prisma.message.create({
+        data: { conversationId, role: "BOT", content: "🧪 [Prueba] Día sin horarios al momento de elegirlo.", externalId: messageId },
+      });
+      return;
+    }
+
+    const rows: InteractiveListRow[] = slots.map((slot) => ({
+      id: `testslot:${slot.date.toISOString()}`,
+      title: slot.label.slice(0, 24),
+    }));
+    const { messageId } = await sendInteractiveListMessage({
+      phoneNumberId: connection.phoneNumberId,
+      accessToken,
+      to: conversation.customerPhone,
+      bodyText: "🧪 Perfecto, estos son los horarios libres ese día.",
+      buttonText: "Ver horarios",
+      sectionTitle: "Horarios disponibles",
+      rows,
+    });
+    await prisma.$transaction([
+      prisma.message.create({
+        data: {
+          conversationId,
+          role: "BOT",
+          content: `🧪 [Prueba] Lista de horarios enviada: ${slots.map((s) => s.label).join(" · ")}`,
+          externalId: messageId,
+        },
+      }),
+      prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date() } }),
+    ]);
+    return;
+  }
+
+  // "testslot:" -- el cliente ya eligió un horario puntual. Solo confirma
+  // visualmente por ahora; no crea una Meeting real (ver comentario arriba).
+  const isoDate = interactiveId.slice("testslot:".length);
+  const org = await prisma.organization.findUniqueOrThrow({
+    where: { id: connection.bot.organizationId },
+    select: { timezone: true },
+  });
+  // Con el huso de la organización, no el del servidor -- mismo criterio
+  // que getAvailableSlots(), para que la hora mostrada sea la real.
+  const parts = getZonedParts(new Date(isoDate), org.timezone);
+  const label = `${parts.day}/${String(parts.month).padStart(2, "0")}, ${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+  const { messageId } = await sendTextMessage({
+    phoneNumberId: connection.phoneNumberId,
+    accessToken,
+    to: conversation.customerPhone,
+    body: `🧪 Prueba completa: elegiste ${label}. (Esto todavía no agenda una reunión real -- es solo para probar el flujo.)`,
+  });
+  await prisma.$transaction([
+    prisma.message.create({
+      data: { conversationId, role: "BOT", content: `🧪 [Prueba] Horario elegido: ${label}`, externalId: messageId },
+    }),
+    prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date() } }),
+  ]);
 }
 
 const MEDIA_PREVIEW: Record<string, string> = {

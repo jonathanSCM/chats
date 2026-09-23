@@ -31,12 +31,14 @@ import {
   ChevronDown,
   Play,
   Pause,
+  FlaskConical,
 } from "lucide-react";
 import {
   sendInboxMessageAction,
   sendInboxAttachmentAction,
   sendInboxLocationAction,
   sendInboxReactionAction,
+  sendTestAvailabilityListAction,
 } from "@/server/actions/inbox";
 import {
   deleteMessageAction,
@@ -503,6 +505,7 @@ export function InboxClient({
   const [adInsights, setAdInsights] = useState<AdInsights | null>(null);
   const [adInsightsLoading, setAdInsightsLoading] = useState(false);
   const [adInsightsError, setAdInsightsError] = useState<string | null>(null);
+  const [testListSending, setTestListSending] = useState(false);
 
   // Se pide a mano (botón), no en cada poll de fetchMessages -- limpiar acá,
   // atado solo a cambiar de conversación, evita que quede pegado el
@@ -1135,6 +1138,20 @@ export function InboxClient({
     });
   }
 
+  function sendTestAvailabilityList() {
+    const id = selectedIdRef.current;
+    if (!id) return;
+    setTestListSending(true);
+    sendTestAvailabilityListAction(id).then((result) => {
+      setTestListSending(false);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      fetchMessages(id);
+    });
+  }
+
   const filteredConversations = conversations.filter((c) => matchesSearch(c, searchQuery));
 
   // Búsqueda dentro del chat abierto -- solo entre lo ya cargado en
@@ -1485,6 +1502,16 @@ export function InboxClient({
                   {assignedTo.id === currentUserId ? "Tú" : assignedTo.name}
                 </span>
               )}
+              <button
+                type="button"
+                onClick={sendTestAvailabilityList}
+                disabled={testListSending}
+                aria-label="Prueba interna: mandar lista de horarios libres"
+                title="Prueba interna: manda los horarios libres como lista de WhatsApp (no visible para el cliente en ningún otro lado, solo para probar el envío)"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-faint/40 transition-colors hover:bg-surface hover:text-ink-muted disabled:opacity-50"
+              >
+                <FlaskConical size={16} />
+              </button>
               <button
                 type="button"
                 onClick={() => setChatSearchOpen((v) => !v)}

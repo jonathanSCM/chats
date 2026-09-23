@@ -10,14 +10,17 @@ import {
   sendTemplateMessage,
   sendLocationMessage,
   sendReactionMessage,
+  sendInteractiveListMessage,
   googleMapsUrl,
   uploadMedia,
   type OutboundMediaType,
+  type InteractiveListRow,
 } from "@/server/services/whatsapp";
 import { saveMediaFile } from "@/lib/media-storage";
 import { isWhatsAppAudioType, transcodeToOpus } from "@/lib/audio-transcode";
 import { convertWebpToPng } from "@/lib/image-convert";
 import { maybeActivateFreeEntryPoint } from "@/server/services/conversation";
+import { getAvailableSlots } from "@/server/services/availability";
 import { enqueue } from "@/server/jobs";
 import { firstUrl } from "@/lib/urls";
 
@@ -460,6 +463,69 @@ export async function sendTemplateMessageAction(
     }),
   ]);
   await maybeActivateFreeEntryPoint(conversationId);
+
+  return { error: null };
+}
+
+/**
+ * Botón de prueba, escondido en el panel -- manda los horarios libres
+ * reales (getAvailableSlots) como lista nativa de WhatsApp en vez de
+ * texto, para ver cómo se ve y probar el envío antes de engancharlo al
+ * bot de calificación (ver plan "Listas de WhatsApp para agendar").
+ * Todavía no interpreta la respuesta del cliente si toca una opción --
+ * eso es la segunda mitad, deliberadamente no incluida acá.
+ */
+export async function sendTestAvailabilityListAction(conversationId: string): Promise<{ error: string | null }> {
+  const conversation = await getOwnedConversation(conversationId);
+  if (!conversation) return { error: "Conversación no encontrada" };
+
+  const connection = conversation.bot.whatsappConnection;
+  if (!connection?.verified) {
+    return { error: "WhatsApp no está conectado." };
+  }
+
+  const slots = await getAvailableSlots(conversation.bot.organizationId, 8);
+  if (slots.length === 0) {
+    return { error: "No hay horarios libres para ofrecer (revisá el horario habilitado en Organización)." };
+  }
+
+  const rows: InteractiveListRow[] = slots.map((slot) => ({
+    id: slot.date.toISOString(),
+    title: slot.label.slice(0, 24),
+  }));
+
+  let messageId: string | null;
+  try {
+    ({ messageId } = await sendInteractiveListMessage({
+      phoneNumberId: connection.phoneNumberId,
+      accessToken: decrypt(connection.accessToken),
+      to: conversation.customerPhone,
+      bodyText: "🧪 Prueba: estos son los horarios disponibles para agendar una reunión.",
+      buttonText: "Ver horarios",
+      sectionTitle: "Horarios disponibles",
+      rows,
+    }));
+  } catch (error) {
+    console.error(error);
+    return { error: "No se pudo enviar la lista por WhatsApp." };
+  }
+
+  const session = await requireSession();
+  await prisma.$transaction([
+    prisma.message.create({
+      data: {
+        conversationId,
+        role: "STAFF",
+        content: `🧪 [Prueba] Lista de horarios enviada: ${slots.map((s) => s.label).join(" · ")}`,
+        sentById: session.user.id,
+        externalId: messageId,
+      },
+    }),
+    prisma.conversation.update({
+      where: { id: conversationId },
+      data: { lastMessageAt: new Date() },
+    }),
+  ]);
 
   return { error: null };
 }

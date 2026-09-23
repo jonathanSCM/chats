@@ -807,6 +807,64 @@ interface SendMessageResponse {
   messages?: { id: string }[];
 }
 
+export interface InteractiveListRow {
+  /** Va y viene tal cual -- cuando el cliente elige, Meta lo manda de vuelta en el webhook sin ambigüedad. */
+  id: string;
+  title: string; // límite de Meta: 24 caracteres
+  description?: string; // límite de Meta: 72 caracteres
+}
+
+/**
+ * Lista nativa de WhatsApp (botón que abre una hoja con opciones) -- a
+ * diferencia de un mensaje de texto con "A) ... B) ..." donde el cliente
+ * escribe y el bot tiene que interpretar qué quiso decir, acá el cliente
+ * toca una opción y Meta manda de vuelta el `id` exacto, sin ambigüedad.
+ * Tope de Meta: 10 filas en total entre todas las secciones.
+ */
+export async function sendInteractiveListMessage(params: {
+  phoneNumberId: string;
+  accessToken: string;
+  to: string;
+  bodyText: string;
+  buttonText: string; // límite de Meta: 20 caracteres
+  sectionTitle: string; // límite de Meta: 24 caracteres
+  rows: InteractiveListRow[];
+}): Promise<{ messageId: string | null }> {
+  const { phoneNumberId, accessToken, to, bodyText, buttonText, sectionTitle, rows } = params;
+
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "list",
+          body: { text: bodyText },
+          action: {
+            button: buttonText,
+            sections: [{ title: sectionTitle, rows }],
+          },
+        },
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`WhatsApp send failed (${res.status}): ${errorBody}`);
+  }
+
+  const data = (await res.json()) as SendMessageResponse;
+  return { messageId: data.messages?.[0]?.id ?? null };
+}
+
 export async function sendTextMessage(params: {
   phoneNumberId: string;
   accessToken: string;

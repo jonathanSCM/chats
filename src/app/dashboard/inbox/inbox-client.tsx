@@ -32,6 +32,7 @@ import {
   Play,
   Pause,
   FlaskConical,
+  CalendarClock,
 } from "lucide-react";
 import {
   sendInboxMessageAction,
@@ -39,6 +40,7 @@ import {
   sendInboxLocationAction,
   sendInboxReactionAction,
   sendTestAvailabilityListAction,
+  sendScheduleOfferAction,
 } from "@/server/actions/inbox";
 import {
   deleteMessageAction,
@@ -506,6 +508,7 @@ export function InboxClient({
   const [adInsightsLoading, setAdInsightsLoading] = useState(false);
   const [adInsightsError, setAdInsightsError] = useState<string | null>(null);
   const [testListSending, setTestListSending] = useState(false);
+  const [scheduleOfferSending, setScheduleOfferSending] = useState(false);
 
   // Se pide a mano (botón), no en cada poll de fetchMessages -- limpiar acá,
   // atado solo a cambiar de conversación, evita que quede pegado el
@@ -1138,6 +1141,23 @@ export function InboxClient({
     });
   }
 
+  function sendScheduleOffer() {
+    const id = selectedIdRef.current;
+    if (!id) return;
+    if (!window.confirm("¿Mandar la lista de días disponibles a este cliente? Si elige un horario, se agenda la reunión automáticamente.")) {
+      return;
+    }
+    setScheduleOfferSending(true);
+    sendScheduleOfferAction(id).then((result) => {
+      setScheduleOfferSending(false);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      fetchMessages(id);
+    });
+  }
+
   function sendTestAvailabilityList() {
     const id = selectedIdRef.current;
     if (!id) return;
@@ -1502,6 +1522,16 @@ export function InboxClient({
                   {assignedTo.id === currentUserId ? "Tú" : assignedTo.name}
                 </span>
               )}
+              <button
+                type="button"
+                onClick={sendScheduleOffer}
+                disabled={scheduleOfferSending}
+                aria-label="Ofrecer horarios de reunión"
+                title="Manda al cliente los días con hueco disponibles; si elige un día y un horario, la reunión se agenda sola en el calendario."
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface hover:text-ink disabled:opacity-50"
+              >
+                <CalendarClock size={16} />
+              </button>
               <button
                 type="button"
                 onClick={sendTestAvailabilityList}

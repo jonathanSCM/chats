@@ -21,6 +21,7 @@ import { isWhatsAppAudioType, transcodeToOpus } from "@/lib/audio-transcode";
 import { convertWebpToPng } from "@/lib/image-convert";
 import { maybeActivateFreeEntryPoint } from "@/server/services/conversation";
 import { getAvailableDays } from "@/server/services/availability";
+import { sendDayList } from "@/server/services/ai/qualification-bot";
 import { enqueue } from "@/server/jobs";
 import { firstUrl } from "@/lib/urls";
 
@@ -532,5 +533,26 @@ export async function sendTestAvailabilityListAction(conversationId: string): Pr
     }),
   ]);
 
+  return { error: null };
+}
+
+/**
+ * Igual que sendDayList() del bot (server/services/ai/qualification-bot.ts),
+ * pero disparado a mano por un vendedor en vez de por la IA -- manda la
+ * lista real (prefijo `day:`, sin "prueba" en ningún lado). El resto del
+ * flujo (elegir día -> elegir hora -> agendar) ya está manejado por
+ * handleIncomingMessage() en conversation.ts, que rutea por prefijo sin
+ * importar quién mandó la lista original.
+ */
+export async function sendScheduleOfferAction(conversationId: string): Promise<{ error: string | null }> {
+  const conversation = await getOwnedConversation(conversationId);
+  if (!conversation) return { error: "Conversación no encontrada" };
+
+  const connection = conversation.bot.whatsappConnection;
+  if (!connection?.verified) {
+    return { error: "WhatsApp no está conectado." };
+  }
+
+  await sendDayList(conversationId);
   return { error: null };
 }

@@ -7,6 +7,7 @@ import { MembersList } from "./_components/members-list";
 import { InvitePanel } from "./_components/invite-panel";
 import { AiSettingsForm } from "./_components/ai-settings-form";
 import { BookingSettingsForm } from "./_components/booking-settings-form";
+import { PipelineStagesList } from "./_components/pipeline-stages-list";
 import { BotAccessMatrix } from "./_components/bot-access-matrix";
 import { DangerZone } from "./_components/danger-zone";
 
@@ -15,7 +16,7 @@ export default async function OrganizationSettingsPage() {
   if (!session?.user.organizationId) redirect("/dashboard");
   if (session.user.role !== "OWNER") redirect("/dashboard");
 
-  const [org, members, invites, bots, botMembers] = await Promise.all([
+  const [org, members, invites, bots, botMembers, pipelineStages] = await Promise.all([
     prisma.organization.findUniqueOrThrow({ where: { id: session.user.organizationId } }),
     prisma.user.findMany({
       // SYSTEM son cuentas técnicas (ej. el bot de subtítulos) sin dueño
@@ -36,6 +37,11 @@ export default async function OrganizationSettingsPage() {
     prisma.botMember.findMany({
       where: { bot: { organizationId: session.user.organizationId } },
       select: { botId: true, userId: true },
+    }),
+    prisma.pipelineStage.findMany({
+      where: { organizationId: session.user.organizationId },
+      orderBy: { order: "asc" },
+      include: { _count: { select: { opportunities: true } } },
     }),
   ]);
 
@@ -71,6 +77,25 @@ export default async function OrganizationSettingsPage() {
           currentEndHour={org.bookingEndHour}
           currentDurationMinutes={org.bookingDurationMinutes}
           currentLeadHours={org.bookingLeadHours}
+        />
+      </Card>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Pipeline comercial</CardTitle>
+        <CardDescription className="mb-4">
+          Las etapas por las que pasa una oportunidad. Ganado, Perdido y En pausa / Nutrir son del
+          sistema (se pueden renombrar, no borrar) — el resto lo definís vos: nombre, color, orden,
+          agregar o quitar.
+        </CardDescription>
+        <PipelineStagesList
+          stages={pipelineStages.map((s) => ({
+            id: s.id,
+            label: s.label,
+            color: s.color,
+            role: s.role,
+            isDefaultEntry: s.isDefaultEntry,
+            opportunityCount: s._count.opportunities,
+          }))}
         />
       </Card>
 

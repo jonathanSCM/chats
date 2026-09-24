@@ -56,7 +56,6 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input, Label, Select } from "@/components/ui/input";
 import {
   PRIORITY_COLOR,
-  SERVICES,
   hasCompleteNextAction,
   missingForStage,
   ALL_LOSS_REASONS,
@@ -161,6 +160,8 @@ interface Props {
   rows: Row[];
   /** Etapas del pipeline de la organización, ordenadas — reemplaza el viejo ALL_STAGES fijo. */
   stages: PipelineStage[];
+  /** Opciones de servicio de la organización — reemplaza la vieja SERVICES fija. */
+  services: string[];
   contacts: { id: string; label: string }[];
   members: Member[];
   currentUserId: string;
@@ -268,6 +269,7 @@ const money = new Intl.NumberFormat("es", {
 export function TrackingTable({
   rows,
   stages,
+  services,
   contacts,
   members,
   currentUserId,
@@ -597,7 +599,7 @@ export function TrackingTable({
           className="w-full py-1.5 text-sm sm:w-36"
         >
           <option value="">Todo servicio</option>
-          {SERVICES.map((s) => (
+          {services.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
@@ -769,7 +771,7 @@ export function TrackingTable({
 
       {creating && (
         <Card>
-          <CreateForm contacts={contacts} onDone={closeCreate} />
+          <CreateForm contacts={contacts} services={services} onDone={closeCreate} />
         </Card>
       )}
 
@@ -865,6 +867,7 @@ export function TrackingTable({
                     key={row.id}
                     row={row}
                     stages={stages}
+                    services={services}
                     alert={alerts.get(row.id) ?? { reasons: [], severity: null }}
                     aiEnabled={ai.enabled}
                     editable={canEdit(row, currentUserId, isAdmin)}
@@ -1061,6 +1064,7 @@ function NextActionCell({
 function TableRow({
   row,
   stages,
+  services,
   alert,
   aiEnabled,
   editable,
@@ -1071,6 +1075,7 @@ function TableRow({
 }: {
   row: Row;
   stages: PipelineStage[];
+  services: string[];
   alert: DerivedAlert;
   aiEnabled: boolean;
   editable: boolean;
@@ -1192,14 +1197,12 @@ function TableRow({
           className="w-28 py-1.5 text-sm"
         >
           <option value="">—</option>
-          {SERVICES.map((s) => (
+          {services.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
           ))}
-          {row.service && !SERVICES.includes(row.service as (typeof SERVICES)[number]) && (
-            <option value={row.service}>{row.service}</option>
-          )}
+          {row.service && !services.includes(row.service) && <option value={row.service}>{row.service}</option>}
         </Select>
       </Td>
 
@@ -1449,9 +1452,11 @@ function Stat({
 
 function CreateForm({
   contacts,
+  services,
   onDone,
 }: {
   contacts: { id: string; label: string }[];
+  services: string[];
   onDone: () => void;
 }) {
   const [state, formAction, isPending] = useActionState(createOpportunityAction, { error: null });
@@ -1503,7 +1508,7 @@ function CreateForm({
         <div className="space-y-1.5">
           <Label htmlFor="serviceInterest">Servicio</Label>
           <Select id="serviceInterest" name="serviceInterest">
-            {SERVICES.map((s) => (
+            {services.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>

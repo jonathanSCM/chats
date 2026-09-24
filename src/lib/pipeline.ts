@@ -159,8 +159,8 @@ export const PRIORITY_COLOR: Record<Priority, string> = {
   BAJA: "#64748b",
 };
 
-/** Servicios que ofrece la empresa, como los escribe el equipo. */
-export const SERVICES = ["AGENTES IA", "SISTEMAS", "APP", "TAXI"] as const;
+/** Servicios de arranque para una organización nueva (ver server/services/services-catalog.ts). */
+export const DEFAULT_SERVICES = ["AGENTES IA", "SISTEMAS", "APP", "TAXI"];
 
 export type LossReason =
   | "PRESUPUESTO"

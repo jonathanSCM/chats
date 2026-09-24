@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
+import { getOrgServices } from "@/server/services/services-catalog";
 
 const CONVERSATION_STATUS_LABEL: Record<string, string> = {
   OPEN: "Reabierta",
@@ -89,6 +90,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     orderBy: { name: "asc" },
   });
   const canCreateGoogleMeet = await hasGoogleCalendarConnected(session.user.id);
+  const services = (await getOrgServices(organizationId)).map((s) => s.label);
 
   // Historial: los movimientos del lead, uniendo lo que ya audita la propia
   // Conversation (archivar, bloquear, transferir) con lo que audita cada
@@ -158,6 +160,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     assignedToId: conversation.assignedToId,
     botPaused: conversation.botPaused,
     aiQualificationEnabled: conversation.bot.aiQualificationEnabled,
+    services,
     contact: conversation.contact
       ? {
           id: conversation.contact.id,

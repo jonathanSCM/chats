@@ -6,7 +6,7 @@ import { Loader2, CalendarDays } from "lucide-react";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, Thead, Th, Td, Tr } from "@/components/ui/table";
 import { Input, Select } from "@/components/ui/input";
-import { LOSS_REASON_LABEL, SERVICES, type LossReason } from "@/lib/pipeline";
+import { LOSS_REASON_LABEL, type LossReason } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 
 interface UpcomingMeeting {
@@ -88,11 +88,13 @@ export function DashboardClient({
   upcomingMeetings,
   members,
   sources,
+  services,
 }: {
   userName: string;
   upcomingMeetings: UpcomingMeeting[];
   members: { id: string; name: string }[];
   sources: string[];
+  services: string[];
 }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -160,7 +162,7 @@ export function DashboardClient({
         </Select>
         <Select value={service} onChange={(e) => setService(e.target.value)} className="w-full py-1.5 text-sm sm:w-36">
           <option value="">Todo servicio</option>
-          {SERVICES.map((s) => (
+          {services.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>

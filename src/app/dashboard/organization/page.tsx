@@ -8,6 +8,7 @@ import { InvitePanel } from "./_components/invite-panel";
 import { AiSettingsForm } from "./_components/ai-settings-form";
 import { BookingSettingsForm } from "./_components/booking-settings-form";
 import { PipelineStagesList } from "./_components/pipeline-stages-list";
+import { ServicesList } from "./_components/services-list";
 import { BotAccessMatrix } from "./_components/bot-access-matrix";
 import { DangerZone } from "./_components/danger-zone";
 
@@ -16,7 +17,7 @@ export default async function OrganizationSettingsPage() {
   if (!session?.user.organizationId) redirect("/dashboard");
   if (session.user.role !== "OWNER") redirect("/dashboard");
 
-  const [org, members, invites, bots, botMembers, pipelineStages] = await Promise.all([
+  const [org, members, invites, bots, botMembers, pipelineStages, services] = await Promise.all([
     prisma.organization.findUniqueOrThrow({ where: { id: session.user.organizationId } }),
     prisma.user.findMany({
       // SYSTEM son cuentas técnicas (ej. el bot de subtítulos) sin dueño
@@ -42,6 +43,10 @@ export default async function OrganizationSettingsPage() {
       where: { organizationId: session.user.organizationId },
       orderBy: { order: "asc" },
       include: { _count: { select: { opportunities: true } } },
+    }),
+    prisma.service.findMany({
+      where: { organizationId: session.user.organizationId },
+      orderBy: { order: "asc" },
     }),
   ]);
 
@@ -97,6 +102,15 @@ export default async function OrganizationSettingsPage() {
             opportunityCount: s._count.opportunities,
           }))}
         />
+      </Card>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Servicios</CardTitle>
+        <CardDescription className="mb-4">
+          Las opciones de "servicio de interés" al cargar una oportunidad — nombre, orden, agregar o
+          quitar. Borrar una no afecta a los clientes que ya tenían ese servicio cargado.
+        </CardDescription>
+        <ServicesList services={services} />
       </Card>
 
       <Card className="mb-6">

@@ -6,7 +6,7 @@ import { prisma } from "@/server/db/client";
 import { requireSession, HttpError } from "@/server/auth/guards";
 import { uniqueOrgSlug } from "@/lib/slugify";
 import { generateToken } from "@/lib/tokens";
-import { DEFAULT_PIPELINE_STAGES } from "@/lib/pipeline";
+import { DEFAULT_PIPELINE_STAGES, DEFAULT_SERVICES } from "@/lib/pipeline";
 import { sendMail } from "@/server/services/mailer";
 import { inviteEmail } from "@/server/services/email-templates";
 import type { ActionState } from "./types";
@@ -67,6 +67,9 @@ export async function createOrganizationAction(
         isDefaultEntry: s.isDefaultEntry,
         requiresProposalFields: s.requiresProposalFields,
       })),
+    });
+    await tx.service.createMany({
+      data: DEFAULT_SERVICES.map((label, order) => ({ organizationId: newOrg.id, label, order })),
     });
     await tx.organizationInvite.create({
       data: {

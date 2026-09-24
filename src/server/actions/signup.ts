@@ -7,7 +7,7 @@ import { prisma } from "@/server/db/client";
 import { signIn } from "@/server/auth";
 import { uniqueOrgSlug } from "@/lib/slugify";
 import { getClientIp, rateLimit, rateLimitMessage } from "@/lib/rate-limit";
-import { DEFAULT_PIPELINE_STAGES } from "@/lib/pipeline";
+import { DEFAULT_PIPELINE_STAGES, DEFAULT_SERVICES } from "@/lib/pipeline";
 import type { ActionState } from "./types";
 
 const signupSchema = z.object({
@@ -74,6 +74,9 @@ export async function signupAction(
         isDefaultEntry: s.isDefaultEntry,
         requiresProposalFields: s.requiresProposalFields,
       })),
+    });
+    await tx.service.createMany({
+      data: DEFAULT_SERVICES.map((label, order) => ({ organizationId: org.id, label, order })),
     });
 
     await tx.user.create({

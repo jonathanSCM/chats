@@ -3,6 +3,7 @@ import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { hasCompleteNextAction, type Priority, type LossReason } from "@/lib/pipeline";
 import { getOrgStages } from "@/server/services/pipeline";
+import { getOrgServices } from "@/server/services/services-catalog";
 import { getAiSpendToday } from "@/server/actions/crm";
 import { hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
 import { TrackingTable } from "./_components/tracking-table";
@@ -43,6 +44,7 @@ export default async function SeguimientoPage({
   const isAdmin = session.user.role === "OWNER" || session.user.role === "SUPERADMIN";
 
   const stages = await getOrgStages(organizationId);
+  const services = (await getOrgServices(organizationId)).map((s) => s.label);
   // Fuera del flujo principal (antes HIDDEN_BY_DEFAULT_STAGES): las 3
   // etapas con role no-null (ganado/perdido/nutrir).
   const hiddenStageIds = stages.filter((s) => s.role !== null).map((s) => s.id);
@@ -185,6 +187,7 @@ export default async function SeguimientoPage({
       <TrackingTable
         rows={rows}
         stages={stages}
+        services={services}
         contacts={contacts.map((c) => ({ id: c.id, label: c.fullName || c.phone }))}
         members={members.map((m) => ({ id: m.id, name: m.name || m.email, color: m.color }))}
         currentUserId={session.user.id}

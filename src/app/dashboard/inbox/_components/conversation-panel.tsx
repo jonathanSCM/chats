@@ -38,7 +38,6 @@ import {
 import { createMeetingFromConversationAction } from "@/server/actions/inbox-meetings";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
-import { SERVICES } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 import { scheduledAtToUtcHidden, utcIsoToLocalInputValue } from "@/lib/datetime-local";
 
@@ -48,6 +47,7 @@ interface PanelData {
   assignedToId: string | null;
   botPaused: boolean;
   aiQualificationEnabled: boolean;
+  services: string[];
   contact: {
     id: string;
     fullName: string | null;
@@ -388,6 +388,7 @@ export function ConversationPanel({
               <AddToTrackingForm
                 contactId={data.contact.id}
                 customerName={data.contact.fullName}
+                services={data.services}
                 onCancel={() => setAddingToTracking(false)}
                 onCreated={(opportunityId) => {
                   router.push(`/dashboard/seguimiento?open=${opportunityId}`);
@@ -571,11 +572,13 @@ function NoteForm({
 function AddToTrackingForm({
   contactId,
   customerName,
+  services,
   onCancel,
   onCreated,
 }: {
   contactId: string;
   customerName: string | null;
+  services: string[];
   onCancel: () => void;
   onCreated: (opportunityId: string) => void;
 }) {
@@ -593,7 +596,7 @@ function AddToTrackingForm({
         <Label>Servicio</Label>
         <Select name="serviceInterest" defaultValue="" className="py-1.5 text-xs">
           <option value="">Sin definir</option>
-          {SERVICES.map((s) => (
+          {services.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>

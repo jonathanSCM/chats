@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { DashboardClient } from "./_components/dashboard-client";
+import { getOrgServices } from "@/server/services/services-catalog";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -10,7 +11,7 @@ export default async function DashboardPage() {
 
   const organizationId = session.user.organizationId;
 
-  const [meetings, members, sourcesRaw] = await Promise.all([
+  const [meetings, members, sourcesRaw, services] = await Promise.all([
     prisma.meeting.findMany({
       where: {
         organizationId,
@@ -39,6 +40,7 @@ export default async function DashboardPage() {
       select: { source: true },
       distinct: ["source"],
     }),
+    getOrgServices(organizationId),
   ]);
 
   const upcomingMeetings = meetings.map((m) => ({
@@ -62,6 +64,7 @@ export default async function DashboardPage() {
       upcomingMeetings={upcomingMeetings}
       members={members.map((m) => ({ id: m.id, name: m.name || m.email }))}
       sources={sourcesRaw.map((s) => s.source!).filter(Boolean)}
+      services={services.map((s) => s.label)}
     />
   );
 }

@@ -71,6 +71,7 @@ model Organization {
   aiAnalyses             AiAnalysis[]
   metaAttributionTouches MetaAttributionTouch[]
   pipelineStages         PipelineStage[]
+  services               Service[]
 
   @@map("organizations")
 }
@@ -707,6 +708,22 @@ model PipelineStage {
 
   @@unique([organizationId, order])
   @@map("pipeline_stages")
+}
+
+// Opciones de "servicio de interés" (manual, antes una lista fija
+// SERVICES en lib/pipeline.ts) -- editable por organización, mismo patrón
+// que PipelineStage pero sin rol protegido ni lógica atada: es solo texto
+// libre para elegir en un <select>, Opportunity.serviceInterest ya era un
+// String? (nunca un enum), así que no hace falta migrar datos existentes.
+model Service {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  label          String
+  order          Int
+
+  @@unique([organizationId, order])
+  @@map("services")
 }
 
 enum Priority {

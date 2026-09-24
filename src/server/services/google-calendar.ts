@@ -124,6 +124,40 @@ export async function createMeetEvent({
   return { meetingUrl, eventId };
 }
 
+/**
+ * Igual que createMeetEvent, pero sin pedir conferenceData -- solo bloquea
+ * el horario en el calendario, sin generar un link de Meet. Para cuando el
+ * bot de calificación agenda solo: no hay nadie eligiendo modalidad
+ * (presencial, llamada, etc.), así que no corresponde inventarle un Meet.
+ */
+export async function createCalendarEvent({
+  calendarId,
+  summary,
+  scheduledAt,
+  durationMinutes,
+}: {
+  calendarId: string;
+  summary: string;
+  scheduledAt: Date;
+  durationMinutes: number;
+}): Promise<{ eventId: string }> {
+  const calendar = getCalendarClient();
+  const endAt = new Date(scheduledAt.getTime() + durationMinutes * 60_000);
+
+  const res = await calendar.events.insert({
+    calendarId,
+    requestBody: {
+      summary,
+      start: { dateTime: scheduledAt.toISOString() },
+      end: { dateTime: endAt.toISOString() },
+    },
+  });
+
+  const eventId = res.data.id;
+  if (!eventId) throw new Error("Google Calendar no devolvió el evento creado.");
+  return { eventId };
+}
+
 /** Cambia la hora/duración de un evento ya creado — avisa a los invitados del cambio. */
 export async function updateMeetEvent({
   calendarId,

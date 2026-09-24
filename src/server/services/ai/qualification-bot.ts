@@ -5,6 +5,7 @@ import { sendTextMessage, sendInteractiveListMessage, type InteractiveListRow } 
 import { notifyNewMessage } from "@/server/services/push";
 import { getOrgStages, defaultEntryStage } from "@/server/services/pipeline";
 import { getAvailableDays, getAvailableSlots, hasSchedulingConflict, formatSlotLabel } from "@/server/services/availability";
+import { createCalendarEvent, getOrCreateOrgCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
 import { MODELS, runStructured } from "./client";
 
 // v2: se saca "reunion_elegida" del esquema -- el horario ya no se elige
@@ -486,17 +487,34 @@ export async function confirmMeetingSlot(conversationId: string, isoDate: string
   // a mano en vez de quedar un choque silencioso en el calendario.
   const org = await prisma.organization.findUniqueOrThrow({
     where: { id: conversation.organizationId },
-    select: { bookingDurationMinutes: true },
+    select: { name: true, bookingDurationMinutes: true },
   });
   const conflict = await hasSchedulingConflict(conversation.organizationId, slotDate, org.bookingDurationMinutes);
   const label = formatSlotLabel(slotDate, conversation.timezone);
 
-  // El bot ya no crea el link de Meet -- decisión explícita: la creación de
-  // Calendar/Meet quedó reservada para cuando un vendedor la arma a mano
-  // (ver createMeetingAction en crm.ts). Acá solo se deja agendada la fecha
-  // y el nombre, para que la reunión ya aparezca en el CRM y el vendedor
-  // solo tenga que completar el link.
   const title = `Reunión de diagnóstico — ${conversation.contact?.fullName || conversation.contact?.phone || "Lead"}`;
+
+  // El bot agenda solo -- no hay nadie eligiendo modalidad (Meet, llamada,
+  // presencial), así que no le inventamos un link de Meet. Igual se crea el
+  // evento en el calendario compartido de la organización para que la
+  // reunión bloquee el horario y sea visible para el equipo, no solo en el
+  // CRM. Si Calendar falla, no se bloquea el agendamiento -- la reunión
+  // queda igual en el CRM, solo sin sincronizar (se loguea el error).
+  let googleEventId: string | null = null;
+  if (isGoogleMeetEnabled()) {
+    try {
+      const calendarId = await getOrCreateOrgCalendar(conversation.organizationId, org.name);
+      const event = await createCalendarEvent({
+        calendarId,
+        summary: title,
+        scheduledAt: slotDate,
+        durationMinutes: org.bookingDurationMinutes,
+      });
+      googleEventId = event.eventId;
+    } catch (error) {
+      console.error("[bot] Error creando el evento en Google Calendar:", error);
+    }
+  }
 
   await prisma.meeting.create({
     data: {
@@ -506,14 +524,15 @@ export async function confirmMeetingSlot(conversationId: string, isoDate: string
       scheduledAt: slotDate,
       durationMinutes: org.bookingDurationMinutes,
       meetingUrl: null,
+      googleEventId,
       status: "SCHEDULED",
       notes: conflict
         ? "⚠️ Posible choque de horario: otra reunión ya ocupaba esta franja cuando se confirmó. Revisar y reagendar si hace falta. Agendada automáticamente por el bot de calificación."
-        : "Agendada automáticamente por el bot de calificación. Falta agregar el link de la reunión.",
+        : "Agendada automáticamente por el bot de calificación.",
     },
   });
 
-  await sendAndSave(conversation, `Listo, quedó agendada para el ${label} 🙌 En breve te paso el link de la reunión.`);
+  await sendAndSave(conversation, `Listo, quedó agendada para el ${label} 🙌 Nos vemos ahí.`);
 
   await notifyNewMessage({
     conversationId: conversation.id,

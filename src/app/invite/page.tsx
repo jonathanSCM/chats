@@ -1,7 +1,9 @@
 import { prisma } from "@/server/db/client";
 import { hashToken } from "@/lib/tokens";
+import { auth } from "@/server/auth";
 import { Logo } from "@/components/logo";
 import { AcceptInviteForm } from "./accept-invite-form";
+import { AcceptWithCurrentSession } from "./accept-with-current-session";
 
 // Consulta la DB en cada visita (valida el token) — nunca debe
 // prerenderizarse en build time, cuando la base todavía no es alcanzable.
@@ -23,6 +25,14 @@ export default async function InvitePage({
 
   const isValid = invite && !invite.acceptedAt && invite.expiresAt > new Date();
 
+  // Si ya hay una sesión activa con el mismo correo (o la invitación no
+  // apunta a un correo fijo), ofrecemos el camino corto: sumar la
+  // membresía nueva sin pedir contraseña de nuevo ni cerrar la sesión
+  // actual (ver acceptInviteWithCurrentSessionAction).
+  const session = isValid ? await auth() : null;
+  const canUseCurrentSession =
+    isValid && session?.user?.email && (!invite.email || invite.email === session.user.email);
+
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm animate-fade-up">
@@ -37,7 +47,13 @@ export default async function InvitePage({
           )}
         </div>
 
-        {isValid ? (
+        {isValid && canUseCurrentSession ? (
+          <AcceptWithCurrentSession
+            token={token!}
+            currentEmail={session!.user!.email!}
+            organizationName={invite.organization.name}
+          />
+        ) : isValid ? (
           <AcceptInviteForm token={token!} fixedEmail={invite.email ?? undefined} />
         ) : (
           <div className="corner-brackets rounded-lg border border-border bg-surface p-6 text-center">

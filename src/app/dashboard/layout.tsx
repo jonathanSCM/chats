@@ -22,6 +22,8 @@ import { SidebarToggle } from "@/components/layout/sidebar-toggle";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ServerClock } from "@/components/layout/server-clock";
+import { OrgSwitcher } from "@/components/layout/org-switcher";
+import { getUserMemberships } from "@/server/services/organization-membership";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -41,6 +43,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const org = session?.user.organizationId
     ? await prisma.organization.findUnique({ where: { id: session.user.organizationId } })
     : null;
+  const memberships = session?.user.id
+    ? await getUserMemberships(session.user.id).then((m) =>
+        m.map((mm) => ({ organizationId: mm.organizationId, organizationName: mm.organizationName })),
+      )
+    : [];
 
   const serverNowIso = new Date().toISOString();
   // Antes usaba el huso horario del SO del servidor (UTC en producción, sin
@@ -102,9 +109,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <UserCircle size={13} className="shrink-0 text-ink-faint" />
             {session?.user.email}
           </p>
-          <p className="truncate font-mono text-[11px] text-ink-faint">
-            {org?.name ?? "Sin organización"}
-          </p>
+          {/* Selector solo si pertenece a más de una organización -- si no,
+              se ve exactamente igual que antes (texto fijo, sin control). */}
+          {memberships.length > 1 && session?.user.organizationId ? (
+            <OrgSwitcher currentOrganizationId={session.user.organizationId} memberships={memberships} />
+          ) : (
+            <p className="truncate px-2 font-mono text-[11px] text-ink-faint">
+              {org?.name ?? "Sin organización"}
+            </p>
+          )}
           <ServerClock initialIso={serverNowIso} timeZone={serverTimeZone} />
         </Link>
         <ThemeToggle />

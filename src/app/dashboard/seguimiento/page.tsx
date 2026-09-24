@@ -4,6 +4,7 @@ import { prisma } from "@/server/db/client";
 import { hasCompleteNextAction, type Priority, type LossReason } from "@/lib/pipeline";
 import { getOrgStages } from "@/server/services/pipeline";
 import { getOrgServices } from "@/server/services/services-catalog";
+import { getOrgMemberUserIds } from "@/server/services/organization-membership";
 import { getAiSpendToday } from "@/server/actions/crm";
 import { hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
 import { TrackingTable } from "./_components/tracking-table";
@@ -97,13 +98,15 @@ export default async function SeguimientoPage({
       orderBy: { lastContactAt: "desc" },
       take: 300,
     }),
-    prisma.user.findMany({
-      // SYSTEM son cuentas técnicas sin dueño humano -- no deben poder
-      // aparecer como "responsable" asignable de una oportunidad.
-      where: { organizationId, role: { not: "SYSTEM" } },
-      select: { id: true, name: true, email: true, color: true },
-      orderBy: { createdAt: "asc" },
-    }),
+    getOrgMemberUserIds(organizationId).then((ids) =>
+      prisma.user.findMany({
+        // SYSTEM son cuentas técnicas sin dueño humano -- no deben poder
+        // aparecer como "responsable" asignable de una oportunidad.
+        where: { id: { in: ids }, role: { not: "SYSTEM" } },
+        select: { id: true, name: true, email: true, color: true },
+        orderBy: { createdAt: "asc" },
+      }),
+    ),
     getAiSpendToday(organizationId),
   ]);
   const canCreateGoogleMeet = await hasGoogleCalendarConnected(session.user.id);

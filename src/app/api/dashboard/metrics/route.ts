@@ -4,6 +4,7 @@ import { prisma } from "@/server/db/client";
 import { deriveAlerts } from "@/lib/opportunity-alerts";
 import { hasCompleteNextAction, ALL_LOSS_REASONS } from "@/lib/pipeline";
 import { getOrgStages, openStages, wonStage, type PipelineStage } from "@/server/services/pipeline";
+import { getOrgMemberUserIds } from "@/server/services/organization-membership";
 
 /**
  * Métricas del Dashboard (scope §1-8): KPIs, funnel con conversión,
@@ -93,7 +94,7 @@ export async function GET(req: NextRequest) {
   });
 
   const opportunityIds = opportunities.map((o) => o.id);
-  const [stageEvents, meetings, members] = await Promise.all([
+  const [stageEvents, meetings, memberIds] = await Promise.all([
     prisma.auditLog.findMany({
       where: { entityType: "Opportunity", entityId: { in: opportunityIds }, action: "stage_change" },
       select: { entityId: true, after: true, createdAt: true },
@@ -103,8 +104,12 @@ export async function GET(req: NextRequest) {
       where: { opportunityId: { in: opportunityIds }, status: "DONE" },
       select: { opportunityId: true },
     }),
-    prisma.user.findMany({ where: { organizationId, role: { not: "SYSTEM" } }, select: { id: true, name: true, email: true } }),
+    getOrgMemberUserIds(organizationId),
   ]);
+  const members = await prisma.user.findMany({
+    where: { id: { in: memberIds }, role: { not: "SYSTEM" } },
+    select: { id: true, name: true, email: true },
+  });
   const memberById = new Map(members.map((m) => [m.id, m.name || m.email]));
 
   const todayStr = new Date().toISOString().slice(0, 10);

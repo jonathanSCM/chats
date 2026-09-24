@@ -3,6 +3,7 @@ import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { DashboardClient } from "./_components/dashboard-client";
 import { getOrgServices } from "@/server/services/services-catalog";
+import { getOrgMemberUserIds } from "@/server/services/organization-membership";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -30,11 +31,9 @@ export default async function DashboardPage() {
       orderBy: { scheduledAt: "asc" },
       take: 4,
     }),
-    prisma.user.findMany({
-      where: { organizationId },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    }),
+    getOrgMemberUserIds(organizationId).then((ids) =>
+      prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, email: true }, orderBy: { name: "asc" } }),
+    ),
     prisma.contact.findMany({
       where: { organizationId, source: { not: null } },
       select: { source: true },

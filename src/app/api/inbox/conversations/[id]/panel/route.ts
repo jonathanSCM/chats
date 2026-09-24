@@ -3,6 +3,7 @@ import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
 import { getOrgServices } from "@/server/services/services-catalog";
+import { getOrgMemberUserIds } from "@/server/services/organization-membership";
 
 const CONVERSATION_STATUS_LABEL: Record<string, string> = {
   OPEN: "Reabierta",
@@ -85,7 +86,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const team = await prisma.user.findMany({
     // SYSTEM son cuentas técnicas sin dueño humano -- no deben poder
     // aparecer como destino de transferencia de la conversación.
-    where: { organizationId, role: { not: "SYSTEM" } },
+    where: { id: { in: await getOrgMemberUserIds(organizationId) }, role: { not: "SYSTEM" } },
     select: { id: true, name: true, email: true },
     orderBy: { name: "asc" },
   });

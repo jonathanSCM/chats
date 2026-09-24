@@ -201,11 +201,14 @@ export async function unshareOrgCalendarAction(email: string): Promise<ActionSta
 
 /**
  * Borra la organización entera: bots, conexiones de WhatsApp, contactos,
- * oportunidades, conversaciones, mensajes, base de conocimiento y todos los
- * usuarios del equipo (cascada por las relaciones del schema). Es
- * irreversible — por eso exige escribir el nombre exacto de la organización,
- * no un simple "sí/no". Los registros de auditoría quedan (no tienen relación
- * con clave foránea a propósito), como rastro de que existió y se borró.
+ * oportunidades, conversaciones, mensajes, base de conocimiento y las
+ * membresías del equipo (cascada por las relaciones del schema). Desde que
+ * un usuario puede pertenecer a varias organizaciones, esto ya NO borra a
+ * los usuarios -- solo su membresía en esta -- para no destruir cuentas que
+ * también pertenecen a otra organización. Es irreversible -- por eso exige
+ * escribir el nombre exacto de la organización, no un simple "sí/no". Los
+ * registros de auditoría quedan (no tienen relación con clave foránea a
+ * propósito), como rastro de que existió y se borró.
  */
 export async function deleteOrganizationAction(
   _prevState: ActionState,
@@ -226,7 +229,25 @@ export async function deleteOrganizationAction(
     return { error: `Escribe exactamente "${org.name}" para confirmar` };
   }
 
+  // Quién más tenía esta organización como activa -- después de borrarla
+  // (SetNull en cascada) les queda organizationId null aunque tengan otra
+  // membresía; se los pasa a otra que les quede, para no dejarlos varados
+  // con el panel roto teniendo a dónde ir.
+  const affectedUserIds = (
+    await prisma.user.findMany({ where: { organizationId: org.id }, select: { id: true } })
+  ).map((u) => u.id);
+
   await prisma.organization.delete({ where: { id: org.id } });
+
+  for (const userId of affectedUserIds) {
+    const another = await prisma.organizationMembership.findFirst({ where: { userId } });
+    if (another) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { organizationId: another.organizationId, role: another.role },
+      });
+    }
+  }
 
   await signOut({ redirectTo: "/login" });
   return { error: null };

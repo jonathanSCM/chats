@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
+import { getOrgMemberUserIds } from "@/server/services/organization-membership";
 
 /**
  * Exportación completa de los datos de la organización (derecho de acceso /
@@ -15,6 +16,7 @@ export async function GET() {
   }
 
   const organizationId = session.user.organizationId;
+  const memberIds = await getOrgMemberUserIds(organizationId);
 
   const [organization, users, bots, contacts, opportunities, conversations, knowledgeItems] =
     await Promise.all([
@@ -23,7 +25,7 @@ export async function GET() {
         select: { id: true, name: true, slug: true, aiMessageLimit: true, createdAt: true },
       }),
       prisma.user.findMany({
-        where: { organizationId },
+        where: { id: { in: memberIds } },
         select: { id: true, name: true, email: true, role: true, createdAt: true },
       }),
       prisma.bot.findMany({

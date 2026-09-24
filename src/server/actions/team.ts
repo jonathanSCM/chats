@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { AuthError } from "next-auth";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { redirect } from "next/navigation";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
-import { signIn } from "@/server/auth";
+import { auth, signIn } from "@/server/auth";
 import { generateToken, hashToken } from "@/lib/tokens";
 import { sendMail } from "@/server/services/mailer";
 import { inviteEmail } from "@/server/services/email-templates";
@@ -92,12 +93,30 @@ export async function removeMemberAction(memberId: string): Promise<ActionState>
     return { error: "No puedes quitarte a ti mismo" };
   }
 
-  const member = await prisma.user.findUnique({ where: { id: memberId } });
-  if (!member || member.organizationId !== organizationId) {
+  const membership = await prisma.organizationMembership.findUnique({
+    where: { userId_organizationId: { userId: memberId, organizationId } },
+  });
+  if (!membership) {
     return { error: "Miembro no encontrado" };
   }
 
-  await prisma.user.update({ where: { id: memberId }, data: { organizationId: null } });
+  await prisma.organizationMembership.delete({ where: { id: membership.id } });
+
+  // Si esta era su organización ACTIVA, no puede quedar apuntando a una
+  // organización de la que ya no es miembro -- pasa a otra que le quede, o
+  // queda "huérfano" (organizationId null) si no le queda ninguna, igual
+  // que el comportamiento de siempre para alguien sin ninguna organización.
+  const member = await prisma.user.findUnique({ where: { id: memberId }, select: { organizationId: true } });
+  if (member?.organizationId === organizationId) {
+    const another = await prisma.organizationMembership.findFirst({ where: { userId: memberId } });
+    await prisma.user.update({
+      where: { id: memberId },
+      data: another
+        ? { organizationId: another.organizationId, role: another.role }
+        : { organizationId: null },
+    });
+  }
+
   revalidatePath("/dashboard/organization");
   return { error: null };
 }
@@ -114,8 +133,10 @@ export async function updateUserColorAction(userId: string, color: string): Prom
   const session = await requireSession();
   if (!session.user.organizationId) return { error: "Sin organización" };
 
-  const member = await prisma.user.findUnique({ where: { id: userId } });
-  if (!member || member.organizationId !== session.user.organizationId) {
+  const membership = await prisma.organizationMembership.findUnique({
+    where: { userId_organizationId: { userId, organizationId: session.user.organizationId } },
+  });
+  if (!membership) {
     return { error: "Miembro no encontrado" };
   }
 
@@ -149,12 +170,22 @@ export async function changeMemberRoleAction(
     return { error: "Rol inválido" };
   }
 
-  const member = await prisma.user.findUnique({ where: { id: memberId } });
-  if (!member || member.organizationId !== organizationId) {
+  const membership = await prisma.organizationMembership.findUnique({
+    where: { userId_organizationId: { userId: memberId, organizationId } },
+  });
+  if (!membership) {
     return { error: "Miembro no encontrado" };
   }
 
-  await prisma.user.update({ where: { id: memberId }, data: { role: parsedRole.data } });
+  // El rol es por organización -- se actualiza la membresía de ESTA
+  // organización, y además User.role si esta es la que tiene activa ahora
+  // mismo (para que su sesión ya refleje el rol nuevo sin re-loguear).
+  await prisma.organizationMembership.update({ where: { id: membership.id }, data: { role: parsedRole.data } });
+  const member = await prisma.user.findUnique({ where: { id: memberId }, select: { organizationId: true } });
+  if (member?.organizationId === organizationId) {
+    await prisma.user.update({ where: { id: memberId }, data: { role: parsedRole.data } });
+  }
+
   revalidatePath("/dashboard/organization");
   return { error: null };
 }
@@ -192,20 +223,41 @@ export async function acceptInviteAction(
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing && existing.organizationId) {
-    return { error: "Ese correo ya tiene una cuenta activa en WhatsApp ProShop. Inicia sesión en su lugar." };
+
+  if (existing) {
+    const alreadyMember = await prisma.organizationMembership.findUnique({
+      where: { userId_organizationId: { userId: existing.id, organizationId: invite.organizationId } },
+    });
+    if (alreadyMember) {
+      return { error: "Ese correo ya es miembro de esta organización. Inicia sesión en su lugar." };
+    }
+
+    // Ya tiene actividad real en otra organización -- este formulario asume
+    // que está fijando una contraseña, y no podemos dejar que le pise la que
+    // ya tiene sin probar identidad primero. Si ya está logueado con este
+    // correo, InvitePage ofrece un camino más corto que no pasa por acá
+    // (ver acceptInviteWithCurrentSessionAction).
+    const hasOtherMemberships = (await prisma.organizationMembership.count({ where: { userId: existing.id } })) > 0;
+    if (hasOtherMemberships) {
+      return {
+        error: "Ese correo ya tiene una cuenta. Inicia sesión con tu contraseña y volvé a abrir este link para unirte.",
+      };
+    }
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
 
   if (existing) {
-    // Cuenta que ya existía pero fue removida de una organización (queda
-    // "huérfana": organizationId null) — la reactivamos en esta en vez de
-    // bloquear la invitación, así se puede volver a invitar a alguien.
+    // Cuenta que existía pero no tenía ninguna organización (huérfana, o
+    // recién creada sin invitación aceptar) -- se reactiva acá, fijando
+    // contraseña nueva, igual que siempre.
     await prisma.$transaction([
       prisma.user.update({
         where: { id: existing.id },
         data: { passwordHash, name, role: invite.role, organizationId: invite.organizationId },
+      }),
+      prisma.organizationMembership.create({
+        data: { userId: existing.id, organizationId: invite.organizationId, role: invite.role },
       }),
       prisma.organizationInvite.update({
         where: { id: invite.id },
@@ -213,16 +265,19 @@ export async function acceptInviteAction(
       }),
     ]);
   } else {
+    const created = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        name,
+        role: invite.role,
+        organizationId: invite.organizationId,
+        emailVerified: new Date(), // llegó por invitación directa, se toma como verificado
+      },
+    });
     await prisma.$transaction([
-      prisma.user.create({
-        data: {
-          email,
-          passwordHash,
-          name,
-          role: invite.role,
-          organizationId: invite.organizationId,
-          emailVerified: new Date(), // llegó por invitación directa, se toma como verificado
-        },
+      prisma.organizationMembership.create({
+        data: { userId: created.id, organizationId: invite.organizationId, role: invite.role },
       }),
       prisma.organizationInvite.update({
         where: { id: invite.id },
@@ -240,4 +295,48 @@ export async function acceptInviteAction(
     }
     throw error;
   }
+}
+
+/**
+ * Camino corto para cuando quien abre el link de invitación YA tiene una
+ * sesión activa (el caso típico: un dueño logueado en la organización A
+ * abre la invitación que le mandaron a la B) -- no pide contraseña de
+ * nuevo, solo agrega la membresía nueva y la deja como activa. Ver
+ * src/app/invite/page.tsx para cuándo se ofrece este camino en vez del
+ * formulario de acceptInviteAction.
+ */
+export async function acceptInviteWithCurrentSessionAction(token: string): Promise<ActionState> {
+  const session = await auth();
+  if (!session?.user?.email || !session.user.id) {
+    return { error: "Iniciá sesión primero." };
+  }
+
+  const tokenHash = hashToken(token);
+  const invite = await prisma.organizationInvite.findUnique({ where: { tokenHash } });
+  if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
+    return { error: "Esa invitación ya no es válida." };
+  }
+  if (invite.email && invite.email !== session.user.email) {
+    return { error: `Esta invitación es solo para ${invite.email}.` };
+  }
+
+  const alreadyMember = await prisma.organizationMembership.findUnique({
+    where: { userId_organizationId: { userId: session.user.id, organizationId: invite.organizationId } },
+  });
+  if (alreadyMember) {
+    return { error: "Ya sos miembro de esta organización." };
+  }
+
+  await prisma.$transaction([
+    prisma.organizationMembership.create({
+      data: { userId: session.user.id, organizationId: invite.organizationId, role: invite.role },
+    }),
+    prisma.user.update({
+      where: { id: session.user.id },
+      data: { organizationId: invite.organizationId, role: invite.role },
+    }),
+    prisma.organizationInvite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }),
+  ]);
+
+  redirect("/dashboard");
 }

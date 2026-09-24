@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { getOrgStages, openStages, wonStage, type PipelineStage } from "@/server/services/pipeline";
+import { getOrgMemberUserIds } from "@/server/services/organization-membership";
 
 /**
  * Analítica agregada de toda la cartera de la organización: valor del
@@ -71,7 +72,7 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
     }),
     prisma.user.findMany({
-      where: { organizationId },
+      where: { id: { in: await getOrgMemberUserIds(organizationId) } },
       select: { id: true, name: true, email: true },
     }),
     // Para el reporte por campaña, más abajo.

@@ -72,6 +72,7 @@ model Organization {
   metaAttributionTouches MetaAttributionTouch[]
   pipelineStages         PipelineStage[]
   services               Service[]
+  memberships            OrganizationMembership[]
 
   @@map("organizations")
 }
@@ -96,8 +97,14 @@ model User {
   // entrás a /dashboard/extension-authorize desde la extensión, reusando tu
   // sesión ya iniciada del CRM (ver src/app/dashboard/extension-authorize).
   meetExtensionToken String?       @unique
+  // Organización ACTIVA ahora mismo -- desde que existe OrganizationMembership
+  // (más abajo), esto es un puntero/caché de cuál de las membresías del
+  // usuario está usando, no la única organización posible. onDelete: SetNull
+  // (no Cascade): borrar una organización no debe borrar a un usuario que
+  // también pertenece a otra.
   organizationId     String?
-  organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  memberships        OrganizationMembership[]
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -119,6 +126,24 @@ model User {
 
   @@index([organizationId])
   @@map("users")
+}
+
+// Un usuario puede pertenecer a varias organizaciones -- esta tabla es la
+// fuente de verdad de "a cuáles"; User.organizationId/role (arriba) es solo
+// cuál de estas está activa en este momento (ver
+// server/actions/organization-switch.ts). El rol es por organización: se
+// puede ser OWNER en una y MEMBER en otra.
+model OrganizationMembership {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           UserRole     @default(MEMBER)
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, organizationId])
+  @@map("organization_memberships")
 }
 
 /**

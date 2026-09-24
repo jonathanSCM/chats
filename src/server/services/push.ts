@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { prisma } from "@/server/db/client";
+import { getOrgMemberUserIds } from "@/server/services/organization-membership";
 
 let configured = false;
 
@@ -93,9 +94,6 @@ export async function notifyNewMessage(params: {
     return;
   }
 
-  const team = await prisma.user.findMany({
-    where: { organizationId: params.organizationId },
-    select: { id: true },
-  });
-  await Promise.all(team.map((u) => sendPushToUser(u.id, payload)));
+  const memberIds = await getOrgMemberUserIds(params.organizationId);
+  await Promise.all(memberIds.map((id) => sendPushToUser(id, payload)));
 }

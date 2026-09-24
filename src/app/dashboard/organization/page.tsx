@@ -17,13 +17,16 @@ export default async function OrganizationSettingsPage() {
   if (!session?.user.organizationId) redirect("/dashboard");
   if (session.user.role !== "OWNER") redirect("/dashboard");
 
-  const [org, members, invites, bots, botMembers, pipelineStages, services] = await Promise.all([
+  const [org, memberships, invites, bots, botMembers, pipelineStages, services] = await Promise.all([
     prisma.organization.findUniqueOrThrow({ where: { id: session.user.organizationId } }),
-    prisma.user.findMany({
-      // SYSTEM son cuentas técnicas (ej. el bot de subtítulos) sin dueño
-      // humano -- no son equipo, no se muestran acá.
-      where: { organizationId: session.user.organizationId, role: { not: "SYSTEM" } },
-      select: { id: true, name: true, email: true, role: true, color: true },
+    // Vía OrganizationMembership, no User.organizationId directo: alguien
+    // sigue siendo del equipo de esta organización aunque tenga OTRA
+    // organización activa ahora mismo. El rol también sale de la membresía
+    // (es por organización, no global) -- SYSTEM son cuentas técnicas (ej.
+    // el bot de subtítulos) sin dueño humano, no son equipo, no se muestran.
+    prisma.organizationMembership.findMany({
+      where: { organizationId: session.user.organizationId, user: { role: { not: "SYSTEM" } } },
+      include: { user: { select: { id: true, name: true, email: true, color: true } } },
       orderBy: { createdAt: "asc" },
     }),
     prisma.organizationInvite.findMany({
@@ -50,6 +53,13 @@ export default async function OrganizationSettingsPage() {
     }),
   ]);
 
+  const members = memberships.map((m) => ({
+    id: m.user.id,
+    name: m.user.name,
+    email: m.user.email,
+    color: m.user.color,
+    role: m.role,
+  }));
   const vendedores = members.filter((m) => m.role === "MEMBER");
 
   return (

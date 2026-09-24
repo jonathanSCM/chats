@@ -109,18 +109,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <UserCircle size={13} className="shrink-0 text-ink-faint" />
             {session?.user.email}
           </p>
-          {/* Selector solo si pertenece a más de una organización -- si no,
-              se ve exactamente igual que antes (texto fijo, sin control). */}
-          {memberships.length > 1 && session?.user.organizationId ? (
-            <OrgSwitcher currentOrganizationId={session.user.organizationId} memberships={memberships} />
-          ) : (
-            <p className="truncate px-2 font-mono text-[11px] text-ink-faint">
-              {org?.name ?? "Sin organización"}
-            </p>
-          )}
+          <p className="truncate font-mono text-[11px] text-ink-faint">
+            {org?.name ?? "Sin organización"}
+          </p>
           <ServerClock initialIso={serverNowIso} timeZone={serverTimeZone} />
         </Link>
         <ThemeToggle />
+        {/* Selector solo si pertenece a más de una organización -- si no, no
+            aparece nada acá (el nombre fijo de arriba alcanza). Afuera del
+            Link de "Mi perfil" a propósito: adentro, un click para abrir el
+            desplegable también disparaba la navegación del Link. */}
+        {memberships.length > 1 && session?.user.organizationId && (
+          <OrgSwitcher currentOrganizationId={session.user.organizationId} memberships={memberships} />
+        )}
         <form action={logoutAction}>
           <button
             type="submit"

@@ -21,7 +21,7 @@ import {
 import { createUserMeetEvent, hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
 import { scheduleMeetingBotJoin, cancelMeetingBotJoin, stopMeetingBot } from "@/server/services/meeting-bot";
 import { requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
-import { reportOpportunityWon } from "@/server/services/meta-conversions";
+import { enqueue } from "@/server/jobs";
 import type { ActionState } from "./types";
 
 const PATH = "/dashboard/seguimiento";
@@ -269,9 +269,30 @@ export async function updateOpportunityFieldAction(
   await prisma.opportunity.update({ where: { id: opportunityId }, data });
 
   if (parsed.data.field === "stage" && targetStage?.role === "WON" && opportunity.stage.role !== "WON") {
-    void reportOpportunityWon(opportunityId).catch((error) =>
-      console.error(`[crm] Error reportando la venta ${opportunityId} a Meta:`, error),
-    );
+    await enqueue({
+      type: "meta_conversion_event",
+      payload: { opportunityId, eventName: "Purchase" },
+      uniqueKey: `meta-purchase-${opportunityId}`,
+    });
+  }
+
+  // Manual §Meta Ads Regla 2: se considera "lead calificado" la primera vez
+  // que una oportunidad deja la etapa de entrada por defecto -- antes era
+  // literal "POR_CALIFICAR → ENTREVISTA"; ahora el pipeline es configurable
+  // por organización, así que se generaliza a isDefaultEntry en vez de
+  // comparar nombres fijos de etapa.
+  if (
+    parsed.data.field === "stage" &&
+    targetStage &&
+    opportunity.stage.isDefaultEntry &&
+    !targetStage.isDefaultEntry &&
+    !opportunity.qualifiedEventSentAt
+  ) {
+    await enqueue({
+      type: "meta_conversion_event",
+      payload: { opportunityId, eventName: "QualifiedLead" },
+      uniqueKey: `meta-qualified-${opportunityId}`,
+    });
   }
 
   // Solo se auditan los cambios de estado y de dueño: son los que después

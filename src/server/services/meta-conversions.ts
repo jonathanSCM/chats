@@ -5,9 +5,10 @@ import { GRAPH_API_VERSION } from "@/server/services/whatsapp";
 /**
  * Le avisa a Meta qué pasó DESPUÉS de que un lead escribió por un anuncio
  * "Click to WhatsApp" -- sin esto, Meta solo sabe que alguien mandó un
- * mensaje, nunca si esa conversación terminó en una venta real. Con esto,
- * el algoritmo de entrega de los anuncios puede optimizar hacia gente que
- * de verdad compra, no solo hacia gente que escribe.
+ * mensaje, nunca si esa conversación terminó en un lead calificado o una
+ * venta real. Con esto, el algoritmo de entrega de los anuncios puede
+ * optimizar hacia gente que de verdad compra, no solo hacia gente que
+ * escribe.
  *
  * Requiere el permiso `whatsapp_business_manage_events` en el token de la
  * conexión -- distinto de los que ya se piden hoy (`whatsapp_business_management`
@@ -50,11 +51,17 @@ export async function getOrCreateDataset(params: {
  * (`ctwa_clid`, capturado del webhook cuando llegó el primer mensaje —
  * ver whatsapp.ts). `eventName` usa el vocabulario que Meta espera para
  * estos eventos (ej. "Purchase", "QualifiedLead"), no uno inventado.
+ *
+ * `eventId` es obligatorio y determinístico (ver reportOpportunityQualified/
+ * reportOpportunityWon) -- es lo que le permite a Meta deduplicar del lado
+ * de ellos si el job de la cola reintenta un envío que en realidad ya había
+ * llegado.
  */
 export async function sendConversionEvent(params: {
   datasetId: string;
   accessToken: string;
   eventName: "Purchase" | "QualifiedLead";
+  eventId: string;
   ctwaClid: string;
   /** Meta lo exige para eventos business_messaging/whatsapp -- confirmado
    * probando contra Test Events: sin esto, Meta rechaza el evento entero
@@ -63,8 +70,13 @@ export async function sendConversionEvent(params: {
   eventTime?: Date;
   value?: number;
   currency?: string;
+  /** Solo se manda cuando META_CONVERSIONS_TEST_EVENT_CODE está seteado --
+   * hace que el evento aparezca en el panel de Test Events de Meta en vez
+   * de contar como tráfico real, para poder probar sin ensuciar datos. */
+  testEventCode?: string;
 }): Promise<void> {
-  const { datasetId, accessToken, eventName, ctwaClid, wabaId, eventTime, value, currency } = params;
+  const { datasetId, accessToken, eventName, eventId, ctwaClid, wabaId, eventTime, value, currency, testEventCode } =
+    params;
 
   const res = await fetch(
     `https://graph.facebook.com/${GRAPH_API_VERSION}/${datasetId}/events?access_token=${encodeURIComponent(accessToken)}`,
@@ -75,6 +87,7 @@ export async function sendConversionEvent(params: {
         data: [
           {
             event_name: eventName,
+            event_id: eventId,
             event_time: Math.floor((eventTime ?? new Date()).getTime() / 1000),
             action_source: "business_messaging",
             messaging_channel: "whatsapp",
@@ -82,6 +95,7 @@ export async function sendConversionEvent(params: {
             ...(value !== undefined ? { custom_data: { currency: currency ?? "USD", value } } : {}),
           },
         ],
+        ...(testEventCode ? { test_event_code: testEventCode } : {}),
       }),
     },
   );
@@ -92,38 +106,34 @@ export async function sendConversionEvent(params: {
   }
 }
 
-/**
- * Se llama cuando una oportunidad pasa a "Ganado". Best-effort: si el lead
- * no vino de un anuncio "Click to WhatsApp" (no hay ctwa_clid guardado, ej.
- * llegó orgánico o por Coexistence), no hace nada -- no es un error, es el
- * caso normal para la mayoría de los clientes.
- *
- * `metaConversionSentAt` se marca ANTES de mandar el evento, no después:
- * Meta no deduplica estos eventos de su lado, así que ante una falla de red
- * a mitad de camino es más seguro arriesgarse a no reintentar un envío que
- * quizás sí llegó, que arriesgarse a contar la misma venta dos veces.
- */
-export async function reportOpportunityWon(opportunityId: string): Promise<void> {
-  const opportunity = await prisma.opportunity.findUnique({
-    where: { id: opportunityId },
-    select: {
-      metaConversionSentAt: true,
-      estimatedValue: true,
-      currency: true,
-      organizationId: true,
-      contact: { select: { phone: true } },
-    },
-  });
-  if (!opportunity || opportunity.metaConversionSentAt) return;
+/** META_CONVERSIONS_TEST_EVENT_CODE vacío/sin setear en producción -- ver .env.example. */
+function testEventCode(): string | undefined {
+  return process.env.META_CONVERSIONS_TEST_EVENT_CODE || undefined;
+}
 
-  // Primero se busca la atribución YA LIGADA a esta oportunidad (el touch
-  // de la conversación puntual que la originó, ver linkAttributionToOpportunity
-  // en meta-attribution.ts). Si no hay (oportunidades creadas antes de que
-  // existiera ese vínculo, o creadas fuera del flujo del bot), se cae al
-  // método viejo: la primera conversación del contacto marcada como venida
-  // de un anuncio.
+interface ResolvedAttribution {
+  ctwaClid: string;
+  botId: string;
+  connection: { wabaId: string; accessToken: string; metaDatasetId: string | null };
+}
+
+/**
+ * Encuentra el ctwa_clid y la conexión de WhatsApp para reportar un evento
+ * de esta oportunidad a Meta. Primero busca la atribución YA LIGADA a la
+ * oportunidad (el touch de la conversación puntual que la originó, ver
+ * linkAttributionToOpportunity en meta-attribution.ts). Si no hay
+ * (oportunidades creadas antes de que existiera ese vínculo, o creadas
+ * fuera del flujo del bot), cae al método viejo: la primera conversación
+ * del contacto marcada como venida de un anuncio. Devuelve null si el lead
+ * no vino de un anuncio "Click to WhatsApp" -- caso normal, no un error.
+ */
+async function resolveAttributionAndConnection(params: {
+  opportunityId: string;
+  organizationId: string;
+  contactPhone: string;
+}): Promise<ResolvedAttribution | null> {
   const touch = await prisma.metaAttributionTouch.findFirst({
-    where: { opportunityId },
+    where: { opportunityId: params.opportunityId },
     orderBy: { capturedAt: "asc" },
     select: { ctwaClid: true, conversationId: true },
   });
@@ -136,9 +146,9 @@ export async function reportOpportunityWon(opportunityId: string): Promise<void>
   if (!ctwaClid || !botId) {
     const conversation = await prisma.conversation.findFirst({
       where: {
-        customerPhone: opportunity.contact.phone,
+        customerPhone: params.contactPhone,
         adReferral: true,
-        bot: { organizationId: opportunity.organizationId },
+        bot: { organizationId: params.organizationId },
       },
       orderBy: { startedAt: "asc" },
       select: { adReferralData: true, botId: true },
@@ -146,45 +156,129 @@ export async function reportOpportunityWon(opportunityId: string): Promise<void>
     ctwaClid = (conversation?.adReferralData as { ctwaClid?: string | null } | null)?.ctwaClid ?? null;
     botId = conversation?.botId;
   }
-  if (!ctwaClid || !botId) return;
+  if (!ctwaClid || !botId) return null;
 
   const connection = await prisma.whatsAppConnection.findUnique({
     where: { botId },
     select: { wabaId: true, accessToken: true, metaDatasetId: true },
   });
-  if (!connection?.wabaId) return;
+  if (!connection?.wabaId) return null;
 
-  // Compare-and-swap: si dos disparos concurrentes llegaran a la vez (poco
-  // probable, pero el mismo cuidado que ya se usa en otros lados de la
-  // app), solo el primero pasa este `updateMany` con éxito.
-  const claimed = await prisma.opportunity.updateMany({
-    where: { id: opportunityId, metaConversionSentAt: null },
-    data: { metaConversionSentAt: new Date() },
-  });
-  if (claimed.count === 0) return;
+  return { ctwaClid, botId, connection: { ...connection, wabaId: connection.wabaId } };
+}
 
-  try {
-    const accessToken = decrypt(connection.accessToken);
-    let datasetId = connection.metaDatasetId;
-    if (!datasetId) {
-      datasetId = await getOrCreateDataset({ wabaId: connection.wabaId, accessToken });
-      await prisma.whatsAppConnection.update({
-        where: { botId },
-        data: { metaDatasetId: datasetId },
-      });
-    }
-
-    await sendConversionEvent({
-      datasetId,
-      accessToken,
-      eventName: "Purchase",
-      ctwaClid,
-      wabaId: connection.wabaId,
-      value: opportunity.estimatedValue ? Number(opportunity.estimatedValue) : undefined,
-      currency: opportunity.currency,
-    });
-  } catch (error) {
-    // No se revierte metaConversionSentAt -- ver nota arriba de la función.
-    console.error(`[meta-conversions] No se pudo reportar la venta de la oportunidad ${opportunityId} a Meta:`, error);
+/** Dataset cacheado en la conexión, o lo crea la primera vez -- compartido por los dos eventos. */
+async function ensureDataset(
+  botId: string,
+  connection: { wabaId: string; accessToken: string; metaDatasetId: string | null },
+): Promise<{ datasetId: string; accessToken: string }> {
+  const accessToken = decrypt(connection.accessToken);
+  let datasetId = connection.metaDatasetId;
+  if (!datasetId) {
+    datasetId = await getOrCreateDataset({ wabaId: connection.wabaId, accessToken });
+    await prisma.whatsAppConnection.update({ where: { botId }, data: { metaDatasetId: datasetId } });
   }
+  return { datasetId, accessToken };
+}
+
+/**
+ * Se llama la primera vez que una oportunidad deja la etapa de entrada por
+ * defecto (manual §Meta Ads Regla 2 — "POR CALIFICAR → ENTREVISTA", ahora
+ * generalizado porque el pipeline es configurable por organización, ver
+ * crm.ts). A diferencia de reportOpportunityWon (legacy, marca ANTES de
+ * mandar y nunca reintenta), esta función SÍ puede reintentarse con
+ * seguridad porque la llama un job de la cola (con backoff) y el evento
+ * lleva un event_id determinístico -- Meta deduplica de su lado si un
+ * reintento en realidad ya había llegado. Por eso acá se marca DESPUÉS de
+ * un envío confirmado, no antes, y un error se relanza (throw) para que el
+ * job falle y la cola lo reintente en vez de tragárselo en silencio.
+ */
+export async function reportOpportunityQualified(opportunityId: string): Promise<void> {
+  const opportunity = await prisma.opportunity.findUnique({
+    where: { id: opportunityId },
+    select: { qualifiedEventSentAt: true, organizationId: true, contact: { select: { phone: true } } },
+  });
+  if (!opportunity || opportunity.qualifiedEventSentAt) return;
+
+  const resolved = await resolveAttributionAndConnection({
+    opportunityId,
+    organizationId: opportunity.organizationId,
+    contactPhone: opportunity.contact.phone,
+  });
+  if (!resolved) return;
+
+  const eventId = `opportunity_${opportunityId}_qualified_v1`;
+  const { datasetId, accessToken } = await ensureDataset(resolved.botId, resolved.connection);
+
+  await sendConversionEvent({
+    datasetId,
+    accessToken,
+    eventName: "QualifiedLead",
+    eventId,
+    ctwaClid: resolved.ctwaClid,
+    wabaId: resolved.connection.wabaId,
+    testEventCode: testEventCode(),
+  });
+
+  await prisma.opportunity.updateMany({
+    where: { id: opportunityId, qualifiedEventSentAt: null },
+    data: { qualifiedEventSentAt: new Date(), qualifiedEventId: eventId },
+  });
+}
+
+/**
+ * Se llama cuando una oportunidad pasa a "Ganado". Best-effort: si el lead
+ * no vino de un anuncio "Click to WhatsApp", o todavía no tiene valor/moneda
+ * confirmados, no manda nada -- no es un error, son los casos normales para
+ * la mayoría de las oportunidades.
+ *
+ * Usa purchaseEventSentAt/purchaseEventId (no metaConversionSentAt, el
+ * campo legacy que ya tiene datos reales en producción de antes de que
+ * existiera esta versión -- se sigue chequeando también, nunca se vuelve a
+ * escribir). Mismo cuidado que reportOpportunityQualified: se marca
+ * DESPUÉS de un envío confirmado y un error se relanza para que la cola
+ * reintente -- el event_id determinístico hace que un reintento sea
+ * seguro del lado de Meta.
+ */
+export async function reportOpportunityWon(opportunityId: string): Promise<void> {
+  const opportunity = await prisma.opportunity.findUnique({
+    where: { id: opportunityId },
+    select: {
+      metaConversionSentAt: true,
+      purchaseEventSentAt: true,
+      estimatedValue: true,
+      currency: true,
+      organizationId: true,
+      contact: { select: { phone: true } },
+    },
+  });
+  if (!opportunity || opportunity.metaConversionSentAt || opportunity.purchaseEventSentAt) return;
+  if (!opportunity.estimatedValue || !opportunity.currency) return;
+
+  const resolved = await resolveAttributionAndConnection({
+    opportunityId,
+    organizationId: opportunity.organizationId,
+    contactPhone: opportunity.contact.phone,
+  });
+  if (!resolved) return;
+
+  const eventId = `opportunity_${opportunityId}_purchase_v1`;
+  const { datasetId, accessToken } = await ensureDataset(resolved.botId, resolved.connection);
+
+  await sendConversionEvent({
+    datasetId,
+    accessToken,
+    eventName: "Purchase",
+    eventId,
+    ctwaClid: resolved.ctwaClid,
+    wabaId: resolved.connection.wabaId,
+    value: Number(opportunity.estimatedValue),
+    currency: opportunity.currency,
+    testEventCode: testEventCode(),
+  });
+
+  await prisma.opportunity.updateMany({
+    where: { id: opportunityId, purchaseEventSentAt: null },
+    data: { purchaseEventSentAt: new Date(), purchaseEventId: eventId },
+  });
 }

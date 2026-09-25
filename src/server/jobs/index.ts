@@ -8,6 +8,7 @@ import { handleGoogleCalendarSync } from "./handlers/google-calendar-sync";
 import { handleCleanupMeetingMedia } from "./handlers/cleanup-meeting-media";
 import { handleCoexistenceHistorySync } from "./handlers/coexistence-history-sync";
 import { handleFetchLinkPreview } from "./handlers/fetch-link-preview";
+import { handleMetaConversionEvent } from "./handlers/meta-conversion-event";
 import { markBotReplyFailed } from "@/server/services/ai/qualification-bot";
 
 export { enqueue, enqueueOrReschedule, cancelJob } from "./queue";
@@ -27,6 +28,7 @@ const handlers: Record<string, JobHandler> = {
   cleanup_meeting_media: handleCleanupMeetingMedia,
   coexistence_history_sync: handleCoexistenceHistorySync,
   fetch_link_preview: handleFetchLinkPreview,
+  meta_conversion_event: handleMetaConversionEvent,
 };
 
 const onExhausted: Record<string, JobExhaustedHandler> = {

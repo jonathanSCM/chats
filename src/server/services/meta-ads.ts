@@ -17,14 +17,18 @@ import { GRAPH_API_VERSION } from "@/server/services/whatsapp";
 
 export interface AdInfo {
   adName: string | null;
+  campaignId: string | null;
   campaignName: string | null;
+  adsetId: string | null;
   adsetName: string | null;
+  adAccountId: string | null;
 }
 
 interface AdApiResponse {
   name?: string;
-  campaign?: { name?: string };
-  adset?: { name?: string };
+  account_id?: string;
+  campaign?: { id?: string; name?: string };
+  adset?: { id?: string; name?: string };
 }
 
 /**
@@ -70,7 +74,7 @@ interface AdInsightsApiResponse {
 export async function resolveAdInfo(adId: string, accessToken: string): Promise<AdInfo | null> {
   try {
     const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${adId}`);
-    url.searchParams.set("fields", "name,campaign{name},adset{name}");
+    url.searchParams.set("fields", "name,account_id,campaign{id,name},adset{id,name}");
     url.searchParams.set("access_token", accessToken);
 
     const res = await fetch(url.toString());
@@ -82,8 +86,11 @@ export async function resolveAdInfo(adId: string, accessToken: string): Promise<
     const data = (await res.json()) as AdApiResponse;
     return {
       adName: data.name ?? null,
+      campaignId: data.campaign?.id ?? null,
       campaignName: data.campaign?.name ?? null,
+      adsetId: data.adset?.id ?? null,
       adsetName: data.adset?.name ?? null,
+      adAccountId: data.account_id ?? null,
     };
   } catch (error) {
     console.warn(`[meta-ads] Error resolviendo el anuncio ${adId}:`, error);

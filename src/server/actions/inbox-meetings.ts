@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireBotAccess } from "@/server/auth/guards";
 import { getOrgStages, defaultEntryStage } from "@/server/services/pipeline";
+import { linkAttributionToOpportunity } from "@/server/services/meta-attribution";
 import { parseGuestEmails } from "@/lib/guest-emails";
 import { createMeetEvent, getOrCreateOrgCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
 import { createUserMeetEvent, hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
@@ -94,6 +95,7 @@ export async function createMeetingFromConversationAction(
       },
       select: { id: true },
     });
+    await linkAttributionToOpportunity(parsed.data.conversationId, opportunity.id);
   }
 
   const durationMinutes = parsed.data.durationMinutes ?? 30;

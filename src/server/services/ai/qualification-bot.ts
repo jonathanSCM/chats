@@ -6,6 +6,7 @@ import { notifyNewMessage } from "@/server/services/push";
 import { getOrgStages, defaultEntryStage } from "@/server/services/pipeline";
 import { getAvailableDays, getAvailableSlots, hasSchedulingConflict, formatSlotLabel } from "@/server/services/availability";
 import { createCalendarEvent, getOrCreateOrgCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
+import { linkAttributionToOpportunity } from "@/server/services/meta-attribution";
 import { MODELS, runStructured } from "./client";
 
 // v2: se saca "reunion_elegida" del esquema -- el horario ya no se elige
@@ -317,6 +318,7 @@ async function ensureOpportunity(
     },
     select: { id: true },
   });
+  await linkAttributionToOpportunity(conversation.id, created.id);
   return created.id;
 }
 
@@ -461,6 +463,7 @@ export async function confirmMeetingSlot(conversationId: string, isoDate: string
             select: { id: true },
           })
         ).id;
+        await linkAttributionToOpportunity(conversation.id, opportunityId);
       }
     }
   }

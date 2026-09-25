@@ -14,6 +14,7 @@ import { notifyNewMessage } from "@/server/services/push";
 import { enqueue, enqueueOrReschedule, runJobsSoon } from "@/server/jobs";
 import { decrypt } from "@/lib/crypto";
 import { resolveAdInfo } from "@/server/services/meta-ads";
+import { recordAttributionTouch } from "@/server/services/meta-attribution";
 import { getAvailableSlots } from "@/server/services/availability";
 import { sendHourList, confirmMeetingSlot } from "@/server/services/ai/qualification-bot";
 import { getZonedParts } from "@/lib/timezone";
@@ -432,6 +433,17 @@ async function findOrCreateConversation(
             : {}),
         },
       });
+      if (fromAd && !existing.adReferral && enrichedAdReferral && existing.contactId) {
+        const bot = await prisma.bot.findUnique({ where: { id: existing.botId }, select: { organizationId: true } });
+        if (bot) {
+          await recordAttributionTouch({
+            organizationId: bot.organizationId,
+            contactId: existing.contactId,
+            conversationId: existing.id,
+            adReferral: enrichedAdReferral,
+          });
+        }
+      }
     }
     return existing.id;
   }
@@ -472,6 +484,14 @@ async function findOrCreateConversation(
         : {}),
     },
   });
+  if (fromAd && enrichedAdReferral) {
+    await recordAttributionTouch({
+      organizationId: bot.organizationId,
+      contactId,
+      conversationId: created.id,
+      adReferral: enrichedAdReferral,
+    });
+  }
   return created.id;
 }
 

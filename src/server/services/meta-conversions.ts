@@ -116,23 +116,40 @@ export async function reportOpportunityWon(opportunityId: string): Promise<void>
   });
   if (!opportunity || opportunity.metaConversionSentAt) return;
 
-  // Se busca la conversación que originó el contacto (la primera marcada
-  // como venida de un anuncio) -- es la que tiene el ctwa_clid del clic
-  // real que generó este lead.
-  const conversation = await prisma.conversation.findFirst({
-    where: {
-      customerPhone: opportunity.contact.phone,
-      adReferral: true,
-      bot: { organizationId: opportunity.organizationId },
-    },
-    orderBy: { startedAt: "asc" },
-    select: { adReferralData: true, botId: true },
+  // Primero se busca la atribución YA LIGADA a esta oportunidad (el touch
+  // de la conversación puntual que la originó, ver linkAttributionToOpportunity
+  // en meta-attribution.ts). Si no hay (oportunidades creadas antes de que
+  // existiera ese vínculo, o creadas fuera del flujo del bot), se cae al
+  // método viejo: la primera conversación del contacto marcada como venida
+  // de un anuncio.
+  const touch = await prisma.metaAttributionTouch.findFirst({
+    where: { opportunityId },
+    orderBy: { capturedAt: "asc" },
+    select: { ctwaClid: true, conversationId: true },
   });
-  const ctwaClid = (conversation?.adReferralData as { ctwaClid?: string | null } | null)?.ctwaClid;
-  if (!conversation || !ctwaClid) return;
+
+  let ctwaClid = touch?.ctwaClid ?? null;
+  let botId = touch?.conversationId
+    ? (await prisma.conversation.findUnique({ where: { id: touch.conversationId }, select: { botId: true } }))?.botId
+    : undefined;
+
+  if (!ctwaClid || !botId) {
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        customerPhone: opportunity.contact.phone,
+        adReferral: true,
+        bot: { organizationId: opportunity.organizationId },
+      },
+      orderBy: { startedAt: "asc" },
+      select: { adReferralData: true, botId: true },
+    });
+    ctwaClid = (conversation?.adReferralData as { ctwaClid?: string | null } | null)?.ctwaClid ?? null;
+    botId = conversation?.botId;
+  }
+  if (!ctwaClid || !botId) return;
 
   const connection = await prisma.whatsAppConnection.findUnique({
-    where: { botId: conversation.botId },
+    where: { botId },
     select: { wabaId: true, accessToken: true, metaDatasetId: true },
   });
   if (!connection?.wabaId) return;
@@ -152,7 +169,7 @@ export async function reportOpportunityWon(opportunityId: string): Promise<void>
     if (!datasetId) {
       datasetId = await getOrCreateDataset({ wabaId: connection.wabaId, accessToken });
       await prisma.whatsAppConnection.update({
-        where: { botId: conversation.botId },
+        where: { botId },
         data: { metaDatasetId: datasetId },
       });
     }

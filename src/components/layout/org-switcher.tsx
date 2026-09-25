@@ -18,8 +18,11 @@ export function OrgSwitcher({
   function pick(organizationId: string) {
     setOpen(false);
     if (organizationId === currentOrganizationId) return;
-    startTransition(() => {
-      switchOrganizationAction(organizationId);
+    startTransition(async () => {
+      const result = await switchOrganizationAction(organizationId);
+      // Recarga real del navegador, no navegación de Next -- ver el
+      // comentario en organization-switch.ts sobre por qué hace falta.
+      if (!result.error) window.location.assign("/dashboard");
     });
   }
 

@@ -338,5 +338,9 @@ export async function acceptInviteWithCurrentSessionAction(token: string): Promi
     prisma.organizationInvite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }),
   ]);
 
+  // Mismo cuidado que switchOrganizationAction: invalida toda la app, no
+  // solo /dashboard, para que el router del cliente no muestre una versión
+  // en caché de una página que ya tenía abierta con la organización vieja.
+  revalidatePath("/", "layout");
   redirect("/dashboard");
 }

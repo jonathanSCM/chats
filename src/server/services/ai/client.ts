@@ -82,6 +82,52 @@ export class AiBudgetExceededError extends Error {
   }
 }
 
+/**
+ * Distingue "sin créditos" de cualquier otro fallo (red, esquema inválido,
+ * rate limit pasajero) -- solo lo primero amerita un aviso en /admin,
+ * porque no se arregla solo con un reintento. OpenAI manda 429 tanto para
+ * rate limit como para sin-créditos; lo que los distingue es el
+ * type/code del error, no el status HTTP.
+ */
+function isQuotaError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const err = error as { status?: number; code?: string; type?: string; message?: string; error?: { type?: string; code?: string } };
+  const code = err.code ?? err.error?.code;
+  const type = err.type ?? err.error?.type;
+  if (code === "insufficient_quota" || code === "credit_balance_exhausted") return true;
+  if (type === "insufficient_quota") return true;
+  return Boolean(err.message?.toLowerCase().includes("credit"));
+}
+
+/**
+ * Se llama solo desde runStructured() -- guarda (o limpia) el aviso de
+ * "sin créditos" en la fila singleton de PlatformSetting, para que
+ * /admin lo muestre sin tener que ir a buscar en los logs del servidor.
+ * Best-effort: si esto falla, no debe tumbar la llamada a la IA en sí.
+ */
+async function updateQuotaAlert(error: unknown): Promise<void> {
+  try {
+    if (isQuotaError(error)) {
+      const message = error instanceof Error ? error.message : String(error);
+      await prisma.platformSetting.upsert({
+        where: { id: "singleton" },
+        create: { id: "singleton", aiQuotaAlertAt: new Date(), aiQuotaAlertMessage: message },
+        update: { aiQuotaAlertAt: new Date(), aiQuotaAlertMessage: message },
+      });
+    } else {
+      // Una llamada que sí llegó a intentar el request (falló por otra razón,
+      // o directamente funcionó) confirma que las credenciales están bien --
+      // se limpia cualquier aviso viejo.
+      await prisma.platformSetting.updateMany({
+        where: { id: "singleton", aiQuotaAlertAt: { not: null } },
+        data: { aiQuotaAlertAt: null, aiQuotaAlertMessage: null },
+      });
+    }
+  } catch (updateError) {
+    console.error("[ai] No se pudo actualizar el aviso de créditos de OpenAI:", updateError);
+  }
+}
+
 export interface RunOptions<T> {
   organizationId: string;
   entityType: string;
@@ -163,6 +209,7 @@ export async function runStructured<T>(options: RunOptions<T>): Promise<T> {
         },
       });
 
+      await updateQuotaAlert(null);
       return parsed;
     } catch (error) {
       lastError = error;
@@ -186,5 +233,6 @@ export async function runStructured<T>(options: RunOptions<T>): Promise<T> {
     },
   });
 
+  await updateQuotaAlert(lastError);
   throw lastError;
 }

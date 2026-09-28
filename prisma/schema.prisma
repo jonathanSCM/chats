@@ -1048,6 +1048,12 @@ model PlatformSetting {
   whatsappAppSecret   String?  @db.Text // cifrado, igual que WhatsAppConnection.accessToken
   whatsappConfigId    String?
   whatsappVerifyToken String?
+  // Se setea sola cuando una llamada a OpenAI falla por falta de créditos
+  // (runStructured en ai/client.ts) y se limpia sola en la próxima llamada
+  // que sí funcione -- así el aviso en /admin refleja el estado actual, no
+  // un error viejo ya resuelto.
+  aiQuotaAlertAt      DateTime?
+  aiQuotaAlertMessage String?   @db.Text
   updatedAt           DateTime @updatedAt
 
   @@map("platform_settings")

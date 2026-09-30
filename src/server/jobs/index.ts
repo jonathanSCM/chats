@@ -9,6 +9,7 @@ import { handleCleanupMeetingMedia } from "./handlers/cleanup-meeting-media";
 import { handleCoexistenceHistorySync } from "./handlers/coexistence-history-sync";
 import { handleFetchLinkPreview } from "./handlers/fetch-link-preview";
 import { handleMetaConversionEvent } from "./handlers/meta-conversion-event";
+import { handleMetaAdsSync } from "./handlers/meta-ads-sync";
 import { markBotReplyFailed } from "@/server/services/ai/qualification-bot";
 
 export { enqueue, enqueueOrReschedule, cancelJob } from "./queue";
@@ -29,6 +30,7 @@ const handlers: Record<string, JobHandler> = {
   coexistence_history_sync: handleCoexistenceHistorySync,
   fetch_link_preview: handleFetchLinkPreview,
   meta_conversion_event: handleMetaConversionEvent,
+  meta_ads_sync: handleMetaAdsSync,
 };
 
 const onExhausted: Record<string, JobExhaustedHandler> = {

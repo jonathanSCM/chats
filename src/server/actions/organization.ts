@@ -125,6 +125,40 @@ export async function updateBookingSettingsAction(
   return { error: null, message: "Horario de citas actualizado." };
 }
 
+// act_XXXXXXXXX -- formato fijo del ID de cuenta publicitaria de Meta, con
+// el que se arma la URL del insights (ver syncAdAccountSpend en meta-ads.ts).
+// Vacío = desconecta (deja de sincronizarse en el cron, no borra el
+// histórico de AdSpendSnapshot ya guardado).
+const metaAdAccountSchema = z.object({
+  metaAdAccountId: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || /^act_\d+$/.test(v), "Formato inválido — debe ser act_ seguido de números"),
+});
+
+export async function updateMetaAdAccountAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireSession();
+  if (session.user.role !== "OWNER" || !session.user.organizationId) {
+    return { error: "Solo el dueño de la organización puede cambiar este dato" };
+  }
+
+  const parsed = metaAdAccountSchema.safeParse({ metaAdAccountId: formData.get("metaAdAccountId") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  await prisma.organization.update({
+    where: { id: session.user.organizationId },
+    data: { metaAdAccountId: parsed.data.metaAdAccountId || null },
+  });
+
+  revalidatePath("/dashboard/organization");
+  return { error: null, message: "Cuenta publicitaria actualizada." };
+}
+
 const shareCalendarSchema = z.object({ email: z.email("Correo inválido") });
 
 /**

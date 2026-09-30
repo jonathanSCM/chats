@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Video,
   UserCircle,
+  Megaphone,
 } from "lucide-react";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
@@ -73,6 +74,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </NavLink>
         <NavLink href="/dashboard/seguimiento">
           <ClipboardList size={16} /> Seguimiento
+        </NavLink>
+        <NavLink href="/dashboard/marketing">
+          <Megaphone size={16} /> Marketing
         </NavLink>
         <NavLink href="/dashboard/calendario">
           <CalendarDays size={16} /> Calendario

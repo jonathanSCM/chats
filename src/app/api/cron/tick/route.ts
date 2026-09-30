@@ -1,7 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
-import { processJobs } from "@/server/jobs";
+import { processJobs, enqueue } from "@/server/jobs";
 import { renewExpiringGoogleCalendarWatches } from "@/server/services/google-calendar-user";
+import { prisma } from "@/server/db/client";
+
+const META_ADS_SYNC_INTERVAL_HOURS = 20;
+
+/**
+ * Encola el sync de gasto de Meta Ads para cada organización que tenga
+ * cuenta publicitaria configurada y no se haya sincronizado en las últimas
+ * ~20h (o nunca) -- mismo patrón que renewExpiringGoogleCalendarWatches
+ * más abajo. uniqueKey evita encolar dos veces si el tick anterior todavía
+ * no terminó de procesar el job.
+ */
+async function syncMetaAdsIfDue(): Promise<void> {
+  const cutoff = new Date(Date.now() - META_ADS_SYNC_INTERVAL_HOURS * 60 * 60 * 1000);
+
+  const orgs = await prisma.organization.findMany({
+    where: {
+      metaAdAccountId: { not: null },
+      OR: [{ metaAdsLastSyncedAt: null }, { metaAdsLastSyncedAt: { lt: cutoff } }],
+    },
+    select: { id: true },
+  });
+
+  for (const org of orgs) {
+    await enqueue({
+      type: "meta_ads_sync",
+      payload: { organizationId: org.id },
+      uniqueKey: `meta-ads-sync-${org.id}`,
+    });
+  }
+}
 
 /**
  * Latido de la cola. Lo invoca una Scheduled Task de Coolify cada minuto:
@@ -35,6 +65,10 @@ export async function POST(req: NextRequest) {
   // vacío) -- no vale la pena un job aparte solo para esto.
   await renewExpiringGoogleCalendarWatches().catch((error) => {
     console.error("[cron] Error renovando suscripciones de Google Calendar:", error);
+  });
+
+  await syncMetaAdsIfDue().catch((error) => {
+    console.error("[cron] Error encolando el sync de Meta Ads:", error);
   });
 
   return NextResponse.json(result);

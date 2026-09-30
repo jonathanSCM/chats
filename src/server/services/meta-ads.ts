@@ -1,4 +1,5 @@
 import { GRAPH_API_VERSION } from "@/server/services/whatsapp";
+import { prisma } from "@/server/db/client";
 
 /**
  * Resuelve el nombre real de un anuncio/campaña -- distinto de todo lo
@@ -146,4 +147,123 @@ export async function resolveAdInsights(adId: string, accessToken: string): Prom
     console.warn(`[meta-ads] Error trayendo el rendimiento del anuncio ${adId}:`, error);
     return null;
   }
+}
+
+interface AdAccountInsightsRow {
+  campaign_id?: string;
+  campaign_name?: string;
+  adset_id?: string;
+  adset_name?: string;
+  ad_id?: string;
+  ad_name?: string;
+  date_start?: string;
+  spend?: string;
+  impressions?: string;
+  reach?: string;
+  clicks?: string;
+  ctr?: string;
+  cpc?: string;
+  cpm?: string;
+  frequency?: string;
+}
+
+interface AdAccountInsightsApiResponse {
+  data?: AdAccountInsightsRow[];
+  paging?: { next?: string };
+}
+
+/**
+ * Sincroniza el gasto/impresiones/alcance de TODA la cuenta publicitaria de
+ * una organización en un solo llamado paginado (level=ad, time_increment=1)
+ * -- a diferencia de resolveAdInsights (un anuncio a la vez, on-demand),
+ * esto trae todos los anuncios con actividad en los últimos 7 días de una,
+ * porque Meta ya incluye el nombre de campaña/conjunto/anuncio en cada fila
+ * del insights, sin hace falta pedirlos aparte.
+ *
+ * `date_preset=last_7d` (no "yesterday" ni "today"): los últimos días de un
+ * período pueden seguir cambiando mientras Meta termina de consolidar, y
+ * repetir la ventana en cada sync hace que un día que falló se recupere
+ * solo en el siguiente. El upsert sobre @@unique([organizationId, adId,
+ * date]) hace que reintentar nunca duplique.
+ */
+export async function syncAdAccountSpend(
+  organizationId: string,
+  adAccountId: string,
+  accessToken: string,
+): Promise<number> {
+  let rowCount = 0;
+  let url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${adAccountId}/insights`);
+  url.searchParams.set("level", "ad");
+  url.searchParams.set("time_increment", "1");
+  url.searchParams.set("date_preset", "last_7d");
+  url.searchParams.set(
+    "fields",
+    "campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency",
+  );
+  url.searchParams.set("access_token", accessToken);
+  url.searchParams.set("limit", "500");
+
+  while (true) {
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      throw new Error(
+        `No se pudo sincronizar el gasto de ${adAccountId}: ${res.status} ${await res.text()}`,
+      );
+    }
+
+    const data = (await res.json()) as AdAccountInsightsApiResponse;
+    for (const row of data.data ?? []) {
+      if (!row.ad_id || !row.date_start) continue; // fila sin identificar, no debería pasar pero no vale la pena tumbar todo el sync por una
+
+      await prisma.adSpendSnapshot.upsert({
+        where: {
+          organizationId_adId_date: {
+            organizationId,
+            adId: row.ad_id,
+            date: new Date(row.date_start),
+          },
+        },
+        create: {
+          organizationId,
+          date: new Date(row.date_start),
+          campaignId: row.campaign_id ?? "",
+          campaignName: row.campaign_name ?? "",
+          adsetId: row.adset_id ?? "",
+          adsetName: row.adset_name ?? "",
+          adId: row.ad_id,
+          adName: row.ad_name ?? "",
+          spend: row.spend ?? "0",
+          impressions: Number(row.impressions ?? 0),
+          reach: Number(row.reach ?? 0),
+          clicks: Number(row.clicks ?? 0),
+          ctr: row.ctr ?? null,
+          cpc: row.cpc ?? null,
+          cpm: row.cpm ?? null,
+          frequency: row.frequency ?? null,
+        },
+        update: {
+          campaignId: row.campaign_id ?? "",
+          campaignName: row.campaign_name ?? "",
+          adsetId: row.adset_id ?? "",
+          adsetName: row.adset_name ?? "",
+          adName: row.ad_name ?? "",
+          spend: row.spend ?? "0",
+          impressions: Number(row.impressions ?? 0),
+          reach: Number(row.reach ?? 0),
+          clicks: Number(row.clicks ?? 0),
+          ctr: row.ctr ?? null,
+          cpc: row.cpc ?? null,
+          cpm: row.cpm ?? null,
+          frequency: row.frequency ?? null,
+          syncedAt: new Date(),
+        },
+      });
+      rowCount++;
+    }
+
+    if (!data.paging?.next) break;
+    url = new URL(data.paging.next);
+  }
+
+  return rowCount;
 }

@@ -181,12 +181,15 @@ export async function GET(req: NextRequest) {
     set.add(o.stageId);
     reachedByOpportunity.set(o.id, set);
   }
+  // Una oportunidad cuenta en una etapa si llegó a ella o a cualquiera
+  // posterior: así saltarse una etapa no hace que el funnel suba (>100%).
+  const highestIdx = [...reachedByOpportunity.values()].map((set) =>
+    funnelStages.reduce((max, s, i) => (set.has(s.id) ? i : max), -1),
+  );
+  const countAtLeast = (i: number) => highestIdx.filter((h) => h >= i).length;
   const funnel = funnelStages.map((stage, i) => {
-    const count = [...reachedByOpportunity.values()].filter((set) => set.has(stage.id)).length;
-    const prevCount =
-      i === 0
-        ? null
-        : [...reachedByOpportunity.values()].filter((set) => set.has(funnelStages[i - 1].id)).length;
+    const count = countAtLeast(i);
+    const prevCount = i === 0 ? null : countAtLeast(i - 1);
     return {
       stage: { id: stage.id, label: stage.label, color: stage.color },
       count,

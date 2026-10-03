@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { processJobs, enqueue } from "@/server/jobs";
 import { renewExpiringGoogleCalendarWatches } from "@/server/services/google-calendar-user";
 import { prisma } from "@/server/db/client";
+import { isMarketingEnabled } from "@/lib/features";
 
 const META_ADS_SYNC_INTERVAL_HOURS = 20;
 
@@ -67,9 +68,11 @@ export async function POST(req: NextRequest) {
     console.error("[cron] Error renovando suscripciones de Google Calendar:", error);
   });
 
-  await syncMetaAdsIfDue().catch((error) => {
-    console.error("[cron] Error encolando el sync de Meta Ads:", error);
-  });
+  if (isMarketingEnabled()) {
+    await syncMetaAdsIfDue().catch((error) => {
+      console.error("[cron] Error encolando el sync de Meta Ads:", error);
+    });
+  }
 
   return NextResponse.json(result);
 }

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { decrypt } from "@/lib/crypto";
 import { prisma } from "@/server/db/client";
 import { syncAdAccountSpend } from "@/server/services/meta-ads";
+import { isMarketingEnabled } from "@/lib/features";
 
 export const metaAdsSyncPayload = z.object({
   organizationId: z.string(),
@@ -16,6 +17,7 @@ export const metaAdsSyncPayload = z.object({
  */
 export async function handleMetaAdsSync(rawPayload: unknown): Promise<void> {
   const { organizationId } = metaAdsSyncPayload.parse(rawPayload);
+  if (!isMarketingEnabled()) return; // apagado: el job pendiente se descarta sin llamar a Meta
 
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },

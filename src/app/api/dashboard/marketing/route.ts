@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { getOrgStages, openStages, wonStage, type PipelineStage } from "@/server/services/pipeline";
+import { isMarketingEnabled } from "@/lib/features";
 
 /**
  * Funnel de marketing + métricas de negocio de Fase 4 (Dashboard Meta Ads).
@@ -12,6 +13,7 @@ import { getOrgStages, openStages, wonStage, type PipelineStage } from "@/server
  * midan específicamente lo que esa publicidad produjo.
  */
 export async function GET(req: NextRequest) {
+  if (!isMarketingEnabled()) return NextResponse.json({ error: "No disponible" }, { status: 404 });
   const session = await auth();
   if (!session?.user?.organizationId) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
@@ -163,6 +165,12 @@ export async function GET(req: NextRequest) {
 
   const won = wonStage(stages);
   const funnelStages: PipelineStage[] = [...openStages(stages), ...(won ? [won] : [])];
+  // Una oportunidad cuenta en una etapa si llegó a ella o a cualquiera
+  // posterior: así saltarse una etapa no hace que el funnel suba (>100%).
+  const highestIdx = [...reachedByOpportunity.values()].map((set) =>
+    funnelStages.reduce((max, s, i) => (set.has(s.id) ? i : max), -1),
+  );
+  const countAtLeast = (i: number) => highestIdx.filter((h) => h >= i).length;
 
   const funnel = [
     { stage: { id: "meta_ads", label: "Meta Ads (alcance)", color: null }, count: reachTotal, conversionFromPrev: null as number | null },
@@ -172,9 +180,8 @@ export async function GET(req: NextRequest) {
       conversionFromPrev: reachTotal > 0 ? conversacionesUnicas / reachTotal : null,
     },
     ...funnelStages.map((stage, i) => {
-      const count = [...reachedByOpportunity.values()].filter((set) => set.has(stage.id)).length;
-      const prevCount =
-        i === 0 ? conversacionesUnicas : [...reachedByOpportunity.values()].filter((set) => set.has(funnelStages[i - 1].id)).length;
+      const count = countAtLeast(i);
+      const prevCount = i === 0 ? conversacionesUnicas : countAtLeast(i - 1);
       return {
         stage: { id: stage.id, label: stage.label, color: stage.color },
         count,

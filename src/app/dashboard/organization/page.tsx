@@ -11,6 +11,7 @@ import { PipelineStagesList } from "./_components/pipeline-stages-list";
 import { ServicesList } from "./_components/services-list";
 import { BotAccessMatrix } from "./_components/bot-access-matrix";
 import { MetaAdAccountForm } from "./_components/meta-ad-account-form";
+import { isMarketingEnabled } from "@/lib/features";
 import { DangerZone } from "./_components/danger-zone";
 
 export default async function OrganizationSettingsPage() {
@@ -124,14 +125,16 @@ export default async function OrganizationSettingsPage() {
         <ServicesList services={services} />
       </Card>
 
-      <Card className="mb-6">
-        <CardTitle className="mb-1">Meta Ads</CardTitle>
-        <CardDescription className="mb-4">
-          Cuenta publicitaria de la que se sincroniza el gasto para el dashboard de marketing — se
-          sincroniza sola cada ~20h una vez cargada acá.
-        </CardDescription>
-        <MetaAdAccountForm currentAdAccountId={org.metaAdAccountId} />
-      </Card>
+      {isMarketingEnabled() && (
+        <Card className="mb-6">
+          <CardTitle className="mb-1">Meta Ads</CardTitle>
+          <CardDescription className="mb-4">
+            Cuenta publicitaria de la que se sincroniza el gasto para el dashboard de marketing — se
+            sincroniza sola cada ~20h una vez cargada acá.
+          </CardDescription>
+          <MetaAdAccountForm currentAdAccountId={org.metaAdAccountId} />
+        </Card>
+      )}
 
       <Card className="mb-6">
         <CardTitle className="mb-1">Equipo</CardTitle>

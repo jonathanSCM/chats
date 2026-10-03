@@ -6,8 +6,10 @@ import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { getOrgServices } from "@/server/services/services-catalog";
 import { getOrgMemberUserIds } from "@/server/services/organization-membership";
 import { MarketingClient } from "./_components/marketing-client";
+import { isMarketingEnabled } from "@/lib/features";
 
 export default async function MarketingPage() {
+  if (!isMarketingEnabled()) redirect("/dashboard");
   const session = await auth();
   if (!session?.user.organizationId) redirect("/login");
 

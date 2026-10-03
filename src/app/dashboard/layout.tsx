@@ -25,6 +25,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { ServerClock } from "@/components/layout/server-clock";
 import { OrgSwitcher } from "@/components/layout/org-switcher";
 import { getUserMemberships } from "@/server/services/organization-membership";
+import { isMarketingEnabled } from "@/lib/features";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -75,9 +76,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <NavLink href="/dashboard/seguimiento">
           <ClipboardList size={16} /> Seguimiento
         </NavLink>
-        <NavLink href="/dashboard/marketing">
-          <Megaphone size={16} /> Marketing
-        </NavLink>
+        {isMarketingEnabled() && (
+          <NavLink href="/dashboard/marketing">
+            <Megaphone size={16} /> Marketing
+          </NavLink>
+        )}
         <NavLink href="/dashboard/calendario">
           <CalendarDays size={16} /> Calendario
         </NavLink>

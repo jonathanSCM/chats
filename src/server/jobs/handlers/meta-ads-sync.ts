@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { prisma } from "@/server/db/client";
-import { syncAdAccountSpend, extendAccessToken } from "@/server/services/meta-ads";
+import { syncAdAccountSpend, extendAccessToken, getAdAccountInfo } from "@/server/services/meta-ads";
 import { getPlatformSettings } from "@/server/services/platform-settings";
 import { isMarketingEnabled } from "@/lib/features";
 
@@ -50,6 +50,11 @@ export async function handleMetaAdsSync(rawPayload: unknown): Promise<void> {
     } catch (error) {
       console.warn(`[meta-ads-sync] No se pudo extender el token de ${organizationId}:`, error);
     }
+  }
+
+  const info = await getAdAccountInfo(org.metaAdAccountId, accessToken);
+  if (info?.currency) {
+    await prisma.organization.update({ where: { id: organizationId }, data: { metaAdCurrency: info.currency } });
   }
 
   try {

@@ -6,7 +6,7 @@ import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { signOut } from "@/server/auth";
 import { decrypt } from "@/lib/crypto";
-import { listAdAccounts } from "@/server/services/meta-ads";
+import { getAdAccountInfo, listAdAccounts } from "@/server/services/meta-ads";
 import { audit } from "@/server/services/audit";
 import { getPlatformSettings } from "@/server/services/platform-settings";
 import { getOrCreateOrgCalendar, shareCalendar, unshareCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
@@ -163,9 +163,15 @@ export async function selectMetaAdAccountAction(adAccountId: string): Promise<Ac
   const chosen = accounts.find((a) => a.id === adAccountId);
   if (!chosen) return { error: "Esa cuenta no está entre las autorizadas." };
 
+  const info = await getAdAccountInfo(chosen.id, decrypt(org.metaAdsAccessToken));
   await prisma.organization.update({
     where: { id: session.user.organizationId },
-    data: { metaAdAccountId: chosen.id, metaAdAccountName: chosen.name, metaAdsLastSyncedAt: null },
+    data: {
+      metaAdAccountId: chosen.id,
+      metaAdAccountName: chosen.name,
+      metaAdCurrency: info?.currency ?? null,
+      metaAdsLastSyncedAt: null,
+    },
   });
 
   await audit({
@@ -196,6 +202,7 @@ export async function disconnectMetaAdsAction(): Promise<ActionState> {
       metaAdsConnectedAt: null,
       metaAdAccountId: null,
       metaAdAccountName: null,
+      metaAdCurrency: null,
     },
   });
   await audit({

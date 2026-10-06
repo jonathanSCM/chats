@@ -45,6 +45,8 @@ interface BreakdownRow {
 }
 
 interface MarketingData {
+  currency: string | null;
+  otherCurrencyOpportunities: number;
   funnel: FunnelStep[];
   metrics: Metrics;
   breakdown: BreakdownRow[];
@@ -55,15 +57,16 @@ const SOURCE_LABEL: Record<string, string> = {
   Manual: "Manual",
 };
 
-const money = new Intl.NumberFormat("es", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-const moneyPrecise = new Intl.NumberFormat("es", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+function makeFormatters(currency: string | null) {
+  const code = currency ?? "USD";
+  return {
+    money: new Intl.NumberFormat("es", { style: "currency", currency: code, maximumFractionDigits: 0 }),
+    moneyPrecise: new Intl.NumberFormat("es", { style: "currency", currency: code, maximumFractionDigits: 2 }),
+  };
+}
 
 function pct(v: number | null): string {
   return v === null ? "—" : `${Math.round(v * 100)}%`;
-}
-
-function m(v: number | null): string {
-  return v === null ? "—" : moneyPrecise.format(v);
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -130,6 +133,9 @@ export function MarketingClient({
       cancelled = true;
     };
   }, [from, to, vendorId, source, service, city, campaignId, adsetId, adId]);
+
+  const { money, moneyPrecise } = makeFormatters(data?.currency ?? null);
+  const m = (v: number | null) => (v === null ? "—" : moneyPrecise.format(v));
 
   const anyFilter = from || to || vendorId || source || service || city || campaignId || adsetId || adId;
 
@@ -230,6 +236,12 @@ export function MarketingClient({
 
       {data && (
         <>
+          {data.otherCurrencyOpportunities > 0 && (
+            <p className="text-xs text-warning">
+              {data.otherCurrencyOpportunities} oportunidad(es) con valor en otra moneda no entran en ingreso,
+              pipeline, CAC ni ROAS (la cuenta publicitaria está en {data.currency}).
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Stat label="Gasto" value={money.format(data.metrics.spend)} />
             <Stat label="CAC" value={m(data.metrics.CAC)} />

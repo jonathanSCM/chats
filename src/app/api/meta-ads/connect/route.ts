@@ -6,7 +6,7 @@ import { encrypt } from "@/lib/crypto";
 import { isMarketingEnabled } from "@/lib/features";
 import { getPlatformSettings } from "@/server/services/platform-settings";
 import { audit } from "@/server/services/audit";
-import { extendAccessToken, listAdAccounts } from "@/server/services/meta-ads";
+import { extendAccessToken, getAdAccountInfo, listAdAccounts } from "@/server/services/meta-ads";
 
 const bodySchema = z.object({ accessToken: z.string().min(1) });
 
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     const only = accounts.length === 1 ? accounts[0] : null;
+    const info = only ? await getAdAccountInfo(only.id, accessToken) : null;
     await prisma.organization.update({
       where: { id: organizationId },
       data: {
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
         metaAdsConnectedAt: new Date(),
         metaAdAccountId: only?.id ?? null,
         metaAdAccountName: only?.name ?? null,
+        metaAdCurrency: info?.currency ?? null,
         metaAdsLastSyncedAt: null,
       },
     });

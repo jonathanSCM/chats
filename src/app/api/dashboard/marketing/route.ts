@@ -33,6 +33,14 @@ export async function GET(req: NextRequest) {
 
   const dateRange = from || to ? { gte: from ? new Date(from) : undefined, lte: to ? new Date(`${to}T23:59:59`) : undefined } : undefined;
 
+  const orgInfo = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { metaAdCurrency: true },
+  });
+  const adCurrency = orgInfo?.metaAdCurrency ?? null;
+  // Sin tipo de cambio: ingresos y valor de pipeline solo suman oportunidades en la moneda de la cuenta publicitaria.
+  const sameCurrency = (c: string) => !adCurrency || c === adCurrency;
+
   // ── Gasto (AdSpendSnapshot) ─────────────────────────────────────────
   const spendRows = await prisma.adSpendSnapshot.findMany({
     where: {
@@ -197,8 +205,15 @@ export async function GET(req: NextRequest) {
   const ganadas = opportunities.filter((o) => o.wonAt);
   const abiertas = opportunities.filter((o) => !o.wonAt && !o.lostAt);
 
-  const valorDelPipeline = abiertas.reduce((sum, o) => sum + Number(o.estimatedValue ?? 0), 0);
-  const ingresoGanado = ganadas.reduce((sum, o) => sum + Number(o.estimatedValue ?? 0), 0);
+  const valorDelPipeline = abiertas
+    .filter((o) => sameCurrency(o.currency))
+    .reduce((sum, o) => sum + Number(o.estimatedValue ?? 0), 0);
+  const ingresoGanado = ganadas
+    .filter((o) => sameCurrency(o.currency))
+    .reduce((sum, o) => sum + Number(o.estimatedValue ?? 0), 0);
+  const otherCurrencyOpportunities = opportunities.filter(
+    (o) => o.estimatedValue !== null && !sameCurrency(o.currency),
+  ).length;
 
   const metrics = {
     spend: spendTotal,
@@ -228,7 +243,9 @@ export async function GET(req: NextRequest) {
     leadsByAd.set(ad, (leadsByAd.get(ad) ?? 0) + 1);
     if (o.wonAt) {
       ganadosByAd.set(ad, (ganadosByAd.get(ad) ?? 0) + 1);
-      ingresoByAd.set(ad, (ingresoByAd.get(ad) ?? 0) + Number(o.estimatedValue ?? 0));
+      if (sameCurrency(o.currency)) {
+        ingresoByAd.set(ad, (ingresoByAd.get(ad) ?? 0) + Number(o.estimatedValue ?? 0));
+      }
     }
   }
 
@@ -254,5 +271,5 @@ export async function GET(req: NextRequest) {
     })
     .sort((a, b) => b.spend - a.spend);
 
-  return NextResponse.json({ funnel, metrics, breakdown });
+  return NextResponse.json({ funnel, metrics, breakdown, currency: adCurrency, otherCurrencyOpportunities });
 }

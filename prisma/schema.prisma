@@ -62,6 +62,8 @@ model Organization {
   // del sync sin romper nada. Se carga a mano en /dashboard/organization.
   metaAdAccountId        String?
   metaAdAccountName      String?
+  // Moneda de la cuenta publicitaria (BOB, USD...) tal como la informa Meta: el gasto de AdSpendSnapshot viene en esta moneda.
+  metaAdCurrency         String?
   // Token del usuario que autorizó "Conectar con Facebook" (ads_read), cifrado
   // con encrypt(). Null con metaAdAccountId seteado = hay que reconectar
   // (venció o Meta lo invalidó).

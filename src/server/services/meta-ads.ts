@@ -348,3 +348,20 @@ export async function extendAccessToken(params: {
   const data = (await res.json()) as { access_token: string; expires_in?: number };
   return { accessToken: data.access_token, expiresIn: data.expires_in ?? null };
 }
+
+/** Nombre y moneda de la cuenta publicitaria (el gasto de Meta viene en esa moneda). Best-effort: null si falla. */
+export async function getAdAccountInfo(
+  adAccountId: string,
+  accessToken: string,
+): Promise<{ name: string | null; currency: string | null } | null> {
+  try {
+    const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${adAccountId}?fields=name,currency`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { name?: string; currency?: string };
+    return { name: data.name ?? null, currency: data.currency ?? null };
+  } catch {
+    return null;
+  }
+}

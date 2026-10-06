@@ -11,6 +11,8 @@ import { auth, signIn } from "@/server/auth";
 import { generateToken, hashToken } from "@/lib/tokens";
 import { sendMail } from "@/server/services/mailer";
 import { inviteEmail } from "@/server/services/email-templates";
+import { removeMembership } from "@/server/services/organization-membership";
+import { audit } from "@/server/services/audit";
 import type { ActionState } from "./types";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 días
@@ -93,29 +95,18 @@ export async function removeMemberAction(memberId: string): Promise<ActionState>
     return { error: "No puedes quitarte a ti mismo" };
   }
 
-  const membership = await prisma.organizationMembership.findUnique({
-    where: { userId_organizationId: { userId: memberId, organizationId } },
-  });
-  if (!membership) {
+  const removed = await removeMembership(memberId, organizationId);
+  if (!removed) {
     return { error: "Miembro no encontrado" };
   }
-
-  await prisma.organizationMembership.delete({ where: { id: membership.id } });
-
-  // Si esta era su organización ACTIVA, no puede quedar apuntando a una
-  // organización de la que ya no es miembro -- pasa a otra que le quede, o
-  // queda "huérfano" (organizationId null) si no le queda ninguna, igual
-  // que el comportamiento de siempre para alguien sin ninguna organización.
-  const member = await prisma.user.findUnique({ where: { id: memberId }, select: { organizationId: true } });
-  if (member?.organizationId === organizationId) {
-    const another = await prisma.organizationMembership.findFirst({ where: { userId: memberId } });
-    await prisma.user.update({
-      where: { id: memberId },
-      data: another
-        ? { organizationId: another.organizationId, role: another.role }
-        : { organizationId: null },
-    });
-  }
+  await audit({
+    entityType: "Membership",
+    entityId: memberId,
+    action: "member_removed",
+    userId,
+    organizationId,
+    after: { removedBy: "owner" },
+  });
 
   revalidatePath("/dashboard/organization");
   return { error: null };
@@ -185,6 +176,16 @@ export async function changeMemberRoleAction(
   if (member?.organizationId === organizationId) {
     await prisma.user.update({ where: { id: memberId }, data: { role: parsedRole.data } });
   }
+
+  await audit({
+    entityType: "Membership",
+    entityId: memberId,
+    action: "member_role_changed",
+    userId,
+    organizationId,
+    before: { role: membership.role },
+    after: { role: parsedRole.data },
+  });
 
   revalidatePath("/dashboard/organization");
   return { error: null };

@@ -7,6 +7,7 @@ import { requireSession } from "@/server/auth/guards";
 import { signOut } from "@/server/auth";
 import { decrypt } from "@/lib/crypto";
 import { listAdAccounts } from "@/server/services/meta-ads";
+import { audit } from "@/server/services/audit";
 import { getPlatformSettings } from "@/server/services/platform-settings";
 import { getOrCreateOrgCalendar, shareCalendar, unshareCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
 import type { ActionState } from "./types";
@@ -167,6 +168,15 @@ export async function selectMetaAdAccountAction(adAccountId: string): Promise<Ac
     data: { metaAdAccountId: chosen.id, metaAdAccountName: chosen.name, metaAdsLastSyncedAt: null },
   });
 
+  await audit({
+    entityType: "MetaAds",
+    entityId: session.user.organizationId,
+    action: "meta_ads_account_selected",
+    userId: session.user.id,
+    organizationId: session.user.organizationId,
+    after: { adAccountId: chosen.id },
+  });
+
   revalidatePath("/dashboard/organization");
   return { error: null, message: "Cuenta publicitaria actualizada." };
 }
@@ -187,6 +197,13 @@ export async function disconnectMetaAdsAction(): Promise<ActionState> {
       metaAdAccountId: null,
       metaAdAccountName: null,
     },
+  });
+  await audit({
+    entityType: "MetaAds",
+    entityId: session.user.organizationId,
+    action: "meta_ads_disconnected",
+    userId: session.user.id,
+    organizationId: session.user.organizationId,
   });
 
   revalidatePath("/dashboard/organization");

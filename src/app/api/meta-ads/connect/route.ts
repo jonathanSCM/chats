@@ -6,6 +6,7 @@ import { encrypt } from "@/lib/crypto";
 import { isMarketingEnabled } from "@/lib/features";
 import { getPlatformSettings } from "@/server/services/platform-settings";
 import { exchangeEmbeddedSignupCode } from "@/server/services/whatsapp";
+import { audit } from "@/server/services/audit";
 import { listAdAccounts } from "@/server/services/meta-ads";
 
 const bodySchema = z.object({ code: z.string().min(1) });
@@ -62,6 +63,15 @@ export async function POST(req: NextRequest) {
         metaAdAccountName: only?.name ?? null,
         metaAdsLastSyncedAt: null,
       },
+    });
+
+    await audit({
+      entityType: "MetaAds",
+      entityId: organizationId,
+      action: "meta_ads_connected",
+      userId: session.user.id,
+      organizationId,
+      after: { accounts: accounts.length, selected: only?.id ?? null },
     });
 
     return NextResponse.json({ error: null, accounts: only ? [] : accounts, selected: only });

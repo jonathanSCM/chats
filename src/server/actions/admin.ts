@@ -9,6 +9,8 @@ import { generateToken } from "@/lib/tokens";
 import { DEFAULT_PIPELINE_STAGES, DEFAULT_SERVICES } from "@/lib/pipeline";
 import { sendMail } from "@/server/services/mailer";
 import { inviteEmail } from "@/server/services/email-templates";
+import { addMembership, removeMembership } from "@/server/services/organization-membership";
+import { audit } from "@/server/services/audit";
 import type { ActionState } from "./types";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 días — mismo plazo que las invitaciones normales de equipo.
@@ -97,6 +99,15 @@ export async function createOrganizationAction(
     }
   }
 
+  await audit({
+    entityType: "Organization",
+    entityId: org.id,
+    action: "org_created",
+    userId: session.user.id,
+    organizationId: org.id,
+    after: { name: org.name, ownerEmail: parsed.data.ownerEmail ?? null },
+  });
+
   revalidatePath("/admin");
   return { error: null, message: inviteUrl };
 }
@@ -105,9 +116,16 @@ export async function toggleOrgSuspensionAction(
   orgId: string,
   suspended: boolean,
 ): Promise<ActionState> {
-  await requireSuperadmin();
+  const session = await requireSuperadmin();
 
   await prisma.organization.update({ where: { id: orgId }, data: { suspended } });
+  await audit({
+    entityType: "Organization",
+    entityId: orgId,
+    action: suspended ? "org_suspended" : "org_unsuspended",
+    userId: session.user.id,
+    organizationId: orgId,
+  });
 
   revalidatePath(`/admin/organizations/${orgId}`);
   revalidatePath("/admin");
@@ -120,13 +138,82 @@ export async function toggleOrgSuspensionAction(
  * toca la organización, el bot, sus conversaciones ni ningún otro dato.
  */
 export async function disconnectWhatsAppAction(botId: string): Promise<ActionState> {
-  await requireSuperadmin();
+  const session = await requireSuperadmin();
 
   const bot = await prisma.bot.findUnique({ where: { id: botId }, select: { organizationId: true } });
   if (!bot) return { error: "Bot no encontrado" };
 
   await prisma.whatsAppConnection.deleteMany({ where: { botId } });
+  await audit({
+    entityType: "WhatsAppConnection",
+    entityId: botId,
+    action: "whatsapp_disconnected",
+    userId: session.user.id,
+    organizationId: bot.organizationId,
+    after: { by: "superadmin" },
+  });
 
   revalidatePath(`/admin/organizations/${bot.organizationId}`);
   return { error: null, message: "Conexión de WhatsApp eliminada." };
+}
+
+const roleSchema = z.enum(["OWNER", "MEMBER"]);
+
+/** Mete a un usuario en una organización (o le cambia el rol si ya estaba). */
+export async function setUserOrgRoleAction(
+  userId: string,
+  organizationId: string,
+  role: "OWNER" | "MEMBER",
+): Promise<ActionState> {
+  const session = await requireSuperadmin();
+  if (!roleSchema.safeParse(role).success) return { error: "Rol inválido" };
+
+  const [user, org, existing] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { role: true, email: true } }),
+    prisma.organization.findUnique({ where: { id: organizationId }, select: { id: true } }),
+    prisma.organizationMembership.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { role: true },
+    }),
+  ]);
+  if (!user || !org) return { error: "Usuario u organización no encontrados" };
+  if (user.role === "SUPERADMIN" || user.role === "SYSTEM") {
+    return { error: "Esa cuenta no pertenece a organizaciones" };
+  }
+
+  await addMembership(userId, organizationId, role);
+  await audit({
+    entityType: "Membership",
+    entityId: userId,
+    action: existing ? "member_role_changed" : "member_added",
+    userId: session.user.id,
+    organizationId,
+    before: existing ? { role: existing.role } : undefined,
+    after: { role, email: user.email, by: "superadmin" },
+  });
+
+  revalidatePath("/admin/users");
+  revalidatePath(`/admin/organizations/${organizationId}`);
+  return { error: null };
+}
+
+export async function removeUserFromOrgAction(userId: string, organizationId: string): Promise<ActionState> {
+  const session = await requireSuperadmin();
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  const removed = await removeMembership(userId, organizationId);
+  if (!removed) return { error: "Ese usuario no es miembro de esa organización" };
+
+  await audit({
+    entityType: "Membership",
+    entityId: userId,
+    action: "member_removed",
+    userId: session.user.id,
+    organizationId,
+    after: { email: user?.email ?? null, by: "superadmin" },
+  });
+
+  revalidatePath("/admin/users");
+  revalidatePath(`/admin/organizations/${organizationId}`);
+  return { error: null };
 }

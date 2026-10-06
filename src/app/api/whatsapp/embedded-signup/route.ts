@@ -12,6 +12,8 @@ import {
   initiateSmbAppDataSync,
 } from "@/server/services/whatsapp";
 import { enqueueOrReschedule } from "@/server/jobs";
+import { audit } from "@/server/services/audit";
+import { auth } from "@/server/auth";
 
 // El "compartir tus chats" que confirma la pantalla del celular es un paso
 // async del lado del celular (mensaje de "Cuenta de Facebook Empresas" +
@@ -136,6 +138,16 @@ export async function POST(req: NextRequest) {
       uniqueKey: `coexistence_history_sync:${connection.id}`,
       payload: { connectionId: connection.id },
       runAfter: new Date(Date.now() + HISTORY_SYNC_DELAY_MS),
+    });
+
+    const bot = await prisma.bot.findUnique({ where: { id: body.botId }, select: { organizationId: true } });
+    await audit({
+      entityType: "WhatsAppConnection",
+      entityId: body.botId,
+      action: "whatsapp_connected",
+      userId: (await auth())?.user?.id ?? null,
+      organizationId: bot?.organizationId ?? null,
+      after: { wabaId: body.wabaId, phoneNumberId, coexistence: true },
     });
 
     return NextResponse.json({ error: null });

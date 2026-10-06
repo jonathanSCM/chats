@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/client";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -24,7 +25,11 @@ export default async function AdminOrganizationDetailPage({
     where: { id },
     include: {
       bots: { include: { whatsappConnection: true, _count: { select: { conversations: true } } } },
-      users: { select: { id: true, name: true, email: true, role: true } },
+      memberships: {
+        where: { user: { role: { not: "SYSTEM" } } },
+        include: { user: { select: { id: true, name: true, email: true } } },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
 
@@ -83,7 +88,12 @@ export default async function AdminOrganizationDetailPage({
       </Card>
 
       <Card>
-        <CardTitle className="mb-4">Usuarios</CardTitle>
+        <div className="mb-4 flex items-center justify-between">
+          <CardTitle>Usuarios</CardTitle>
+          <Link href="/admin/users" className="text-xs text-accent hover:underline">
+            Gestionar usuarios
+          </Link>
+        </div>
         <Table>
           <Thead>
             <tr>
@@ -93,12 +103,12 @@ export default async function AdminOrganizationDetailPage({
             </tr>
           </Thead>
           <tbody>
-            {org.users.map((user) => (
-              <Tr key={user.id}>
-                <Td>{user.name ?? "—"}</Td>
-                <Td className="text-ink-muted">{user.email}</Td>
+            {org.memberships.map((m) => (
+              <Tr key={m.id}>
+                <Td>{m.user.name ?? "—"}</Td>
+                <Td className="text-ink-muted">{m.user.email}</Td>
                 <Td>
-                  <Badge tone={user.role === "OWNER" ? "accent" : "neutral"}>{user.role}</Badge>
+                  <Badge tone={m.role === "OWNER" ? "accent" : "neutral"}>{m.role}</Badge>
                 </Td>
               </Tr>
             ))}

@@ -6,6 +6,7 @@ import { prisma } from "@/server/db/client";
 import { requireSession, HttpError } from "@/server/auth/guards";
 import { encrypt } from "@/lib/crypto";
 import { invalidatePlatformSettingsCache } from "@/server/services/platform-settings";
+import { audit } from "@/server/services/audit";
 import type { ActionState } from "./types";
 
 async function requireSuperadmin() {
@@ -35,7 +36,7 @@ export async function updatePlatformSettingsAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireSuperadmin();
+  const session = await requireSuperadmin();
 
   const parsed = schema.safeParse({
     whatsappAppId: formData.get("whatsappAppId") || undefined,
@@ -68,6 +69,14 @@ export async function updatePlatformSettingsAction(
     where: { id: "singleton" },
     create: { id: "singleton", ...data },
     update: data,
+  });
+
+  await audit({
+    entityType: "PlatformSetting",
+    entityId: "singleton",
+    action: "settings_updated",
+    userId: session.user.id,
+    after: { appSecretChanged: Boolean(parsed.data.whatsappAppSecret) },
   });
 
   invalidatePlatformSettingsCache();

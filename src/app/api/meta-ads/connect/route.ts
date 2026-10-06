@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       code: body.code,
       appId: settings.whatsappAppId,
       appSecret: settings.whatsappAppSecret,
+      redirectUri: "",
     });
 
     const accounts = await listAdAccounts(accessToken, { appId: settings.whatsappAppId, appSecret: settings.whatsappAppSecret });

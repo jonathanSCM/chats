@@ -1215,11 +1215,15 @@ export async function exchangeEmbeddedSignupCode(params: {
   code: string;
   appId: string;
   appSecret: string;
+  // Con tokens de usuario el código sale del SDK de JavaScript y Meta exige
+  // redirect_uri vacío al canjearlo (error 36008 si no se manda).
+  redirectUri?: string;
 }): Promise<{ accessToken: string; expiresIn: number | null }> {
   const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/oauth/access_token`);
   url.searchParams.set("client_id", params.appId);
   url.searchParams.set("client_secret", params.appSecret);
   url.searchParams.set("code", params.code);
+  if (params.redirectUri !== undefined) url.searchParams.set("redirect_uri", params.redirectUri);
 
   const res = await fetch(url.toString());
   if (!res.ok) {

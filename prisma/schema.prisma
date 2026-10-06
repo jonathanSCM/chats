@@ -61,6 +61,13 @@ model Organization {
   // (Fase 4). Null = esa organización no tiene Meta Ads conectado, se omite
   // del sync sin romper nada. Se carga a mano en /dashboard/organization.
   metaAdAccountId        String?
+  metaAdAccountName      String?
+  // Token del usuario que autorizó "Conectar con Facebook" (ads_read), cifrado
+  // con encrypt(). Null con metaAdAccountId seteado = hay que reconectar
+  // (venció o Meta lo invalidó).
+  metaAdsAccessToken     String?  @db.Text
+  metaAdsTokenExpiresAt  DateTime?
+  metaAdsConnectedAt     DateTime?
   // Última vez que syncMetaAdsIfDue() (api/cron/tick) encoló el sync de
   // gasto de esta organización -- evita re-encolar cada minuto; se
   // resincroniza cada ~20h. Null = nunca corrió.
@@ -1094,6 +1101,9 @@ model PlatformSetting {
   whatsappAppSecret   String?  @db.Text // cifrado, igual que WhatsAppConnection.accessToken
   whatsappConfigId    String?
   whatsappVerifyToken String?
+  // Configuración de Facebook Login for Business que pide solo ads_read
+  // (Organización → Meta Ads → "Conectar con Facebook").
+  metaAdsConfigId     String?
   // Se setea sola cuando una llamada a OpenAI falla por falta de créditos
   // (runStructured en ai/client.ts) y se limpia sola en la próxima llamada
   // que sí funcione -- así el aviso en /admin refleja el estado actual, no

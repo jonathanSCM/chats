@@ -267,3 +267,40 @@ export async function syncAdAccountSpend(
 
   return rowCount;
 }
+
+export interface AdAccountSummary {
+  id: string; // act_XXXXXXXXX
+  name: string;
+}
+
+/** Cuentas publicitarias a las que el token tiene acceso (las que la persona autorizó en el login). */
+export async function listAdAccounts(accessToken: string): Promise<AdAccountSummary[]> {
+  const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/me/adaccounts`);
+  url.searchParams.set("fields", "id,name");
+  url.searchParams.set("limit", "100");
+  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) {
+    throw new Error(`No se pudieron listar las cuentas publicitarias (${res.status}): ${await res.text()}`);
+  }
+  const data = (await res.json()) as { data?: Array<{ id: string; name?: string }> };
+  return (data.data ?? []).map((a) => ({ id: a.id, name: a.name || a.id }));
+}
+
+/** Pide a Meta extender la vida del token (fb_exchange_token). Devuelve el token nuevo y su duración en segundos. */
+export async function extendAccessToken(params: {
+  accessToken: string;
+  appId: string;
+  appSecret: string;
+}): Promise<{ accessToken: string; expiresIn: number | null }> {
+  const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/oauth/access_token`);
+  url.searchParams.set("grant_type", "fb_exchange_token");
+  url.searchParams.set("client_id", params.appId);
+  url.searchParams.set("client_secret", params.appSecret);
+  url.searchParams.set("fb_exchange_token", params.accessToken);
+  const res = await fetch(url.toString());
+  if (!res.ok) {
+    throw new Error(`No se pudo extender el token de Meta Ads (${res.status}): ${await res.text()}`);
+  }
+  const data = (await res.json()) as { access_token: string; expires_in?: number };
+  return { accessToken: data.access_token, expiresIn: data.expires_in ?? null };
+}

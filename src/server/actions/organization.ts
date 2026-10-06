@@ -5,6 +5,8 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { signOut } from "@/server/auth";
+import { decrypt } from "@/lib/crypto";
+import { listAdAccounts } from "@/server/services/meta-ads";
 import { getOrCreateOrgCalendar, shareCalendar, unshareCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
 import type { ActionState } from "./types";
 
@@ -125,38 +127,61 @@ export async function updateBookingSettingsAction(
   return { error: null, message: "Horario de citas actualizado." };
 }
 
-// act_XXXXXXXXX -- formato fijo del ID de cuenta publicitaria de Meta, con
-// el que se arma la URL del insights (ver syncAdAccountSpend en meta-ads.ts).
-// Vacío = desconecta (deja de sincronizarse en el cron, no borra el
-// histórico de AdSpendSnapshot ya guardado).
-const metaAdAccountSchema = z.object({
-  metaAdAccountId: z
-    .string()
-    .trim()
-    .refine((v) => v === "" || /^act_\d+$/.test(v), "Formato inválido — debe ser act_ seguido de números"),
-});
-
-export async function updateMetaAdAccountAction(
-  _prevState: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
+/**
+ * Elige cuál de las cuentas publicitarias autorizadas en "Conectar con
+ * Facebook" usa esta organización. Se vuelve a listar con el token guardado
+ * para no confiar en el ID que manda el navegador.
+ */
+export async function selectMetaAdAccountAction(adAccountId: string): Promise<ActionState> {
   const session = await requireSession();
   if (session.user.role !== "OWNER" || !session.user.organizationId) {
     return { error: "Solo el dueño de la organización puede cambiar este dato" };
   }
 
-  const parsed = metaAdAccountSchema.safeParse({ metaAdAccountId: formData.get("metaAdAccountId") });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  const org = await prisma.organization.findUniqueOrThrow({
+    where: { id: session.user.organizationId },
+    select: { metaAdsAccessToken: true },
+  });
+  if (!org.metaAdsAccessToken) return { error: "Primero conectá con Facebook." };
+
+  let accounts;
+  try {
+    accounts = await listAdAccounts(decrypt(org.metaAdsAccessToken));
+  } catch {
+    return { error: "No se pudo consultar Meta. Probá reconectar." };
   }
+  const chosen = accounts.find((a) => a.id === adAccountId);
+  if (!chosen) return { error: "Esa cuenta no está entre las autorizadas." };
 
   await prisma.organization.update({
     where: { id: session.user.organizationId },
-    data: { metaAdAccountId: parsed.data.metaAdAccountId || null },
+    data: { metaAdAccountId: chosen.id, metaAdAccountName: chosen.name, metaAdsLastSyncedAt: null },
   });
 
   revalidatePath("/dashboard/organization");
   return { error: null, message: "Cuenta publicitaria actualizada." };
+}
+
+/** Borra el token y la cuenta; el histórico de AdSpendSnapshot ya guardado se conserva. */
+export async function disconnectMetaAdsAction(): Promise<ActionState> {
+  const session = await requireSession();
+  if (session.user.role !== "OWNER" || !session.user.organizationId) {
+    return { error: "Solo el dueño de la organización puede cambiar este dato" };
+  }
+
+  await prisma.organization.update({
+    where: { id: session.user.organizationId },
+    data: {
+      metaAdsAccessToken: null,
+      metaAdsTokenExpiresAt: null,
+      metaAdsConnectedAt: null,
+      metaAdAccountId: null,
+      metaAdAccountName: null,
+    },
+  });
+
+  revalidatePath("/dashboard/organization");
+  return { error: null };
 }
 
 const shareCalendarSchema = z.object({ email: z.email("Correo inválido") });

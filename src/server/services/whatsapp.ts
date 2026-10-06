@@ -1215,7 +1215,7 @@ export async function exchangeEmbeddedSignupCode(params: {
   code: string;
   appId: string;
   appSecret: string;
-}): Promise<{ accessToken: string }> {
+}): Promise<{ accessToken: string; expiresIn: number | null }> {
   const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/oauth/access_token`);
   url.searchParams.set("client_id", params.appId);
   url.searchParams.set("client_secret", params.appSecret);
@@ -1227,8 +1227,8 @@ export async function exchangeEmbeddedSignupCode(params: {
     throw new Error(`No se pudo intercambiar el código del Embedded Signup (${res.status}): ${errorBody}`);
   }
 
-  const data = (await res.json()) as { access_token: string };
-  return { accessToken: data.access_token };
+  const data = (await res.json()) as { access_token: string; expires_in?: number };
+  return { accessToken: data.access_token, expiresIn: data.expires_in ?? null };
 }
 
 // Suscribe esta app a los webhooks de la WABA — sin esto, Meta no manda

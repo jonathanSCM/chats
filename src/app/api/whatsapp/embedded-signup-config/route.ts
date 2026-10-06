@@ -13,5 +13,9 @@ export async function GET() {
   }
 
   const settings = await getPlatformSettings();
-  return NextResponse.json({ appId: settings.whatsappAppId, configId: settings.whatsappConfigId });
+  return NextResponse.json({
+    appId: settings.whatsappAppId,
+    configId: settings.whatsappConfigId,
+    metaAdsConfigId: settings.metaAdsConfigId,
+  });
 }

@@ -38,6 +38,7 @@ export default async function AdminSettingsPage() {
           whatsappAppId={row?.whatsappAppId ?? ""}
           whatsappConfigId={row?.whatsappConfigId ?? ""}
           whatsappVerifyToken={row?.whatsappVerifyToken ?? ""}
+          metaAdsConfigId={row?.metaAdsConfigId ?? ""}
           hasAppSecret={Boolean(row?.whatsappAppSecret)}
         />
       </Card>

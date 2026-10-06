@@ -10,7 +10,9 @@ import { BookingSettingsForm } from "./_components/booking-settings-form";
 import { PipelineStagesList } from "./_components/pipeline-stages-list";
 import { ServicesList } from "./_components/services-list";
 import { BotAccessMatrix } from "./_components/bot-access-matrix";
-import { MetaAdAccountForm } from "./_components/meta-ad-account-form";
+import { MetaAdsConnect } from "./_components/meta-ads-connect";
+import { listAdAccounts } from "@/server/services/meta-ads";
+import { decrypt } from "@/lib/crypto";
 import { isMarketingEnabled } from "@/lib/features";
 import { DangerZone } from "./_components/danger-zone";
 
@@ -54,6 +56,13 @@ export default async function OrganizationSettingsPage() {
       orderBy: { order: "asc" },
     }),
   ]);
+
+  // Conectó con Facebook pero todavía no eligió cuenta (autorizó varias): se
+  // vuelve a listar para mostrar el selector aunque haya recargado la página.
+  const pendingAdAccounts =
+    org.metaAdsAccessToken && !org.metaAdAccountId && isMarketingEnabled()
+      ? await listAdAccounts(decrypt(org.metaAdsAccessToken)).catch(() => [])
+      : [];
 
   const members = memberships.map((m) => ({
     id: m.user.id,
@@ -129,10 +138,16 @@ export default async function OrganizationSettingsPage() {
         <Card className="mb-6">
           <CardTitle className="mb-1">Meta Ads</CardTitle>
           <CardDescription className="mb-4">
-            Cuenta publicitaria de la que se sincroniza el gasto para el dashboard de marketing — se
-            sincroniza sola cada ~20h una vez cargada acá.
+            Conectá tu cuenta publicitaria con Facebook (solo lectura) para ver el gasto junto a tus
+            ventas en Marketing — se sincroniza sola cada ~20h.
           </CardDescription>
-          <MetaAdAccountForm currentAdAccountId={org.metaAdAccountId} />
+          <MetaAdsConnect
+            accountId={org.metaAdAccountId}
+            accountName={org.metaAdAccountName}
+            connected={Boolean(org.metaAdsAccessToken)}
+            needsReconnect={!org.metaAdsAccessToken && Boolean(org.metaAdAccountId)}
+            pendingAccounts={pendingAdAccounts}
+          />
         </Card>
       )}
 

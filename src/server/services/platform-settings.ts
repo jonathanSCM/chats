@@ -8,6 +8,7 @@ export interface PlatformSettings {
   whatsappAppSecret: string | null;
   whatsappConfigId: string | null;
   whatsappVerifyToken: string | null;
+  metaAdsConfigId: string | null;
 }
 
 // Se cachea en memoria un rato corto: esto se consulta en cada webhook de
@@ -33,6 +34,7 @@ function fromEnv(): PlatformSettings {
     whatsappAppSecret: trimOrNull(process.env.WHATSAPP_APP_SECRET),
     whatsappConfigId: trimOrNull(process.env.WHATSAPP_CONFIG_ID),
     whatsappVerifyToken: trimOrNull(process.env.WHATSAPP_VERIFY_TOKEN),
+    metaAdsConfigId: trimOrNull(process.env.META_ADS_CONFIG_ID),
   };
 }
 
@@ -59,6 +61,7 @@ async function loadFromDb(): Promise<PlatformSettings> {
     whatsappConfigId: trimOrNull(row?.whatsappConfigId) || trimOrNull(process.env.WHATSAPP_CONFIG_ID),
     whatsappVerifyToken:
       trimOrNull(row?.whatsappVerifyToken) || trimOrNull(process.env.WHATSAPP_VERIFY_TOKEN),
+    metaAdsConfigId: trimOrNull(row?.metaAdsConfigId) || trimOrNull(process.env.META_ADS_CONFIG_ID),
   };
 }
 

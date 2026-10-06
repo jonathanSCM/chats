@@ -25,6 +25,7 @@ const schema = z.object({
   whatsappAppId: z.string().trim().max(60).optional().default(""),
   whatsappConfigId: z.string().trim().max(60).optional().default(""),
   whatsappVerifyToken: z.string().trim().max(120).optional().default(""),
+  metaAdsConfigId: z.string().trim().max(60).optional().default(""),
   // Vacío = no cambiar (no se vuelve a mostrar en claro, igual que el
   // access token de cada conexión de WhatsApp).
   whatsappAppSecret: z.string().trim().max(200).optional().default(""),
@@ -40,6 +41,7 @@ export async function updatePlatformSettingsAction(
     whatsappAppId: formData.get("whatsappAppId") || undefined,
     whatsappConfigId: formData.get("whatsappConfigId") || undefined,
     whatsappVerifyToken: formData.get("whatsappVerifyToken") || undefined,
+    metaAdsConfigId: formData.get("metaAdsConfigId") || undefined,
     whatsappAppSecret: formData.get("whatsappAppSecret") || undefined,
   });
   if (!parsed.success) {
@@ -50,8 +52,10 @@ export async function updatePlatformSettingsAction(
     whatsappAppId: string | null;
     whatsappConfigId: string | null;
     whatsappVerifyToken: string | null;
+    metaAdsConfigId: string | null;
     whatsappAppSecret?: string;
   } = {
+    metaAdsConfigId: parsed.data.metaAdsConfigId || null,
     whatsappAppId: parsed.data.whatsappAppId || null,
     whatsappConfigId: parsed.data.whatsappConfigId || null,
     whatsappVerifyToken: parsed.data.whatsappVerifyToken || null,

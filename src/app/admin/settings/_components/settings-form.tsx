@@ -10,11 +10,13 @@ export function SettingsForm({
   whatsappAppId,
   whatsappConfigId,
   whatsappVerifyToken,
+  metaAdsConfigId,
   hasAppSecret,
 }: {
   whatsappAppId: string;
   whatsappConfigId: string;
   whatsappVerifyToken: string;
+  metaAdsConfigId: string;
   hasAppSecret: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(updatePlatformSettingsAction, {
@@ -61,6 +63,16 @@ export function SettingsForm({
           name="whatsappConfigId"
           defaultValue={whatsappConfigId}
           placeholder="Configuración con Coexistence activado"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="metaAdsConfigId">Config ID (Meta Ads, solo ads_read)</Label>
+        <Input
+          id="metaAdsConfigId"
+          name="metaAdsConfigId"
+          defaultValue={metaAdsConfigId}
+          placeholder="Facebook Login for Business con ads_read"
         />
       </div>
 

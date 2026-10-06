@@ -20,6 +20,7 @@ async function syncMetaAdsIfDue(): Promise<void> {
   const orgs = await prisma.organization.findMany({
     where: {
       metaAdAccountId: { not: null },
+      metaAdsAccessToken: { not: null },
       OR: [{ metaAdsLastSyncedAt: null }, { metaAdsLastSyncedAt: { lt: cutoff } }],
     },
     select: { id: true },

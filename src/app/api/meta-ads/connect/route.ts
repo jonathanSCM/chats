@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       appSecret: settings.whatsappAppSecret,
     });
 
-    const accounts = await listAdAccounts(accessToken);
+    const accounts = await listAdAccounts(accessToken, { appId: settings.whatsappAppId, appSecret: settings.whatsappAppSecret });
     if (accounts.length === 0) {
       return NextResponse.json(
         { error: "Meta no devolvió ninguna cuenta publicitaria. Marcá una cuenta al autorizar." },

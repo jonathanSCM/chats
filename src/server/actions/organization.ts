@@ -7,6 +7,7 @@ import { requireSession } from "@/server/auth/guards";
 import { signOut } from "@/server/auth";
 import { decrypt } from "@/lib/crypto";
 import { listAdAccounts } from "@/server/services/meta-ads";
+import { getPlatformSettings } from "@/server/services/platform-settings";
 import { getOrCreateOrgCalendar, shareCalendar, unshareCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
 import type { ActionState } from "./types";
 
@@ -144,9 +145,17 @@ export async function selectMetaAdAccountAction(adAccountId: string): Promise<Ac
   });
   if (!org.metaAdsAccessToken) return { error: "Primero conectá con Facebook." };
 
+  const settings = await getPlatformSettings();
+  if (!settings.whatsappAppId || !settings.whatsappAppSecret) {
+    return { error: "Falta configurar la app de Meta en /admin/settings." };
+  }
+
   let accounts;
   try {
-    accounts = await listAdAccounts(decrypt(org.metaAdsAccessToken));
+    accounts = await listAdAccounts(decrypt(org.metaAdsAccessToken), {
+      appId: settings.whatsappAppId,
+      appSecret: settings.whatsappAppSecret,
+    });
   } catch {
     return { error: "No se pudo consultar Meta. Probá reconectar." };
   }

@@ -13,6 +13,7 @@ import { BotAccessMatrix } from "./_components/bot-access-matrix";
 import { MetaAdsConnect } from "./_components/meta-ads-connect";
 import { listAdAccounts } from "@/server/services/meta-ads";
 import { decrypt } from "@/lib/crypto";
+import { getPlatformSettings } from "@/server/services/platform-settings";
 import { isMarketingEnabled } from "@/lib/features";
 import { DangerZone } from "./_components/danger-zone";
 
@@ -59,9 +60,13 @@ export default async function OrganizationSettingsPage() {
 
   // Conectó con Facebook pero todavía no eligió cuenta (autorizó varias): se
   // vuelve a listar para mostrar el selector aunque haya recargado la página.
+  const platform = await getPlatformSettings();
   const pendingAdAccounts =
-    org.metaAdsAccessToken && !org.metaAdAccountId && isMarketingEnabled()
-      ? await listAdAccounts(decrypt(org.metaAdsAccessToken)).catch(() => [])
+    org.metaAdsAccessToken && !org.metaAdAccountId && isMarketingEnabled() && platform.whatsappAppId && platform.whatsappAppSecret
+      ? await listAdAccounts(decrypt(org.metaAdsAccessToken), {
+          appId: platform.whatsappAppId,
+          appSecret: platform.whatsappAppSecret,
+        }).catch(() => [])
       : [];
 
   const members = memberships.map((m) => ({

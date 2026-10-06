@@ -273,8 +273,48 @@ export interface AdAccountSummary {
   name: string;
 }
 
-/** Cuentas publicitarias a las que el token tiene acceso (las que la persona autorizó en el login). */
-export async function listAdAccounts(accessToken: string): Promise<AdAccountSummary[]> {
+/**
+ * Cuentas publicitarias que la persona autorizó en el login. Con un token de
+ * usuario del sistema, /me es el usuario del sistema (no la persona) y no
+ * lista nada: el camino documentado es debug_token, que devuelve en
+ * granular_scopes los IDs de las cuentas autorizadas para ads_read. Si eso
+ * no trae nada, se prueba /me/adaccounts (tokens de usuario normales).
+ */
+export async function listAdAccounts(
+  accessToken: string,
+  app: { appId: string; appSecret: string },
+): Promise<AdAccountSummary[]> {
+  const debugUrl = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/debug_token`);
+  debugUrl.searchParams.set("input_token", accessToken);
+  debugUrl.searchParams.set("access_token", `${app.appId}|${app.appSecret}`);
+  const debugRes = await fetch(debugUrl.toString());
+  if (!debugRes.ok) {
+    throw new Error(`No se pudo inspeccionar el token de Meta Ads (${debugRes.status}): ${await debugRes.text()}`);
+  }
+  const debug = (await debugRes.json()) as {
+    data?: { granular_scopes?: Array<{ scope: string; target_ids?: string[] }> };
+  };
+  const ids = (debug.data?.granular_scopes ?? [])
+    .filter((g) => g.scope === "ads_read" || g.scope === "ads_management")
+    .flatMap((g) => g.target_ids ?? []);
+
+  if (ids.length > 0) {
+    const unique = [...new Set(ids.map((id) => (id.startsWith("act_") ? id : `act_${id}`)))];
+    return Promise.all(
+      unique.map(async (id) => {
+        try {
+          const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${id}?fields=name`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          const data = res.ok ? ((await res.json()) as { name?: string }) : {};
+          return { id, name: data.name || id };
+        } catch {
+          return { id, name: id };
+        }
+      }),
+    );
+  }
+
   const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/me/adaccounts`);
   url.searchParams.set("fields", "id,name");
   url.searchParams.set("limit", "100");

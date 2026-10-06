@@ -315,6 +315,8 @@ export async function listAdAccounts(
     );
   }
 
+  console.warn("[meta-ads] debug_token no trajo cuentas autorizadas:", JSON.stringify(debug.data ?? debug));
+
   const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/me/adaccounts`);
   url.searchParams.set("fields", "id,name");
   url.searchParams.set("limit", "100");

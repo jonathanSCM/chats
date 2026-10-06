@@ -30,7 +30,9 @@ async function syncMetaAdsIfDue(): Promise<void> {
     await enqueue({
       type: "meta_ads_sync",
       payload: { organizationId: org.id },
-      uniqueKey: `meta-ads-sync-${org.id}`,
+      // Con fecha en la clave: una clave fija chocaba para siempre con un job
+      // viejo ya terminado o fallido y el sync nunca volvía a encolarse.
+      uniqueKey: `meta-ads-sync-${org.id}-${new Date().toISOString().slice(0, 10)}`,
     });
   }
 }

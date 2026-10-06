@@ -192,10 +192,12 @@ export async function syncAdAccountSpend(
   accessToken: string,
 ): Promise<number> {
   let rowCount = 0;
+  // La primera vez trae 30 días de historia; después alcanza con 7 (ver arriba).
+  const hasHistory = (await prisma.adSpendSnapshot.count({ where: { organizationId } })) > 0;
   let url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${adAccountId}/insights`);
   url.searchParams.set("level", "ad");
   url.searchParams.set("time_increment", "1");
-  url.searchParams.set("date_preset", "last_7d");
+  url.searchParams.set("date_preset", hasHistory ? "last_7d" : "last_30d");
   url.searchParams.set(
     "fields",
     "campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency",

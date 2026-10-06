@@ -45,13 +45,13 @@ export function MetaAdsConnect({
     loadFacebookSdk(config.appId).catch(() => {});
   }, [config?.appId]);
 
-  async function completeConnection(code: string) {
+  async function completeConnection(accessToken: string) {
     setStatus("connecting");
     try {
       const res = await fetch("/api/meta-ads/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ accessToken }),
       });
       const data = (await res.json()) as { error: string | null; accounts?: AdAccount[] };
       if (!res.ok || data.error) {
@@ -90,14 +90,14 @@ export function MetaAdsConnect({
     // El callback de FB.login() no puede ser async (el SDK lo rechaza).
     window.FB!.login(
       (response) => {
-        const code = response.authResponse?.code;
-        if (!code) {
+        const token = response.authResponse?.accessToken;
+        if (!token) {
           setStatus("idle");
           return;
         }
-        void completeConnection(code);
+        void completeConnection(token);
       },
-      { config_id: configId, response_type: "code", override_default_response_type: true },
+      { config_id: configId },
     );
   }
 

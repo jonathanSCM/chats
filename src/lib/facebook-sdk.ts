@@ -10,13 +10,13 @@ declare global {
       }) => void;
       login: (
         callback: (response: {
-          authResponse?: { code?: string };
+          authResponse?: { code?: string; accessToken?: string };
           status?: string;
         }) => void,
         options: {
           config_id: string;
-          response_type: string;
-          override_default_response_type: boolean;
+          response_type?: string;
+          override_default_response_type?: boolean;
           // Para v4, la doc de Meta pide "extras: {}" vacío a propósito --
           // featureType/sessionInfoVersion son solo para v2/v3.
           extras?: Record<string, unknown>;

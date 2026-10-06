@@ -5,15 +5,13 @@ import { prisma } from "@/server/db/client";
 import { encrypt } from "@/lib/crypto";
 import { isMarketingEnabled } from "@/lib/features";
 import { getPlatformSettings } from "@/server/services/platform-settings";
-import { exchangeEmbeddedSignupCode } from "@/server/services/whatsapp";
 import { audit } from "@/server/services/audit";
-import { listAdAccounts } from "@/server/services/meta-ads";
+import { extendAccessToken, listAdAccounts } from "@/server/services/meta-ads";
 
-const bodySchema = z.object({ code: z.string().min(1) });
+const bodySchema = z.object({ accessToken: z.string().min(1) });
 
-// Recibe el "code" del FB.login() de "Conectar con Facebook" (ads_read), lo
-// canjea por token en el servidor -- el token nunca toca el navegador -- y
-// lo guarda cifrado en la organización. Si la persona autorizó una sola
+// Recibe el token del FB.login() de "Conectar con Facebook" (ads_read), lo
+// extiende a larga duración en el servidor y lo guarda cifrado en la organización. Si la persona autorizó una sola
 // cuenta publicitaria queda elegida; si autorizó varias, el cliente muestra
 // la lista y llama a selectMetaAdAccountAction.
 export async function POST(req: NextRequest) {
@@ -38,11 +36,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Falta configurar la app de Meta en /admin/settings." }, { status: 500 });
     }
 
-    const { accessToken, expiresIn } = await exchangeEmbeddedSignupCode({
-      code: body.code,
+    // El SDK entrega un token de corta duración: se cambia ya mismo por uno de ~60 días.
+    const { accessToken, expiresIn } = await extendAccessToken({
+      accessToken: body.accessToken,
       appId: settings.whatsappAppId,
       appSecret: settings.whatsappAppSecret,
-      redirectUri: "",
     });
 
     const accounts = await listAdAccounts(accessToken, { appId: settings.whatsappAppId, appSecret: settings.whatsappAppSecret });

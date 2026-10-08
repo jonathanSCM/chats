@@ -7,6 +7,8 @@ import { isMarketingEnabled } from "@/lib/features";
 
 export const metaAdsSyncPayload = z.object({
   organizationId: z.string(),
+  // Ventana de Meta para reprocesar histórico (last_90d, last_year...); sin esto se elige sola.
+  datePreset: z.enum(["last_7d", "last_30d", "last_90d", "last_year"]).optional(),
 });
 
 const EXTEND_WHEN_LESS_THAN_MS = 7 * 24 * 60 * 60 * 1000;
@@ -17,7 +19,7 @@ const EXTEND_WHEN_LESS_THAN_MS = 7 * 24 * 60 * 60 * 1000;
  * "Conectar con Facebook" (solo ads_read), no el de WhatsApp.
  */
 export async function handleMetaAdsSync(rawPayload: unknown): Promise<void> {
-  const { organizationId } = metaAdsSyncPayload.parse(rawPayload);
+  const { organizationId, datePreset } = metaAdsSyncPayload.parse(rawPayload);
   if (!isMarketingEnabled()) return; // apagado: el job pendiente se descarta sin llamar a Meta
 
   const org = await prisma.organization.findUnique({
@@ -58,7 +60,7 @@ export async function handleMetaAdsSync(rawPayload: unknown): Promise<void> {
   }
 
   try {
-    await syncAdAccountSpend(organizationId, org.metaAdAccountId, accessToken);
+    await syncAdAccountSpend(organizationId, org.metaAdAccountId, accessToken, datePreset);
   } catch (error) {
     // 190 = token vencido/revocado: reintentar no sirve, hay que reconectar.
     // Se borra el token (la pantalla pasa a "Reconectar") y no se reintenta.

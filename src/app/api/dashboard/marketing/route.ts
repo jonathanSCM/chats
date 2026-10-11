@@ -59,6 +59,8 @@ export async function GET(req: NextRequest) {
       adName: true,
       spend: true,
       reach: true,
+      impressions: true,
+      clicks: true,
     },
   });
 
@@ -67,7 +69,7 @@ export async function GET(req: NextRequest) {
 
   const spendByAd = new Map<
     string,
-    { campaignName: string; adsetName: string; adName: string; campaignId: string; adsetId: string; spend: number }
+    { campaignName: string; adsetName: string; adName: string; campaignId: string; adsetId: string; spend: number; impressions: number; clicks: number }
   >();
   for (const r of spendRows) {
     const entry = spendByAd.get(r.adId) ?? {
@@ -77,8 +79,12 @@ export async function GET(req: NextRequest) {
       campaignId: r.campaignId,
       adsetId: r.adsetId,
       spend: 0,
+      impressions: 0,
+      clicks: 0,
     };
     entry.spend += Number(r.spend);
+    entry.impressions += r.impressions;
+    entry.clicks += r.clicks;
     spendByAd.set(r.adId, entry);
   }
 
@@ -263,6 +269,9 @@ export async function GET(req: NextRequest) {
         campaignId: r.campaignId,
         campaignName: r.campaignName,
         spend,
+        impressions: r.impressions,
+        clicks: r.clicks,
+        ctr: r.impressions > 0 ? r.clicks / r.impressions : null,
         leads,
         ganados,
         CAC: ganados > 0 ? spend / ganados : null,

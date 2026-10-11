@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Megaphone } from "lucide-react";
+import { Megaphone, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { loadFacebookSdk } from "@/lib/facebook-sdk";
-import { selectMetaAdAccountAction, disconnectMetaAdsAction } from "@/server/actions/organization";
+import { selectMetaAdAccountAction, disconnectMetaAdsAction, syncMetaAdsNowAction } from "@/server/actions/organization";
 
 interface AdAccount {
   id: string;
@@ -19,19 +19,22 @@ export function MetaAdsConnect({
   connected,
   needsReconnect,
   pendingAccounts,
+  lastSyncedAt,
 }: {
   accountName: string | null;
   accountId: string | null;
   connected: boolean;
   needsReconnect: boolean;
   pendingAccounts: AdAccount[];
+  lastSyncedAt: string | null;
 }) {
   const router = useRouter();
   const [config, setConfig] = useState<{ appId: string | null; metaAdsConfigId: string | null } | null>(null);
-  const [status, setStatus] = useState<"idle" | "loading" | "connecting" | "saving">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "connecting" | "saving" | "syncing">("idle");
   const [error, setError] = useState<string | null>(null);
   const [choices, setChoices] = useState<AdAccount[]>(pendingAccounts);
   const [chosenId, setChosenId] = useState(pendingAccounts[0]?.id ?? "");
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/whatsapp/embedded-signup-config")
@@ -113,6 +116,17 @@ export function MetaAdsConnect({
     router.refresh();
   }
 
+  async function handleSyncNow() {
+    setStatus("syncing");
+    setError(null);
+    setSyncMessage(null);
+    const result = await syncMetaAdsNowAction();
+    setStatus("idle");
+    if (result.error) setError(result.error);
+    else setSyncMessage(result.message ?? "Sincronizado.");
+    router.refresh();
+  }
+
   async function handleDisconnect() {
     setStatus("saving");
     await disconnectMetaAdsAction();
@@ -147,10 +161,22 @@ export function MetaAdsConnect({
             Conectado: <span className="font-medium">{accountName ?? accountId}</span>{" "}
             <span className="font-mono text-xs text-ink-faint">{accountId}</span>
           </p>
+          <Button type="button" variant="secondary" onClick={handleSyncNow} disabled={busy}>
+            <RefreshCw size={14} className={status === "syncing" ? "animate-spin" : ""} />
+            {status === "syncing" ? "Consultando Meta…" : "Sincronizar ahora"}
+          </Button>
           <Button type="button" variant="secondary" onClick={handleDisconnect} disabled={busy}>
             Desconectar
           </Button>
         </div>
+      )}
+
+      {choices.length === 0 && connected && accountId && !needsReconnect && (
+        <p className="text-xs text-ink-muted">
+          Última sincronización:{" "}
+          {lastSyncedAt ? new Date(lastSyncedAt).toLocaleString("es") : "todavía no se sincronizó"}
+          {syncMessage && <span className="ml-2 text-accent">{syncMessage}</span>}
+        </p>
       )}
 
       {needsReconnect && (

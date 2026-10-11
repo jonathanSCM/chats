@@ -19,14 +19,24 @@ const EXTEND_WHEN_LESS_THAN_MS = 7 * 24 * 60 * 60 * 1000;
  * "Conectar con Facebook" (solo ads_read), no el de WhatsApp.
  */
 export async function handleMetaAdsSync(rawPayload: unknown): Promise<void> {
+  await runMetaAdsSync(rawPayload);
+}
+
+export type MetaAdsSyncResult =
+  | { status: "ok"; rows: number }
+  | { status: "skipped" } // apagado, desconectada o pendiente de reconexión
+  | { status: "revoked" }; // Meta invalidó el token: hay que reconectar
+
+/** Misma lógica del job, pero devolviendo el resultado (la usa también "Sincronizar ahora"). */
+export async function runMetaAdsSync(rawPayload: unknown): Promise<MetaAdsSyncResult> {
   const { organizationId, datePreset } = metaAdsSyncPayload.parse(rawPayload);
-  if (!isMarketingEnabled()) return; // apagado: el job pendiente se descarta sin llamar a Meta
+  if (!isMarketingEnabled()) return { status: "skipped" }; // apagado: el job pendiente se descarta sin llamar a Meta
 
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
     select: { metaAdAccountId: true, metaAdsAccessToken: true, metaAdsTokenExpiresAt: true },
   });
-  if (!org?.metaAdAccountId || !org.metaAdsAccessToken) return; // desconectada o pendiente de reconexión
+  if (!org?.metaAdAccountId || !org.metaAdsAccessToken) return { status: "skipped" }; // desconectada o pendiente de reconexión
 
   let accessToken = decrypt(org.metaAdsAccessToken);
 
@@ -59,8 +69,9 @@ export async function handleMetaAdsSync(rawPayload: unknown): Promise<void> {
     await prisma.organization.update({ where: { id: organizationId }, data: { metaAdCurrency: info.currency } });
   }
 
+  let rows: number;
   try {
-    await syncAdAccountSpend(organizationId, org.metaAdAccountId, accessToken, datePreset);
+    rows = await syncAdAccountSpend(organizationId, org.metaAdAccountId, accessToken, datePreset);
   } catch (error) {
     // 190 = token vencido/revocado: reintentar no sirve, hay que reconectar.
     // Se borra el token (la pantalla pasa a "Reconectar") y no se reintenta.
@@ -69,7 +80,7 @@ export async function handleMetaAdsSync(rawPayload: unknown): Promise<void> {
         where: { id: organizationId },
         data: { metaAdsAccessToken: null, metaAdsTokenExpiresAt: null },
       });
-      return;
+      return { status: "revoked" };
     }
     throw error;
   }
@@ -78,4 +89,5 @@ export async function handleMetaAdsSync(rawPayload: unknown): Promise<void> {
     where: { id: organizationId },
     data: { metaAdsLastSyncedAt: new Date() },
   });
+  return { status: "ok", rows };
 }

@@ -8,6 +8,7 @@ import { signOut } from "@/server/auth";
 import { decrypt } from "@/lib/crypto";
 import { getAdAccountInfo, listAdAccounts } from "@/server/services/meta-ads";
 import { audit } from "@/server/services/audit";
+import { runMetaAdsSync } from "@/server/jobs/handlers/meta-ads-sync";
 import { getPlatformSettings } from "@/server/services/platform-settings";
 import { getOrCreateOrgCalendar, shareCalendar, unshareCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
 import type { ActionState } from "./types";
@@ -185,6 +186,48 @@ export async function selectMetaAdAccountAction(adAccountId: string): Promise<Ac
 
   revalidatePath("/dashboard/organization");
   return { error: null, message: "Cuenta publicitaria actualizada." };
+}
+
+/**
+ * "Sincronizar ahora": corre la misma consulta del cron, a pedido del dueño.
+ * Pasa por Meta de verdad (Marketing API) y devuelve cuántas filas trajo.
+ */
+export async function syncMetaAdsNowAction(): Promise<ActionState> {
+  const session = await requireSession();
+  if (session.user.role !== "OWNER" || !session.user.organizationId) {
+    return { error: "Solo el dueño de la organización puede cambiar este dato" };
+  }
+  const organizationId = session.user.organizationId;
+
+  const org = await prisma.organization.findUniqueOrThrow({
+    where: { id: organizationId },
+    select: { metaAdsLastSyncedAt: true },
+  });
+  // Evita martillar la API de Meta con clics repetidos.
+  if (org.metaAdsLastSyncedAt && Date.now() - org.metaAdsLastSyncedAt.getTime() < 30_000) {
+    return { error: "Se acaba de sincronizar. Esperá unos segundos." };
+  }
+
+  let result;
+  try {
+    result = await runMetaAdsSync({ organizationId });
+  } catch {
+    return { error: "Meta no respondió bien. Probá de nuevo en un rato." };
+  }
+  if (result.status === "revoked") return { error: "La conexión venció. Volvé a conectar con Facebook." };
+  if (result.status === "skipped") return { error: "Conectá primero tu cuenta publicitaria." };
+
+  await audit({
+    entityType: "MetaAds",
+    entityId: organizationId,
+    action: "meta_ads_synced_manually",
+    userId: session.user.id,
+    organizationId,
+    after: { rows: result.rows },
+  });
+
+  revalidatePath("/dashboard/organization");
+  return { error: null, message: `Listo: Meta devolvió ${result.rows} filas de gasto por anuncio y día.` };
 }
 
 /** Borra el token y la cuenta; el histórico de AdSpendSnapshot ya guardado se conserva. */

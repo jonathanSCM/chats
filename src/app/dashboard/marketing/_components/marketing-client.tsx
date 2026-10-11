@@ -38,6 +38,9 @@ interface BreakdownRow {
   campaignId: string;
   campaignName: string;
   spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number | null;
   leads: number;
   ganados: number;
   CAC: number | null;
@@ -305,6 +308,9 @@ export function MarketingClient({
                     <Th>Conjunto</Th>
                     <Th>Campaña</Th>
                     <Th>Gasto</Th>
+                    <Th>Impresiones</Th>
+                    <Th>Clics</Th>
+                    <Th>CTR</Th>
                     <Th>Leads</Th>
                     <Th>Ganados</Th>
                     <Th>CAC</Th>
@@ -324,6 +330,9 @@ export function MarketingClient({
                         {r.campaignName || "—"}
                       </Td>
                       <Td className="font-mono">{money.format(r.spend)}</Td>
+                      <Td className="font-mono">{r.impressions.toLocaleString("es")}</Td>
+                      <Td className="font-mono">{r.clicks.toLocaleString("es")}</Td>
+                      <Td className="font-mono">{r.ctr === null ? "—" : `${(r.ctr * 100).toFixed(2)}%`}</Td>
                       <Td className="font-mono">{r.leads}</Td>
                       <Td className="font-mono">{r.ganados}</Td>
                       <Td className="font-mono">{m(r.CAC)}</Td>

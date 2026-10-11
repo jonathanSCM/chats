@@ -152,6 +152,7 @@ export default async function OrganizationSettingsPage() {
             connected={Boolean(org.metaAdsAccessToken)}
             needsReconnect={!org.metaAdsAccessToken && Boolean(org.metaAdAccountId)}
             pendingAccounts={pendingAdAccounts}
+            lastSyncedAt={org.metaAdsLastSyncedAt?.toISOString() ?? null}
           />
         </Card>
       )}

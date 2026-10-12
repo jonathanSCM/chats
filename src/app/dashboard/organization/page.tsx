@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
@@ -17,7 +18,23 @@ import { getPlatformSettings } from "@/server/services/platform-settings";
 import { isMarketingEnabled } from "@/lib/features";
 import { DangerZone } from "./_components/danger-zone";
 
-export default async function OrganizationSettingsPage() {
+const TABS = [
+  { key: "general", label: "General" },
+  { key: "equipo", label: "Equipo" },
+  { key: "ventas", label: "Ventas" },
+  { key: "integraciones", label: "Integraciones" },
+] as const;
+
+type TabKey = (typeof TABS)[number]["key"];
+
+export default async function OrganizationSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ seccion?: string }>;
+}) {
+  const { seccion } = await searchParams;
+  const tab: TabKey = TABS.some((t) => t.key === seccion) ? (seccion as TabKey) : "general";
+
   const session = await auth();
   if (!session?.user.organizationId) redirect("/dashboard");
   if (session.user.role !== "OWNER") redirect("/dashboard");
@@ -62,7 +79,7 @@ export default async function OrganizationSettingsPage() {
   // vuelve a listar para mostrar el selector aunque haya recargado la página.
   const platform = await getPlatformSettings();
   const pendingAdAccounts =
-    org.metaAdsAccessToken && !org.metaAdAccountId && isMarketingEnabled() && platform.whatsappAppId && platform.whatsappAppSecret
+    tab === "integraciones" && org.metaAdsAccessToken && !org.metaAdAccountId && isMarketingEnabled() && platform.whatsappAppId && platform.whatsappAppSecret
       ? await listAdAccounts(decrypt(org.metaAdsAccessToken), {
           appId: platform.whatsappAppId,
           appSecret: platform.whatsappAppSecret,
@@ -81,8 +98,27 @@ export default async function OrganizationSettingsPage() {
   return (
     <div className="max-w-2xl animate-fade-up">
       <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Organización</h1>
-      <p className="mb-8 text-sm text-ink-muted">Datos, equipo e invitaciones.</p>
+      <p className="mb-6 text-sm text-ink-muted">Datos, equipo, ventas e integraciones.</p>
 
+      <nav className="mb-6 flex gap-1 overflow-x-auto border-b border-border" aria-label="Secciones de la organización">
+        {TABS.map((t) => (
+          <Link
+            key={t.key}
+            href={`/dashboard/organization?seccion=${t.key}`}
+            aria-current={t.key === tab ? "page" : undefined}
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2 text-sm transition-colors ${
+              t.key === tab
+                ? "border-accent font-medium text-accent"
+                : "border-transparent text-ink-muted hover:text-ink"
+            }`}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </nav>
+
+      {tab === "general" && (
+        <>
       <Card className="mb-6">
         <CardTitle className="mb-4">Nombre</CardTitle>
         <RenameOrgForm currentName={org.name} />
@@ -95,6 +131,19 @@ export default async function OrganizationSettingsPage() {
         </CardDescription>
         <AiSettingsForm currentLimit={org.aiMessageLimit} />
       </Card>
+
+      <Card className="border-danger/30">
+        <CardTitle className="mb-1 text-danger">Zona de peligro</CardTitle>
+        <CardDescription className="mb-4">
+          Exportar tus datos o eliminar la organización por completo.
+        </CardDescription>
+        <DangerZone orgName={org.name} />
+      </Card>
+        </>
+      )}
+
+      {tab === "ventas" && (
+        <>
 
       <Card className="mb-6">
         <CardTitle className="mb-1">Horario de citas</CardTitle>
@@ -133,12 +182,17 @@ export default async function OrganizationSettingsPage() {
       <Card className="mb-6">
         <CardTitle className="mb-1">Servicios</CardTitle>
         <CardDescription className="mb-4">
-          Las opciones de "servicio de interés" al cargar una oportunidad — nombre, orden, agregar o
+          Las opciones de &quot;servicio de interés&quot; al cargar una oportunidad — nombre, orden, agregar o
           quitar. Borrar una no afecta a los clientes que ya tenían ese servicio cargado.
         </CardDescription>
         <ServicesList services={services} />
       </Card>
 
+        </>
+      )}
+
+      {tab === "integraciones" && (
+        <>
       {isMarketingEnabled() && (
         <Card className="mb-6">
           <CardTitle className="mb-1">Meta Ads</CardTitle>
@@ -157,6 +211,21 @@ export default async function OrganizationSettingsPage() {
         </Card>
       )}
 
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Extensión de subtítulos para Meet</CardTitle>
+        <CardDescription className="mb-4">
+          Extensión de Chrome que lee los subtítulos en vivo de Google Meet desde el navegador de
+          quien esté en la reunión — no hace falta que un bot pida entrar ni que nadie lo admita.
+          Función aparte del bot grabador: el bot sigue disponible para cuando sí se necesita audio.
+          Cada vendedor se identifica solo, con su propia sesión del CRM — no hace falta generar ni
+          pegar ningún token: instalá la extensión, tocá su ícono y elegí &quot;Iniciar sesión&quot;.
+        </CardDescription>
+      </Card>
+        </>
+      )}
+
+      {tab === "equipo" && (
+        <>
       <Card className="mb-6">
         <CardTitle className="mb-1">Equipo</CardTitle>
         <CardDescription className="mb-4">
@@ -178,17 +247,6 @@ export default async function OrganizationSettingsPage() {
       </Card>
 
       <Card className="mb-6">
-        <CardTitle className="mb-1">Extensión de subtítulos para Meet</CardTitle>
-        <CardDescription className="mb-4">
-          Extensión de Chrome que lee los subtítulos en vivo de Google Meet desde el navegador de
-          quien esté en la reunión — no hace falta que un bot pida entrar ni que nadie lo admita.
-          Función aparte del bot grabador: el bot sigue disponible para cuando sí se necesita audio.
-          Cada vendedor se identifica solo, con su propia sesión del CRM — no hace falta generar ni
-          pegar ningún token: instalá la extensión, tocá su ícono y elegí &quot;Iniciar sesión&quot;.
-        </CardDescription>
-      </Card>
-
-      <Card className="mb-6">
         <CardTitle className="mb-1">Invitar a alguien</CardTitle>
         <CardDescription className="mb-4">
           Genera un enlace y compártelo — quien lo abra se une como miembro.
@@ -202,13 +260,8 @@ export default async function OrganizationSettingsPage() {
         />
       </Card>
 
-      <Card className="border-danger/30">
-        <CardTitle className="mb-1 text-danger">Zona de peligro</CardTitle>
-        <CardDescription className="mb-4">
-          Exportar tus datos o eliminar la organización por completo.
-        </CardDescription>
-        <DangerZone orgName={org.name} />
-      </Card>
+        </>
+      )}
     </div>
   );
 }

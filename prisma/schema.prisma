@@ -1032,6 +1032,8 @@ model Meeting {
   // Resumen estructurado (resumen, puntos, decisiones, próximos pasos e información comercial) y cuándo se generó -- ver services/meeting-summary.ts.
   aiSummaryData         Json?
   aiSummaryAt           DateTime?
+  // Última vez que una persona aprobó pasar este resumen a la oportunidad (Aplicar a la oportunidad).
+  aiSummaryAppliedAt    DateTime?
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 

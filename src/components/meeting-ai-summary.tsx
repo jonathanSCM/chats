@@ -1,8 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Sparkles, RefreshCw } from "lucide-react";
-import { regenerateMeetingSummaryAction } from "@/server/actions/crm";
+import { useRouter } from "next/navigation";
+import { Sparkles, RefreshCw, ClipboardCheck } from "lucide-react";
+import {
+  regenerateMeetingSummaryAction,
+  getMeetingApplyProposalsAction,
+  applyMeetingSummaryAction,
+  type MeetingApplyProposal,
+} from "@/server/actions/crm";
 import { meetingSummarySchema } from "@/lib/meeting-summary";
 
 function List({ title, items }: { title: string; items: string[] }) {
@@ -30,15 +36,26 @@ export function MeetingAiSummary({
   text,
   summarizedAt,
   hasTranscript,
+  canApply = false,
 }: {
   meetingId: string;
   data: unknown;
   text: string;
   summarizedAt: string | null;
   hasTranscript: boolean;
+  /** Hay una oportunidad vinculada: se puede pasar el resumen a sus campos. */
+  canApply?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [review, setReview] = useState<{
+    proposals: MeetingApplyProposal[];
+    appliedAt: string | null;
+    title: string;
+  } | null>(null);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [applied, setApplied] = useState<string | null>(null);
   const parsed = meetingSummarySchema.safeParse(data);
   const summary = parsed.success ? parsed.data : null;
 
@@ -51,6 +68,48 @@ export function MeetingAiSummary({
     startTransition(async () => {
       const result = await regenerateMeetingSummaryAction(meetingId);
       if (result.error) setError(result.error);
+    });
+  }
+
+  function openReview() {
+    setError(null);
+    setApplied(null);
+    startTransition(async () => {
+      const result = await getMeetingApplyProposalsAction(meetingId);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      if (result.proposals.length === 0) {
+        setApplied("La oportunidad ya tiene cargados estos datos: no hay nada nuevo para aplicar.");
+        return;
+      }
+      setReview({ proposals: result.proposals, appliedAt: result.appliedAt, title: result.title });
+      // Lo que estaba vacío viene marcado; lo que pisa un valor existente, no.
+      setChecked(new Set(result.proposals.filter((p) => p.mode !== "replace").map((p) => p.key)));
+    });
+  }
+
+  function toggle(key: string) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function applySelected() {
+    setError(null);
+    startTransition(async () => {
+      const result = await applyMeetingSummaryAction(meetingId, [...checked]);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setReview(null);
+      setApplied(result.message ?? "Datos aplicados.");
+      router.refresh();
     });
   }
 
@@ -124,6 +183,73 @@ export function MeetingAiSummary({
           <span className="text-[11px] text-ink-faint">Generado {new Date(summarizedAt).toLocaleString("es")}</span>
         )}
       </div>
+      {summary && canApply && !review && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={openReview}
+            className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-ink-muted transition-colors hover:border-accent-dim hover:text-accent disabled:opacity-50"
+          >
+            <ClipboardCheck size={11} /> Aplicar a la oportunidad
+          </button>
+          {applied && <span className="text-[11px] text-accent">{applied}</span>}
+        </div>
+      )}
+
+      {review && (
+        <div className="space-y-2 rounded-md border border-accent-dim/40 bg-accent-dim/5 p-3">
+          <p className="text-xs font-medium text-ink">Revisá qué pasar a &quot;{review.title}&quot;</p>
+          {review.appliedAt && (
+            <p className="text-[11px] text-ink-faint">
+              Ya se aplicó una vez el {new Date(review.appliedAt).toLocaleString("es")}.
+            </p>
+          )}
+          <ul className="space-y-2">
+            {review.proposals.map((p) => (
+              <li key={p.key}>
+                <label className="flex cursor-pointer items-start gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={checked.has(p.key)}
+                    onChange={() => toggle(p.key)}
+                  />
+                  <span className="min-w-0">
+                    <span className="font-medium text-ink">{p.label}</span>
+                    <span className="ml-1.5 rounded-full bg-surface-2 px-1.5 py-0.5 font-mono text-[9px] uppercase text-ink-faint">
+                      {p.mode === "fill" ? "completa" : p.mode === "append" ? "agrega" : "reemplaza"}
+                    </span>
+                    {p.current && p.mode !== "append" && (
+                      <span className="mt-0.5 block text-ink-faint line-through">{p.current}</span>
+                    )}
+                    <span className="mt-0.5 block whitespace-pre-wrap text-ink">{p.proposed}</span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              disabled={pending || checked.size === 0}
+              onClick={applySelected}
+              className="rounded-full border border-accent-dim/40 bg-accent-dim/10 px-3 py-1 text-[11px] text-accent transition-colors hover:bg-accent-dim/20 disabled:opacity-50"
+            >
+              {pending ? "Aplicando…" : `Aplicar ${checked.size} campo${checked.size === 1 ? "" : "s"}`}
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setReview(null)}
+              className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-muted hover:text-ink"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   );

@@ -3,7 +3,7 @@ import { z } from "zod";
 // Parte pura del resumen de reuniones (sin base de datos): la usan el servidor
 // (services/meeting-summary.ts) y la interfaz (components/meeting-ai-summary.tsx).
 
-export const MEETING_SUMMARY_VERSION = "v2";
+export const MEETING_SUMMARY_VERSION = "v3";
 
 /** Menos que esto no hay nada que resumir (un par de frases sueltas de subtítulos). */
 export const MIN_TRANSCRIPT_CHARS = 400;
@@ -21,6 +21,8 @@ export const meetingSummarySchema = z.object({
       accion: z.string(),
       responsable: z.string().nullable(),
       fecha: z.string().nullable(),
+      // yyyy-mm-dd cuando el plazo dicho se puede calcular con la fecha de la reunión.
+      fechaIso: z.string().nullable().optional(),
     }),
   ),
   informacionComercial: z.object({

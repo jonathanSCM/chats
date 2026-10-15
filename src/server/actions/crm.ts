@@ -22,6 +22,8 @@ import { createUserMeetEvent, hasGoogleCalendarConnected } from "@/server/servic
 import { scheduleMeetingBotJoin, cancelMeetingBotJoin, stopMeetingBot } from "@/server/services/meeting-bot";
 import { requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
 import { generateMeetingSummary } from "@/server/services/meeting-summary";
+import { meetingSummarySchema } from "@/lib/meeting-summary";
+import { buildProposals, type ApplyKey } from "@/lib/meeting-apply";
 import { AiBudgetExceededError } from "@/server/services/ai/client";
 import { enqueue } from "@/server/jobs";
 import type { ActionState } from "./types";
@@ -793,6 +795,111 @@ export async function stopMeetingBotAction(meetingId: string): Promise<ActionSta
 
   revalidatePath(PATH);
   return { error: null, message: "Avisado — el bot debería salir en breve." };
+}
+
+export interface MeetingApplyProposal {
+  key: ApplyKey;
+  label: string;
+  current: string;
+  proposed: string;
+  mode: "fill" | "replace" | "append";
+}
+
+/** Carga reunión + oportunidad con los chequeos de pertenencia y permiso que usan las dos acciones de abajo. */
+async function loadMeetingForApply(meetingId: string) {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    include: {
+      opportunity: {
+        select: {
+          id: true,
+          title: true,
+          assignedToId: true,
+          needSummary: true,
+          needStatus: true,
+          budgetRange: true,
+          budgetStatus: true,
+          urgency: true,
+          authorityLevel: true,
+          nextAction: true,
+          nextActionAt: true,
+          lastUpdate: true,
+        },
+      },
+    },
+  });
+  if (!meeting || meeting.organizationId !== organizationId) return { error: "Reunión no encontrada" as const };
+  if (!meeting.opportunity) return { error: "Esta reunión no está vinculada a una oportunidad." as const };
+  if (!canEditOpportunity(meeting.opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." as const };
+  }
+  const parsed = meetingSummarySchema.safeParse(meeting.aiSummaryData);
+  if (!parsed.success) return { error: "Todavía no hay resumen para aplicar. Generalo primero." as const };
+  return { error: null, meeting, opportunity: meeting.opportunity, data: parsed.data, organizationId, userId };
+}
+
+/** Qué campos de la oportunidad propone completar el resumen. No escribe nada. */
+export async function getMeetingApplyProposalsAction(
+  meetingId: string,
+): Promise<{ error: string | null; proposals: MeetingApplyProposal[]; appliedAt: string | null; title: string }> {
+  const loaded = await loadMeetingForApply(meetingId);
+  if (loaded.error) return { error: loaded.error, proposals: [], appliedAt: null, title: "" };
+
+  const proposals = buildProposals(loaded.data, loaded.opportunity, loaded.meeting.scheduledAt).map(
+    ({ key, label, current, proposed, mode }) => ({ key, label, current, proposed, mode }),
+  );
+  return {
+    error: null,
+    proposals,
+    appliedAt: loaded.meeting.aiSummaryAppliedAt?.toISOString() ?? null,
+    title: loaded.opportunity.title,
+  };
+}
+
+const APPLY_KEYS = ["need", "budget", "urgency", "authority", "nextAction", "lastUpdate"] as const;
+
+/**
+ * Aplica a la oportunidad solo los campos que la persona aprobó. Las
+ * propuestas se recalculan acá con los datos actuales: no se confía en lo que
+ * mande el navegador.
+ */
+export async function applyMeetingSummaryAction(meetingId: string, keys: string[]): Promise<ActionState> {
+  const selected = new Set(
+    keys.filter((k): k is ApplyKey => (APPLY_KEYS as readonly string[]).includes(k)),
+  );
+  if (selected.size === 0) return { error: "Elegí al menos un campo para aplicar." };
+
+  const loaded = await loadMeetingForApply(meetingId);
+  if (loaded.error) return { error: loaded.error };
+
+  const chosen = buildProposals(loaded.data, loaded.opportunity, loaded.meeting.scheduledAt).filter((p) =>
+    selected.has(p.key),
+  );
+  if (chosen.length === 0) return { error: "Esos datos ya están cargados en la oportunidad." };
+
+  const changes = Object.assign({}, ...chosen.map((p) => p.changes)) as Record<string, unknown>;
+  const before = Object.fromEntries(
+    Object.keys(changes).map((k) => [k, (loaded.opportunity as Record<string, unknown>)[k] ?? null]),
+  );
+
+  await prisma.$transaction([
+    prisma.opportunity.update({ where: { id: loaded.opportunity.id }, data: changes }),
+    prisma.meeting.update({ where: { id: meetingId }, data: { aiSummaryAppliedAt: new Date() } }),
+  ]);
+
+  await audit({
+    entityType: "Opportunity",
+    entityId: loaded.opportunity.id,
+    action: "apply_meeting_summary",
+    userId: loaded.userId,
+    organizationId: loaded.organizationId,
+    before,
+    after: { ...changes, meetingId, fields: chosen.map((p) => p.key) },
+  });
+
+  revalidatePath(PATH);
+  return { error: null, message: "Datos aplicados a la oportunidad." };
 }
 
 /** Genera (o actualiza) el resumen de IA de la reunión a pedido, sin esperar al barrido automático. */

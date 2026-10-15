@@ -27,10 +27,15 @@ const SUMMARY_JSON_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["accion", "responsable", "fecha"],
+        required: ["accion", "responsable", "fecha", "fechaIso"],
         properties: {
           accion: { type: "string" },
           responsable: { ...nullableString, description: "Quién lo hará, solo si se dijo. Si no, null." },
+          fechaIso: {
+            ...nullableString,
+            description:
+              "Esa misma fecha como yyyy-mm-dd, calculada a partir de la fecha de la reunión (ej. 'el viernes' = el próximo viernes). Si no se puede calcular con certeza, null.",
+          },
           fecha: { ...nullableString, description: "Fecha o plazo tal como se dijo (ej. 'el viernes'). Si no se dijo, null." },
         },
       },
@@ -63,6 +68,7 @@ const SUMMARY_SYSTEM = [
   "- Sé breve y concreto. Cada ítem de una lista es una frase corta.",
 ].join("\n");
 
+const WEEKDAYS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const line = (label: string, value: string | null | undefined) => (value ? `${label}: ${value}` : null);
 
 /**
@@ -132,7 +138,7 @@ export async function generateMeetingSummary(meetingId: string): Promise<Generat
   const clientName = meeting.opportunity?.contact.fullName || meeting.opportunity?.contact.phone || null;
   const header = [
     line("Título", meeting.title),
-    `Fecha: ${meeting.scheduledAt.toISOString().slice(0, 10)}`,
+    `Fecha: ${meeting.scheduledAt.toISOString().slice(0, 10)} (${WEEKDAYS[meeting.scheduledAt.getUTCDay()]})`,
     `Duración prevista: ${meeting.durationMinutes} min`,
     meeting.guestEmails.length ? `Invitados: ${meeting.guestEmails.join(", ")}` : null,
     line("Cliente", clientName),

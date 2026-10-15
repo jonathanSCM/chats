@@ -2330,6 +2330,7 @@ function MeetingsSection({
                 text={m.aiSummary}
                 summarizedAt={m.aiSummaryAt}
                 hasTranscript={Boolean(m.transcript || m.audioTranscript)}
+                canApply
               />
             </PanelSection>
 

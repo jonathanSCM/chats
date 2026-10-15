@@ -33,6 +33,8 @@ export default async function ReunionesPage({
       transcript: true,
       audioTranscript: true,
       aiSummary: true,
+      aiSummaryData: true,
+      aiSummaryAt: true,
       attachments: {
         select: { id: true, url: true, fileName: true, mimeType: true, fileSize: true },
         orderBy: { createdAt: "asc" },
@@ -55,6 +57,8 @@ export default async function ReunionesPage({
     transcript: m.transcript ?? "",
     audioTranscript: m.audioTranscript ?? "",
     aiSummary: m.aiSummary ?? "",
+    aiSummaryData: m.aiSummaryData ?? null,
+    aiSummaryAt: m.aiSummaryAt?.toISOString() ?? null,
     attachments: m.attachments,
   }));
 

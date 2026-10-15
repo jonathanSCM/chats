@@ -6,6 +6,40 @@ import { prisma } from "@/server/db/client";
 import { isMarketingEnabled } from "@/lib/features";
 
 const META_ADS_SYNC_INTERVAL_HOURS = 20;
+const MEETING_SUMMARY_BATCH = 5;
+const MEETING_SETTLE_MINUTES = 10;
+
+/**
+ * Encola el resumen de IA de las reuniones que ya terminaron de recibir su
+ * transcripción y todavía no tienen resumen. También sirve de relleno de
+ * las anteriores. Las ya resumidas se actualizan a mano desde la pantalla.
+ * Pocas por tick para no pegar un pico de gasto de IA.
+ */
+async function enqueueMeetingSummaries(): Promise<void> {
+  if (process.env.AI_ENABLED === "false" || !process.env.OPENAI_API_KEY) return;
+
+  const settledBefore = new Date(Date.now() - MEETING_SETTLE_MINUTES * 60_000);
+  const candidates = await prisma.meeting.findMany({
+    where: {
+      updatedAt: { lt: settledBefore },
+      scheduledAt: { lt: settledBefore },
+      OR: [{ transcript: { not: null } }, { audioTranscript: { not: null } }],
+      aiSummaryAt: null,
+    },
+    select: { id: true },
+    orderBy: { updatedAt: "desc" },
+    take: MEETING_SUMMARY_BATCH,
+  });
+
+  const day = new Date().toISOString().slice(0, 10);
+  for (const m of candidates) {
+    await enqueue({
+      type: "meeting_summary",
+      payload: { meetingId: m.id },
+      uniqueKey: `meeting-summary-${m.id}-${day}`,
+    });
+  }
+}
 
 /**
  * Encola el sync de gasto de Meta Ads para cada organización que tenga
@@ -69,6 +103,10 @@ export async function POST(req: NextRequest) {
   // vacío) -- no vale la pena un job aparte solo para esto.
   await renewExpiringGoogleCalendarWatches().catch((error) => {
     console.error("[cron] Error renovando suscripciones de Google Calendar:", error);
+  });
+
+  await enqueueMeetingSummaries().catch((error) => {
+    console.error("[cron] Error encolando resúmenes de reuniones:", error);
   });
 
   if (isMarketingEnabled()) {

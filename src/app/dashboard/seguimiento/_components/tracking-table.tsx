@@ -48,6 +48,7 @@ import {
 } from "@/server/actions/crm";
 import { MeetingAttachments, type MeetingAttachmentInfo } from "@/components/meeting-attachments";
 import { PdfViewerModal } from "@/components/pdf-viewer-modal";
+import { MeetingAiSummary } from "@/components/meeting-ai-summary";
 import { EditableTitle } from "@/components/editable-title";
 import { SidePanel, PanelSection } from "@/components/side-panel";
 import { panelAccent, PILL_BUTTON, hasMeetingEnded } from "@/lib/meeting-panel-ui";
@@ -115,6 +116,9 @@ export interface Row {
     notes: string;
     transcript: string;
     audioTranscript: string;
+    aiSummary: string;
+    aiSummaryData: unknown;
+    aiSummaryAt: string | null;
     meetingUrl: string | null;
     recordedByName: string | null;
     attachments: MeetingAttachmentInfo[];
@@ -2317,6 +2321,16 @@ function MeetingsSection({
                   </span>
                 )}
               </div>
+            </PanelSection>
+
+            <PanelSection label="Resumen de IA" delay={30}>
+              <MeetingAiSummary
+                meetingId={m.id}
+                data={m.aiSummaryData}
+                text={m.aiSummary}
+                summarizedAt={m.aiSummaryAt}
+                hasTranscript={Boolean(m.transcript || m.audioTranscript)}
+              />
             </PanelSection>
 
             <PanelSection label="Acciones" delay={40}>

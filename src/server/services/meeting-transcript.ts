@@ -1,7 +1,8 @@
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
 import { isAiEnabled, AiBudgetExceededError } from "@/server/services/ai/client";
-import { summarizeMeetingTranscript, renderMeetingSummaryPdf } from "@/server/services/meeting-summary-pdf";
+import { renderMeetingSummaryPdf, type MeetingSummary } from "@/server/services/meeting-summary-pdf";
+import { ensureMeetingSummaryData } from "@/server/services/meeting-summary";
 
 /**
  * "Generar resumen (PDF)" — arma un resumen ejecutivo con IA a partir de la
@@ -19,16 +20,25 @@ export async function requestMeetingSummaryPdf(
 
   const meeting = await prisma.meeting.findUnique({
     where: { id: meetingId },
-    select: { transcript: true, audioTranscript: true, title: true, scheduledAt: true },
+    select: { organizationId: true, transcript: true, audioTranscript: true, title: true, scheduledAt: true },
   });
-  if (!meeting) return { ok: false, error: "Reunión no encontrada" };
+  if (!meeting || meeting.organizationId !== organizationId) return { ok: false, error: "Reunión no encontrada" };
   const transcriptText = meeting.transcript || meeting.audioTranscript;
   if (!transcriptText) {
     return { ok: false, error: "Todavía no hay transcripción para resumir." };
   }
 
   try {
-    const summary = await summarizeMeetingTranscript({ organizationId, meetingId, transcript: transcriptText });
+    const data = await ensureMeetingSummaryData(meetingId);
+    if (!data) return { ok: false, error: "No se pudo generar el resumen." };
+    const summary: MeetingSummary = {
+      resumen: data.resumen,
+      puntosClave: data.puntosClave,
+      decisiones: data.decisiones,
+      proximosPasos: data.proximosPasos.map(
+        (p) => `${p.accion}${p.responsable ? ` — ${p.responsable}` : ""}${p.fecha ? ` (${p.fecha})` : ""}`,
+      ),
+    };
     const pdfBuffer = await renderMeetingSummaryPdf({
       title: meeting.title || "Resumen de reunión",
       scheduledAt: meeting.scheduledAt,

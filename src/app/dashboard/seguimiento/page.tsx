@@ -80,6 +80,9 @@ export default async function SeguimientoPage({
             notes: true,
             transcript: true,
             audioTranscript: true,
+            aiSummary: true,
+            aiSummaryData: true,
+            aiSummaryAt: true,
             meetingUrl: true,
             recordedBy: { select: { id: true, name: true } },
             attachments: {
@@ -158,6 +161,9 @@ export default async function SeguimientoPage({
       notes: m.notes ?? "",
       transcript: m.transcript ?? "",
       audioTranscript: m.audioTranscript ?? "",
+      aiSummary: m.aiSummary ?? "",
+      aiSummaryData: m.aiSummaryData ?? null,
+      aiSummaryAt: m.aiSummaryAt?.toISOString() ?? null,
       meetingUrl: m.meetingUrl,
       recordedByName: m.recordedBy?.name ?? null,
       attachments: m.attachments.map((a) => ({

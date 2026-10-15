@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { stopMeetingBot } from "@/server/services/meeting-bot";
-import { summarizeMeetingTranscript } from "@/server/services/meeting-summary-pdf";
+import { summarizeTranscriptNow } from "@/server/services/meeting-summary";
 
 /**
  * Comandos escritos en el chat de la propia reunión de Google Meet (no
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       return withCors(NextResponse.json({ ok: true, reply: "Asistente: todavía no hay suficiente transcripción para resumir." }));
     }
     try {
-      const summary = await summarizeMeetingTranscript({
+      const summary = await summarizeTranscriptNow({
         organizationId: user.organizationId,
         meetingId: meeting.id,
         transcript: transcriptText,

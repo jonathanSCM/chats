@@ -10,6 +10,7 @@ import { handleCoexistenceHistorySync } from "./handlers/coexistence-history-syn
 import { handleFetchLinkPreview } from "./handlers/fetch-link-preview";
 import { handleMetaConversionEvent } from "./handlers/meta-conversion-event";
 import { handleMetaAdsSync } from "./handlers/meta-ads-sync";
+import { handleMeetingSummary } from "./handlers/meeting-summary";
 import { markBotReplyFailed } from "@/server/services/ai/qualification-bot";
 
 export { enqueue, enqueueOrReschedule, cancelJob } from "./queue";
@@ -31,6 +32,7 @@ const handlers: Record<string, JobHandler> = {
   fetch_link_preview: handleFetchLinkPreview,
   meta_conversion_event: handleMetaConversionEvent,
   meta_ads_sync: handleMetaAdsSync,
+  meeting_summary: handleMeetingSummary,
 };
 
 const onExhausted: Record<string, JobExhaustedHandler> = {

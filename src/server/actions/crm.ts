@@ -21,6 +21,8 @@ import {
 import { createUserMeetEvent, hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
 import { scheduleMeetingBotJoin, cancelMeetingBotJoin, stopMeetingBot } from "@/server/services/meeting-bot";
 import { requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
+import { generateMeetingSummary } from "@/server/services/meeting-summary";
+import { AiBudgetExceededError } from "@/server/services/ai/client";
 import { enqueue } from "@/server/jobs";
 import type { ActionState } from "./types";
 
@@ -791,6 +793,39 @@ export async function stopMeetingBotAction(meetingId: string): Promise<ActionSta
 
   revalidatePath(PATH);
   return { error: null, message: "Avisado — el bot debería salir en breve." };
+}
+
+/** Genera (o actualiza) el resumen de IA de la reunión a pedido, sin esperar al barrido automático. */
+export async function regenerateMeetingSummaryAction(meetingId: string): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    include: { opportunity: { select: { assignedToId: true } } },
+  });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+  if (meeting.opportunity && !canEditOpportunity(meeting.opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  try {
+    const result = await generateMeetingSummary(meetingId);
+    if (result.status === "ai_disabled") return { error: "La IA no está configurada en el servidor." };
+    if (result.status === "no_transcript") return { error: "Todavía no hay transcripción para resumir." };
+    if (result.status === "too_short") return { error: "La transcripción es demasiado corta para resumir." };
+    if (result.status === "not_found") return { error: "Reunión no encontrada" };
+  } catch (error) {
+    if (error instanceof AiBudgetExceededError) {
+      return { error: "Se alcanzó el tope de gasto diario de IA. Probá de nuevo mañana." };
+    }
+    return { error: "No se pudo generar el resumen. Probá de nuevo en un momento." };
+  }
+
+  revalidatePath(PATH);
+  revalidatePath("/dashboard/reuniones");
+  return { error: null, message: "Resumen actualizado." };
 }
 
 export async function generateMeetingSummaryPdfAction(meetingId: string): Promise<ActionState> {

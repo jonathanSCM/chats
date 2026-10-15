@@ -23,6 +23,7 @@ import { scheduledAtToUtcHidden, utcIsoToLocalInputValue } from "@/lib/datetime-
 import { BOT_STATUS_CONFIG } from "@/lib/meeting-bot-status";
 import { MeetingAttachments, type MeetingAttachmentInfo } from "@/components/meeting-attachments";
 import { PdfViewerModal } from "@/components/pdf-viewer-modal";
+import { MeetingAiSummary } from "@/components/meeting-ai-summary";
 import { EditableTitle } from "@/components/editable-title";
 import { SidePanel, PanelSection } from "@/components/side-panel";
 import { panelAccent, PILL_BUTTON, hasMeetingEnded } from "@/lib/meeting-panel-ui";
@@ -42,6 +43,8 @@ export interface AdhocMeetingRow {
   transcript: string;
   audioTranscript: string;
   aiSummary: string;
+  aiSummaryData: unknown;
+  aiSummaryAt: string | null;
   attachments: MeetingAttachmentInfo[];
 }
 
@@ -494,6 +497,16 @@ export function AdhocMeetingsClient({
 
             <PanelSection label="Cliente" delay={20}>
               <LinkClientSection meetingId={m.id} disabled={isPending} />
+            </PanelSection>
+
+            <PanelSection label="Resumen de IA" delay={30}>
+              <MeetingAiSummary
+                meetingId={m.id}
+                data={m.aiSummaryData}
+                text={m.aiSummary}
+                summarizedAt={m.aiSummaryAt}
+                hasTranscript={Boolean(m.transcript || m.audioTranscript)}
+              />
             </PanelSection>
 
             <PanelSection label="Acciones" delay={40}>

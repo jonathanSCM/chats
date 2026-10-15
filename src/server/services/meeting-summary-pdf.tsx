@@ -1,67 +1,10 @@
 import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
-import { runStructured, MODELS } from "@/server/services/ai/client";
-
-const SUMMARY_SYSTEM =
-  "Analizá la transcripción de una reunión y devolvé un resumen ejecutivo bien estructurado, en " +
-  "español. No inventes nada que no esté en el texto — si una sección no tiene contenido real, " +
-  "devolvé una lista vacía en vez de inventar algo.";
-
-const SUMMARY_SCHEMA = {
-  type: "object",
-  properties: {
-    resumen: { type: "string", description: "3-5 oraciones con el resumen general de la reunión" },
-    puntosClave: { type: "array", items: { type: "string" } },
-    decisiones: { type: "array", items: { type: "string" } },
-    proximosPasos: { type: "array", items: { type: "string" } },
-  },
-  required: ["resumen", "puntosClave", "decisiones", "proximosPasos"],
-  additionalProperties: false,
-} as const;
 
 export interface MeetingSummary {
   resumen: string;
   puntosClave: string[];
   decisiones: string[];
   proximosPasos: string[];
-}
-
-function parseSummary(raw: unknown): MeetingSummary {
-  const obj = raw as Partial<MeetingSummary>;
-  if (
-    typeof obj.resumen !== "string" ||
-    !Array.isArray(obj.puntosClave) ||
-    !Array.isArray(obj.decisiones) ||
-    !Array.isArray(obj.proximosPasos)
-  ) {
-    throw new Error("Respuesta de resumen inválida");
-  }
-  return {
-    resumen: obj.resumen,
-    puntosClave: obj.puntosClave,
-    decisiones: obj.decisiones,
-    proximosPasos: obj.proximosPasos,
-  };
-}
-
-/** Reusa el mismo `runStructured` (JSON-schema estricto) que ya usa el resto de la IA de la app. */
-export async function summarizeMeetingTranscript(options: {
-  organizationId: string;
-  meetingId: string;
-  transcript: string;
-}): Promise<MeetingSummary> {
-  return runStructured({
-    organizationId: options.organizationId,
-    entityType: "Meeting",
-    entityId: options.meetingId,
-    analysisType: "meeting_summary_pdf",
-    promptVersion: "v1",
-    model: MODELS.fast(),
-    system: SUMMARY_SYSTEM,
-    input: options.transcript,
-    schemaName: "meeting_summary",
-    schema: SUMMARY_SCHEMA,
-    parse: parseSummary,
-  });
 }
 
 const styles = StyleSheet.create({

@@ -39,6 +39,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
               estimatedValue: true,
               nextAction: true,
               nextActionAt: true,
+              // Tareas (Activity) del caso: las crea el equipo o el Jefe de Operaciones vía API.
+              activities: {
+                where: { status: { not: "CANCELED" } },
+                select: {
+                  id: true,
+                  title: true,
+                  status: true,
+                  dueAt: true,
+                  source: true,
+                  assignedTo: { select: { name: true, email: true } },
+                },
+                orderBy: [{ status: "asc" }, { dueAt: "asc" }],
+                take: 10,
+              },
               meetings: {
                 where: { status: { not: "CANCELED" } },
                 select: {
@@ -179,6 +193,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
             estimatedValue: o.estimatedValue ? Number(o.estimatedValue) : null,
             nextAction: o.nextAction,
             nextActionAt: o.nextActionAt?.toISOString() ?? null,
+            activities: o.activities.map((a) => ({
+              id: a.id,
+              title: a.title,
+              status: a.status,
+              dueAt: a.dueAt?.toISOString() ?? null,
+              overdue: a.status === "PENDING" && a.dueAt !== null && a.dueAt.getTime() < Date.now(),
+              source: a.source,
+              assignee: a.assignedTo ? a.assignedTo.name || a.assignedTo.email : null,
+            })),
             meetings: o.meetings.map((m) => ({
               id: m.id,
               title: m.title,

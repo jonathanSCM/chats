@@ -11,6 +11,7 @@ import { handleFetchLinkPreview } from "./handlers/fetch-link-preview";
 import { handleMetaConversionEvent } from "./handlers/meta-conversion-event";
 import { handleMetaAdsSync } from "./handlers/meta-ads-sync";
 import { handleMeetingSummary } from "./handlers/meeting-summary";
+import { handleIntegrationWebhookDelivery, markIntegrationDeliveryFailed } from "@/server/integrations/delivery";
 import { markBotReplyFailed } from "@/server/services/ai/qualification-bot";
 
 export { enqueue, enqueueOrReschedule, cancelJob } from "./queue";
@@ -33,6 +34,7 @@ const handlers: Record<string, JobHandler> = {
   meta_conversion_event: handleMetaConversionEvent,
   meta_ads_sync: handleMetaAdsSync,
   meeting_summary: handleMeetingSummary,
+  integration_webhook_delivery: handleIntegrationWebhookDelivery,
 };
 
 const onExhausted: Record<string, JobExhaustedHandler> = {
@@ -40,6 +42,7 @@ const onExhausted: Record<string, JobExhaustedHandler> = {
   bot_reply: markBotReplyFailed,
   meeting_bot_join: markMeetingBotJoinFailed,
   vexa_bot_poll: markVexaBotPollFailed,
+  integration_webhook_delivery: markIntegrationDeliveryFailed,
 };
 
 const BATCH_SIZE = 10;

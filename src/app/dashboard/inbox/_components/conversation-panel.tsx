@@ -34,6 +34,7 @@ import {
   updateMeetingAction,
   cancelMeetingAction,
   deleteMeetingAction,
+  completeActivityAction,
 } from "@/server/actions/crm";
 import { createMeetingFromConversationAction } from "@/server/actions/inbox-meetings";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,15 @@ interface PanelData {
       estimatedValue: number | null;
       nextAction: string | null;
       nextActionAt: string | null;
+      activities: {
+        id: string;
+        title: string;
+        status: "PENDING" | "DONE" | "CANCELED";
+        dueAt: string | null;
+        overdue: boolean;
+        source: string;
+        assignee: string | null;
+      }[];
       meetings: {
         id: string;
         title: string | null;
@@ -417,6 +427,7 @@ export function ConversationPanel({
                         <AlertTriangle size={10} /> sin próximo paso
                       </p>
                     )}
+                    <OpportunityTasks activities={o.activities} onChanged={reload} />
                   </div>
                 ))}
               </div>
@@ -994,6 +1005,57 @@ function MeetingsPanel({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+
+type PanelActivity = NonNullable<PanelData["contact"]>["opportunities"][number]["activities"][number];
+
+/** Vista mínima de tareas del caso: las pendientes primero, con "Hecho" en un clic. */
+function OpportunityTasks({ activities, onChanged }: { activities: PanelActivity[]; onChanged: () => void }) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  if (activities.length === 0) return null;
+
+  function complete(id: string) {
+    setError(null);
+    startTransition(async () => {
+      const result = await completeActivityAction(id);
+      if (result.error) setError(result.error);
+      else onChanged();
+    });
+  }
+
+  return (
+    <div className="mt-1.5 space-y-1 border-t border-border pt-1.5">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-ink-faint">Tareas</p>
+      {activities.map((a) => {
+        const done = a.status === "DONE";
+        const overdue = a.overdue;
+        return (
+          <div key={a.id} className="flex items-start gap-1.5 text-[11px]">
+            <input
+              type="checkbox"
+              checked={done}
+              disabled={done || isPending}
+              onChange={() => complete(a.id)}
+              aria-label={`Marcar como hecha: ${a.title}`}
+              className="mt-0.5"
+            />
+            <div className="min-w-0 flex-1">
+              <p className={done ? "truncate text-ink-faint line-through" : "truncate text-ink"}>{a.title}</p>
+              <p className={overdue ? "text-[10px] text-warning" : "text-[10px] text-ink-muted"}>
+                {a.dueAt ? new Date(a.dueAt).toLocaleDateString("es") : "sin fecha"}
+                {a.assignee ? ` · ${a.assignee}` : ""}
+                {a.source === "ai" ? " · IA" : ""}
+                {overdue ? " · vencida" : ""}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+      {error && <p className="text-[10px] text-warning">{error}</p>}
     </div>
   );
 }

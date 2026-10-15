@@ -93,6 +93,10 @@ model Organization {
   services               Service[]
   memberships            OrganizationMembership[]
 
+  integrationKeys     IntegrationKey[]
+  integrationWebhooks IntegrationWebhook[]
+  idempotencyRecords  IdempotencyRecord[]
+
   @@map("organizations")
 }
 
@@ -1120,4 +1124,66 @@ model PlatformSetting {
   updatedAt           DateTime @updatedAt
 
   @@map("platform_settings")
+}
+
+// ─── API de integración v1 (Jefe de Operaciones y otros) ────────────
+
+// Clave de API por organización. Solo se guarda su hash SHA-256: la clave en
+// claro se muestra una única vez al crearla.
+model IntegrationKey {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  // Primeros caracteres visibles para reconocerla en la pantalla.
+  prefix         String
+  keyHash        String       @unique
+  // "read", "write:activities"
+  scopes         String[]
+  createdById    String?
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@map("integration_keys")
+}
+
+// Destino de los eventos salientes. El secreto va cifrado con lib/crypto.
+model IntegrationWebhook {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  url             String
+  secretEncrypted String
+  // Vacío = todos los eventos.
+  events          String[]
+  enabled         Boolean      @default(true)
+  lastSuccessAt   DateTime?
+  lastFailureAt   DateTime?
+  lastError       String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId, enabled])
+  @@map("integration_webhooks")
+}
+
+// Respuesta guardada de una escritura con Idempotency-Key: repetirla devuelve
+// lo mismo en vez de crear otra cosa.
+model IdempotencyRecord {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  idempotencyKey  String
+  method          String
+  path            String
+  requestHash     String
+  responseStatus  Int
+  responseBody    Json
+  createdAt       DateTime     @default(now())
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([createdAt])
+  @@map("idempotency_records")
 }

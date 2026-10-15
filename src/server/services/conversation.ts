@@ -1,4 +1,5 @@
 import { Prisma } from "@/generated/prisma/client";
+import { emitMessageCreated } from "@/server/integrations/domain-events";
 import { prisma } from "@/server/db/client";
 import type {
   ParsedInboundMessage,
@@ -140,6 +141,9 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
     }
     throw error;
   }
+
+  // Aviso al integrador (Jefe de Operaciones): sin await ni riesgo de lanzar.
+  void emitMessageCreated(messageId);
 
   if (inbound.media) {
     await enqueue({
@@ -538,6 +542,8 @@ export async function handlePhoneAppEcho(echo: ParsedEcho): Promise<void> {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return;
     throw error;
   }
+
+  void emitMessageCreated(messageId);
 
   if (echo.media) {
     await enqueue({

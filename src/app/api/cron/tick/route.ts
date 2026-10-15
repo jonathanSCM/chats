@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { processJobs, enqueue } from "@/server/jobs";
 import { renewExpiringGoogleCalendarWatches } from "@/server/services/google-calendar-user";
 import { prisma } from "@/server/db/client";
+import { emitSettledMeetingTranscripts } from "@/server/integrations/domain-events";
 import { isMarketingEnabled } from "@/lib/features";
 
 const META_ADS_SYNC_INTERVAL_HOURS = 20;
@@ -96,6 +97,11 @@ export async function POST(req: NextRequest) {
   if (!authorized) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
+
+  // Avisos al integrador antes de procesar la cola: así salen en este mismo tick.
+  await emitSettledMeetingTranscripts().catch((error) => {
+    console.error("[cron] Error emitiendo transcripciones de reuniones:", error);
+  });
 
   const result = await processJobs();
 

@@ -17,6 +17,8 @@ import { decrypt } from "@/lib/crypto";
 import { getPlatformSettings } from "@/server/services/platform-settings";
 import { isMarketingEnabled } from "@/lib/features";
 import { DangerZone } from "./_components/danger-zone";
+import { IntegrationApiPanel } from "./_components/integration-api-panel";
+import { INTEGRATION_EVENT_TYPES } from "@/server/integrations/events";
 
 const TABS = [
   { key: "general", label: "General" },
@@ -94,6 +96,19 @@ export default async function OrganizationSettingsPage({
     role: m.role,
   }));
   const vendedores = members.filter((m) => m.role === "MEMBER");
+
+  // API de integración: solo se consulta cuando se mira esa pestaña.
+  const [integrationKeys, integrationWebhook] =
+    tab === "integraciones"
+      ? await Promise.all([
+          prisma.integrationKey.findMany({
+            where: { organizationId: session.user.organizationId },
+            orderBy: { createdAt: "desc" },
+            select: { id: true, name: true, prefix: true, scopes: true, lastUsedAt: true, revokedAt: true },
+          }),
+          prisma.integrationWebhook.findFirst({ where: { organizationId: session.user.organizationId } }),
+        ])
+      : [[], null];
 
   return (
     <div className="max-w-2xl animate-fade-up">
@@ -220,6 +235,36 @@ export default async function OrganizationSettingsPage({
           Cada vendedor se identifica solo, con su propia sesión del CRM — no hace falta generar ni
           pegar ningún token: instalá la extensión, tocá su ícono y elegí &quot;Iniciar sesión&quot;.
         </CardDescription>
+      </Card>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">API para integraciones</CardTitle>
+        <CardDescription className="mb-4">
+          Claves de API y avisos automáticos (webhook) para conectar otros sistemas, como el Jefe de Operaciones.
+        </CardDescription>
+        <IntegrationApiPanel
+          keys={integrationKeys.map((k) => ({
+            id: k.id,
+            name: k.name,
+            prefix: k.prefix,
+            scopes: k.scopes,
+            lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
+            revokedAt: k.revokedAt?.toISOString() ?? null,
+          }))}
+          webhook={
+            integrationWebhook
+              ? {
+                  url: integrationWebhook.url,
+                  events: integrationWebhook.events,
+                  enabled: integrationWebhook.enabled,
+                  lastSuccessAt: integrationWebhook.lastSuccessAt?.toISOString() ?? null,
+                  lastFailureAt: integrationWebhook.lastFailureAt?.toISOString() ?? null,
+                  lastError: integrationWebhook.lastError,
+                }
+              : null
+          }
+          availableEvents={[...INTEGRATION_EVENT_TYPES]}
+        />
       </Card>
         </>
       )}

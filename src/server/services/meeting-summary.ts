@@ -1,4 +1,5 @@
 import { prisma } from "@/server/db/client";
+import { emitMeetingSummaryReady } from "@/server/integrations/domain-events";
 import { runStructured, MODELS, isAiEnabled } from "@/server/services/ai/client";
 import {
   MEETING_SUMMARY_VERSION,
@@ -166,6 +167,7 @@ export async function generateMeetingSummary(meetingId: string): Promise<Generat
     where: { id: meetingId },
     data: { aiSummary: renderSummaryText(data), aiSummaryData: data as never, aiSummaryAt: new Date() },
   });
+  await emitMeetingSummaryReady(meetingId);
 
   return { status: "generated", data };
 }

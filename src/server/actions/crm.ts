@@ -26,6 +26,7 @@ import { meetingSummarySchema } from "@/lib/meeting-summary";
 import { buildProposals, type ApplyKey } from "@/lib/meeting-apply";
 import { AiBudgetExceededError } from "@/server/services/ai/client";
 import { enqueue } from "@/server/jobs";
+import { emitIntegrationEvent, eventIds } from "@/server/integrations/events";
 import type { ActionState } from "./types";
 
 const PATH = "/dashboard/seguimiento";
@@ -1033,10 +1034,19 @@ export async function completeActivityAction(activityId: string): Promise<Action
     return { error: "Tarea no encontrada" };
   }
 
+  const alreadyDone = activity.status === "DONE";
   await prisma.activity.update({
     where: { id: activityId },
     data: { status: "DONE", completedAt: new Date() },
   });
+  if (!alreadyDone) {
+    await emitIntegrationEvent({
+      eventId: eventIds.activityCompleted(activityId),
+      type: "activity.completed",
+      organizationId,
+      data: { activityId, title: activity.title, opportunityId: activity.opportunityId, contactId: activity.contactId },
+    });
+  }
 
   await audit({
     entityType: "Activity",

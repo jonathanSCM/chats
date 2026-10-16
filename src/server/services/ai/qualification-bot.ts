@@ -8,15 +8,22 @@ import { getAvailableDays, getAvailableSlots, hasSchedulingConflict, formatSlotL
 import { createCalendarEvent, getOrCreateOrgCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
 import { linkAttributionToOpportunity } from "@/server/services/meta-attribution";
 import { MODELS, runStructured } from "./client";
+import {
+  clientAnsweredMeetingInvitation,
+  countBotMessagesInSession,
+  describeBookingWindow,
+} from "@/lib/bot-guards";
 
 // v2: se saca "reunion_elegida" del esquema -- el horario ya no se elige
 // interpretando texto libre, se ofrece por lista de WhatsApp y se resuelve
 // directo por el id de la opción (ver sendDayList/sendHourList/confirmMeetingSlot).
-export const PROMPT_VERSION = "bot-calificacion-v2";
+export const PROMPT_VERSION = "bot-calificacion-v3";
 
 // Tope duro independiente de lo que devuelva el modelo: si después de esta
 // cantidad de mensajes del bot todavía no se pudo calificar, se escala solo
-// — defensa en profundidad contra un loop que no avanza (manual §36).
+// — defensa en profundidad contra un loop que no avanza (manual §36). Se
+// cuenta por sesión (ver countBotMessagesInSession), no por toda la historia:
+// un cliente que vuelve días después no hereda los mensajes de antes.
 const MAX_BOT_MESSAGES = 12;
 
 const resultSchema = z.object({
@@ -131,6 +138,8 @@ Reglas duras, siempre:
 - Si el cliente hace una pregunta directa, respóndela en una frase y vuelve de forma natural al filtro.
 - Si el cliente pide hablar con una persona, se queja, o hace algo que esta guía no cubre, pon
   debe_escalar en true y deja de insistir con preguntas.
+- "listo_para_agendar" solo puede ser true si el mensaje anterior del bot ya invitó a la reunión y el cliente
+  contestó que sí. En el primer turno, o en el mismo turno en que recién invitás, es SIEMPRE false.
 - Primero invita a la reunión de diagnóstico en general (sin mencionar horarios) y espera a que el
   cliente acepte. Cuando el cliente ya dijo que sí quiere agendar, poné "listo_para_agendar" en true y
   tu "respuesta" es solo una frase corta de transición (ej. "Perfecto 😊 Te paso los horarios
@@ -150,6 +159,7 @@ interface ConversationForBot {
   id: string;
   organizationId: string;
   timezone: string;
+  bookingWindow: string;
   botPaused: boolean;
   botMemory: string | null;
   assignedToId: string | null;
@@ -176,6 +186,7 @@ export async function loadConversation(conversationId: string): Promise<Conversa
     id: conversation.id,
     organizationId: conversation.bot.organizationId,
     timezone: conversation.bot.organization.timezone,
+    bookingWindow: describeBookingWindow(conversation.bot.organization),
     botPaused: conversation.botPaused,
     botMemory: conversation.botMemory,
     assignedToId: conversation.assignedToId,
@@ -246,6 +257,9 @@ ${qualificationText}
 
 TONO DE CONVERSACIÓN (obligatorio)
 ${toneText}
+
+HORARIO DE REUNIONES DE LA EMPRESA (solo si el cliente pregunta en qué horarios atienden; no ofrezcas horas puntuales)
+${conversation.bookingWindow}
 
 CLIENTE
 Nombre de perfil de WhatsApp: ${conversation.customerName ?? "(desconocido)"}
@@ -623,10 +637,18 @@ export async function runQualificationTurn(conversationId: string): Promise<void
     (!conversation.aiTestPhone || conversation.aiTestPhone === conversation.customerPhone);
   if (!conversation || conversation.botPaused || !botActiveForThisPhone) return;
 
-  const botMessageCount = await prisma.message.count({
-    where: { conversationId, role: "BOT" },
-  });
-  if (botMessageCount >= MAX_BOT_MESSAGES) {
+  // Historial reciente en orden cronológico: lo usan el tope por sesión y la
+  // guarda de "el cliente ya aceptó la reunión" más abajo.
+  const history = (
+    await prisma.message.findMany({
+      where: { conversationId, role: { in: ["CUSTOMER", "BOT", "STAFF"] } },
+      select: { role: true, content: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    })
+  ).reverse();
+
+  if (countBotMessagesInSession(history) >= MAX_BOT_MESSAGES) {
     await escalate(conversation, "Se alcanzó el máximo de mensajes del bot sin calificar al lead.");
     return;
   }
@@ -676,6 +698,15 @@ export async function runQualificationTurn(conversationId: string): Promise<void
         where: { opportunityId, status: { not: "CANCELED" } },
         select: { id: true },
       }));
-    if (!alreadyScheduled) await sendDayList(conversationId);
+    if (!alreadyScheduled) {
+      // El modelo rápido a veces marca "listo_para_agendar" sin que el cliente
+      // haya aceptado (p. ej. en el primer turno): la lista de días solo sale
+      // si el bot ya había invitado a la reunión y el cliente contestó.
+      if (clientAnsweredMeetingInvitation(history)) {
+        await sendDayList(conversationId);
+      } else {
+        console.warn(`[bot] listo_para_agendar sin invitación previa aceptada (${conversationId}): no se manda la lista`);
+      }
+    }
   }
 }

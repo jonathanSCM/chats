@@ -13,6 +13,7 @@ import {
   Video,
   UserCircle,
   Megaphone,
+  Lightbulb,
 } from "lucide-react";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
@@ -94,6 +95,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <>
             <NavLink href="/dashboard/knowledge">
               <BookOpen size={16} /> Conocimiento
+            </NavLink>
+            <NavLink href="/dashboard/aprendizaje">
+              <Lightbulb size={16} /> Aprendizaje
             </NavLink>
             <NavLink href="/dashboard/organization">
               <Building2 size={16} /> Organización

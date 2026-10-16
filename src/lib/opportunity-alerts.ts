@@ -20,6 +20,10 @@ import type { PipelineStageRole } from "@/generated/prisma/enums";
 const STALE_DAYS = 14;
 const HOT_LEAD_STALE_DAYS = 7;
 const HOT_LEAD_SCORE = 70;
+// F13: umbrales de las alertas de coach.
+const HIGH_CLOSE_PROBABILITY = 70;
+const PROPOSAL_NO_REPLY_DAYS = 5;
+const MEETING_NO_FOLLOWUP_DAYS = 3;
 
 interface AlertableRow {
   // Antes `Stage` (union fija); ahora basta con el rol resuelto de la
@@ -32,11 +36,19 @@ interface AlertableRow {
   expectedCloseDate: string | null;
   updatedAt: string;
   assignedTo: unknown;
+  // F13 (opcionales: los callers que no los tengan siguen funcionando).
+  probability?: number | null;
+  proposalSentAt?: string | null;
+  authorityLevel?: string | null;
+  /** Fecha de la última reunión realizada (status DONE). */
+  lastMeetingAt?: string | null;
 }
 
 export interface DerivedAlert {
   reasons: string[];
   severity: "alta" | "media" | null;
+  /** Señales positivas (p. ej. alta probabilidad de cierre): no suben la severidad. */
+  highlights: string[];
 }
 
 function daysSince(todayStr: string, iso: string): number {
@@ -66,9 +78,10 @@ export function urgencyRank(
 }
 
 export function deriveAlerts(row: AlertableRow, todayStr: string): DerivedAlert {
-  if (row.stage.role !== null) return { reasons: [], severity: null };
+  if (row.stage.role !== null) return { reasons: [], severity: null, highlights: [] };
 
   const reasons: string[] = [];
+  const highlights: string[] = [];
 
   if (row.nextActionAt) {
     const overdueDays = daysSince(todayStr, row.nextActionAt);
@@ -91,7 +104,27 @@ export function deriveAlerts(row: AlertableRow, todayStr: string): DerivedAlert 
     reasons.push("Lead de alta calidad sin avance reciente");
   }
 
-  if (reasons.length === 0) return { reasons, severity: null };
+  // ── F13: alertas de coach ─────────────────────────────────────────────
+  if (row.proposalSentAt) {
+    const days = daysSince(todayStr, row.proposalSentAt);
+    if (days >= PROPOSAL_NO_REPLY_DAYS && row.updatedAt.slice(0, 10) <= row.proposalSentAt.slice(0, 10)) {
+      reasons.push(`Propuesta enviada hace ${days} días sin respuesta`);
+    }
+  }
+  if (row.lastMeetingAt) {
+    const days = daysSince(todayStr, row.lastMeetingAt);
+    if (days >= MEETING_NO_FOLLOWUP_DAYS && row.updatedAt.slice(0, 10) <= row.lastMeetingAt.slice(0, 10)) {
+      reasons.push(`Reunión sin seguimiento hace ${days} días`);
+    }
+  }
+  if ((row.proposalSentAt || row.lastMeetingAt) && !row.authorityLevel?.trim()) {
+    reasons.push("Falta identificar al decisor");
+  }
+  if ((row.probability ?? 0) >= HIGH_CLOSE_PROBABILITY) {
+    highlights.push(`Alta probabilidad de cierre (${row.probability}%): priorizar`);
+  }
+
+  if (reasons.length === 0) return { reasons, severity: null, highlights };
   const severity = row.priority === "ALTA" || reasons.length >= 3 ? "alta" : "media";
-  return { reasons, severity };
+  return { reasons, severity, highlights };
 }

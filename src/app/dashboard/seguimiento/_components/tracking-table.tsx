@@ -103,6 +103,8 @@ export interface Row {
   aiNextQuestion: string;
   aiAlerts: string;
   authorityLevel: string;
+  proposalSentAt: string | null;
+  lastMeetingAt: string | null;
   meetings: {
     id: string;
     title: string | null;
@@ -872,7 +874,7 @@ export function TrackingTable({
                     row={row}
                     stages={stages}
                     services={services}
-                    alert={alerts.get(row.id) ?? { reasons: [], severity: null }}
+                    alert={alerts.get(row.id) ?? { reasons: [], severity: null, highlights: [] }}
                     aiEnabled={ai.enabled}
                     editable={canEdit(row, currentUserId, isAdmin)}
                     onOpen={() => setDetail(row)}
@@ -1708,6 +1710,18 @@ function DetailPanel({
               </p>
             )}
           </Field>
+
+          {alert.highlights.length > 0 && (
+            <Field label="Oportunidad">
+              <ul className="space-y-1">
+                {alert.highlights.map((h) => (
+                  <li key={h} className="flex items-start gap-1.5 text-xs leading-relaxed text-accent">
+                    <Bell size={11} className="mt-0.5 shrink-0" /> {h}
+                  </li>
+                ))}
+              </ul>
+            </Field>
+          )}
 
           {alert.reasons.length > 0 && (
             <Field label="Alertas del sistema">

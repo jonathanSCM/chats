@@ -144,6 +144,9 @@ export default async function SeguimientoPage({
     aiNextQuestion: o.aiNextQuestion ?? "",
     aiAlerts: o.aiAlerts ?? "",
     authorityLevel: o.authorityLevel ?? "",
+    proposalSentAt: o.proposalSentAt?.toISOString() ?? null,
+    // Última reunión realizada (meetings viene ordenado por fecha desc).
+    lastMeetingAt: o.meetings.find((m) => m.status === "DONE")?.scheduledAt.toISOString() ?? null,
     lostReason: o.lostReason ?? "",
     lostReasonCategory: (o.lostReasonCategory as LossReason | null) ?? null,
     archived: o.archivedAt !== null,

@@ -1,0 +1,598 @@
+openapi: 3.1.0
+info:
+  title: ProShop CRM - API de integracion v1
+  version: 1.0.1-draft
+  description: |
+    Contrato que el CRM debe exponer para el Jefe de Operaciones (y futuros integradores).
+    Borrador del plan tecnico seccion 5.3. A construir en el CRM en una sesion aparte.
+
+    - Autenticacion: `Authorization: Bearer <IntegrationKey>`. La clave pertenece a UNA organizacion;
+      el CRM guarda solo su hash. Cada clave tiene scopes (`read`, `write:activities`).
+    - Paginacion por cursor: `?cursor=&limit=` (limit maximo 200).
+    - Escrituras idempotentes con cabecera `Idempotency-Key`.
+    - Nunca se exponen tokens ni secretos de la organizacion.
+    - Errores: `{error, code}`. Codigos usados por el CRM: `unauthorized`, `organization_suspended`,
+      `insufficient_scope`, `not_found`, `validation_error`, `idempotency_key_reuse`, `rate_limited`.
+    - `GET /meetings` trae transcripciones completas: el CRM puede devolver MENOS filas que `limit`
+      (tope practico 25 por pagina). Seguir siempre `nextCursor`, no asumir `data.length == limit`.
+    - Revision 1.0.1 (16/10/2026): `ping`, campos de resumen/`updatedAt` en Meeting, `GET /activities`,
+      `updatedSince` en contactos y respuestas 403/409/429 declaradas.
+servers:
+  - url: https://chats.proshop.lat/api/integrations/v1
+security:
+  - bearerAuth: []
+tags:
+  - { name: Lectura }
+  - { name: Escritura }
+  - { name: Eventos }
+paths:
+  /me:
+    get:
+      tags: [Lectura]
+      operationId: getMe
+      summary: Organizacion y alcance de la clave
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Error" }
+  /users:
+    get:
+      tags: [Lectura]
+      operationId: listUsers
+      summary: Equipo de la organizacion (para mapear con Mattermost)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/User" }
+  /conversations:
+    get:
+      tags: [Lectura]
+      operationId: listConversations
+      summary: Conversaciones modificadas desde una fecha
+      parameters:
+        - { $ref: "#/components/parameters/since" }
+        - { $ref: "#/components/parameters/cursor" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Conversation" }
+  /conversations/{id}/messages:
+    get:
+      tags: [Lectura]
+      operationId: listMessages
+      summary: Mensajes de una conversacion
+      parameters:
+        - { $ref: "#/components/parameters/id" }
+        - name: after
+          in: query
+          description: Solo mensajes posteriores a esta fecha.
+          schema: { type: string, format: date-time }
+        - { $ref: "#/components/parameters/cursor" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Message" }
+        "404": { $ref: "#/components/responses/Error" }
+  /messages/{id}/media:
+    get:
+      tags: [Lectura]
+      operationId: getMessageMedia
+      summary: Descarga controlada del archivo de un mensaje
+      parameters:
+        - { $ref: "#/components/parameters/id" }
+      responses:
+        "200":
+          description: Contenido binario del archivo
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/Error" }
+  /meetings:
+    get:
+      tags: [Lectura]
+      operationId: listMeetings
+      summary: Reuniones con transcripcion
+      parameters:
+        - { $ref: "#/components/parameters/since" }
+        - { $ref: "#/components/parameters/cursor" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Meeting" }
+  /meetings/{id}/attachments:
+    get:
+      tags: [Lectura]
+      operationId: listMeetingAttachments
+      summary: Adjuntos de una reunion (PDF, etc.)
+      parameters:
+        - { $ref: "#/components/parameters/id" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Attachment" }
+  /contacts:
+    get:
+      tags: [Lectura]
+      operationId: listContacts
+      summary: Clientes
+      parameters:
+        - name: updatedSince
+          in: query
+          description: Solo clientes modificados desde esta fecha.
+          schema: { type: string, format: date-time }
+        - { $ref: "#/components/parameters/cursor" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Contact" }
+  /opportunities:
+    get:
+      tags: [Lectura]
+      operationId: listOpportunities
+      summary: Casos comerciales
+      parameters:
+        - name: updatedSince
+          in: query
+          schema: { type: string, format: date-time }
+        - { $ref: "#/components/parameters/cursor" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Opportunity" }
+  /opportunities/{id}:
+    get:
+      tags: [Lectura]
+      operationId: getOpportunity
+      summary: Detalle de un caso con proxima accion
+      parameters:
+        - { $ref: "#/components/parameters/id" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Opportunity" }
+        "404": { $ref: "#/components/responses/Error" }
+  /opportunities/{id}/next-action:
+    post:
+      tags: [Escritura]
+      operationId: setNextAction
+      summary: Actualizar proxima accion de un caso
+      description: Scope `write:activities`. Escribe `nextAction`, `nextActionAt` y `assignedToId`.
+      parameters:
+        - { $ref: "#/components/parameters/id" }
+        - { $ref: "#/components/parameters/idempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nextAction]
+              properties:
+                nextAction: { type: string, minLength: 1 }
+                nextActionAt: { type: [string, "null"], format: date-time }
+                assignedToId: { type: [string, "null"] }
+      responses:
+        "200":
+          description: Caso actualizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Opportunity" }
+        "404": { $ref: "#/components/responses/Error" }
+  /knowledge:
+    get:
+      tags: [Lectura]
+      operationId: listKnowledge
+      summary: Base de conocimiento activa
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/KnowledgeItem" }
+  /activities:
+    get:
+      tags: [Lectura]
+      operationId: listActivities
+      summary: Tareas modificadas desde una fecha
+      description: |
+        Para reconciliar: si se pierde un evento `activity.completed`, el Jefe puede volver a leer el
+        estado de las tareas. Scope `read`.
+      parameters:
+        - name: updatedSince
+          in: query
+          schema: { type: string, format: date-time }
+        - { $ref: "#/components/parameters/cursor" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Activity" }
+    post:
+      tags: [Escritura]
+      operationId: createActivity
+      summary: Crear una tarea
+      description: |
+        Scope `write:activities`. `source` queda en `ai` cuando la crea el Jefe.
+        Con la misma `Idempotency-Key` devuelve la tarea ya creada (200) en vez de duplicarla.
+      parameters:
+        - { $ref: "#/components/parameters/idempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ActivityCreate" }
+      responses:
+        "201":
+          description: Creada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Activity" }
+        "200":
+          description: Ya existia (idempotencia)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Activity" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /activities/{id}:
+    patch:
+      tags: [Escritura]
+      operationId: updateActivity
+      summary: Completar, cancelar o reprogramar
+      parameters:
+        - { $ref: "#/components/parameters/id" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                status: { type: string, enum: [PENDING, DONE, CANCELED] }
+                dueAt: { type: [string, "null"], format: date-time }
+                assignedToId: { type: [string, "null"] }
+      responses:
+        "200":
+          description: Actualizada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Activity" }
+        "404": { $ref: "#/components/responses/Error" }
+  /events/ack:
+    post:
+      tags: [Eventos]
+      operationId: ackEvents
+      summary: Confirmar eventos recibidos (opcional)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [eventIds]
+              properties:
+                eventIds:
+                  type: array
+                  items: { type: string }
+                  maxItems: 200
+      responses:
+        "204": { description: Confirmado }
+
+webhooks:
+  crmEvent:
+    post:
+      tags: [Eventos]
+      operationId: receiveCrmEvent
+      summary: Evento saliente del CRM hacia el Jefe
+      description: |
+        Firmado con HMAC-SHA256 (hex) de `<t>.<cuerpo crudo>` en la cabecera `X-ProShop-Signature: t=<unix>,v1=<hex>`.
+        Rechazar si `t` difiere mas de 5 minutos (anti-replay). `eventId` es deterministico:
+        el receptor debe deduplicar por el. Reintentos con espera exponencial; responder 2xx rapido.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Event" }
+      responses:
+        "200": { description: Recibido }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: IntegrationKey de la organizacion (se guarda solo su hash en el CRM).
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    since:
+      name: since
+      in: query
+      description: Solo registros modificados desde esta fecha.
+      schema: { type: string, format: date-time }
+    cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+    limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    idempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error, code]
+      properties:
+        error: { type: string }
+        code:
+          type: string
+          examples: [unauthorized, organization_suspended, insufficient_scope, not_found, validation_error, idempotency_key_reuse, rate_limited]
+    Page:
+      type: object
+      required: [data, nextCursor]
+      properties:
+        data: { type: array, items: {} }
+        nextCursor: { type: [string, "null"] }
+    Me:
+      type: object
+      required: [organizationId, name, scopes]
+      properties:
+        organizationId: { type: string }
+        name: { type: string }
+        timezone: { type: string }
+        scopes:
+          type: array
+          items: { type: string, enum: [read, "write:activities"] }
+    User:
+      type: object
+      required: [id, name, email, role]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [OWNER, MEMBER] }
+    Conversation:
+      type: object
+      required: [id, customerPhone, status, lastMessageAt]
+      properties:
+        id: { type: string }
+        customerPhone: { type: string }
+        customerName: { type: [string, "null"] }
+        status: { type: string, enum: [OPEN, ON_HOLD, CLOSED] }
+        assignedToId: { type: [string, "null"] }
+        contactId: { type: [string, "null"] }
+        lastMessageAt: { type: string, format: date-time }
+    Message:
+      type: object
+      required: [id, conversationId, role, createdAt]
+      properties:
+        id: { type: string }
+        conversationId: { type: string }
+        role: { type: string, enum: [CUSTOMER, BOT, STAFF, SYSTEM] }
+        text: { type: [string, "null"] }
+        mediaType: { type: [string, "null"], enum: [IMAGE, VIDEO, AUDIO, DOCUMENT, LOCATION, null] }
+        isVoiceNote: { type: boolean }
+        fileName: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+    Meeting:
+      type: object
+      required: [id, title, scheduledAt, status]
+      properties:
+        id: { type: string }
+        title: { type: string, description: "El CRM manda \"Reunion\" cuando la reunion no tiene titulo." }
+        scheduledAt: { type: string, format: date-time }
+        durationMinutes: { type: [integer, "null"] }
+        status: { type: string, enum: [SCHEDULED, CONFIRMED, DONE, CANCELED, NO_SHOW] }
+        opportunityId: { type: [string, "null"] }
+        transcript: { type: [string, "null"], description: "Subtitulos en vivo con nombre de quien hablo." }
+        audioTranscript: { type: [string, "null"], description: "Whisper sobre el audio (sin nombres)." }
+        notes: { type: [string, "null"] }
+        aiSummary: { type: [string, "null"], description: "Resumen de IA en texto legible (lo genera el CRM)." }
+        aiSummaryData:
+          type: [object, "null"]
+          additionalProperties: true
+          description: |
+            Resumen estructurado del CRM: `resumen`, `puntosClave[]`, `decisiones[]`,
+            `proximosPasos[{accion, responsable, fecha, fechaIso}]` e `informacionComercial`
+            (`necesidad`, `dolor`, `presupuesto`, `decisor`, `urgencia`, `objeciones[]`, `acuerdos[]`).
+        aiSummaryAt: { type: [string, "null"], format: date-time }
+        updatedAt: { type: string, format: date-time, description: "Cursor de sincronizacion (`since` filtra por este campo)." }
+        attendees:
+          type: array
+          items: { type: string }
+    Attachment:
+      type: object
+      required: [id, fileName, mimeType]
+      properties:
+        id: { type: string }
+        fileName: { type: string }
+        mimeType: { type: string }
+        fileSize: { type: [integer, "null"] }
+        downloadUrl: { type: string, description: "URL firmada de corta duracion." }
+    Contact:
+      type: object
+      required: [id, fullName]
+      properties:
+        id: { type: string }
+        fullName: { type: string, description: "El CRM manda el telefono, o \"Sin nombre\", si el cliente no tiene nombre." }
+        phone: { type: [string, "null"] }
+        email: { type: [string, "null"] }
+        companyName: { type: [string, "null"] }
+        assignedToId: { type: [string, "null"] }
+    Opportunity:
+      type: object
+      required: [id, title, stageLabel]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        contactId: { type: [string, "null"] }
+        assignedToId: { type: [string, "null"] }
+        stageLabel: { type: string }
+        priority: { type: [string, "null"], enum: [ALTA, MEDIA, BAJA, null] }
+        estimatedValue: { type: [number, "null"] }
+        currency: { type: [string, "null"] }
+        nextAction: { type: [string, "null"] }
+        nextActionAt: { type: [string, "null"], format: date-time }
+        updatedAt: { type: string, format: date-time }
+    KnowledgeItem:
+      type: object
+      required: [id, category, title, content]
+      properties:
+        id: { type: string }
+        category: { type: string }
+        title: { type: string }
+        content: { type: string }
+    ActivityCreate:
+      type: object
+      required: [type, title]
+      properties:
+        type: { type: string, enum: [TASK, CALL, MESSAGE, PROPOSAL, FOLLOW_UP] }
+        title: { type: string, minLength: 1, maxLength: 300 }
+        description: { type: [string, "null"] }
+        dueAt: { type: [string, "null"], format: date-time }
+        assignedToId: { type: [string, "null"] }
+        opportunityId: { type: [string, "null"] }
+        contactId: { type: [string, "null"] }
+        source: { type: string, enum: [user, ai], default: ai }
+    Activity:
+      allOf:
+        - $ref: "#/components/schemas/ActivityCreate"
+        - type: object
+          required: [id, status, createdAt]
+          properties:
+            id: { type: string }
+            status: { type: string, enum: [PENDING, DONE, CANCELED] }
+            completedAt: { type: [string, "null"], format: date-time }
+            createdAt: { type: string, format: date-time }
+    Event:
+      type: object
+      required: [eventId, type, organizationId, occurredAt, data]
+      properties:
+        eventId: { type: string, description: "Deterministico: deduplicar por este valor." }
+        type:
+          type: string
+          enum:
+            - message.created
+            - conversation.assigned
+            - meeting.transcript_ready
+            - meeting.summary_ready
+            - opportunity.stage_changed
+            - opportunity.next_action_changed
+            - activity.created
+            - activity.completed
+            - document.received
+            - ping
+        organizationId: { type: string }
+        occurredAt: { type: string, format: date-time }
+        data:
+          type: object
+          additionalProperties: true
+          description: |
+            Carga segun `type`. Para `meeting.transcript_ready`:
+            `{meetingId, title, scheduledAt, transcript?, audioTranscript?, notes?, opportunityId?}`.
+            Debe incluir el texto: el Jefe no hace una llamada extra para obtenerlo.
+            Para `ping` (boton de prueba del CRM) `data` es `{}`; el receptor responde `{ok:true,pong:true}`.
+            Para `meeting.summary_ready`: `{meetingId, aiSummary, aiSummaryData, aiSummaryAt}`.

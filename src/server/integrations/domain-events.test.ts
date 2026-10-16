@@ -18,7 +18,12 @@ vi.mock("./events", async (orig) => ({
   emitIntegrationEvent: db.emit,
 }));
 
-import { emitMeetingSummaryReady, emitMessageCreated, emitSettledMeetingTranscripts } from "./domain-events";
+import {
+  emitDocumentReceived,
+  emitMeetingSummaryReady,
+  emitMessageCreated,
+  emitSettledMeetingTranscripts,
+} from "./domain-events";
 
 const probeWith = (webhooks: { id: string }[]) => ({
   conversation: { bot: { organization: { integrationWebhooks: webhooks } } },
@@ -178,5 +183,45 @@ describe("emitMeetingSummaryReady", () => {
     expect(db.emit).not.toHaveBeenCalled();
     db.meetingFind.mockRejectedValueOnce(new Error("boom"));
     await expect(emitMeetingSummaryReady("m1")).resolves.toBeUndefined();
+  });
+});
+
+describe("emitDocumentReceived", () => {
+  const doc = {
+    id: "g9",
+    conversationId: "cv1",
+    mediaType: "DOCUMENT",
+    mediaStatus: "READY",
+    fileName: "contrato.pdf",
+    mimeType: "application/pdf",
+    createdAt: new Date("2026-10-15T14:03:11Z"),
+    conversation: { bot: { organizationId: "orgA" } },
+  };
+
+  it("emite document.received con el archivo y la conversacion", async () => {
+    db.messageFind.mockResolvedValueOnce(doc);
+    await emitDocumentReceived("g9");
+    expect(db.emit).toHaveBeenCalledOnce();
+    expect(db.emit.mock.calls[0][0]).toMatchObject({
+      eventId: "doc_g9",
+      type: "document.received",
+      organizationId: "orgA",
+      data: { messageId: "g9", conversationId: "cv1", fileName: "contrato.pdf", mimeType: "application/pdf" },
+    });
+  });
+
+  it("no emite si no es un documento o todavia no esta descargado", async () => {
+    db.messageFind.mockResolvedValueOnce({ ...doc, mediaType: "IMAGE" });
+    await emitDocumentReceived("g9");
+    db.messageFind.mockResolvedValueOnce({ ...doc, mediaStatus: "PENDING" });
+    await emitDocumentReceived("g9");
+    db.messageFind.mockResolvedValueOnce(null);
+    await emitDocumentReceived("nada");
+    expect(db.emit).not.toHaveBeenCalled();
+  });
+
+  it("nunca lanza", async () => {
+    db.messageFind.mockRejectedValueOnce(new Error("db caida"));
+    await expect(emitDocumentReceived("g9")).resolves.toBeUndefined();
   });
 });

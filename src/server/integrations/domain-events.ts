@@ -142,6 +142,43 @@ export async function emitSettledMeetingTranscripts(now = new Date()): Promise<n
   return meetings.length;
 }
 
+/**
+ * Emite `document.received` cuando un documento (PDF, etc.) de WhatsApp ya se descargo y esta
+ * disponible. El integrador lo baja luego con GET /messages/{id}/media. Nunca lanza.
+ */
+export async function emitDocumentReceived(messageId: string): Promise<void> {
+  try {
+    const m = await prisma.message.findUnique({
+      where: { id: messageId },
+      select: {
+        id: true,
+        conversationId: true,
+        mediaType: true,
+        mediaStatus: true,
+        fileName: true,
+        mimeType: true,
+        createdAt: true,
+        conversation: { select: { bot: { select: { organizationId: true } } } },
+      },
+    });
+    if (!m || m.mediaType !== "DOCUMENT" || m.mediaStatus !== "READY") return;
+    await emitIntegrationEvent({
+      eventId: eventIds.documentReceived(m.id),
+      type: "document.received",
+      organizationId: m.conversation.bot.organizationId,
+      data: {
+        messageId: m.id,
+        conversationId: m.conversationId,
+        fileName: m.fileName,
+        mimeType: m.mimeType,
+        receivedAt: m.createdAt.toISOString(),
+      },
+    });
+  } catch (e) {
+    console.error("[integrations] document.received falló:", e instanceof Error ? e.message : e);
+  }
+}
+
 export async function emitMeetingSummaryReady(meetingId: string): Promise<void> {
   try {
     const m = await prisma.meeting.findUnique({

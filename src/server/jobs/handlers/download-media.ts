@@ -3,6 +3,7 @@ import { prisma } from "@/server/db/client";
 import { decrypt } from "@/lib/crypto";
 import { getMediaUrl, downloadMedia } from "@/server/services/whatsapp";
 import { saveMediaFile } from "@/lib/media-storage";
+import { emitDocumentReceived } from "@/server/integrations/domain-events";
 
 export const downloadMediaPayload = z.object({
   messageId: z.string(),
@@ -45,6 +46,9 @@ export async function handleDownloadMedia(rawPayload: unknown): Promise<void> {
     where: { id: messageId },
     data: { mediaUrl, mimeType, mediaStatus: "READY" },
   });
+
+  // Aviso al integrador (Jefe de Operaciones) si es un documento. Nunca lanza.
+  await emitDocumentReceived(messageId);
 }
 
 /** Se llama cuando se agotaron los reintentos, para reflejarlo en la bandeja. */

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readMediaFileFromS3 } from "@/lib/media-storage";
+import { readMediaFile } from "@/lib/media-storage";
 import { prisma } from "@/server/db/client";
 import { ApiError } from "@/server/integrations/http";
 import { integrationRoute } from "@/server/integrations/route";
@@ -21,13 +21,14 @@ export const GET = integrationRoute<{ id: string }>("read", async (ctx, _req, { 
     throw new ApiError(404, "not_found", "Archivo no encontrado.");
   }
 
-  const file = await readMediaFileFromS3(storedName);
-  if (!file) throw new ApiError(404, "not_found", "Archivo no encontrado.");
+  // readMediaFile lee de S3 si está configurado y, si no, del disco local (/public/media).
+  const buffer = await readMediaFile(storedName).catch(() => null);
+  if (!buffer) throw new ApiError(404, "not_found", "Archivo no encontrado.");
 
   const safeName = (message.fileName ?? storedName).replace(/[^\w.\- ]/g, "_");
-  return new NextResponse(file.body, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
-      "Content-Type": file.contentType ?? message.mimeType ?? "application/octet-stream",
+      "Content-Type": message.mimeType ?? "application/octet-stream",
       "Content-Disposition": `attachment; filename="${safeName}"`,
       "Cache-Control": "no-store",
     },

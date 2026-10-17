@@ -27,7 +27,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const conversation = await prisma.conversation.findUnique({
     where: { id },
     include: {
-      bot: { select: { organizationId: true, aiQualificationEnabled: true } },
+      bot: { select: { organizationId: true, aiQualificationEnabled: true, organization: { select: { jefeEnabled: true } } } },
       contact: {
         include: {
           company: { select: { id: true, name: true } },
@@ -193,7 +193,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
             estimatedValue: o.estimatedValue ? Number(o.estimatedValue) : null,
             nextAction: o.nextAction,
             nextActionAt: o.nextActionAt?.toISOString() ?? null,
-            activities: o.activities.map((a) => ({
+            // Las tareas del Jefe de Operaciones solo se muestran si la organizacion lo tiene habilitado.
+            activities: (conversation.bot.organization.jefeEnabled ? o.activities : []).map((a) => ({
               id: a.id,
               title: a.title,
               status: a.status,

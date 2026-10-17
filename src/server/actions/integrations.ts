@@ -25,6 +25,12 @@ async function requireOwner() {
   if (session.user.role !== "OWNER" || !session.user.organizationId) {
     throw new Error("Solo un administrador puede gestionar integraciones.");
   }
+  // El superadmin habilita el Jefe de Operaciones por organizacion; apagado, nada de esto aplica.
+  const org = await prisma.organization.findUnique({
+    where: { id: session.user.organizationId },
+    select: { jefeEnabled: true },
+  });
+  if (!org?.jefeEnabled) throw new Error("El Jefe de Operaciones no está habilitado para esta organización.");
   return { organizationId: session.user.organizationId, userId: session.user.id };
 }
 

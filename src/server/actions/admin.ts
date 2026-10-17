@@ -133,6 +133,34 @@ export async function toggleOrgSuspensionAction(
 }
 
 /**
+ * Habilita o apaga el Jefe de Operaciones (API de integración, webhooks y tareas en la ficha)
+ * para una organización. Apagarlo no borra nada: las claves y el webhook quedan guardados y
+ * vuelven a funcionar al reactivarlo. Efecto inmediato: la API responde 403 y dejan de salir eventos.
+ */
+export async function toggleOrgJefeAction(orgId: string, enabled: boolean): Promise<ActionState> {
+  const session = await requireSuperadmin();
+
+  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { jefeEnabled: true } });
+  if (!org) return { error: "Organización no encontrada" };
+  if (org.jefeEnabled === enabled) return { error: null };
+
+  await prisma.organization.update({ where: { id: orgId }, data: { jefeEnabled: enabled } });
+  await audit({
+    entityType: "Organization",
+    entityId: orgId,
+    action: enabled ? "jefe_enabled" : "jefe_disabled",
+    userId: session.user.id,
+    organizationId: orgId,
+    before: { jefeEnabled: org.jefeEnabled },
+    after: { jefeEnabled: enabled },
+  });
+
+  revalidatePath(`/admin/organizations/${orgId}`);
+  revalidatePath("/dashboard/organization");
+  return { error: null };
+}
+
+/**
  * Borra solo la conexión de WhatsApp de un bot (token, phone_number_id,
  * waba_id) para poder volver a intentar Embedded Signup desde cero. No
  * toca la organización, el bot, sus conversaciones ni ningún otro dato.

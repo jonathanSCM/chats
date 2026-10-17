@@ -66,7 +66,7 @@ export async function emitIntegrationEvent(p: {
 }): Promise<void> {
   try {
     const webhooks = await prisma.integrationWebhook.findMany({
-      where: { organizationId: p.organizationId, enabled: true },
+      where: { organizationId: p.organizationId, enabled: true, organization: { jefeEnabled: true } },
       select: { id: true, events: true },
     });
     const targets = webhooks.filter((w) => w.events.length === 0 || w.events.includes(p.type));

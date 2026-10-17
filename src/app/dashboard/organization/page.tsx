@@ -237,6 +237,8 @@ export default async function OrganizationSettingsPage({
         </CardDescription>
       </Card>
 
+      {/* Solo si el superadmin habilitó el Jefe de Operaciones para esta organización. */}
+      {org.jefeEnabled && (
       <Card className="mb-6">
         <CardTitle className="mb-1">API para integraciones</CardTitle>
         <CardDescription className="mb-4">
@@ -266,6 +268,7 @@ export default async function OrganizationSettingsPage({
           availableEvents={[...INTEGRATION_EVENT_TYPES]}
         />
       </Card>
+      )}
         </>
       )}
 

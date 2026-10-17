@@ -114,8 +114,11 @@ const payloadSchema = z.object({
 /** Handler del job `integration_webhook_delivery`: lanza ante cualquier fallo para que la cola reintente. */
 export async function handleIntegrationWebhookDelivery(rawPayload: unknown): Promise<void> {
   const { webhookId, event } = payloadSchema.parse(rawPayload);
-  const webhook = await prisma.integrationWebhook.findUnique({ where: { id: webhookId } });
-  if (!webhook || !webhook.enabled) return; // se apagó o borró mientras esperaba: nada que entregar
+  const webhook = await prisma.integrationWebhook.findUnique({
+    where: { id: webhookId },
+    include: { organization: { select: { jefeEnabled: true } } },
+  });
+  if (!webhook || !webhook.enabled || !webhook.organization.jefeEnabled) return; // se apagó o borró mientras esperaba: nada que entregar
 
   const result = await deliverOnce(webhook, event);
   if (result.ok) {

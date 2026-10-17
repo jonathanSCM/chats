@@ -16,7 +16,7 @@ const record = (over: Record<string, unknown> = {}) => ({
   keyHash,
   scopes: ["read", "write:activities"],
   revokedAt: null,
-  organization: { suspended: false },
+  organization: { suspended: false, jefeEnabled: true },
   ...over,
 });
 const req = (auth?: string) => new Request("http://x/api", { headers: auth ? { authorization: auth } : {} });
@@ -60,6 +60,18 @@ describe("authenticateIntegration", () => {
 
   it("organización suspendida: 403", async () => {
     db.keyFind.mockResolvedValueOnce(record({ organization: { suspended: true } }));
+    expect(await code(authenticateIntegration(req(`Bearer ${key}`), "read"))).toBe("403:organization_suspended");
+  });
+
+  it("organización sin el Jefe de Operaciones habilitado: 403 feature_disabled (aunque la clave sea válida)", async () => {
+    db.keyFind.mockResolvedValueOnce(record({ organization: { suspended: false, jefeEnabled: false } }));
+    expect(await code(authenticateIntegration(req(`Bearer ${key}`), "read"))).toBe("403:feature_disabled");
+    // No consume cupo de rate limit ni marca uso: se corta antes.
+    expect(db.keyUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("suspendida tiene prioridad sobre el interruptor", async () => {
+    db.keyFind.mockResolvedValueOnce(record({ organization: { suspended: true, jefeEnabled: false } }));
     expect(await code(authenticateIntegration(req(`Bearer ${key}`), "read"))).toBe("403:organization_suspended");
   });
 

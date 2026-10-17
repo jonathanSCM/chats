@@ -25,8 +25,8 @@ import {
   emitSettledMeetingTranscripts,
 } from "./domain-events";
 
-const probeWith = (webhooks: { id: string }[]) => ({
-  conversation: { bot: { organization: { integrationWebhooks: webhooks } } },
+const probeWith = (webhooks: { id: string }[], jefeEnabled = true) => ({
+  conversation: { bot: { organization: { jefeEnabled, integrationWebhooks: webhooks } } },
 });
 
 const fullMessage = {
@@ -53,6 +53,13 @@ beforeEach(() => {
 describe("emitMessageCreated", () => {
   it("sin webhook activo: una sola consulta liviana y no emite", async () => {
     db.messageFind.mockResolvedValueOnce(probeWith([]));
+    await emitMessageCreated("g1");
+    expect(db.messageFind).toHaveBeenCalledTimes(1);
+    expect(db.emit).not.toHaveBeenCalled();
+  });
+
+  it("con webhook pero el Jefe deshabilitado para la organizacion: no emite", async () => {
+    db.messageFind.mockResolvedValueOnce(probeWith([{ id: "w1" }], false));
     await emitMessageCreated("g1");
     expect(db.messageFind).toHaveBeenCalledTimes(1);
     expect(db.emit).not.toHaveBeenCalled();
@@ -119,7 +126,7 @@ describe("emitSettledMeetingTranscripts", () => {
     const where = db.meetingFindMany.mock.calls[0][0].where;
     expect(where.updatedAt.gt).toEqual(new Date("2026-10-14T20:00:00Z"));
     expect(where.updatedAt.lt).toEqual(new Date("2026-10-15T19:50:00Z"));
-    expect(where.organization).toEqual({ integrationWebhooks: { some: { enabled: true } } });
+    expect(where.organization).toEqual({ jefeEnabled: true, integrationWebhooks: { some: { enabled: true } } });
   });
 
   it("emite meeting.transcript_ready con la carga que espera el Jefe", async () => {

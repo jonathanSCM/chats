@@ -53,7 +53,7 @@ export async function authenticateIntegration(
   const hash = hashApiKey(match[1]);
   const record = await prisma.integrationKey.findUnique({
     where: { keyHash: hash },
-    include: { organization: { select: { suspended: true } } },
+    include: { organization: { select: { suspended: true, jefeEnabled: true } } },
   });
 
   // La búsqueda ya fue por hash exacto; la comparación en tiempo constante es defensa en profundidad.
@@ -63,6 +63,9 @@ export async function authenticateIntegration(
 
   if (record.organization.suspended) {
     throw new ApiError(403, "organization_suspended", "La organización está suspendida.");
+  }
+  if (!record.organization.jefeEnabled) {
+    throw new ApiError(403, "feature_disabled", "Esta organización no tiene habilitado el Jefe de Operaciones.");
   }
   if (!record.scopes.includes(scope)) {
     throw new ApiError(403, "insufficient_scope", "La clave no tiene permiso para esta operación.");

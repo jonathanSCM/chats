@@ -29,6 +29,9 @@ model Organization {
   name                   String
   slug                   String   @unique
   suspended              Boolean  @default(false) // desactivada por el superadmin (ej. impago, abuso)
+  // Jefe de Operaciones (API de integración, webhooks y tareas en la ficha): lo activa el
+  // superadmin por organización. Apagado no borra nada: claves y webhook quedan guardados.
+  jefeEnabled            Boolean  @default(false)
   // Cuántos mensajes recientes de WhatsApp se le mandan al asesor IA por
   // análisis (ajustable por el dueño en /dashboard/organization). Más
   // mensajes = más contexto pero más costo por análisis.

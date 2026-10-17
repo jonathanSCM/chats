@@ -121,6 +121,7 @@ describe("handleIntegrationWebhookDelivery (job)", () => {
     url: "http://localhost:3111/webhooks/crm",
     secretEncrypted: encrypt(SECRET),
     enabled: true,
+    organization: { jefeEnabled: true },
     ...over,
   });
 
@@ -130,6 +131,16 @@ describe("handleIntegrationWebhookDelivery (job)", () => {
     db.webhookFind.mockResolvedValueOnce(row({ enabled: false }));
     await expect(handleIntegrationWebhookDelivery(payload)).resolves.toBeUndefined();
     expect(db.webhookUpdate).not.toHaveBeenCalled();
+  });
+
+  it("si apagaron el Jefe mientras el aviso esperaba en la cola, se descarta sin enviar", async () => {
+    db.webhookFind.mockResolvedValueOnce(row({ organization: { jefeEnabled: false } }));
+    const f = vi.fn();
+    vi.stubGlobal("fetch", f);
+    await expect(handleIntegrationWebhookDelivery(payload)).resolves.toBeUndefined();
+    expect(f).not.toHaveBeenCalled();
+    expect(db.webhookUpdate).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 
   it("éxito: marca lastSuccessAt y limpia el error", async () => {
@@ -168,6 +179,16 @@ describe("emitIntegrationEvent", () => {
     const keys = db.enqueue.mock.calls.map((c) => c[0].uniqueKey);
     expect(keys).toEqual(["intg-w1-msg_1", "intg-w2-msg_1"]);
     expect(db.enqueue.mock.calls[0][0]).toMatchObject({ type: "integration_webhook_delivery", maxAttempts: 8 });
+  });
+
+  it("solo busca webhooks de organizaciones con el Jefe habilitado", async () => {
+    db.webhookFindMany.mockResolvedValue([]);
+    await emitIntegrationEvent({ eventId: "msg_1", type: "message.created", organizationId: "org1", data: {} });
+    expect(db.webhookFindMany.mock.calls[0][0].where).toEqual({
+      organizationId: "org1",
+      enabled: true,
+      organization: { jefeEnabled: true },
+    });
   });
 
   it("sin webhooks no encola nada", async () => {

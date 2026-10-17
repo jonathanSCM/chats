@@ -21,7 +21,10 @@ export async function emitMessageCreated(messageId: string): Promise<void> {
             bot: {
               select: {
                 organization: {
-                  select: { integrationWebhooks: { where: { enabled: true }, select: { id: true }, take: 1 } },
+                  select: {
+                    jefeEnabled: true,
+                    integrationWebhooks: { where: { enabled: true }, select: { id: true }, take: 1 },
+                  },
                 },
               },
             },
@@ -29,7 +32,8 @@ export async function emitMessageCreated(messageId: string): Promise<void> {
         },
       },
     });
-    if (!probe || probe.conversation.bot.organization.integrationWebhooks.length === 0) return;
+    const org = probe?.conversation.bot.organization;
+    if (!org || !org.jefeEnabled || org.integrationWebhooks.length === 0) return;
 
     const m = await prisma.message.findUnique({
       where: { id: messageId },
@@ -105,7 +109,7 @@ export async function emitSettledMeetingTranscripts(now = new Date()): Promise<n
       updatedAt: { gt: since, lt: settledBefore },
       scheduledAt: { lt: settledBefore },
       OR: [{ transcript: { not: null } }, { audioTranscript: { not: null } }],
-      organization: { integrationWebhooks: { some: { enabled: true } } },
+      organization: { jefeEnabled: true, integrationWebhooks: { some: { enabled: true } } },
     },
     select: {
       id: true,

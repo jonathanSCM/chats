@@ -5,6 +5,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Badge, StatusDot } from "@/components/ui/badge";
 import { Table, Thead, Th, Td, Tr } from "@/components/ui/table";
 import { SuspendToggle } from "./_components/suspend-toggle";
+import { JefeToggle } from "./_components/jefe-toggle";
 import { DisconnectWhatsAppButton } from "./_components/disconnect-whatsapp-button";
 import type { BotStatus } from "@/generated/prisma/enums";
 
@@ -25,6 +26,8 @@ export default async function AdminOrganizationDetailPage({
     where: { id },
     include: {
       bots: { include: { whatsappConnection: true, _count: { select: { conversations: true } } } },
+      integrationKeys: { where: { revokedAt: null }, select: { id: true } },
+      integrationWebhooks: { select: { enabled: true, lastSuccessAt: true, lastError: true } },
       memberships: {
         where: { user: { role: { not: "SYSTEM" } } },
         include: { user: { select: { id: true, name: true, email: true } } },
@@ -47,6 +50,36 @@ export default async function AdminOrganizationDetailPage({
           <SuspendToggle orgId={org.id} suspended={org.suspended} />
         </div>
       </div>
+
+      <Card className="mb-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="mb-1 flex items-center gap-2">
+              <CardTitle>Jefe de Operaciones</CardTitle>
+              <Badge tone={org.jefeEnabled ? "accent" : "neutral"}>
+                {org.jefeEnabled ? "Habilitado" : "No habilitado"}
+              </Badge>
+            </div>
+            <p className="text-sm text-ink-muted">
+              API de integración, webhooks y tareas en la ficha del caso. Si está deshabilitado la organización no ve la
+              sección en Integraciones, la API responde 403 y no salen eventos. No se borra nada: al habilitarlo de
+              nuevo todo vuelve a funcionar.
+            </p>
+            <p className="mt-2 text-xs text-ink-faint">
+              {org.integrationKeys.length} clave{org.integrationKeys.length === 1 ? "" : "s"} activa
+              {org.integrationKeys.length === 1 ? "" : "s"} ·{" "}
+              {org.integrationWebhooks.length === 0
+                ? "sin webhook"
+                : org.integrationWebhooks[0].enabled
+                  ? org.integrationWebhooks[0].lastError
+                    ? "webhook activo con errores"
+                    : "webhook activo"
+                  : "webhook apagado"}
+            </p>
+          </div>
+          <JefeToggle orgId={org.id} enabled={org.jefeEnabled} />
+        </div>
+      </Card>
 
       <Card className="mb-6">
         <CardTitle className="mb-4">Números de WhatsApp</CardTitle>

@@ -49,6 +49,8 @@ export function serializeOpportunity(o: {
   nextActionAt: Date | null;
   updatedAt: Date;
   stage: { label: string };
+  aiMemory?: string | null;
+  needSummary?: string | null;
 }) {
   return {
     id: o.id,
@@ -61,6 +63,9 @@ export function serializeOpportunity(o: {
     currency: o.currency,
     nextAction: o.nextAction,
     nextActionAt: iso(o.nextActionAt),
+    // Lo que el asesor IA del CRM aprendio del cliente (se reescribe en cada analisis).
+    aiMemory: o.aiMemory ?? null,
+    needSummary: o.needSummary ?? null,
     updatedAt: o.updatedAt.toISOString(),
   };
 }

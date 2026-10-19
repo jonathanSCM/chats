@@ -28,6 +28,8 @@ export const GET = integrationRoute("read", async (ctx, req) => {
       currency: true,
       nextAction: true,
       nextActionAt: true,
+      aiMemory: true,
+      needSummary: true,
       updatedAt: true,
       stage: { select: { label: true } },
     },

@@ -18,6 +18,8 @@ export const GET = integrationRoute<{ id: string }>("read", async (ctx, _req, { 
       currency: true,
       nextAction: true,
       nextActionAt: true,
+      aiMemory: true,
+      needSummary: true,
       updatedAt: true,
       stage: { select: { label: true } },
     },

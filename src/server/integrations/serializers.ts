@@ -127,3 +127,45 @@ export function serializeMessage(m: {
     createdAt: m.createdAt.toISOString(),
   };
 }
+
+/** Acciones de la auditoría que se publican como bitácora de cambios. */
+export const CHANGE_ACTIONS = ["stage_change", "reassign", "reschedule", "cancel", "status_change", "transfer", "unassign"] as const;
+
+const CHANGE_KEYS = ["stage", "stageId", "assignedToId", "scheduledAt", "status", "opportunityId"] as const;
+
+// Solo claves conocidas y de tipo simple: nunca se vuelca el JSON libre de la auditoría.
+function pickChange(v: unknown): Record<string, string | null> | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const src = v as Record<string, unknown>;
+  const out: Record<string, string | null> = {};
+  for (const k of CHANGE_KEYS) {
+    if (!(k in src)) continue;
+    const val = src[k];
+    out[k] = typeof val === "string" ? val : null;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+export function serializeChange(c: {
+  id: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  actor: string;
+  userId: string | null;
+  before: unknown;
+  after: unknown;
+  createdAt: Date;
+}) {
+  return {
+    id: c.id,
+    entityType: c.entityType,
+    entityId: c.entityId,
+    action: c.action,
+    actor: c.actor,
+    userId: c.userId,
+    before: pickChange(c.before),
+    after: pickChange(c.after),
+    at: iso(c.createdAt),
+  };
+}

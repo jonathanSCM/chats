@@ -55,6 +55,23 @@ paths:
                   data:
                     type: array
                     items: { $ref: "#/components/schemas/User" }
+  /changes:
+    get:
+      tags: [Lectura]
+      operationId: listChanges
+      summary: Bitácora de cambios (etapa, responsable, fecha de reunión, estado del chat)
+      description: >
+        Cambios registrados en la auditoría del CRM, en orden cronológico. Acciones:
+        stage_change, reassign, reschedule, cancel, status_change, transfer, unassign.
+        `before`/`after` traen solo claves conocidas (stage, stageId, assignedToId,
+        scheduledAt, status, opportunityId).
+      parameters:
+        - { $ref: "#/components/parameters/since" }
+        - { $ref: "#/components/parameters/cursor" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200":
+          description: OK
   /conversations:
     get:
       tags: [Lectura]

@@ -1,5 +1,6 @@
 "use server";
 
+import { audit } from "@/server/services/audit";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
@@ -279,11 +280,11 @@ const updateAdhocMeetingSchema = z.object({
  * real de Calendar (si lo hay), que sigue siendo el que se creó al agendar.
  */
 export async function updateAdhocMeetingAction(meetingId: string, formData: FormData): Promise<ActionState> {
-  const { organizationId } = await requireOrg();
+  const { organizationId, userId } = await requireOrg();
 
   const meeting = await prisma.meeting.findUnique({
     where: { id: meetingId },
-    select: { organizationId: true, opportunityId: true, title: true, meetingUrl: true, googleEventId: true, googleCalendarOwnerId: true },
+    select: { organizationId: true, opportunityId: true, title: true, scheduledAt: true, meetingUrl: true, googleEventId: true, googleCalendarOwnerId: true },
   });
   if (!meeting || meeting.organizationId !== organizationId || meeting.opportunityId !== null) {
     return { error: "Reunión no encontrada" };
@@ -342,6 +343,18 @@ export async function updateAdhocMeetingAction(meetingId: string, formData: Form
       botEnabled,
     },
   });
+
+  if (meeting.scheduledAt.getTime() !== scheduledAt.getTime()) {
+    await audit({
+      entityType: "Meeting",
+      entityId: meetingId,
+      action: "reschedule",
+      userId,
+      organizationId,
+      before: { scheduledAt: meeting.scheduledAt.toISOString(), opportunityId: null },
+      after: { scheduledAt: scheduledAt.toISOString(), opportunityId: null },
+    });
+  }
 
   if (meetingUrl && botEnabled) {
     await scheduleMeetingBotJoin(meetingId, scheduledAt);

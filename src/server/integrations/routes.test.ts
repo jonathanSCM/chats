@@ -9,6 +9,7 @@ const db = vi.hoisted(() => ({
   activityUpdate: vi.fn(),
   conversationFind: vi.fn(),
   conversationMany: vi.fn(),
+  auditMany: vi.fn(),
   recFind: vi.fn(),
   recCreate: vi.fn(),
   tx: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock("@/server/db/client", () => ({
     activity: { findFirst: db.activityFind, update: db.activityUpdate },
     conversation: { findFirst: db.conversationFind, findMany: db.conversationMany },
     message: { findMany: vi.fn().mockResolvedValue([]) },
+    auditLog: { findMany: db.auditMany },
     idempotencyRecord: { findUnique: db.recFind, create: db.recCreate },
     $transaction: db.tx,
   },
@@ -39,6 +41,7 @@ vi.mock("@/server/integrations/auth", () => ({
 }));
 
 import { GET as getMessages } from "@/app/api/integrations/v1/conversations/[id]/messages/route";
+import { GET as getChanges } from "@/app/api/integrations/v1/changes/route";
 import { POST as postActivity } from "@/app/api/integrations/v1/activities/route";
 import { PATCH as patchActivity } from "@/app/api/integrations/v1/activities/[id]/route";
 
@@ -182,5 +185,31 @@ describe("GET /conversations/{id}/messages", () => {
     const res = await getMessages(new Request("http://x/api?limit=0"), ctx({ id: "c1" }));
     expect(res.status).toBe(400);
     expect((await res.json()).code).toBe("invalid_limit");
+  });
+});
+
+describe("GET /changes", () => {
+  it("filtra por organizacion y acciones, y solo expone claves conocidas", async () => {
+    db.auditMany.mockResolvedValue([
+      {
+        id: "a1",
+        entityType: "Opportunity",
+        entityId: "o1",
+        action: "stage_change",
+        actor: "USER",
+        userId: "u1",
+        before: { stage: "Nuevo", stageId: "s1", secreto: "x" },
+        after: { stage: "Propuesta", stageId: "s2" },
+        createdAt: new Date("2026-10-19T10:00:00Z"),
+      },
+    ]);
+    const res = await getChanges(new Request("http://x/api/integrations/v1/changes?limit=10"), ctx({}));
+    const body = await res.json();
+    const where = db.auditMany.mock.calls[0][0].where;
+    expect(where.organizationId).toBe("orgA");
+    expect(where.action.in).toContain("reschedule");
+    expect(where.action.in).not.toContain("ai_analysis");
+    expect(body.data[0]).toMatchObject({ action: "stage_change", before: { stage: "Nuevo", stageId: "s1" }, at: "2026-10-19T10:00:00.000Z" });
+    expect(JSON.stringify(body)).not.toContain("secreto");
   });
 });

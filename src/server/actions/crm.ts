@@ -734,6 +734,18 @@ export async function updateMeetingAction(meetingId: string, formData: FormData)
     },
   });
 
+  if (meeting.scheduledAt.getTime() !== scheduledAt.getTime()) {
+    await audit({
+      entityType: "Meeting",
+      entityId: meetingId,
+      action: "reschedule",
+      userId,
+      organizationId,
+      before: { scheduledAt: meeting.scheduledAt.toISOString(), opportunityId: meeting.opportunityId },
+      after: { scheduledAt: scheduledAt.toISOString(), opportunityId: meeting.opportunityId },
+    });
+  }
+
   // Con el link nuevo (no el de antes de este guardado) -- si recién ahora
   // se cargó el link a mano, el bot tiene que empezar a poder unirse.
   if (meetingUrl && botEnabled) {
@@ -770,6 +782,15 @@ export async function cancelMeetingAction(meetingId: string): Promise<ActionStat
 
   await cancelMeetingBotJoin(meetingId);
   await prisma.meeting.update({ where: { id: meetingId }, data: { status: "CANCELED" } });
+  await audit({
+    entityType: "Meeting",
+    entityId: meetingId,
+    action: "cancel",
+    userId,
+    organizationId,
+    before: { status: meeting.status, scheduledAt: meeting.scheduledAt.toISOString(), opportunityId: meeting.opportunityId },
+    after: { status: "CANCELED", scheduledAt: meeting.scheduledAt.toISOString(), opportunityId: meeting.opportunityId },
+  });
 
   revalidatePath(PATH);
   return { error: null, message: "Reunión cancelada." };

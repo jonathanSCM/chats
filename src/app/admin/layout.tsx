@@ -10,51 +10,43 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-surface/60 px-3 py-5">
-        <Link href="/admin" className="mb-8 flex items-center gap-2 px-2">
-          <Logo />
+      <aside className="sticky top-0 flex h-screen w-[232px] shrink-0 flex-col overflow-y-auto bg-sidebar px-3 py-5">
+        <Link href="/admin" className="mb-6 flex h-10 items-center gap-2 px-2">
+          <Logo onDark />
           <Badge>Admin</Badge>
         </Link>
 
         <nav className="flex flex-1 flex-col gap-0.5">
-          <NavLink href="/admin" exact>
-            <Building2 size={16} /> Organizaciones
-          </NavLink>
-          <NavLink href="/admin/users">
-            <Users size={16} /> Usuarios
-          </NavLink>
-          <NavLink href="/admin/logs">
-            <ScrollText size={16} /> Registro
-          </NavLink>
-          <NavLink href="/admin/settings">
-            <Settings size={16} /> Configuración
-          </NavLink>
+          <NavLink href="/admin" exact icon={<Building2 size={18} />}>Organizaciones</NavLink>
+          <NavLink href="/admin/users" icon={<Users size={18} />}>Usuarios</NavLink>
+          <NavLink href="/admin/logs" icon={<ScrollText size={18} />}>Registro</NavLink>
+          <NavLink href="/admin/settings" icon={<Settings size={18} />}>Configuración</NavLink>
         </nav>
 
-        <div className="mt-4 border-t border-border pt-4">
+        <div className="mt-4 border-t border-[var(--sidebar-border)] pt-4">
           <div className="mb-2 px-2">
-            <p className="truncate text-sm text-ink">{session?.user.email}</p>
-            <p className="font-mono text-[11px] text-ink-faint">superadmin</p>
+            <p className="truncate text-sm font-medium text-white">{session?.user.email}</p>
+            <p className="text-xs text-[var(--sidebar-ink)]/70">superadmin</p>
           </div>
           <form action={logoutAction}>
             <button
               type="submit"
-              className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm text-ink-muted transition-colors hover:bg-surface-2/60 hover:text-danger"
+              className="flex h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-medium text-[var(--sidebar-ink)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-white"
             >
-              <LogOut size={16} /> Salir
+              <LogOut size={18} /> Salir
             </button>
           </form>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto px-8 py-8">{children}</main>
+      <main className="min-w-0 flex-1 bg-canvas px-8 py-8">{children}</main>
     </div>
   );
 }
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-full border border-accent-dim/50 bg-accent/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-accent">
+    <span className="rounded-full bg-[var(--sidebar-active)] px-2 py-0.5 text-xs font-medium text-accent-dim">
       {children}
     </span>
   );

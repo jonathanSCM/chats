@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, CalendarDays } from "lucide-react";
+import { Loader2, CalendarDays, Layers, AlarmClock, CircleSlash, Flame, Trophy, Percent, Hourglass, type LucideIcon } from "lucide-react";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, Thead, Th, Td, Tr } from "@/components/ui/table";
 import { Input, Select } from "@/components/ui/input";
 import { LOSS_REASON_LABEL, type LossReason } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
+import { STATUS_COLOR } from "@/lib/status-colors";
 
 interface UpcomingMeeting {
   id: string;
@@ -71,16 +72,59 @@ function seguimientoHref(params: Record<string, string>): string {
   return `/dashboard/seguimiento${qs ? `?${qs}` : ""}`;
 }
 
-function Stat({ label, value, href }: { label: string; value: string; href?: string }) {
+function Stat({
+  label,
+  value,
+  href,
+  icon: Icon,
+  color,
+}: {
+  label: string;
+  value: string;
+  href?: string;
+  icon: LucideIcon;
+  /** Color de estado (ver lib/status-colors): el mismo significado que en la Tabla y el Kanban. */
+  color: string;
+}) {
   const content = (
-    <Card className={`py-3 ${href ? "transition-colors hover:border-accent-dim" : ""}`}>
-      <CardDescription className="mb-1 font-mono text-[11px] uppercase tracking-wide">
-        {label}
-      </CardDescription>
-      <CardTitle className="font-mono text-xl">{value}</CardTitle>
+    <Card className={`flex h-full items-start justify-between gap-3 p-4 ${href ? "transition-colors duration-[180ms] hover:border-border-strong" : ""}`}>
+      <div className="min-w-0">
+        <CardDescription className="mb-1.5 text-xs font-medium">{label}</CardDescription>
+        <p className="text-[30px] font-bold leading-none text-ink">{value}</p>
+      </div>
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+        style={{ color, backgroundColor: `${color}1a` }}
+      >
+        <Icon size={18} />
+      </span>
     </Card>
   );
-  return href ? <Link href={href}>{content}</Link> : content;
+  return href ? (
+    <Link href={href} className="block">
+      {content}
+    </Link>
+  ) : (
+    content
+  );
+}
+
+/** Fila de la "Salud del pipeline": un problema por fila, con su color de estado. */
+function HealthRow({ href, icon: Icon, color, label, value }: { href: string; icon: LucideIcon; color: string; label: string; value: number }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 text-sm transition-colors duration-[180ms] hover:bg-surface-2/60"
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ color, backgroundColor: `${color}1a` }}>
+        <Icon size={16} />
+      </span>
+      <span className="flex-1 font-medium text-ink">{label}</span>
+      <span className="text-lg font-bold" style={{ color: value > 0 ? color : undefined }}>
+        {value}
+      </span>
+    </Link>
+  );
 }
 
 export function DashboardClient({
@@ -136,15 +180,15 @@ export function DashboardClient({
   return (
     <div className="animate-fade-up space-y-6">
       <div>
-        <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Hola, {userName} 👋</h1>
+        <h1 className="mb-1 text-2xl font-bold">Hola, {userName}</h1>
         <p className="text-sm capitalize text-ink-muted">{today}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} title="Desde" className="w-full py-1.5 text-sm sm:w-36" />
+        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} title="Desde" className="w-full text-sm sm:w-36" />
         <span className="text-xs text-ink-faint">–</span>
-        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} title="Hasta" className="w-full py-1.5 text-sm sm:w-36" />
-        <Select value={vendorId} onChange={(e) => setVendorId(e.target.value)} className="w-full py-1.5 text-sm sm:w-40">
+        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} title="Hasta" className="w-full text-sm sm:w-36" />
+        <Select value={vendorId} onChange={(e) => setVendorId(e.target.value)} className="w-full text-sm sm:w-40">
           <option value="">Todo vendedor</option>
           {members.map((m) => (
             <option key={m.id} value={m.id}>
@@ -152,7 +196,7 @@ export function DashboardClient({
             </option>
           ))}
         </Select>
-        <Select value={source} onChange={(e) => setSource(e.target.value)} className="w-full py-1.5 text-sm sm:w-36">
+        <Select value={source} onChange={(e) => setSource(e.target.value)} className="w-full text-sm sm:w-36">
           <option value="">Toda fuente</option>
           {sources.map((s) => (
             <option key={s} value={s}>
@@ -160,7 +204,7 @@ export function DashboardClient({
             </option>
           ))}
         </Select>
-        <Select value={service} onChange={(e) => setService(e.target.value)} className="w-full py-1.5 text-sm sm:w-36">
+        <Select value={service} onChange={(e) => setService(e.target.value)} className="w-full text-sm sm:w-36">
           <option value="">Todo servicio</option>
           {services.map((s) => (
             <option key={s} value={s}>
@@ -194,22 +238,28 @@ export function DashboardClient({
 
       {data && (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
-            <Stat label="Oportunidades activas" value={String(data.kpis.activas)} href={seguimientoHref({})} />
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <Stat label="Oportunidades activas" value={String(data.kpis.activas)} href={seguimientoHref({})} icon={Layers} color={STATUS_COLOR.info} />
             <Stat
               label="Acciones vencidas"
               value={String(data.kpis.vencidas)}
               href={seguimientoHref({ quick: "vencidos" })}
+              icon={AlarmClock}
+              color={STATUS_COLOR.danger}
             />
             <Stat
               label="Sin próxima acción"
               value={String(data.kpis.sinProximaAccion)}
               href={seguimientoHref({ quick: "sin_accion" })}
+              icon={CircleSlash}
+              color={STATUS_COLOR.warning}
             />
             <Stat
               label="Prioridad alta"
               value={String(data.kpis.altaPrioridad)}
               href={seguimientoHref({ quick: "alta" })}
+              icon={Flame}
+              color={STATUS_COLOR.danger}
             />
             <Stat
               label="Ganadas"
@@ -219,34 +269,44 @@ export function DashboardClient({
                   ? seguimientoHref({ estado: "todos", stage: data.wonStageId })
                   : seguimientoHref({ estado: "todos" })
               }
+              icon={Trophy}
+              color={STATUS_COLOR.success}
             />
-            <Stat label="Tasa de conversión" value={pct(data.kpis.tasaConversion)} />
+            <Stat label="Tasa de conversión" value={pct(data.kpis.tasaConversion)} icon={Percent} color={STATUS_COLOR.info} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
-              <CardTitle className="mb-3 text-sm">Funnel comercial</CardTitle>
-              <div className="space-y-2">
+              <CardTitle className="mb-4 text-base">Funnel comercial</CardTitle>
+              <div className="mb-1 flex items-center gap-3 px-1 text-xs font-medium text-ink-faint">
+                <span className="w-32 shrink-0">Etapa</span>
+                <span className="flex-1" />
+                <span className="w-8 shrink-0 text-right">Cant.</span>
+                <span className="w-16 shrink-0 text-right" title="Porcentaje de oportunidades que llegaron desde la etapa anterior">
+                  vs. anterior
+                </span>
+              </div>
+              <div className="space-y-1">
                 {data.funnel.map((f, i) => {
                   const first = data.funnel[0]?.count || 1;
                   return (
                     <Link
                       key={f.stage.id}
                       href={seguimientoHref({ estado: "todos", stage: f.stage.id })}
-                      className="flex items-center gap-2 rounded px-1 py-0.5 text-xs transition-colors hover:bg-surface-2/60"
+                      className="flex items-center gap-3 rounded-lg px-1 py-1.5 text-[13px] transition-colors duration-[180ms] hover:bg-surface-2/60"
                     >
-                      <span className="w-32 shrink-0 truncate text-ink-muted">{f.stage.label}</span>
-                      <div className="h-4 flex-1 overflow-hidden rounded bg-surface-2">
+                      <span className="w-32 shrink-0 truncate font-medium text-ink lowercase first-letter:uppercase">{f.stage.label}</span>
+                      <div className="h-3 flex-1 overflow-hidden rounded-full bg-surface-2">
                         <div
-                          className="h-full rounded"
+                          className="h-full rounded-full"
                           style={{
                             width: `${Math.max(4, (f.count / first) * 100)}%`,
                             backgroundColor: f.stage.color,
                           }}
                         />
                       </div>
-                      <span className="w-8 shrink-0 text-right font-mono text-ink-muted">{f.count}</span>
-                      <span className="w-12 shrink-0 text-right font-mono text-ink-faint">
+                      <span className="w-8 shrink-0 text-right font-semibold text-ink">{f.count}</span>
+                      <span className="w-16 shrink-0 text-right text-ink-muted">
                         {i === 0 ? "—" : pct(f.conversionFromPrev)}
                       </span>
                     </Link>
@@ -256,35 +316,17 @@ export function DashboardClient({
             </Card>
 
             <Card>
-              <CardTitle className="mb-3 text-sm">Salud del pipeline</CardTitle>
+              <CardTitle className="mb-4 text-base">Salud del pipeline</CardTitle>
               <div className="space-y-2">
-                <Link
-                  href={seguimientoHref({ quick: "vencidos" })}
-                  className="flex items-center justify-between rounded px-2 py-2 text-sm transition-colors hover:bg-surface-2/60"
-                >
-                  <span className="text-ink-muted">⚠ Acciones vencidas</span>
-                  <span className="font-mono font-semibold text-danger">{data.kpis.vencidas}</span>
-                </Link>
-                <Link
-                  href={seguimientoHref({ quick: "sin_accion" })}
-                  className="flex items-center justify-between rounded px-2 py-2 text-sm transition-colors hover:bg-surface-2/60"
-                >
-                  <span className="text-ink-muted">⚠ Sin próxima acción</span>
-                  <span className="font-mono font-semibold text-warning">{data.kpis.sinProximaAccion}</span>
-                </Link>
-                <Link
-                  href={seguimientoHref({ quick: "atencion" })}
-                  className="flex items-center justify-between rounded px-2 py-2 text-sm transition-colors hover:bg-surface-2/60"
-                >
-                  <span className="text-ink-muted">⚠ Oportunidades estancadas</span>
-                  <span className="font-mono font-semibold text-warning">{data.kpis.estancadas}</span>
-                </Link>
+                <HealthRow href={seguimientoHref({ quick: "vencidos" })} icon={AlarmClock} color={STATUS_COLOR.danger} label="Acciones vencidas" value={data.kpis.vencidas} />
+                <HealthRow href={seguimientoHref({ quick: "sin_accion" })} icon={CircleSlash} color={STATUS_COLOR.warning} label="Sin próxima acción" value={data.kpis.sinProximaAccion} />
+                <HealthRow href={seguimientoHref({ quick: "atencion" })} icon={Hourglass} color={STATUS_COLOR.info} label="Oportunidades estancadas" value={data.kpis.estancadas} />
               </div>
             </Card>
           </div>
 
           <Card>
-            <CardTitle className="mb-3 text-sm">Rendimiento por vendedor</CardTitle>
+            <CardTitle className="mb-4 text-base">Rendimiento por vendedor</CardTitle>
             <Table>
               <Thead>
                 <tr>
@@ -314,12 +356,12 @@ export function DashboardClient({
                         {v.name}
                       </Link>
                     </Td>
-                    <Td className="font-mono">{v.activas}</Td>
-                    <Td className="font-mono">{v.vencidos}</Td>
-                    <Td className="font-mono">{v.reuniones}</Td>
-                    <Td className="font-mono">{v.propuestas}</Td>
-                    <Td className="font-mono">{v.ganados}</Td>
-                    <Td className="font-mono">{pct(v.tasaConversion)}</Td>
+                    <Td className="">{v.activas}</Td>
+                    <Td className="">{v.vencidos}</Td>
+                    <Td className="">{v.reuniones}</Td>
+                    <Td className="">{v.propuestas}</Td>
+                    <Td className="">{v.ganados}</Td>
+                    <Td className="">{pct(v.tasaConversion)}</Td>
                   </Tr>
                 ))}
               </tbody>
@@ -328,7 +370,7 @@ export function DashboardClient({
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
-              <CardTitle className="mb-3 text-sm">Fuentes</CardTitle>
+              <CardTitle className="mb-4 text-base">Fuentes</CardTitle>
               {data.sources.length === 0 ? (
                 <p className="text-sm text-ink-faint">Sin datos de fuente todavía.</p>
               ) : (
@@ -350,10 +392,10 @@ export function DashboardClient({
                             {SOURCE_LABEL[s.source] ?? s.source}
                           </Link>
                         </Td>
-                        <Td className="font-mono">{s.leads}</Td>
-                        <Td className="font-mono">{s.oportunidades}</Td>
-                        <Td className="font-mono">{s.ganados}</Td>
-                        <Td className="font-mono">{pct(s.tasaConversion)}</Td>
+                        <Td className="">{s.leads}</Td>
+                        <Td className="">{s.oportunidades}</Td>
+                        <Td className="">{s.ganados}</Td>
+                        <Td className="">{pct(s.tasaConversion)}</Td>
                       </Tr>
                     ))}
                   </tbody>
@@ -362,7 +404,7 @@ export function DashboardClient({
             </Card>
 
             <Card>
-              <CardTitle className="mb-3 text-sm">Razones de pérdida</CardTitle>
+              <CardTitle className="mb-4 text-base">Razones de pérdida</CardTitle>
               {data.lossReasons.length === 0 ? (
                 <p className="text-sm text-ink-faint">
                   Todavía no hay oportunidades perdidas con motivo cargado.
@@ -375,16 +417,16 @@ export function DashboardClient({
                       <Link
                         key={r.reason}
                         href={seguimientoHref({ estado: "todos", stage: "PERDIDO" })}
-                        className="flex items-center gap-2 rounded px-1 py-0.5 text-xs transition-colors hover:bg-surface-2/60"
+                        className="flex items-center gap-3 rounded-lg px-1 py-1.5 text-[13px] transition-colors duration-[180ms] hover:bg-surface-2/60"
                       >
-                        <span className="w-32 shrink-0 truncate text-ink-muted">{LOSS_REASON_LABEL[r.reason]}</span>
-                        <div className="h-4 flex-1 overflow-hidden rounded bg-surface-2">
+                        <span className="w-32 shrink-0 truncate font-medium text-ink">{LOSS_REASON_LABEL[r.reason]}</span>
+                        <div className="h-3 flex-1 overflow-hidden rounded-full bg-surface-2">
                           <div
-                            className="h-full rounded bg-danger/70"
+                            className="h-full rounded-full bg-danger/70"
                             style={{ width: `${Math.max(4, (r.count / max) * 100)}%` }}
                           />
                         </div>
-                        <span className="w-6 shrink-0 text-right font-mono text-ink-muted">{r.count}</span>
+                        <span className="w-6 shrink-0 text-right font-semibold text-ink">{r.count}</span>
                       </Link>
                     );
                   })}
@@ -397,8 +439,8 @@ export function DashboardClient({
 
       <Card>
         <div className="mb-3 flex items-center justify-between">
-          <CardTitle className="flex items-center gap-1.5 text-sm">
-            <CalendarDays size={15} /> Próximas reuniones
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarDays size={18} /> Próximas reuniones
           </CardTitle>
           <Link href="/dashboard/calendario" className="text-xs text-accent hover:underline">
             Ver calendario
@@ -420,7 +462,7 @@ export function DashboardClient({
                 }
                 className="flex items-center gap-3 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-surface-2/60"
               >
-                <span className="w-28 shrink-0 font-mono text-xs text-ink-muted">
+                <span className="w-28 shrink-0 text-xs text-ink-muted">
                   {new Date(m.scheduledAt).toLocaleDateString("es", {
                     day: "2-digit",
                     month: "2-digit",
@@ -430,13 +472,13 @@ export function DashboardClient({
                 </span>
                 <span className="flex-1 truncate text-ink">{m.client}</span>
                 {m.isInternal && (
-                  <span className="shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 font-mono text-[9px] uppercase text-ink-faint">
+                  <span className="shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-xs text-ink-faint">
                     Interna
                   </span>
                 )}
                 {m.assignedTo && (
                   <span
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold text-white"
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
                     style={{ backgroundColor: vendorColor(m.assignedTo.id, m.assignedTo.color) }}
                     title={m.assignedTo.name}
                   >

@@ -94,7 +94,7 @@ export function KnowledgeManager({ items }: { items: Item[] }) {
 
       {Object.entries(grouped).map(([category, categoryItems]) => (
         <section key={category}>
-          <h2 className="mb-2 font-mono text-[11px] uppercase tracking-wide text-ink-faint">
+          <h2 className="mb-2 text-xs text-ink-faint">
             {categoryLabel[category as Category]}
           </h2>
           <div className="space-y-2">
@@ -133,7 +133,7 @@ function ItemRow({ item, onEdit }: { item: Item; onEdit: () => void }) {
           <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-xs text-ink-muted">
             {item.content}
           </p>
-          <p className="mt-1.5 font-mono text-[10px] text-ink-faint">
+          <p className="mt-1.5 text-xs text-ink-faint">
             v{item.version} · {new Date(item.updatedAt).toLocaleDateString("es")}
             {item.updatedBy && ` · ${item.updatedBy}`}
           </p>

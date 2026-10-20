@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 
 export function Table({ className, ...props }: React.TableHTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className="overflow-x-auto rounded-lg border border-border bg-surface shadow-sm">
       <table className={cn("w-full text-sm", className)} {...props} />
     </div>
   );
@@ -16,7 +16,7 @@ export function Th({ className, ...props }: React.ThHTMLAttributes<HTMLTableCell
   return (
     <th
       className={cn(
-        "px-4 py-2.5 text-left font-mono text-[11px] font-medium uppercase tracking-wide text-ink-muted",
+        "px-4 py-2.5 text-left text-xs font-medium text-ink-muted",
         className,
       )}
       {...props}

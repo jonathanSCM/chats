@@ -81,7 +81,7 @@ export function CalendarList({ rows }: { rows: MeetingRow[] }) {
         return (
           <div key={dateKey} className="space-y-2">
             <p
-              className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wide"
+              className="flex items-center gap-1.5 text-xs font-semibold"
               style={{ color }}
             >
               <CalendarDays size={12} /> {label}
@@ -101,7 +101,7 @@ export function CalendarList({ rows }: { rows: MeetingRow[] }) {
 function MeetingCard({ m }: { m: MeetingRow }) {
   return (
     <Card className="flex flex-wrap items-center gap-3 py-3">
-      <div className="flex w-16 shrink-0 items-center gap-1 font-mono text-sm text-ink">
+      <div className="flex w-16 shrink-0 items-center gap-1 text-sm text-ink">
         <Clock size={13} className="text-ink-faint" /> {timeLabel(m.scheduledAt)}
       </div>
 
@@ -124,17 +124,17 @@ function MeetingCard({ m }: { m: MeetingRow }) {
       </div>
 
       {m.isInternal && (
-        <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] uppercase text-ink-faint">
+        <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-faint">
           Interna
         </span>
       )}
-      <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-ink-muted">
+      <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-muted">
         {STATUS_LABEL[m.status] ?? m.status}
       </span>
 
       {m.assignedTo && (
         <span
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold text-white"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
           style={{ backgroundColor: vendorColor(m.assignedTo.id, m.assignedTo.color) }}
           title={m.assignedTo.name}
         >
@@ -147,7 +147,7 @@ function MeetingCard({ m }: { m: MeetingRow }) {
           type="button"
           onClick={() => navigator.clipboard.writeText(m.meetingUrl!)}
           title="Copiar link de la reunión"
-          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent"
+          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-ink-muted hover:border-accent-dim hover:text-accent"
         >
           <Copy size={11} /> Link
         </button>

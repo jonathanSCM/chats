@@ -93,7 +93,7 @@ export default async function CalendarioPage({
 
   return (
     <div className="animate-fade-up">
-      <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Calendario</h1>
+      <h1 className="mb-1 text-2xl font-bold">Calendario</h1>
       <p className="mb-6 text-sm text-ink-muted">
         Las reuniones agendadas en Seguimiento, todas juntas en un solo lugar.
       </p>

@@ -81,7 +81,7 @@ export function MeetingAttachments({
         <ul className="mb-1.5 space-y-1">
           {attachments.map((a) => (
             <li key={a.id} className="space-y-1">
-              <div className="flex items-center gap-1.5 text-[11px]">
+              <div className="flex items-center gap-1.5 text-xs">
                 <FileText size={11} className="shrink-0 text-ink-faint" />
                 <a
                   href={a.url}
@@ -124,7 +124,7 @@ export function MeetingAttachments({
       )}
       {editable && (
         <label
-          className={`flex w-fit items-center gap-1 text-[11px] ${
+          className={`flex w-fit items-center gap-1 text-xs ${
             disabled || isPending ? "cursor-not-allowed text-ink-faint" : "cursor-pointer text-accent hover:opacity-80"
           }`}
         >
@@ -133,7 +133,7 @@ export function MeetingAttachments({
           <input type="file" multiple disabled={disabled || isPending} onChange={handleFileChange} className="hidden" />
         </label>
       )}
-      {uploadError && <p className="mt-1 text-[11px] text-danger">{uploadError}</p>}
+      {uploadError && <p className="mt-1 text-xs text-danger">{uploadError}</p>}
     </div>
   );
 }

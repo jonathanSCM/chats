@@ -35,7 +35,7 @@ export default async function AdminOrganizationsPage() {
 
   return (
     <div className="animate-fade-up">
-      <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Organizaciones</h1>
+      <h1 className="mb-1 text-2xl font-bold">Organizaciones</h1>
       <p className="mb-8 text-sm text-ink-muted">Visión global de la plataforma.</p>
 
       {platformSetting?.aiQuotaAlertAt && (
@@ -60,7 +60,7 @@ export default async function AdminOrganizationsPage() {
                 {platformSetting.aiQuotaAlertMessage && (
                   <>
                     <br />
-                    <span className="font-mono text-[11px] text-ink-faint">
+                    <span className=" text-xs text-ink-faint">
                       {platformSetting.aiQuotaAlertMessage}
                     </span>
                   </>
@@ -105,7 +105,7 @@ export default async function AdminOrganizationsPage() {
                 >
                   {org.name}
                 </Link>
-                <p className="font-mono text-xs text-ink-faint">{org.slug}</p>
+                <p className="font-code text-xs text-ink-faint">{org.slug}</p>
               </Td>
               <Td>
                 {org.suspended ? (
@@ -120,8 +120,8 @@ export default async function AdminOrganizationsPage() {
                   </Badge>
                 )}
               </Td>
-              <Td className="font-mono">{org.users.length}</Td>
-              <Td className="font-mono">{conversations.toLocaleString("es")}</Td>
+              <Td className="">{org.users.length}</Td>
+              <Td className="">{conversations.toLocaleString("es")}</Td>
             </Tr>
           ))}
         </tbody>
@@ -133,10 +133,10 @@ export default async function AdminOrganizationsPage() {
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <Card>
-      <CardDescription className="mb-2 font-mono text-[11px] uppercase tracking-wide">
+      <CardDescription className="mb-2 text-xs">
         {label}
       </CardDescription>
-      <CardTitle className="font-mono text-2xl">{value}</CardTitle>
+      <CardTitle className="text-2xl">{value}</CardTitle>
     </Card>
   );
 }

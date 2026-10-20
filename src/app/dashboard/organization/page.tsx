@@ -112,7 +112,7 @@ export default async function OrganizationSettingsPage({
 
   return (
     <div className="max-w-2xl animate-fade-up">
-      <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Organización</h1>
+      <h1 className="mb-1 text-2xl font-bold">Organización</h1>
       <p className="mb-6 text-sm text-ink-muted">Datos, equipo, ventas e integraciones.</p>
 
       <nav className="mb-6 flex gap-1 overflow-x-auto border-b border-border" aria-label="Secciones de la organización">

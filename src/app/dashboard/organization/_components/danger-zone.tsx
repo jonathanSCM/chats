@@ -69,7 +69,7 @@ export function DangerZone({ orgName }: { orgName: string }) {
           <form action={formAction} className="max-w-sm space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="confirmName">
-                Escribe <span className="font-mono text-ink">{orgName}</span> para confirmar
+                Escribe <span className=" text-ink">{orgName}</span> para confirmar
               </Label>
               <Input
                 id="confirmName"

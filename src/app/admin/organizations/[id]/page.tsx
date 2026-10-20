@@ -42,8 +42,8 @@ export default async function AdminOrganizationDetailPage({
     <div className="max-w-3xl animate-fade-up">
       <div className="mb-8 flex items-start justify-between">
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">{org.name}</h1>
-          <p className="font-mono text-xs text-ink-faint">{org.slug}</p>
+          <h1 className="text-2xl font-bold">{org.name}</h1>
+          <p className="font-code text-xs text-ink-faint">{org.slug}</p>
         </div>
         <div className="flex items-center gap-2">
           {org.suspended && <Badge tone="danger">Suspendida</Badge>}
@@ -109,7 +109,7 @@ export default async function AdminOrganizationDetailPage({
                   <Td className="text-ink-muted">
                     {bot.whatsappConnection?.verified ? "Conectado" : "Sin conectar"}
                   </Td>
-                  <Td className="font-mono">{bot._count.conversations}</Td>
+                  <Td className="">{bot._count.conversations}</Td>
                   <Td>
                     {bot.whatsappConnection && <DisconnectWhatsAppButton botId={bot.id} />}
                   </Td>

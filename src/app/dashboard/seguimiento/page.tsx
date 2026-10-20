@@ -191,7 +191,7 @@ export default async function SeguimientoPage({
 
   return (
     <div className="animate-fade-up">
-      <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Seguimiento comercial</h1>
+      <h1 className="mb-1 text-2xl font-bold">Seguimiento comercial</h1>
       <p className="mb-6 text-sm text-ink-muted">
         Oportunidades activas con acciones pendientes para avanzar en el proceso comercial.
       </p>

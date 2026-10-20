@@ -53,13 +53,13 @@ export function MobileNav({ children }: { children: React.ReactNode }) {
               onClick={(e) => {
                 if ((e.target as HTMLElement).closest("a, button[type=submit]")) setOpen(false);
               }}
-              className="animate-slide-in absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col overflow-y-auto border-r border-border bg-surface px-3 py-5"
+              className="animate-slide-in absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col overflow-y-auto bg-sidebar px-3 py-5"
             >
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Cerrar menú"
-                className="absolute right-3 top-4 flex h-9 w-9 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-surface-2"
+                className="absolute right-3 top-4 flex h-9 w-9 items-center justify-center rounded-lg text-[var(--sidebar-ink)] transition-colors hover:bg-[var(--sidebar-hover)]"
               >
                 <X size={18} />
               </button>

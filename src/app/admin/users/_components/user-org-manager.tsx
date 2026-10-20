@@ -53,7 +53,7 @@ export function UserOrgManager({
               onChange={(e) =>
                 run(() => setUserOrgRoleAction(userId, m.organizationId, e.target.value as "OWNER" | "MEMBER"))
               }
-              className="cursor-pointer rounded bg-transparent font-mono text-[10px] uppercase text-accent"
+              className="cursor-pointer rounded bg-transparent text-xs text-accent"
               aria-label={`Rol de ${userEmail} en ${m.organizationName}`}
             >
               <option value="OWNER">Owner</option>

@@ -159,7 +159,7 @@ export function MetaAdsConnect({
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-ink">
             Conectado: <span className="font-medium">{accountName ?? accountId}</span>{" "}
-            <span className="font-mono text-xs text-ink-faint">{accountId}</span>
+            <span className="font-code text-xs text-ink-faint">{accountId}</span>
           </p>
           <Button type="button" variant="secondary" onClick={handleSyncNow} disabled={busy}>
             <RefreshCw size={14} className={status === "syncing" ? "animate-spin" : ""} />

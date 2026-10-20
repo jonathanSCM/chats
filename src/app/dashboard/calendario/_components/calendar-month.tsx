@@ -142,7 +142,7 @@ export function CalendarMonth({
             {WEEKDAY_LABELS.map((d, i) => (
               <div
                 key={d}
-                className={`px-2 py-2 text-center font-mono text-[10px] uppercase tracking-wide text-ink-faint ${
+                className={`px-2 py-2 text-center text-xs text-ink-faint ${
                   i >= 5 ? "text-ink-faint/70" : ""
                 }`}
               >
@@ -167,7 +167,7 @@ export function CalendarMonth({
                     }`}
                   >
                     <span
-                      className={`mb-1 inline-flex h-5 w-5 items-center justify-center rounded-full font-mono text-[11px] ${
+                      className={`mb-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-xs ${
                         isToday
                           ? "bg-accent font-semibold text-accent-ink"
                           : inMonth
@@ -184,14 +184,14 @@ export function CalendarMonth({
                           type="button"
                           onClick={() => setDayDetail(key)}
                           title={`${timeLabel(m.scheduledAt)} · ${m.client}`}
-                          className="flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[10px] hover:bg-surface-2"
+                          className="flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-xs hover:bg-surface-2"
                           style={{ backgroundColor: `${vendorColor(m.assignedTo?.id ?? "sin-asignar", m.assignedTo?.color)}1a` }}
                         >
                           <span
                             className="h-1.5 w-1.5 shrink-0 rounded-full"
                             style={{ backgroundColor: vendorColor(m.assignedTo?.id ?? "sin-asignar", m.assignedTo?.color) }}
                           />
-                          <span className="shrink-0 font-mono text-ink-faint">{timeLabel(m.scheduledAt)}</span>
+                          <span className="shrink-0 text-ink-faint">{timeLabel(m.scheduledAt)}</span>
                           <span className="truncate text-ink-muted">{m.client}</span>
                         </button>
                       ))}
@@ -199,7 +199,7 @@ export function CalendarMonth({
                         <button
                           type="button"
                           onClick={() => setDayDetail(key)}
-                          className="w-full rounded px-1 py-0.5 text-left text-[10px] text-ink-faint hover:text-accent"
+                          className="w-full rounded px-1 py-0.5 text-left text-xs text-ink-faint hover:text-accent"
                         >
                           +{overflow} más
                         </button>
@@ -239,10 +239,10 @@ export function CalendarMonth({
               {detailRows.map((m) => (
                 <Card key={m.id} className="py-3">
                   <div className="mb-1.5 flex items-center gap-2">
-                    <span className="flex items-center gap-1 font-mono text-sm text-ink">
+                    <span className="flex items-center gap-1 text-sm text-ink">
                       <Clock size={12} className="text-ink-faint" /> {timeLabel(m.scheduledAt)}
                     </span>
-                    <span className="ml-auto rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-ink-muted">
+                    <span className="ml-auto rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-muted">
                       {STATUS_LABEL[m.status] ?? m.status}
                     </span>
                   </div>
@@ -259,7 +259,7 @@ export function CalendarMonth({
                     {m.client}
                   </Link>
                   {m.isInternal && (
-                    <span className="ml-1 rounded-full bg-surface-2 px-1.5 py-0.5 font-mono text-[9px] uppercase text-ink-faint">
+                    <span className="ml-1 rounded-full bg-surface-2 px-1.5 py-0.5 text-xs text-ink-faint">
                       Interna
                     </span>
                   )}
@@ -268,7 +268,7 @@ export function CalendarMonth({
                   </p>
                   <div className="mt-2 flex items-center gap-2">
                     {m.assignedTo && (
-                      <span className="flex items-center gap-1 text-[11px] text-ink-muted">
+                      <span className="flex items-center gap-1 text-xs text-ink-muted">
                         <span
                           className="h-2 w-2 rounded-full"
                           style={{ backgroundColor: vendorColor(m.assignedTo.id, m.assignedTo.color) }}
@@ -281,7 +281,7 @@ export function CalendarMonth({
                         type="button"
                         onClick={() => navigator.clipboard.writeText(m.meetingUrl!)}
                         title="Copiar link de la reunión"
-                        className="ml-auto flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent"
+                        className="ml-auto flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-ink-muted hover:border-accent-dim hover:text-accent"
                       >
                         <Copy size={11} /> Link
                       </button>

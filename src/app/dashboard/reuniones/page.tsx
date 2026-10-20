@@ -64,7 +64,7 @@ export default async function ReunionesPage({
 
   return (
     <div className="animate-fade-up">
-      <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Reuniones</h1>
+      <h1 className="mb-1 text-2xl font-bold">Reuniones</h1>
       <p className="mb-6 text-sm text-ink-muted">
         Reuniones internas que no pasan por Seguimiento — con empleados, dirección, o cualquier
         reunión de emergencia que necesite grabarse.

@@ -200,7 +200,7 @@ function ColorSwatch({ member }: { member: Member }) {
               />
             ))}
             <label
-              className="relative flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full border border-dashed border-border-strong text-[10px] text-ink-faint hover:text-ink"
+              className="relative flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full border border-dashed border-border-strong text-xs text-ink-faint hover:text-ink"
               title="Color personalizado"
             >
               +

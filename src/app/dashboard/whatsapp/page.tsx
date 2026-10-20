@@ -57,7 +57,7 @@ export default async function WhatsAppSettingsPage() {
 
   return (
     <div className="max-w-2xl animate-fade-up">
-      <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">
+      <h1 className="mb-1 text-2xl font-bold">
         Conexión de WhatsApp
       </h1>
       <p className="mb-8 text-sm text-ink-muted">

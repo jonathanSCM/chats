@@ -416,7 +416,7 @@ function AudioPlayer({ url, isVoiceNote }: { url: string; isVoiceNote: boolean }
         }}
         className="h-1 flex-1 accent-current"
       />
-      <span className="w-9 shrink-0 text-right font-mono text-[10px] opacity-70">
+      <span className="w-9 shrink-0 text-right text-xs opacity-70">
         {formatAudioTime(duration ? duration - currentTime : 0)}
       </span>
     </div>
@@ -1210,7 +1210,7 @@ export function InboxClient({
               <button
                 type="button"
                 onClick={subscribePush}
-                className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-ink-muted transition-colors hover:bg-surface"
+                className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-ink-muted transition-colors hover:bg-surface"
                 title="Recibir notificaciones de mensajes nuevos"
               >
                 <Bell size={12} /> Activar avisos
@@ -1324,12 +1324,12 @@ export function InboxClient({
                 </span>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {c.unreadCount > 0 && (
-                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-ink">
+                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-xs font-semibold text-accent-ink">
                       {c.unreadCount}
                     </span>
                   )}
                   {c.lastMessage && (
-                    <span className="font-mono text-[11px] text-ink-faint">
+                    <span className=" text-xs text-ink-faint">
                       {listTimeFmt(c.lastMessage.createdAt)}
                     </span>
                   )}
@@ -1345,7 +1345,7 @@ export function InboxClient({
                     : c.lastMessage.content}
                 </span>
               )}
-              <span className="flex items-center gap-1.5 text-[11px]">
+              <span className="flex items-center gap-1.5 text-xs">
                 <span
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{
@@ -1413,7 +1413,7 @@ export function InboxClient({
                           ? `Vino del anuncio "${adReferralData.headline}"${adReferralData.adName ? ` — anuncio "${adReferralData.adName}"` : ""}${adReferralData.campaignName ? ` — campaña "${adReferralData.campaignName}"` : ""}${adReferralData.body ? ` — ${adReferralData.body}` : ""}`
                           : "Este lead llegó por un anuncio de Meta (Click to WhatsApp) — tiene 72h de gracia sin necesitar plantilla."
                       }
-                      className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-accent"
+                      className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 text-xs font-medium text-accent"
                     >
                       Anuncio
                     </span>
@@ -1422,14 +1422,14 @@ export function InboxClient({
                       type="button"
                       onClick={markFromAd}
                       title="Marcar a mano que este chat vino de un anuncio. Ojo: esto solo cambia lo que ve el panel — si Meta no tiene realmente activa la ventana extendida, el mensaje igual puede rebotar."
-                      className="shrink-0 cursor-pointer rounded-full border border-border px-1.5 py-0.5 font-mono text-[10px] font-medium text-ink-faint hover:border-accent-dim hover:text-accent"
+                      className="shrink-0 cursor-pointer rounded-full border border-border px-1.5 py-0.5 text-xs font-medium text-ink-faint hover:border-accent-dim hover:text-accent"
                     >
                       Marcar anuncio
                     </button>
                   )}
                 </p>
                 {customerName && (
-                  <p className="truncate font-mono text-xs text-ink-faint">{customerPhone}</p>
+                  <p className="truncate text-xs text-ink-faint">{customerPhone}</p>
                 )}
                 {conversationFromAd && adReferralData?.headline && (
                   <p className="flex items-center gap-1.5 truncate text-xs text-accent">
@@ -1443,7 +1443,7 @@ export function InboxClient({
                       onClick={fetchAdInsights}
                       disabled={adInsightsLoading}
                       title="Traer inversión, impresiones, alcance, clics, CTR, CPC y CPM de este anuncio desde Meta"
-                      className="shrink-0 cursor-pointer font-mono text-[10px] text-ink-faint underline decoration-dotted hover:text-accent disabled:cursor-default"
+                      className="shrink-0 cursor-pointer text-xs text-ink-faint underline decoration-dotted hover:text-accent disabled:cursor-default"
                     >
                       {adInsightsLoading ? "cargando…" : "ver rendimiento"}
                     </button>
@@ -1453,7 +1453,7 @@ export function InboxClient({
                   <p className="text-xs text-danger">{adInsightsError}</p>
                 )}
                 {adInsights && (
-                  <dl className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 rounded-md border border-border bg-surface-2 p-2 font-mono text-[11px] sm:grid-cols-5">
+                  <dl className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 rounded-md border border-border bg-surface-2 p-2 text-xs sm:grid-cols-5">
                     <div>
                       <dt className="text-ink-faint">Inversión</dt>
                       <dd className="text-ink">{adInsights.spend ?? "—"}</dd>
@@ -1622,7 +1622,7 @@ export function InboxClient({
                   className="flex-1 bg-transparent text-xs text-ink outline-none placeholder:text-ink-faint"
                 />
                 {chatSearchNormalized && (
-                  <span className="shrink-0 font-mono text-[11px] text-ink-faint">
+                  <span className="shrink-0 text-xs text-ink-faint">
                     {chatSearchMatches.length > 0 ? `${clampedChatSearchIndex + 1} de ${chatSearchMatches.length}` : "0"}
                   </span>
                 )}
@@ -1693,13 +1693,13 @@ export function InboxClient({
                     <div key={m.id}>
                       {showDateDivider && (
                         <div className="my-3 flex justify-center">
-                          <span className="rounded-full bg-surface px-3 py-1 text-[11px] font-medium text-ink-muted shadow-sm">
+                          <span className="rounded-full bg-surface px-3 py-1 text-xs font-medium text-ink-muted shadow-sm">
                             {dayLabel(m.createdAt)}
                           </span>
                         </div>
                       )}
                       <div className="my-1.5 flex justify-center">
-                        <span className="flex max-w-[85%] items-center gap-1.5 rounded-full bg-danger-dim px-3 py-1.5 text-center text-[11px] font-medium text-danger shadow-sm">
+                        <span className="flex max-w-[85%] items-center gap-1.5 rounded-full bg-danger-dim px-3 py-1.5 text-center text-xs font-medium text-danger shadow-sm">
                           <AlertTriangle size={12} className="shrink-0" />
                           {m.content}
                         </span>
@@ -1743,7 +1743,7 @@ export function InboxClient({
                   <div key={m.id} id={`msg-${m.id}`}>
                     {showDateDivider && (
                       <div className="my-3 flex justify-center">
-                        <span className="rounded-full bg-surface px-3 py-1 text-[11px] font-medium text-ink-muted shadow-sm">
+                        <span className="rounded-full bg-surface px-3 py-1 text-xs font-medium text-ink-muted shadow-sm">
                           {dayLabel(m.createdAt)}
                         </span>
                       </div>
@@ -1792,12 +1792,12 @@ export function InboxClient({
                           <div className="bg-black/5 px-2 py-1.5 dark:bg-white/5">
                             <p className="line-clamp-1 text-xs font-medium">{m.linkPreview.title}</p>
                             {m.linkPreview.description && (
-                              <p className="line-clamp-2 text-[11px] opacity-70">{m.linkPreview.description}</p>
+                              <p className="line-clamp-2 text-xs opacity-70">{m.linkPreview.description}</p>
                             )}
                           </div>
                         </a>
                       )}
-                      <div className="mt-1 flex items-center gap-1.5 text-[10px] opacity-70">
+                      <div className="mt-1 flex items-center gap-1.5 text-xs opacity-70">
                         {m.viaPhoneApp && (
                           <>
                             <Smartphone size={11} />
@@ -1817,7 +1817,7 @@ export function InboxClient({
                         {m.role === "STAFF" && !m.viaPhoneApp && <StatusTicks status={m.status} />}
                       </div>
                       {m.status === "FAILED" && m.errorDetail && (
-                        <p className="mt-1 text-[11px] leading-snug text-danger opacity-90">
+                        <p className="mt-1 text-xs leading-snug text-danger opacity-90">
                           ⚠️ No se entregó: {m.errorDetail}
                         </p>
                       )}
@@ -1929,7 +1929,7 @@ export function InboxClient({
                   </button>
                   <div className="flex flex-1 items-center gap-2 text-sm text-ink">
                     <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-danger" />
-                    <span className="font-mono">{durationFmt(recordSeconds)}</span>
+                    <span className="">{durationFmt(recordSeconds)}</span>
                     <span className="text-ink-faint">Grabando…</span>
                   </div>
                   <button

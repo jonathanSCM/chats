@@ -74,7 +74,7 @@ export function PanelSection({
 }) {
   return (
     <div className="animate-fade-up space-y-1.5" style={{ animationDelay: `${delay}ms` }}>
-      <p className="font-mono text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+      <p className=" text-xs font-semibold text-ink-faint">
         {label}
       </p>
       {children}

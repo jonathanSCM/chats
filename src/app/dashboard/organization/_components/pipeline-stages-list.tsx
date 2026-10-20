@@ -229,13 +229,13 @@ function StageRowItem({
           {stage.role && (
             <span
               title={`Etapa de sistema: ${ROLE_LABEL[stage.role]} — no se puede borrar`}
-              className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] uppercase tracking-wide text-ink-faint"
+              className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-ink-faint"
             >
               <Lock size={10} /> {ROLE_LABEL[stage.role]}
             </span>
           )}
           {stage.isDefaultEntry && (
-            <span className="shrink-0 whitespace-nowrap text-[10px] uppercase tracking-wide text-ink-faint">
+            <span className="shrink-0 whitespace-nowrap text-xs text-ink-faint">
               Entrada de leads
             </span>
           )}

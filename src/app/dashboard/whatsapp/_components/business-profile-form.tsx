@@ -182,7 +182,7 @@ function PhotoUploader({ botId, currentUrl }: { botId: string; currentUrl: strin
         >
           Cambiar imagen
         </button>
-        <p className="text-[11px] text-ink-faint">JPEG o PNG, hasta 5 MB.</p>
+        <p className="text-xs text-ink-faint">JPEG o PNG, hasta 5 MB.</p>
         {error && <p className="text-xs text-danger">{error}</p>}
       </div>
       <input

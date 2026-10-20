@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Clock } from "lucide-react";
 
 /**
  * Hora del SERVIDOR, no la del navegador — útil para comparar contra la
@@ -32,10 +33,10 @@ export function ServerClock({ initialIso, timeZone }: { initialIso: string; time
 
   return (
     <p
-      className="flex items-center gap-1 font-mono text-[11px] text-ink-faint"
-      title={`Huso horario del servidor: ${timeZone}`}
+      className="nav-extra flex items-center gap-1.5 pl-[26px] text-xs text-[var(--sidebar-ink)]/70"
+      title={`Hora del servidor (huso horario: ${timeZone})`}
     >
-      🕐 Servidor: {display || "…"} <span className="text-ink-faint/70">({timeZone})</span>
+      <Clock size={12} className="shrink-0" /> {display || "…"}
     </p>
   );
 }

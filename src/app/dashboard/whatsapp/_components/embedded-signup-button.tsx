@@ -218,11 +218,11 @@ export function EmbeddedSignupButton({ botId }: { botId: string }) {
       {error && <p className="text-xs text-danger">{error}</p>}
       {debugEvents.length > 0 && (
         <div className="rounded-md border border-border/60 bg-surface-2/50 p-2">
-          <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-ink-faint">
+          <p className="mb-1 text-xs font-medium text-ink-faint">
             Diagnóstico (temporal) — eventos de Facebook
           </p>
           {debugEvents.map((line, i) => (
-            <p key={i} className="break-all font-mono text-[10px] text-ink-muted">
+            <p key={i} className="break-all text-xs text-ink-muted">
               {line}
             </p>
           ))}

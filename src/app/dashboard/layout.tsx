@@ -63,64 +63,42 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // Mismo contenido para el sidebar de escritorio y el drawer de móvil.
   const navContent = (
     <>
-      <Link href="/dashboard" className="mb-8 px-2">
-        <Logo />
+      <Link href="/dashboard" className="nav-item mb-6 flex h-10 items-center px-2">
+        <Logo onDark />
       </Link>
 
       <nav className="flex flex-1 flex-col gap-0.5">
-        <NavLink href="/dashboard" exact>
-          <LayoutDashboard size={16} /> Dashboard
-        </NavLink>
-        <NavLink href="/dashboard/inbox">
-          <MessageCircle size={16} /> Chats
-        </NavLink>
-        <NavLink href="/dashboard/seguimiento">
-          <ClipboardList size={16} /> Seguimiento
-        </NavLink>
+        <NavLink href="/dashboard" exact icon={<LayoutDashboard size={18} />}>Dashboard</NavLink>
+        <NavLink href="/dashboard/inbox" icon={<MessageCircle size={18} />}>Chats</NavLink>
+        <NavLink href="/dashboard/seguimiento" icon={<ClipboardList size={18} />}>Seguimiento</NavLink>
         {isMarketingEnabled() && (
-          <NavLink href="/dashboard/marketing">
-            <Megaphone size={16} /> Marketing
-          </NavLink>
+          <NavLink href="/dashboard/marketing" icon={<Megaphone size={18} />}>Marketing</NavLink>
         )}
-        <NavLink href="/dashboard/calendario">
-          <CalendarDays size={16} /> Calendario
-        </NavLink>
-        <NavLink href="/dashboard/reuniones">
-          <Video size={16} /> Reuniones
-        </NavLink>
-        <NavLink href="/dashboard/whatsapp">
-          <Smartphone size={16} /> Conexión WhatsApp
-        </NavLink>
+        <NavLink href="/dashboard/calendario" icon={<CalendarDays size={18} />}>Calendario</NavLink>
+        <NavLink href="/dashboard/reuniones" icon={<Video size={18} />}>Reuniones</NavLink>
+        <NavLink href="/dashboard/whatsapp" icon={<Smartphone size={18} />}>Conexión WhatsApp</NavLink>
         {session?.user.role === "OWNER" && (
           <>
-            <NavLink href="/dashboard/knowledge">
-              <BookOpen size={16} /> Conocimiento
-            </NavLink>
-            <NavLink href="/dashboard/aprendizaje">
-              <Lightbulb size={16} /> Aprendizaje
-            </NavLink>
-            <NavLink href="/dashboard/organization">
-              <Building2 size={16} /> Organización
-            </NavLink>
+            <NavLink href="/dashboard/knowledge" icon={<BookOpen size={18} />}>Conocimiento</NavLink>
+            <NavLink href="/dashboard/aprendizaje" icon={<Lightbulb size={18} />}>Aprendizaje</NavLink>
+            <NavLink href="/dashboard/organization" icon={<Building2 size={18} />}>Organización</NavLink>
           </>
         )}
         {session?.user.role === "SUPERADMIN" && (
-          <NavLink href="/admin">
-            <ShieldCheck size={16} /> Admin
-          </NavLink>
+          <NavLink href="/admin" icon={<ShieldCheck size={18} />}>Admin</NavLink>
         )}
       </nav>
 
-      <div className="mt-4 border-t border-border pt-4">
+      <div className="mt-4 space-y-0.5 border-t border-[var(--sidebar-border)] pt-4">
         <Link
           href="/dashboard/perfil"
-          className="mb-2 block rounded-md px-2 py-1 transition-colors hover:bg-surface-2/60"
+          className="nav-item mb-2 block rounded-lg px-2 py-2 transition-colors hover:bg-[var(--sidebar-hover)]"
         >
-          <p className="flex items-center gap-1.5 truncate text-sm text-ink">
-            <UserCircle size={13} className="shrink-0 text-ink-faint" />
-            {session?.user.email}
+          <p className="flex items-center gap-2 truncate text-sm font-medium text-white">
+            <UserCircle size={18} className="shrink-0 text-[var(--sidebar-ink)]" />
+            <span className="nav-label truncate">{session?.user.email}</span>
           </p>
-          <p className="truncate font-mono text-[11px] text-ink-faint">
+          <p className="nav-extra truncate pl-[26px] text-xs text-[var(--sidebar-ink)]/70">
             {org?.name ?? "Sin organización"}
           </p>
           <ServerClock initialIso={serverNowIso} timeZone={serverTimeZone} />
@@ -136,9 +114,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <form action={logoutAction}>
           <button
             type="submit"
-            className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm text-ink-muted transition-colors hover:bg-surface-2/60 hover:text-danger"
+            className="nav-item flex h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-medium text-[var(--sidebar-ink)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-white"
           >
-            <LogOut size={16} /> Salir
+            <LogOut size={18} /> <span className="nav-label">Salir</span>
           </button>
         </form>
       </div>
@@ -149,13 +127,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar fijo: solo escritorio. overflow-y-auto propio por si el
           menú alguna vez no entra en pantallas bajas. */}
-      <aside className="app-sidebar hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface/60 px-3 py-5 md:flex">
+      <aside className="app-sidebar hidden shrink-0 flex-col overflow-y-auto bg-sidebar px-3 py-5 md:flex">
         {navContent}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Hamburguesa en móvil; plegado del menú en escritorio. */}
-        <header className="flex items-center gap-2 border-b border-border bg-surface/80 px-2 py-2 backdrop-blur">
+        <header className="flex h-14 items-center gap-2 border-b border-border bg-surface px-3">
           <MobileNav>{navContent}</MobileNav>
           <SidebarToggle />
           <span className="md:hidden">
@@ -163,7 +141,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </span>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-4 py-5 md:px-6 md:py-6">
+        <main className="flex-1 overflow-y-auto bg-canvas px-4 py-5 md:px-6 md:py-6">
           {org?.suspended ? (
             <div className="mx-auto max-w-md rounded-lg border border-danger/40 bg-danger-dim px-6 py-8 text-center">
               <p className="mb-1 font-display text-lg font-semibold text-ink">

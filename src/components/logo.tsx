@@ -30,14 +30,17 @@ const markSizes = {
 export function Logo({
   size = "md",
   className,
+  onDark,
 }: {
   size?: keyof typeof wordmarkSizes;
   className?: string;
+  /** Sobre el menú lateral oscuro: texto blanco y sin nombre cuando el menú está contraído. */
+  onDark?: boolean;
 }) {
   return (
     <span className={cn("inline-flex items-center gap-1.5", className)}>
       <LogoMark size={markSizes[size]} />
-      <span className={cn("font-display font-bold tracking-tight text-ink", wordmarkSizes[size])}>
+      <span className={cn("font-bold tracking-tight", onDark ? "nav-label text-white" : "text-ink", wordmarkSizes[size])}>
         WhatsApp ProShop
       </span>
     </span>

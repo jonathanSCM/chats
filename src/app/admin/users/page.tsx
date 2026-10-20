@@ -24,7 +24,7 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="animate-fade-up">
-      <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Usuarios</h1>
+      <h1 className="mb-1 text-2xl font-bold">Usuarios</h1>
       <p className="mb-8 text-sm text-ink-muted">
         Todos los usuarios de la plataforma y las organizaciones a las que pertenecen. Desde acá podés
         meter o sacar gente y cambiar su rol; cada cambio queda en el Registro.

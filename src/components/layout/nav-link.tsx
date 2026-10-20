@@ -5,13 +5,19 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Enlace del menú lateral. El texto va en `.nav-label` para que, con el menú
+ * contraído (68 px, ver globals.css), solo quede el ícono; `title` lo explica.
+ */
 export function NavLink({
   href,
   exact,
+  icon,
   children,
 }: {
   href: string;
   exact?: boolean;
+  icon: ReactNode;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -20,16 +26,17 @@ export function NavLink({
   return (
     <Link
       href={href}
+      aria-current={active ? "page" : undefined}
+      title={typeof children === "string" ? children : undefined}
       className={cn(
-        "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
+        "nav-item flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
         active
-          ? "bg-surface-2 text-ink"
-          : "text-ink-muted hover:bg-surface-2/60 hover:text-ink",
+          ? "bg-[var(--sidebar-active)] text-[var(--sidebar-ink-strong)]"
+          : "text-[var(--sidebar-ink)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-ink-strong)]",
       )}
     >
-      {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
-      {!active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-transparent" />}
-      {children}
+      <span className={cn("flex shrink-0 items-center", active && "text-accent-dim")}>{icon}</span>
+      <span className="nav-label truncate">{children}</span>
     </Link>
   );
 }

@@ -75,7 +75,7 @@ function CopyableLink({ url }: { url: string }) {
 
   return (
     <div className="flex items-center gap-2 rounded-md border border-accent-dim/50 bg-accent/10 px-3 py-2">
-      <p className="flex-1 truncate font-mono text-xs text-ink">{url}</p>
+      <p className="flex-1 truncate font-code text-xs text-ink">{url}</p>
       <button
         type="button"
         className="shrink-0 cursor-pointer text-accent hover:brightness-125"

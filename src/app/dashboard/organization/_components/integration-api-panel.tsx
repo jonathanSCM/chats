@@ -72,7 +72,7 @@ function SecretOnce({ secret }: { secret: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="flex items-center gap-2 rounded-md border border-accent-dim/50 bg-accent/10 px-3 py-2">
-      <p className="flex-1 break-all font-mono text-xs text-ink">{secret}</p>
+      <p className="flex-1 break-all font-code text-xs text-ink">{secret}</p>
       <button
         type="button"
         className="text-ink-muted hover:text-ink"
@@ -147,7 +147,7 @@ function KeysSection({ keys }: { keys: IntegrationKeyRow[] }) {
             <li key={k.id} className="flex items-center gap-3 px-3 py-2 text-xs">
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-ink">
-                  {k.name} <span className="font-mono text-ink-faint">{k.prefix}…</span>
+                  {k.name} <span className=" text-ink-faint">{k.prefix}…</span>
                 </p>
                 <p className="text-ink-muted">
                   {k.scopes.map((s) => SCOPE_LABEL[s] ?? s).join(" · ")} · último uso {dateTime(k.lastUsedAt)}

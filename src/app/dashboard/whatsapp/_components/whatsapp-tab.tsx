@@ -49,7 +49,7 @@ export function WhatsAppTab({
             )}
           </div>
           {connection && (
-            <p className="font-mono text-xs text-ink-muted">phone_number_id: {connection.phoneNumberId}</p>
+            <p className=" text-xs text-ink-muted">phone_number_id: {connection.phoneNumberId}</p>
           )}
           {connection?.coexistence && connection.historySyncStatus === "PENDING" && (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-warning">

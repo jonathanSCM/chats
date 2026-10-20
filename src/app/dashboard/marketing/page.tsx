@@ -23,7 +23,7 @@ export default async function MarketingPage() {
   if (!org.metaAdAccountId) {
     return (
       <div className="max-w-lg animate-fade-up">
-        <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Marketing</h1>
+        <h1 className="mb-1 text-2xl font-bold">Marketing</h1>
         <p className="mb-8 text-sm text-ink-muted">Embudo comercial conectado al gasto de Meta Ads.</p>
         <Card>
           <CardTitle className="mb-1">Todavía no hay cuenta publicitaria conectada</CardTitle>

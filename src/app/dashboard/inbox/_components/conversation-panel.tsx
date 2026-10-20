@@ -271,7 +271,7 @@ export function ConversationPanel({
               ))}
             </Select>
             {!isAdmin && (
-              <p className="text-[11px] text-ink-faint">
+              <p className="text-xs text-ink-faint">
                 Puedes tomar o soltar esta conversación. Para pasarla a otro compañero, pídeselo al
                 dueño de la organización.
               </p>
@@ -320,7 +320,7 @@ export function ConversationPanel({
                     ),
                   )
                 }
-                className="group flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-ink-muted hover:bg-danger-dim hover:text-danger"
+                className="group flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-muted hover:bg-danger-dim hover:text-danger"
                 title="Quitar etiqueta"
               >
                 {tag}
@@ -328,7 +328,7 @@ export function ConversationPanel({
               </button>
             ))}
             {data.tags.length === 0 && (
-              <span className="text-[11px] text-ink-faint">Sin etiquetas</span>
+              <span className="text-xs text-ink-faint">Sin etiquetas</span>
             )}
           </div>
 
@@ -341,7 +341,7 @@ export function ConversationPanel({
                 onClick={() =>
                   run(() => setConversationTagsAction(conversationId, [...data.tags, tag]))
                 }
-                className="rounded-full border border-dashed border-border px-2 py-0.5 text-[11px] text-ink-faint hover:border-accent-dim hover:text-ink"
+                className="rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-ink-faint hover:border-accent-dim hover:text-ink"
               >
                 + {tag}
               </button>
@@ -387,7 +387,7 @@ export function ConversationPanel({
                 <button
                   type="button"
                   onClick={() => setAddingToTracking(true)}
-                  className="flex cursor-pointer items-center gap-1 text-[11px] text-accent hover:opacity-80"
+                  className="flex cursor-pointer items-center gap-1 text-xs text-accent hover:opacity-80"
                 >
                   <Plus size={11} /> Agregar
                 </button>
@@ -407,7 +407,7 @@ export function ConversationPanel({
             )}
 
             {data.contact.opportunities.length === 0 ? (
-              <p className="text-[11px] text-ink-faint">Ninguno todavía.</p>
+              <p className="text-xs text-ink-faint">Ninguno todavía.</p>
             ) : (
               <div className="space-y-1.5">
                 {data.contact.opportunities.map((o) => (
@@ -416,14 +416,14 @@ export function ConversationPanel({
                     className="rounded-md border border-border bg-surface px-2.5 py-2"
                   >
                     <p className="truncate text-xs font-medium text-ink">{o.title}</p>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-ink-muted">
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-muted">
                       <span>{o.stage}</span>
                       {o.estimatedValue !== null && (
-                        <span className="font-mono">{money.format(o.estimatedValue)}</span>
+                        <span className="">{money.format(o.estimatedValue)}</span>
                       )}
                     </div>
                     {o.open && !o.nextAction && (
-                      <p className="mt-1 flex items-center gap-1 text-[10px] text-warning">
+                      <p className="mt-1 flex items-center gap-1 text-xs text-warning">
                         <AlertTriangle size={10} /> sin próximo paso
                       </p>
                     )}
@@ -433,7 +433,7 @@ export function ConversationPanel({
               </div>
             )}
             {openOpportunities.length === 0 && data.contact.opportunities.length > 0 && (
-              <p className="text-[10px] text-ink-faint">Ninguna abierta.</p>
+              <p className="text-xs text-ink-faint">Ninguna abierta.</p>
             )}
           </div>
         )}
@@ -456,7 +456,7 @@ export function ConversationPanel({
           <Label>
             <StickyNote size={11} className="mr-1 inline" /> Notas internas
           </Label>
-          <p className="text-[10px] text-ink-faint">
+          <p className="text-xs text-ink-faint">
             Solo las ve el equipo. No se envían al cliente.
           </p>
 
@@ -467,7 +467,7 @@ export function ConversationPanel({
               <div key={note.id} className="rounded-md bg-surface-2/60 px-2.5 py-2">
                 <p className="whitespace-pre-wrap text-xs text-ink">{note.body}</p>
                 <div className="mt-1 flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1 text-[10px] text-ink-faint">
+                  <span className="flex items-center gap-1 text-xs text-ink-faint">
                     {note.author && (
                       <span
                         className="h-1.5 w-1.5 rounded-full"
@@ -497,7 +497,7 @@ export function ConversationPanel({
               </div>
             ))}
             {data.notes.length === 0 && (
-              <p className="text-[11px] text-ink-faint">Todavía no hay notas.</p>
+              <p className="text-xs text-ink-faint">Todavía no hay notas.</p>
             )}
           </div>
         </div>
@@ -511,7 +511,7 @@ export function ConversationPanel({
           </Label>
           <div className="space-y-2.5 border-l border-border pl-3">
             {data.history.map((h, i) => (
-              <div key={i} className="text-[11px]">
+              <div key={i} className="text-xs">
                 <p className="text-ink-muted">{h.label}</p>
                 <p className="text-ink-faint">
                   {new Date(h.at).toLocaleDateString("es", {
@@ -572,7 +572,7 @@ function NoteForm({
         className="min-h-0 text-xs"
         required
       />
-      {state.error && <p className="text-[11px] text-danger">{state.error}</p>}
+      {state.error && <p className="text-xs text-danger">{state.error}</p>}
       <Button type="submit" variant="secondary" disabled={isPending} className="w-full py-1.5 text-xs">
         {isPending ? "Guardando…" : "Agregar nota"}
       </Button>
@@ -624,7 +624,7 @@ function AddToTrackingForm({
           required
         />
       </div>
-      {state.error && <p className="text-[11px] text-danger">{state.error}</p>}
+      {state.error && <p className="text-xs text-danger">{state.error}</p>}
       <div className="flex gap-2">
         <Button type="submit" disabled={isPending} className="flex-1 py-1.5 text-xs">
           {isPending ? "Agregando…" : "Agregar y ver"}
@@ -675,7 +675,7 @@ function ContactForm({
   return (
     <form action={formAction} className="space-y-2 border-t border-border pt-4">
       <Label>Contacto</Label>
-      <p className="font-mono text-[11px] text-ink-faint">{contact.phone}</p>
+      <p className=" text-xs text-ink-faint">{contact.phone}</p>
 
       <Input
         name="fullName"
@@ -707,7 +707,7 @@ function ContactForm({
         className="py-1.5 text-xs"
       />
 
-      {state.error && <p className="text-[11px] text-danger">{state.error}</p>}
+      {state.error && <p className="text-xs text-danger">{state.error}</p>}
 
       <Button
         type="submit"
@@ -809,7 +809,7 @@ function MeetingsPanel({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="flex cursor-pointer items-center gap-1 text-[11px] text-accent hover:opacity-80"
+            className="flex cursor-pointer items-center gap-1 text-xs text-accent hover:opacity-80"
           >
             <Plus size={11} /> Añadir reunión
           </button>
@@ -842,7 +842,7 @@ function MeetingsPanel({
             />
           </div>
           {canCreateGoogleMeet && (
-            <label className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+            <label className="flex items-center gap-1.5 text-xs text-ink-muted">
               <input
                 type="checkbox"
                 name="withGoogleMeet"
@@ -853,7 +853,7 @@ function MeetingsPanel({
               Crear con Google Meet (en tu calendario, genera el link automáticamente)
             </label>
           )}
-          <label className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+          <label className="flex items-center gap-1.5 text-xs text-ink-muted">
             <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked />
             Que el bot se una a esta reunión
           </label>
@@ -871,7 +871,7 @@ function MeetingsPanel({
             placeholder="Pegá el link de la reunión (Meet, Zoom, etc.)"
             className="py-1.5 text-xs"
           />
-          {state.error && <p className="text-[11px] text-danger">{state.error}</p>}
+          {state.error && <p className="text-xs text-danger">{state.error}</p>}
           <div className="flex gap-2">
             <Button type="submit" size="sm" className="text-xs">
               Guardar reunión
@@ -884,14 +884,14 @@ function MeetingsPanel({
       )}
 
       {meetings.length === 0 ? (
-        <p className="text-[11px] text-ink-faint">Todavía no hay reuniones registradas.</p>
+        <p className="text-xs text-ink-faint">Todavía no hay reuniones registradas.</p>
       ) : (
         <div className="space-y-1.5">
           {meetings.map((m) => (
             <div key={m.id} className="rounded-md border border-border bg-surface px-2.5 py-2">
               {m.title && <p className="truncate text-xs font-medium text-ink">{m.title}</p>}
-              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-ink-muted">
-                <span className="font-mono">
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
+                <span className="">
                   {new Date(m.scheduledAt).toLocaleString("es", {
                     day: "2-digit",
                     month: "2-digit",
@@ -980,11 +980,11 @@ function MeetingsPanel({
                     defaultValue={m.meetingUrl ?? ""}
                     className="py-1.5 text-xs"
                   />
-                  <label className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+                  <label className="flex items-center gap-1.5 text-xs text-ink-muted">
                     <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked={m.botEnabled} />
                     Que el bot se una a esta reunión
                   </label>
-                  {editError?.id === m.id && <p className="text-[11px] text-danger">{editError.message}</p>}
+                  {editError?.id === m.id && <p className="text-xs text-danger">{editError.message}</p>}
                   <div className="flex gap-2">
                     <Button type="submit" size="sm" className="text-xs" disabled={editPending}>
                       {editPending ? "Guardando…" : "Guardar cambios"}
@@ -1029,12 +1029,12 @@ function OpportunityTasks({ activities, onChanged }: { activities: PanelActivity
 
   return (
     <div className="mt-1.5 space-y-1 border-t border-border pt-1.5">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-ink-faint">Tareas</p>
+      <p className="text-xs font-medium text-ink-faint">Tareas</p>
       {activities.map((a) => {
         const done = a.status === "DONE";
         const overdue = a.overdue;
         return (
-          <div key={a.id} className="flex items-start gap-1.5 text-[11px]">
+          <div key={a.id} className="flex items-start gap-1.5 text-xs">
             <input
               type="checkbox"
               checked={done}
@@ -1045,7 +1045,7 @@ function OpportunityTasks({ activities, onChanged }: { activities: PanelActivity
             />
             <div className="min-w-0 flex-1">
               <p className={done ? "truncate text-ink-faint line-through" : "truncate text-ink"}>{a.title}</p>
-              <p className={overdue ? "text-[10px] text-warning" : "text-[10px] text-ink-muted"}>
+              <p className={overdue ? "text-xs text-warning" : "text-xs text-ink-muted"}>
                 {a.dueAt ? new Date(a.dueAt).toLocaleDateString("es") : "sin fecha"}
                 {a.assignee ? ` · ${a.assignee}` : ""}
                 {a.source === "ai" ? " · IA" : ""}
@@ -1055,7 +1055,7 @@ function OpportunityTasks({ activities, onChanged }: { activities: PanelActivity
           </div>
         );
       })}
-      {error && <p className="text-[10px] text-warning">{error}</p>}
+      {error && <p className="text-xs text-warning">{error}</p>}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { DUE_COLOR, leadScoreColor } from "@/lib/status-colors";
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -28,6 +29,8 @@ import {
   MessageCircle,
   Pencil,
   Ban,
+  Search,
+  SlidersHorizontal,
 } from "lucide-react";
 import {
   createOpportunityAction,
@@ -53,7 +56,7 @@ import { EditableTitle } from "@/components/editable-title";
 import { SidePanel, PanelSection } from "@/components/side-panel";
 import { panelAccent, PILL_BUTTON, hasMeetingEnded } from "@/lib/meeting-panel-ui";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription } from "@/components/ui/card";
 import { Input, Label, Select } from "@/components/ui/input";
 import {
   PRIORITY_COLOR,
@@ -142,13 +145,6 @@ const LEAD_SCORE_BREAKDOWN_LABEL: Record<string, [string, number]> = {
   urgencia: ["Urgencia", 5],
 };
 
-function leadScoreColor(score: number): string {
-  if (score >= 80) return "#22c55e";
-  if (score >= 60) return "#3b82f6";
-  if (score >= 40) return "#eab308";
-  return "#71717a";
-}
-
 function leadScoreLabel(score: number): string {
   if (score >= 80) return "Oportunidad alta";
   if (score >= 60) return "Lead calificado";
@@ -205,10 +201,10 @@ function dueBadge(iso: string | null): { text: string; color: string } | null {
   const diffDays = Math.round((date.getTime() - today.getTime()) / 86_400_000);
 
   if (diffDays < 0) {
-    return { text: `Vencido hace ${-diffDays} día${-diffDays === 1 ? "" : "s"}`, color: "#dc2626" };
+    return { text: `Vencido hace ${-diffDays} día${-diffDays === 1 ? "" : "s"}`, color: DUE_COLOR.overdue };
   }
-  if (diffDays === 0) return { text: "Hoy", color: "#ea580c" };
-  if (diffDays === 1) return { text: "Mañana", color: "#2563eb" };
+  if (diffDays === 0) return { text: "Hoy", color: DUE_COLOR.today };
+  if (diffDays === 1) return { text: "Mañana", color: DUE_COLOR.tomorrow };
   return { text: dateShort(iso), color: "var(--color-ink-faint)" };
 }
 
@@ -293,6 +289,7 @@ export function TrackingTable({
   ai,
 }: Props) {
   const [creating, setCreating] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [boardView, setBoardView] = useState<"table" | "kanban" | "analisis">("table");
 
   // La tabla se arrastra con el botón IZQUIERDO del mouse; reordenar filas a
@@ -540,8 +537,19 @@ export function TrackingTable({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-xs text-ink-faint">Filtros rápidos:</span>
+      <div className="space-y-3 rounded-xl border border-border bg-surface p-3 shadow-sm">
+        {/* Nivel principal: búsqueda, filtros rápidos, vista y nueva oportunidad */}
+        <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-72">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
+          <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar cliente, teléfono, ciudad…"
+          className="w-full pl-9 text-sm"
+        />
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
         {quickFilterChips.map((c) => (
           <button
             key={c.key}
@@ -549,26 +557,75 @@ export function TrackingTable({
             onClick={() => setQuickFilter((f) => (f === c.key ? null : c.key))}
             className={`cursor-pointer rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
               quickFilter === c.key
-                ? "border-accent bg-accent text-accent-ink"
-                : "border-border text-ink-muted hover:border-accent-dim hover:text-accent"
+                ? "border-accent/40 bg-accent/10 text-accent"
+                : "border-border bg-surface text-ink-muted hover:bg-surface-2 hover:text-ink"
             }`}
           >
             {c.label}
           </button>
         ))}
       </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar cliente, teléfono, ciudad…"
-          className="w-full py-1.5 text-sm sm:w-64"
-        />
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center rounded-lg border border-border bg-surface-2 p-0.5">
+            <button
+              type="button"
+              onClick={() => setBoardView("table")}
+              title="Vista de tabla"
+              className={`flex h-8 w-9 items-center justify-center rounded-md text-xs font-medium transition-colors duration-[180ms] ${
+                boardView === "table" ? "bg-surface text-accent shadow-sm" : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              <Table2 size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setBoardView("kanban")}
+              title="Vista de tablero"
+              className={`flex h-8 w-9 items-center justify-center rounded-md text-xs font-medium transition-colors duration-[180ms] ${
+                boardView === "kanban" ? "bg-surface text-accent shadow-sm" : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setBoardView("analisis")}
+              title="Vista de análisis"
+              className={`flex h-8 w-9 items-center justify-center rounded-md text-xs font-medium transition-colors duration-[180ms] ${
+                boardView === "analisis" ? "bg-surface text-accent shadow-sm" : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              <TrendingUp size={16} />
+            </button>
+          </div>
+          <a
+            href="/api/seguimiento/export"
+            title="Descargar los leads activos en un Excel"
+            className="flex h-10 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-strong bg-surface px-3 text-sm font-medium text-ink hover:bg-surface-2"
+          >
+            <FileDown size={16} /> Exportar a Excel
+          </a>
+          {!viewingArchived && (
+            <Button type="button" onClick={() => setCreating(true)}>
+              <Plus size={16} /> Nueva oportunidad
+            </Button>
+          )}
+        </div>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            className="flex h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-border-strong px-3 text-sm font-medium text-ink hover:bg-surface-2 lg:hidden"
+          >
+            <SlidersHorizontal size={16} /> Filtros
+          </button>
+        </div>
+        {/* Nivel secundario: en pantallas chicas se agrupa detrás del botón "Filtros" (mismos valores y comportamiento) */}
+        <div className={`${filtersOpen ? "flex" : "hidden lg:flex"} flex-wrap items-center gap-2 border-t border-border pt-3`}>
         <Select
           value={stageFilter}
           onChange={(e) => setStageFilter(e.target.value)}
-          className="w-full py-1.5 text-sm sm:w-48"
+          className="w-full text-sm sm:w-48"
         >
           <option value="">Todos los estados</option>
           {stages.map((s) => (
@@ -580,7 +637,7 @@ export function TrackingTable({
         <Select
           value={priorityFilter}
           onChange={(e) => setPriorityFilter(e.target.value as Priority | "")}
-          className="w-full py-1.5 text-sm sm:w-36"
+          className="w-full text-sm sm:w-36"
         >
           <option value="">Toda prioridad</option>
           <option value="ALTA">ALTA</option>
@@ -590,7 +647,7 @@ export function TrackingTable({
         <Select
           value={assigneeFilter}
           onChange={(e) => setAssigneeFilter(e.target.value)}
-          className="w-full py-1.5 text-sm sm:w-40"
+          className="w-full text-sm sm:w-40"
         >
           <option value="">Todo vendedor</option>
           {members.map((m) => (
@@ -602,7 +659,7 @@ export function TrackingTable({
         <Select
           value={serviceFilter}
           onChange={(e) => setServiceFilter(e.target.value)}
-          className="w-full py-1.5 text-sm sm:w-36"
+          className="w-full text-sm sm:w-36"
         >
           <option value="">Todo servicio</option>
           {services.map((s) => (
@@ -615,7 +672,7 @@ export function TrackingTable({
           <Select
             value={sourceFilter}
             onChange={(e) => setSourceFilter(e.target.value)}
-            className="w-full py-1.5 text-sm sm:w-36"
+            className="w-full text-sm sm:w-36"
           >
             <option value="">Toda fuente</option>
             {leadSources.map((s) => (
@@ -632,7 +689,7 @@ export function TrackingTable({
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
             title="Fecha de próxima acción desde"
-            className="w-full py-1.5 text-sm sm:w-36"
+            className="w-full text-sm sm:w-36"
           />
           <span className="text-xs text-ink-faint">–</span>
           <Input
@@ -640,7 +697,7 @@ export function TrackingTable({
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
             title="Fecha de próxima acción hasta"
-            className="w-full py-1.5 text-sm sm:w-36"
+            className="w-full text-sm sm:w-36"
           />
         </div>
         <div className="flex items-center gap-1.5">
@@ -653,7 +710,7 @@ export function TrackingTable({
               if (urgente) setSortField(null);
             }}
             title="Vencidas primero, luego hoy, alta prioridad, mayor calidad y fecha más cercana"
-            className="w-full py-1.5 text-sm sm:w-36"
+            className="w-full text-sm sm:w-36"
           >
             <option value="manual">Manual</option>
             <option value="urgente">Más urgente</option>
@@ -690,8 +747,8 @@ export function TrackingTable({
             cambia la fuente de datos (otra query), "estado=todos" solo suma
             etapas a la vista activa. Se agrupan con borde + etiqueta para
             que no parezcan la misma opción. */}
-        <div className="flex items-center gap-2 rounded-md border border-border px-2 py-1">
-          <span className="text-[10px] uppercase tracking-wide text-ink-faint">Vista:</span>
+        <div className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5">
+          <span className="text-xs text-ink-faint">Vista:</span>
           <Link
             href={viewingArchived ? "/dashboard/seguimiento" : "/dashboard/seguimiento?archived=1"}
             className="flex items-center gap-1 whitespace-nowrap text-xs text-ink-muted hover:text-accent"
@@ -719,51 +776,6 @@ export function TrackingTable({
             </>
           )}
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <div className="flex items-center rounded-md border border-border p-0.5">
-            <button
-              type="button"
-              onClick={() => setBoardView("table")}
-              title="Vista de tabla"
-              className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
-                boardView === "table" ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink"
-              }`}
-            >
-              <Table2 size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setBoardView("kanban")}
-              title="Vista de tablero"
-              className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
-                boardView === "kanban" ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink"
-              }`}
-            >
-              <LayoutGrid size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setBoardView("analisis")}
-              title="Vista de análisis"
-              className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
-                boardView === "analisis" ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink"
-              }`}
-            >
-              <TrendingUp size={13} />
-            </button>
-          </div>
-          <a
-            href="/api/seguimiento/export"
-            title="Descargar los leads activos en un Excel"
-            className="flex items-center gap-1 whitespace-nowrap rounded-md border border-border px-2.5 py-1.5 text-xs text-ink-muted hover:border-accent-dim hover:text-accent"
-          >
-            <FileDown size={14} /> Exportar a Excel
-          </a>
-          {!viewingArchived && (
-            <Button type="button" onClick={() => setCreating(true)}>
-              <Plus size={16} /> Nueva oportunidad
-            </Button>
-          )}
         </div>
       </div>
 
@@ -808,7 +820,7 @@ export function TrackingTable({
           }`}
         >
           <div className="min-w-max px-4 md:px-8">
-            <table className="w-full border-separate border-spacing-0 text-sm">
+            <table className="tracking-grid w-full border-separate border-spacing-0 text-[13px]">
               <thead>
                 <tr>
                   {canDrag && <Th />}
@@ -906,7 +918,7 @@ export function TrackingTable({
               <Sparkles size={11} />
               Las últimas cinco columnas las propone el asesor IA; el vendedor decide.
               {ai.enabled ? (
-                <span className="font-mono">
+                <span className="">
                   · Gasto de hoy: {ai.spent.toFixed(3)} / {ai.budget.toFixed(2)} US$
                 </span>
               ) : (
@@ -936,7 +948,7 @@ export function TrackingTable({
 function Th({ children, ai }: { children?: React.ReactNode; ai?: boolean }) {
   return (
     <th
-      className={`sticky top-0 z-20 whitespace-nowrap border-b border-border bg-surface px-3 py-2.5 text-left font-mono text-[11px] font-semibold uppercase tracking-wide ${
+      className={`sticky top-0 z-20 h-11 whitespace-nowrap border-b border-border bg-surface-2 px-3 text-left text-xs font-semibold ${
         ai ? "text-accent" : "text-ink-muted"
       }`}
     >
@@ -955,7 +967,7 @@ function Td({
   title?: string;
 }) {
   return (
-    <td title={title} className={`border-b border-border/50 px-3 py-4 align-top ${className}`}>
+    <td title={title} className={`border-b border-border px-3 py-3 align-top ${className}`}>
       {children}
     </td>
   );
@@ -986,8 +998,8 @@ function SortableTh({
   return (
     <th
       title={title}
-      className={`sticky top-0 whitespace-nowrap border-b border-border bg-surface px-1 py-1 text-left font-mono text-[11px] font-semibold uppercase tracking-wide ${
-        frozen ? "left-0 z-30 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]" : "z-20"
+      className={`sticky top-0 h-11 whitespace-nowrap border-b border-border bg-surface-2 px-1 text-left text-xs font-semibold ${
+        frozen ? "left-0 z-30 shadow-[2px_0_6px_-4px_rgba(15,23,42,0.35)]" : "z-20"
       } ${ai ? "text-accent" : "text-ink-muted"}`}
     >
       <button
@@ -1039,7 +1051,7 @@ function NextActionCell({
           onBlur={(e) => handleBlur("nextAction", "action", e.target.value)}
           className="w-full py-1 text-xs"
         />
-        {justSaved === "action" && <span className="shrink-0 text-[10px] text-accent">Guardado ✓</span>}
+        {justSaved === "action" && <span className="shrink-0 text-xs text-accent">Guardado ✓</span>}
       </div>
       <div className="flex items-center gap-1">
         <Input
@@ -1049,16 +1061,16 @@ function NextActionCell({
           onBlur={(e) => handleBlur("nextActionAt", "date", e.target.value)}
           className="w-full py-1 text-xs"
         />
-        {justSaved === "date" && <span className="shrink-0 text-[10px] text-accent">Guardado ✓</span>}
+        {justSaved === "date" && <span className="shrink-0 text-xs text-accent">Guardado ✓</span>}
       </div>
       {missing ? (
-        <p className="flex items-center gap-1 text-[11px] text-warning">
+        <p className="flex items-center gap-1 text-xs text-warning">
           <AlertTriangle size={10} />{" "}
           {row.nextAction && row.nextActionAt ? "Sin responsable asignado" : "Sin próxima acción"}
         </p>
       ) : (
         badge && (
-          <p className="text-[11px] font-medium" style={{ color: badge.color }}>
+          <p className="text-xs font-medium" style={{ color: badge.color }}>
             {badge.text}
           </p>
         )
@@ -1142,7 +1154,7 @@ function TableRow({
       onPointerDown={handleRowPointerDown}
       onPointerUp={handleRowPointerUp}
       onContextMenu={draggable ? (e) => e.preventDefault() : undefined}
-      className={`transition-colors hover:bg-surface-2/40 ${isPending ? "opacity-60" : ""} ${
+      className={`group transition-colors duration-[180ms] hover:bg-surface-2/70 ${isPending ? "opacity-60" : ""} ${
         draggable ? "cursor-default" : ""
       }`}
     >
@@ -1151,11 +1163,11 @@ function TableRow({
           <GripVertical size={14} />
         </Td>
       )}
-      <Td className="whitespace-nowrap font-mono text-[13px] text-ink-muted">
+      <Td className="whitespace-nowrap text-[13px] text-ink-muted">
         {dateShort(row.registeredAt)}
       </Td>
 
-      <Td className="sticky left-0 z-10 max-w-[9rem] bg-surface shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]">
+      <Td className="sticky left-0 z-10 max-w-[10rem] bg-surface shadow-[2px_0_6px_-4px_rgba(15,23,42,0.35)] group-hover:bg-surface-2">
         <button
           type="button"
           onClick={onOpen}
@@ -1169,7 +1181,7 @@ function TableRow({
           )}
         </button>
         {row.assignedTo ? (
-          <span className="mt-1 flex items-center gap-1.5 text-[11px] text-ink-faint">
+          <span className="mt-1 flex items-center gap-1.5 text-xs text-ink-faint">
             <span
               className="h-1.5 w-1.5 rounded-full"
               style={{ backgroundColor: vendorColor(row.assignedTo.id, row.assignedTo.color) }}
@@ -1177,11 +1189,11 @@ function TableRow({
             {row.assignedTo.name}
           </span>
         ) : (
-          <span className="mt-1 block text-[11px] italic text-ink-faint">Sin asignar</span>
+          <span className="mt-1 block text-xs italic text-ink-faint">Sin asignar</span>
         )}
       </Td>
 
-      <Td className="whitespace-nowrap font-mono text-[13px] text-ink-muted">
+      <Td className="whitespace-nowrap text-[13px] text-ink-muted">
         <span className="inline-flex items-center gap-1.5">
           {row.phone}
           <Link
@@ -1261,7 +1273,7 @@ function TableRow({
         {row.leadScore !== null ? (
           <div
             title={leadScoreLabel(row.leadScore)}
-            className="flex items-center gap-1.5 whitespace-nowrap font-mono text-xs font-semibold"
+            className="flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold"
             style={{ color: leadScoreColor(row.leadScore) }}
           >
             <span
@@ -1320,11 +1332,11 @@ function TableRow({
         </div>
       </Td>
 
-      <Td className="max-w-[14rem]">
-        <p className="line-clamp-3 w-56 text-sm leading-relaxed text-ink">{row.aiRecommendation || "—"}</p>
+      <Td className="max-w-[14rem] bg-accent/[0.04]" title={row.aiRecommendation || undefined}>
+        <p className="line-clamp-2 w-56 text-[13px] leading-snug text-ink">{row.aiRecommendation || "—"}</p>
       </Td>
 
-      <Td className="max-w-[14rem]">
+      <Td className="max-w-[14rem] bg-accent/[0.04]">
         {row.aiSuggestedMessage ? (
           <CopyableMessage text={row.aiSuggestedMessage} />
         ) : (
@@ -1386,7 +1398,7 @@ function AnalyzeButton({
             if (result.error) setError(result.error);
           })
         }
-        className="flex cursor-pointer items-center gap-1 rounded-md border border-accent-dim/50 px-2.5 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex h-9 cursor-pointer items-center gap-1 rounded-lg border border-accent/40 px-3 text-xs font-medium text-accent transition-colors duration-[180ms] hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {isPending ? (
           <>
@@ -1396,7 +1408,7 @@ function AnalyzeButton({
           <Sparkles size={13} />
         )}
       </button>
-      {error && <p className="mt-1 max-w-[11rem] text-[11px] text-danger">{error}</p>}
+      {error && <p className="mt-1 max-w-[11rem] text-xs text-danger">{error}</p>}
     </div>
   );
 }
@@ -1436,20 +1448,18 @@ function Stat({
 }) {
   const content = (
     <>
-      <CardDescription className="mb-1 font-mono text-[11px] uppercase tracking-wide">
-        {label}
-      </CardDescription>
-      <CardTitle className="font-mono text-xl">{value}</CardTitle>
+      <CardDescription className="mb-1.5 text-xs font-medium">{label}</CardDescription>
+      <p className="text-[28px] font-bold leading-none text-ink">{value}</p>
     </>
   );
 
   if (!onClick) {
-    return <Card className="py-3">{content}</Card>;
+    return <Card className="p-4">{content}</Card>;
   }
 
   return (
     <button type="button" onClick={onClick} className="w-full cursor-pointer text-left">
-      <Card className={`py-3 transition-colors ${active ? "border-accent bg-accent/5" : "hover:border-accent-dim"}`}>
+      <Card className={`p-4 transition-colors duration-[180ms] ${active ? "border-accent bg-accent/5" : "hover:border-border-strong"}`}>
         {content}
       </Card>
     </button>
@@ -1613,13 +1623,13 @@ function DetailPanel({
             <h2 className="font-display text-lg font-semibold text-ink">
               {row.client || row.phone}
             </h2>
-            <p className="font-mono text-[13px] text-ink-faint">
+            <p className=" text-[13px] text-ink-faint">
               {row.phone}
               {row.city && ` · ${row.city}`}
             </p>
             <Link
               href={`/dashboard/inbox?phone=${encodeURIComponent(row.phone)}`}
-              className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-muted hover:border-accent-dim hover:text-accent"
+              className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-ink-muted hover:border-accent-dim hover:text-accent"
             >
               <MessageCircle size={11} /> Ir al chat
             </Link>
@@ -1695,7 +1705,7 @@ function DetailPanel({
                     className="w-36 py-1.5 text-sm"
                   />
                 </div>
-                {justSaved && <p className="text-[11px] text-accent">Guardado ✓</p>}
+                {justSaved && <p className="text-xs text-accent">Guardado ✓</p>}
               </div>
             ) : (
               <p className="text-sm leading-relaxed text-ink-muted">
@@ -1806,7 +1816,7 @@ function DetailPanel({
           />
 
           <div className="rounded-lg border border-accent-dim/40 bg-accent/5 p-3">
-            <p className="mb-2 flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-accent">
               <Sparkles size={11} /> Asesor IA
             </p>
 
@@ -1815,7 +1825,7 @@ function DetailPanel({
                 <div className="mb-2 flex items-center justify-between">
                   <div>
                     <p
-                      className="font-mono text-2xl font-bold leading-none"
+                      className="text-[30px] font-bold leading-none"
                       style={{ color: leadScoreColor(row.leadScore) }}
                     >
                       {row.leadScore}
@@ -1839,7 +1849,7 @@ function DetailPanel({
                       return (
                         <p key={key} className="flex justify-between text-xs text-ink-muted">
                           <span>{label}</span>
-                          <span className="font-mono text-ink">
+                          <span className=" text-ink">
                             {value}/{max}
                           </span>
                         </p>
@@ -2138,7 +2148,7 @@ function MeetingsSection({
   return (
     <div className="rounded-lg border border-border bg-surface-2/40 p-3">
       <div className="mb-2 flex items-center justify-between">
-        <p className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-ink-muted">
           <Video size={11} /> Reuniones
         </p>
         {editable && (
@@ -2245,9 +2255,9 @@ function MeetingsSection({
                     className="text-sm font-medium text-ink"
                   />
                   {m.recordedByName && (
-                    <p className="text-[11px] text-ink-faint">grabada por {m.recordedByName}</p>
+                    <p className="text-xs text-ink-faint">grabada por {m.recordedByName}</p>
                   )}
-                  <p className="flex items-center gap-1.5 font-mono text-xs text-ink-muted">
+                  <p className="flex items-center gap-1.5 text-xs text-ink-muted">
                     {new Date(m.scheduledAt).toLocaleString("es", {
                       day: "2-digit",
                       month: "2-digit",
@@ -2262,7 +2272,7 @@ function MeetingsSection({
                   {botConfig && BotIcon && (
                     <span
                       data-active={live}
-                      className={`corner-brackets flex items-center gap-1 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${botConfig.className}`}
+                      className={`corner-brackets flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs ${botConfig.className}`}
                     >
                       {live && <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-current" />}
                       <BotIcon size={9} className={m.botStatus === "JOINING" || m.botStatus === "TRANSCRIBING" ? "animate-spin" : ""} />
@@ -2275,7 +2285,7 @@ function MeetingsSection({
                       disabled={isPending || stoppingId === m.id}
                       onClick={() => handleStopBot(m.id)}
                       title="Sacar al bot de la reunión ahora"
-                      className={`${PILL_BUTTON} border-danger/30 px-2 py-0.5 text-[10px] text-danger hover:border-danger hover:bg-danger/10`}
+                      className={`${PILL_BUTTON} border-danger/30 px-2 py-0.5 text-xs text-danger hover:border-danger hover:bg-danger/10`}
                     >
                       <PhoneOff size={9} /> {stoppingId === m.id ? "Deteniendo…" : "Detener bot"}
                     </button>
@@ -2304,9 +2314,9 @@ function MeetingsSection({
                   onSave={(v) => handleRenameMeeting(m.id, v)}
                   disabled={disabled || !editable}
                   placeholder="Reunión sin nombre"
-                  className="font-display text-2xl font-semibold tracking-tight text-ink"
+                  className="text-2xl font-bold text-ink"
                 />
-                <p className="mt-1.5 font-mono text-[13px] text-ink-faint">
+                <p className="mt-1.5 text-[13px] text-ink-faint">
                   {new Date(m.scheduledAt).toLocaleString("es", {
                     day: "2-digit",
                     month: "2-digit",
@@ -2322,13 +2332,13 @@ function MeetingsSection({
           >
             <PanelSection label="Estado">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-surface-2 px-2.5 py-1 font-mono text-[10px] text-ink-muted">
+                <span className="rounded-full bg-surface-2 px-2.5 py-1 text-xs text-ink-muted">
                   {m.status}
                 </span>
                 {botConfig && BotIcon && (
                   <span
                     data-active={m.botStatus === "JOINING" || m.botStatus === "RECORDING" || m.botStatus === "TRANSCRIBING"}
-                    className={`corner-brackets flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[10px] ${botConfig.className}`}
+                    className={`corner-brackets flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ${botConfig.className}`}
                   >
                     <BotIcon size={10} className={m.botStatus === "JOINING" || m.botStatus === "TRANSCRIBING" ? "animate-spin" : ""} />
                     {botConfig.label}
@@ -2483,7 +2493,7 @@ function MeetingsSection({
 
             {m.botJoinedAt && (
               <PanelSection label="Grabación" delay={120}>
-                <p className="font-mono text-xs text-ink-muted">
+                <p className=" text-xs text-ink-muted">
                   {new Date(m.botJoinedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}
                   {" → "}
                   {m.botLeftAt

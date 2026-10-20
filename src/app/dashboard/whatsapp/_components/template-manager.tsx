@@ -141,7 +141,7 @@ export function TemplateManager({ botId }: { botId: string }) {
             <div className="space-y-1.5">
               <Label htmlFor="name">Nombre (identificador)</Label>
               <Input id="name" name="name" placeholder="confirmacion_pedido" required />
-              <p className="text-[11px] text-ink-faint">Solo minúsculas, números y guion bajo.</p>
+              <p className="text-xs text-ink-faint">Solo minúsculas, números y guion bajo.</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="category">Categoría</Label>
@@ -171,8 +171,8 @@ export function TemplateManager({ botId }: { botId: string }) {
               placeholder="Hola {{1}}, tu pedido #{{2}} ya está confirmado."
               required
             />
-            <p className="text-[11px] text-ink-faint">
-              Usa <code className="font-mono">{"{{1}}"}</code>, <code className="font-mono">{"{{2}}"}</code>…
+            <p className="text-xs text-ink-faint">
+              Usa <code className="">{"{{1}}"}</code>, <code className="">{"{{2}}"}</code>…
               para las partes que cambian en cada envío.
             </p>
           </div>
@@ -180,8 +180,8 @@ export function TemplateManager({ botId }: { botId: string }) {
           <div className="space-y-1.5">
             <Label htmlFor="bodyExample">Ejemplo de esos valores (si usaste variables)</Label>
             <Input id="bodyExample" name="bodyExample" placeholder="Jonathan, 20, 31 de agosto" />
-            <p className="text-[11px] text-ink-faint">
-              Un valor por cada <code className="font-mono">{"{{n}}"}</code>, separados por coma, en
+            <p className="text-xs text-ink-faint">
+              Un valor por cada <code className="">{"{{n}}"}</code>, separados por coma, en
               orden. Meta lo exige para revisar la plantilla — si tiene variables y no das
               ejemplos, la rechaza automáticamente sin revisarla.
             </p>

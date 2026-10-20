@@ -1,7 +1,8 @@
 "use client";
 
+import { DUE_COLOR, leadScoreColor } from "@/lib/status-colors";
 import { useRef, useState, useTransition } from "react";
-import { Sparkles, AlertTriangle, Bell } from "lucide-react";
+import { Sparkles, AlertTriangle, Bell, CalendarDays } from "lucide-react";
 import { updateOpportunityFieldAction } from "@/server/actions/crm";
 import { PRIORITY_COLOR, hasCompleteNextAction, missingForStage } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
@@ -14,13 +15,6 @@ function dateShort(iso: string | null): string {
   return new Date(iso).toLocaleDateString("es", { day: "2-digit", month: "2-digit" });
 }
 
-function leadScoreColor(score: number): string {
-  if (score >= 80) return "#22c55e";
-  if (score >= 60) return "#3b82f6";
-  if (score >= 40) return "#eab308";
-  return "#71717a";
-}
-
 /** 🔴 vencido / 🟠 hoy / 🔵 mañana / fecha corta — mismo criterio que la tabla. */
 function dueBadge(iso: string | null): { text: string; color: string } | null {
   if (!iso) return null;
@@ -29,9 +23,9 @@ function dueBadge(iso: string | null): { text: string; color: string } | null {
   const date = new Date(iso.slice(0, 10) + "T00:00:00");
   const diffDays = Math.round((date.getTime() - today.getTime()) / 86_400_000);
 
-  if (diffDays < 0) return { text: `Vencido (${-diffDays}d)`, color: "#dc2626" };
-  if (diffDays === 0) return { text: "Hoy", color: "#ea580c" };
-  if (diffDays === 1) return { text: "Mañana", color: "#2563eb" };
+  if (diffDays < 0) return { text: `Vencido (${-diffDays}d)`, color: DUE_COLOR.overdue };
+  if (diffDays === 0) return { text: "Hoy", color: DUE_COLOR.today };
+  if (diffDays === 1) return { text: "Mañana", color: DUE_COLOR.tomorrow };
   return { text: dateShort(iso), color: "var(--color-ink-faint)" };
 }
 
@@ -135,11 +129,11 @@ export function KanbanBoard({
       onPointerMove={handlePointerMove}
       onPointerUp={endPan}
       onPointerLeave={endPan}
-      className={`-mx-4 overflow-x-auto pb-2 md:-mx-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+      className={`-mx-4 overflow-x-auto pb-3 md:-mx-6 ${
         isPanning ? "cursor-grabbing select-none" : "cursor-grab"
       }`}
     >
-      <div className="flex min-w-max gap-3 px-4 md:px-8">
+      <div className="flex min-w-max gap-3 px-4 md:px-6">
         {stages.map((stage) => {
           // Los vencidos suben solos arriba dentro de cada etapa (scope §9).
           const cards = rows
@@ -164,25 +158,24 @@ export function KanbanBoard({
                 e.preventDefault();
                 handleDrop(stage.id);
               }}
-              className={`flex w-64 shrink-0 flex-col rounded-lg border bg-surface-2/40 transition-colors ${
-                dragOverStage === stage.id ? "border-accent-dim bg-accent/5" : "border-border"
+              className={`flex w-[280px] shrink-0 flex-col rounded-xl border bg-surface-2/60 transition-colors duration-[180ms] ${
+                dragOverStage === stage.id ? "border-accent bg-accent/5" : "border-border"
               }`}
             >
-              <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: stage.color }}
-                />
-                <p
-                  className="flex-1 truncate font-mono text-[11px] font-semibold uppercase tracking-wide text-ink-muted"
-                  title={stage.criteria}
-                >
+              <div
+                className="flex items-center gap-2 rounded-t-xl border-b border-border px-3.5 py-3"
+                style={{ boxShadow: `inset 0 3px 0 ${stage.color}` }}
+              >
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: stage.color }} />
+                <p className="flex-1 truncate text-sm font-semibold text-ink lowercase first-letter:uppercase" title={stage.criteria}>
                   {stage.label}
                 </p>
-                <span className="font-mono text-[11px] text-ink-faint">{cards.length}</span>
+                <span className="rounded-full bg-surface px-2 py-0.5 text-xs font-medium text-ink-muted ring-1 ring-border">
+                  {cards.length}
+                </span>
               </div>
 
-              <div className="flex-1 space-y-2 overflow-y-auto p-2" style={{ minHeight: 120 }}>
+              <div className="flex-1 space-y-3 overflow-y-auto p-3" style={{ minHeight: 120, maxHeight: "calc(100vh - 260px)" }}>
                 {cards.map((row) => {
                   const draggable = canEdit(row);
                   return (
@@ -195,11 +188,11 @@ export function KanbanBoard({
                       }}
                       onClick={() => onOpen(row)}
                       disabled={isPending}
-                      className={`block w-full rounded-md border border-border bg-surface p-2.5 text-left text-xs transition-colors hover:border-accent-dim ${
+                      className={`block w-full rounded-lg border border-border bg-surface p-3 text-left text-[13px] shadow-sm transition-colors duration-[180ms] hover:border-accent/60 ${
                         draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                       }`}
                     >
-                      <p className="flex items-center gap-1 truncate font-medium text-ink">
+                      <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-ink">
                         <span className="truncate">{row.client || row.phone}</span>
                         {(() => {
                           const alert = deriveAlerts(row, todayStr);
@@ -207,7 +200,7 @@ export function KanbanBoard({
                             alert.reasons.length > 0 && (
                               <span title={alert.reasons.join(" · ")} className="shrink-0">
                                 <Bell
-                                  size={10}
+                                  size={13}
                                   className={alert.severity === "alta" ? "text-danger" : "text-warning"}
                                 />
                               </span>
@@ -215,12 +208,12 @@ export function KanbanBoard({
                           );
                         })()}
                       </p>
-                      {row.service && <p className="mt-0.5 truncate text-[11px] text-ink-faint">{row.service}</p>}
+                      {row.service && <p className="mt-0.5 truncate text-xs text-ink-muted">{row.service}</p>}
 
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                         {row.priority && (
                           <span
-                            className="rounded-full px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase"
+                            className="rounded-full px-2 py-0.5 text-xs font-medium"
                             style={{
                               color: PRIORITY_COLOR[row.priority],
                               backgroundColor: `${PRIORITY_COLOR[row.priority]}1a`,
@@ -231,20 +224,21 @@ export function KanbanBoard({
                         )}
                         {row.leadScore !== null && (
                           <span
-                            className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-mono text-[9px] font-semibold"
+                            className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
                             style={{
                               color: leadScoreColor(row.leadScore),
                               backgroundColor: `${leadScoreColor(row.leadScore)}1a`,
                             }}
                           >
-                            <Sparkles size={9} /> {row.leadScore}
+                            <Sparkles size={12} /> {row.leadScore}
                           </span>
                         )}
                       </div>
 
                       {hasCompleteNextAction(row) ? (
-                        <p className="mt-1.5 flex items-center gap-1 truncate text-[10px] text-ink-muted">
-                          📅 {row.nextAction}
+                        <p className="mt-2.5 flex items-center gap-1.5 truncate border-t border-border pt-2.5 text-xs text-ink-muted">
+                          <CalendarDays size={13} className="shrink-0 text-ink-faint" />
+                          <span className="truncate">{row.nextAction}</span>
                           {(() => {
                             const badge = dueBadge(row.nextActionAt);
                             return (
@@ -257,21 +251,21 @@ export function KanbanBoard({
                           })()}
                         </p>
                       ) : (
-                        <p className="mt-1.5 flex items-center gap-1 text-[10px] text-warning">
-                          <AlertTriangle size={9} />{" "}
+                        <p className="mt-2.5 flex items-center gap-1.5 border-t border-border pt-2.5 text-xs font-medium text-warning">
+                          <AlertTriangle size={13} />{" "}
                           {row.nextAction && row.nextActionAt ? "Sin responsable asignado" : "Sin próxima acción"}
                         </p>
                       )}
 
                       {row.assignedTo && (
-                        <div className="mt-2 flex items-center gap-1.5">
+                        <div className="mt-2.5 flex items-center gap-2">
                           <span
-                            className="h-4 w-4 shrink-0 rounded-full text-center font-mono text-[8px] font-semibold leading-4 text-white"
+                            className="h-5 w-5 shrink-0 rounded-full text-center text-[10px] font-semibold leading-5 text-white"
                             style={{ backgroundColor: vendorColor(row.assignedTo.id, row.assignedTo.color) }}
                           >
                             {row.assignedTo.name.slice(0, 1).toUpperCase()}
                           </span>
-                          <span className="truncate text-[10px] text-ink-faint">
+                          <span className="truncate text-xs text-ink-muted">
                             {row.assignedTo.id === currentUserId ? "Tú" : row.assignedTo.name}
                           </span>
                         </div>
@@ -280,7 +274,7 @@ export function KanbanBoard({
                   );
                 })}
                 {cards.length === 0 && (
-                  <p className="px-1 py-4 text-center text-[11px] text-ink-faint">Sin clientes acá.</p>
+                  <p className="px-1 py-4 text-center text-xs text-ink-faint">Sin clientes acá.</p>
                 )}
               </div>
             </div>

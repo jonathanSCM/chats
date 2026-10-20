@@ -59,10 +59,10 @@ function monthLabel(mes: string): string {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <Card className="py-3">
-      <CardDescription className="mb-1 font-mono text-[11px] uppercase tracking-wide">
+      <CardDescription className="mb-1 text-xs">
         {label}
       </CardDescription>
-      <CardTitle className="font-mono text-xl">{value}</CardTitle>
+      <CardTitle className=" text-xl">{value}</CardTitle>
     </Card>
   );
 }
@@ -135,7 +135,7 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
                     }}
                   />
                 </div>
-                <span className="w-20 shrink-0 text-right font-mono text-ink-muted">
+                <span className="w-20 shrink-0 text-right text-ink-muted">
                   {money.format(m.valor)}
                 </span>
               </div>
@@ -159,7 +159,7 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
                   }}
                 />
               </div>
-              <span className="w-20 shrink-0 text-right font-mono text-ink-muted">
+              <span className="w-20 shrink-0 text-right text-ink-muted">
                 {money.format(s.valor)}
               </span>
             </div>
@@ -169,7 +169,7 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
 
       <Card>
         <CardTitle className="mb-1 text-sm">Días promedio por etapa</CardTitle>
-        <p className="mb-3 text-[11px] text-ink-faint">
+        <p className="mb-3 text-xs text-ink-faint">
           Solo cuenta tramos completos (con salida a otra etapa) — auditados desde la Fase 1, así que
           el histórico todavía es corto.
         </p>
@@ -190,7 +190,7 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
                       }}
                     />
                   </div>
-                  <span className="w-24 shrink-0 text-right font-mono text-ink-muted">
+                  <span className="w-24 shrink-0 text-right text-ink-muted">
                     {s.avgDays.toFixed(1)} días ({s.sampleSize})
                   </span>
                 </>
@@ -203,7 +203,7 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
       <Card>
         <CardTitle className="mb-1 text-sm">Conversión entre etapas</CardTitle>
         {data.historyStartsAt && (
-          <p className="mb-3 text-[11px] text-ink-faint">
+          <p className="mb-3 text-xs text-ink-faint">
             Historial de cambios de etapa desde el{" "}
             {new Date(data.historyStartsAt).toLocaleDateString("es")} — lo anterior a esa fecha se
             cuenta solo por la etapa en la que está cada oportunidad hoy.
@@ -222,8 +222,8 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
                   }}
                 />
               </div>
-              <span className="w-10 shrink-0 text-right font-mono text-ink-muted">{f.count}</span>
-              <span className="w-14 shrink-0 text-right font-mono text-ink-faint">
+              <span className="w-10 shrink-0 text-right text-ink-muted">{f.count}</span>
+              <span className="w-14 shrink-0 text-right text-ink-faint">
                 {f.conversionFromPrev !== null ? `${Math.round(f.conversionFromPrev * 100)}%` : "—"}
               </span>
             </div>
@@ -234,7 +234,7 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
       {data.campaignReport.length > 0 && (
         <Card>
           <CardTitle className="mb-1 text-sm">Leads por campaña/anuncio</CardTitle>
-          <p className="mb-3 text-[11px] text-ink-faint">
+          <p className="mb-3 text-xs text-ink-faint">
             Cada cliente cuenta una sola vez, atribuido a su primer contacto marcado como venido de
             un anuncio. Solo incluye leads de Click-to-WhatsApp con detalle capturado.
           </p>
@@ -254,10 +254,10 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
                   <Td className="max-w-xs truncate" title={c.campaign}>
                     {c.campaign}
                   </Td>
-                  <Td className="font-mono">{c.leads}</Td>
-                  <Td className="font-mono">{c.won}</Td>
-                  <Td className="font-mono">{c.leads > 0 ? `${Math.round((c.won / c.leads) * 100)}%` : "—"}</Td>
-                  <Td className="font-mono">{money.format(c.wonValue)}</Td>
+                  <Td className="">{c.leads}</Td>
+                  <Td className="">{c.won}</Td>
+                  <Td className="">{c.leads > 0 ? `${Math.round((c.won / c.leads) * 100)}%` : "—"}</Td>
+                  <Td className="">{money.format(c.wonValue)}</Td>
                 </Tr>
               ))}
             </tbody>
@@ -283,13 +283,13 @@ export function AnalysisView({ isAdmin }: { isAdmin: boolean }) {
               {data.vendorComparison.map((v) => (
                 <Tr key={v.id}>
                   <Td>{v.name}</Td>
-                  <Td className="font-mono">{v.countOpen}</Td>
-                  <Td className="font-mono">{v.countWon}</Td>
-                  <Td className="font-mono">
+                  <Td className="">{v.countOpen}</Td>
+                  <Td className="">{v.countWon}</Td>
+                  <Td className="">
                     {v.winRate !== null ? `${Math.round(v.winRate * 100)}%` : "—"}
                   </Td>
-                  <Td className="font-mono">{money.format(v.valorGanado)}</Td>
-                  <Td className="font-mono">{money.format(v.ticketPromedio)}</Td>
+                  <Td className="">{money.format(v.valorGanado)}</Td>
+                  <Td className="">{money.format(v.ticketPromedio)}</Td>
                 </Tr>
               ))}
             </tbody>

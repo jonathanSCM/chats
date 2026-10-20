@@ -10,7 +10,7 @@ export default function DataDeletionPage() {
         <Logo />
       </Link>
 
-      <h1 className="mb-2 font-display text-3xl font-bold tracking-tight text-ink">
+      <h1 className="mb-2 text-2xl font-bold text-ink">
         Instrucciones para eliminar tus datos
       </h1>
       <p className="mb-4 text-sm text-ink-faint">
@@ -47,7 +47,7 @@ export default function DataDeletionPage() {
           <p className="mt-2">
             Si eres el dueño de la organización, también puedes exportar y eliminar tus datos
             directamente desde el panel, en{" "}
-            <span className="font-mono text-ink">Organización → Zona de peligro</span>.
+            <span className=" text-ink">Organización → Zona de peligro</span>.
           </p>
         </Section>
 

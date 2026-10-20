@@ -75,8 +75,8 @@ function pct(v: number | null): string {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <Card className="py-3">
-      <CardDescription className="mb-1 font-mono text-[11px] uppercase tracking-wide">{label}</CardDescription>
-      <CardTitle className="font-mono text-xl">{value}</CardTitle>
+      <CardDescription className="mb-1 text-xs">{label}</CardDescription>
+      <CardTitle className=" text-xl">{value}</CardTitle>
     </Card>
   );
 }
@@ -145,7 +145,7 @@ export function MarketingClient({
   return (
     <div className="animate-fade-up space-y-6">
       <div>
-        <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Marketing</h1>
+        <h1 className="mb-1 text-2xl font-bold">Marketing</h1>
         <p className="text-sm text-ink-muted">Embudo comercial conectado al gasto de Meta Ads.</p>
       </div>
 
@@ -283,8 +283,8 @@ export function MarketingClient({
                         }}
                       />
                     </div>
-                    <span className="w-10 shrink-0 text-right font-mono text-ink-muted">{f.count}</span>
-                    <span className="w-12 shrink-0 text-right font-mono text-ink-faint">
+                    <span className="w-10 shrink-0 text-right text-ink-muted">{f.count}</span>
+                    <span className="w-12 shrink-0 text-right text-ink-faint">
                       {i === 0 ? "—" : pct(f.conversionFromPrev)}
                     </span>
                   </div>
@@ -329,14 +329,14 @@ export function MarketingClient({
                       <Td className="max-w-40 truncate" title={r.campaignName}>
                         {r.campaignName || "—"}
                       </Td>
-                      <Td className="font-mono">{money.format(r.spend)}</Td>
-                      <Td className="font-mono">{r.impressions.toLocaleString("es")}</Td>
-                      <Td className="font-mono">{r.clicks.toLocaleString("es")}</Td>
-                      <Td className="font-mono">{r.ctr === null ? "—" : `${(r.ctr * 100).toFixed(2)}%`}</Td>
-                      <Td className="font-mono">{r.leads}</Td>
-                      <Td className="font-mono">{r.ganados}</Td>
-                      <Td className="font-mono">{m(r.CAC)}</Td>
-                      <Td className="font-mono">{r.ROAS === null ? "—" : `${r.ROAS.toFixed(2)}x`}</Td>
+                      <Td className="">{money.format(r.spend)}</Td>
+                      <Td className="">{r.impressions.toLocaleString("es")}</Td>
+                      <Td className="">{r.clicks.toLocaleString("es")}</Td>
+                      <Td className="">{r.ctr === null ? "—" : `${(r.ctr * 100).toFixed(2)}%`}</Td>
+                      <Td className="">{r.leads}</Td>
+                      <Td className="">{r.ganados}</Td>
+                      <Td className="">{m(r.CAC)}</Td>
+                      <Td className="">{r.ROAS === null ? "—" : `${r.ROAS.toFixed(2)}x`}</Td>
                     </Tr>
                   ))}
                 </tbody>

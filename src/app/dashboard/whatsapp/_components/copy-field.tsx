@@ -14,7 +14,7 @@ export function CopyField({ label, value }: { label: string; value: string }) {
 
   return (
     <div className="space-y-1.5">
-      <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">{label}</p>
+      <p className="text-xs font-medium text-ink-muted">{label}</p>
       <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
         <code className="flex-1 truncate text-xs text-ink-muted">{value}</code>
         <button

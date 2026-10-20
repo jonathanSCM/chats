@@ -1,3 +1,4 @@
+import { STATUS_COLOR } from "@/lib/status-colors";
 import type { PipelineStageRole } from "@/generated/prisma/enums";
 
 /**
@@ -154,9 +155,9 @@ export function missingForStage(
 export type Priority = "ALTA" | "MEDIA" | "BAJA";
 
 export const PRIORITY_COLOR: Record<Priority, string> = {
-  ALTA: "#dc2626",
-  MEDIA: "#ca8a04",
-  BAJA: "#64748b",
+  ALTA: STATUS_COLOR.danger,
+  MEDIA: STATUS_COLOR.warning,
+  BAJA: STATUS_COLOR.neutral,
 };
 
 /** Servicios de arranque para una organización nueva (ver server/services/services-catalog.ts). */

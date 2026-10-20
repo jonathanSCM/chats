@@ -15,7 +15,7 @@ function List({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null;
   return (
     <div>
-      <p className="mb-0.5 font-mono text-[10px] uppercase tracking-wide text-ink-faint">{title}</p>
+      <p className="mb-0.5 text-xs text-ink-faint">{title}</p>
       <ul className="list-disc space-y-0.5 pl-4 text-xs text-ink">
         {items.map((item, i) => (
           <li key={i}>{item}</li>
@@ -133,7 +133,7 @@ export function MeetingAiSummary({
           <List title="Decisiones" items={summary.decisiones} />
           {summary.proximosPasos.length > 0 && (
             <div>
-              <p className="mb-0.5 font-mono text-[10px] uppercase tracking-wide text-ink-faint">Próximos pasos</p>
+              <p className="mb-0.5 text-xs text-ink-faint">Próximos pasos</p>
               <ul className="list-disc space-y-0.5 pl-4 text-xs text-ink">
                 {summary.proximosPasos.map((p, i) => (
                   <li key={i}>
@@ -147,7 +147,7 @@ export function MeetingAiSummary({
           )}
           {(commercial.length > 0 || (c && (c.objeciones.length > 0 || c.acuerdos.length > 0))) && (
             <div className="space-y-1.5 rounded-md border border-border bg-surface-2/40 p-2.5">
-              <p className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">Información comercial</p>
+              <p className=" text-xs text-ink-faint">Información comercial</p>
               {commercial.map(([label, value]) => (
                 <p key={label} className="text-xs text-ink">
                   <span className="text-ink-muted">{label}: </span>
@@ -173,14 +173,14 @@ export function MeetingAiSummary({
             type="button"
             disabled={pending}
             onClick={run}
-            className="flex items-center gap-1.5 rounded-full border border-accent-dim/40 bg-accent-dim/10 px-2.5 py-1 text-[11px] text-accent transition-colors hover:bg-accent-dim/20 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-full border border-accent-dim/40 bg-accent-dim/10 px-2.5 py-1 text-xs text-accent transition-colors hover:bg-accent-dim/20 disabled:opacity-50"
           >
             {summary ? <RefreshCw size={11} className={pending ? "animate-spin" : ""} /> : <Sparkles size={11} />}
             {pending ? "Generando…" : summary ? "Actualizar resumen" : "Generar resumen"}
           </button>
         )}
         {summarizedAt && (
-          <span className="text-[11px] text-ink-faint">Generado {new Date(summarizedAt).toLocaleString("es")}</span>
+          <span className="text-xs text-ink-faint">Generado {new Date(summarizedAt).toLocaleString("es")}</span>
         )}
       </div>
       {summary && canApply && !review && (
@@ -189,11 +189,11 @@ export function MeetingAiSummary({
             type="button"
             disabled={pending}
             onClick={openReview}
-            className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-ink-muted transition-colors hover:border-accent-dim hover:text-accent disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-ink-muted transition-colors hover:border-accent-dim hover:text-accent disabled:opacity-50"
           >
             <ClipboardCheck size={11} /> Aplicar a la oportunidad
           </button>
-          {applied && <span className="text-[11px] text-accent">{applied}</span>}
+          {applied && <span className="text-xs text-accent">{applied}</span>}
         </div>
       )}
 
@@ -201,7 +201,7 @@ export function MeetingAiSummary({
         <div className="space-y-2 rounded-md border border-accent-dim/40 bg-accent-dim/5 p-3">
           <p className="text-xs font-medium text-ink">Revisá qué pasar a &quot;{review.title}&quot;</p>
           {review.appliedAt && (
-            <p className="text-[11px] text-ink-faint">
+            <p className="text-xs text-ink-faint">
               Ya se aplicó una vez el {new Date(review.appliedAt).toLocaleString("es")}.
             </p>
           )}
@@ -217,7 +217,7 @@ export function MeetingAiSummary({
                   />
                   <span className="min-w-0">
                     <span className="font-medium text-ink">{p.label}</span>
-                    <span className="ml-1.5 rounded-full bg-surface-2 px-1.5 py-0.5 font-mono text-[9px] uppercase text-ink-faint">
+                    <span className="ml-1.5 rounded-full bg-surface-2 px-1.5 py-0.5 text-xs text-ink-faint">
                       {p.mode === "fill" ? "completa" : p.mode === "append" ? "agrega" : "reemplaza"}
                     </span>
                     {p.current && p.mode !== "append" && (
@@ -234,7 +234,7 @@ export function MeetingAiSummary({
               type="button"
               disabled={pending || checked.size === 0}
               onClick={applySelected}
-              className="rounded-full border border-accent-dim/40 bg-accent-dim/10 px-3 py-1 text-[11px] text-accent transition-colors hover:bg-accent-dim/20 disabled:opacity-50"
+              className="rounded-full border border-accent-dim/40 bg-accent-dim/10 px-3 py-1 text-xs text-accent transition-colors hover:bg-accent-dim/20 disabled:opacity-50"
             >
               {pending ? "Aplicando…" : `Aplicar ${checked.size} campo${checked.size === 1 ? "" : "s"}`}
             </button>
@@ -242,7 +242,7 @@ export function MeetingAiSummary({
               type="button"
               disabled={pending}
               onClick={() => setReview(null)}
-              className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-muted hover:text-ink"
+              className="rounded-full border border-border px-3 py-1 text-xs text-ink-muted hover:text-ink"
             >
               Cancelar
             </button>

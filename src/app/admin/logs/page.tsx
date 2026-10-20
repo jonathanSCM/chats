@@ -46,7 +46,7 @@ export default async function AdminLogsPage() {
 
   return (
     <div className="animate-fade-up">
-      <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Registro</h1>
+      <h1 className="mb-1 text-2xl font-bold">Registro</h1>
       <p className="mb-8 text-sm text-ink-muted">
         Conexiones, desconexiones y ediciones de administración (últimas 200). Los eventos anteriores a
         esta función no aparecen.
@@ -68,7 +68,7 @@ export default async function AdminLogsPage() {
           <tbody>
             {logs.map((l) => (
               <Tr key={l.id}>
-                <Td className="whitespace-nowrap font-mono text-xs">{l.createdAt.toLocaleString("es")}</Td>
+                <Td className="whitespace-nowrap text-xs">{l.createdAt.toLocaleString("es")}</Td>
                 <Td>
                   <Badge tone={DANGER_ACTIONS.has(l.action) ? "danger" : "accent"}>
                     {ACTION_LABEL[l.action] ?? l.action}
@@ -76,7 +76,7 @@ export default async function AdminLogsPage() {
                 </Td>
                 <Td className="text-ink-muted">{l.organizationId ? (orgById.get(l.organizationId) ?? "—") : "—"}</Td>
                 <Td className="text-ink-muted">{l.userId ? (emailById.get(l.userId) ?? "—") : "Sistema"}</Td>
-                <Td className="max-w-xs break-words font-mono text-[11px] text-ink-faint">
+                <Td className="max-w-xs break-words text-xs text-ink-faint">
                   {describe(l.before, l.after)}
                 </Td>
               </Tr>

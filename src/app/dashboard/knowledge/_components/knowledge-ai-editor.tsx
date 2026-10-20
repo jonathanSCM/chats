@@ -73,7 +73,7 @@ function ChangeDiff({ change }: { change: ProposedChange }) {
   });
 
   return (
-    <div className="max-h-64 overflow-y-auto rounded-md border border-border bg-surface-2/40 p-2 font-mono text-[11px] leading-relaxed">
+    <div className="max-h-64 overflow-y-auto rounded-md border border-border bg-surface-2/40 p-2 text-xs leading-relaxed">
       {shown.map((l, i) => (
         <div
           key={i}
@@ -196,7 +196,7 @@ export function KnowledgeAiEditor({ history }: { history: AiEditEntry[] }) {
               type="button"
               disabled={pending}
               onClick={() => send(ex)}
-              className="rounded-full border border-border px-2.5 py-1 text-left text-[11px] text-ink-muted transition-colors hover:border-accent-dim hover:text-accent"
+              className="rounded-full border border-border px-2.5 py-1 text-left text-xs text-ink-muted transition-colors hover:border-accent-dim hover:text-accent"
             >
               {ex}
             </button>
@@ -237,7 +237,7 @@ export function KnowledgeAiEditor({ history }: { history: AiEditEntry[] }) {
                             }
                           />
                           <span className="min-w-0 text-xs">
-                            <span className="mr-1.5 rounded-full bg-surface-2 px-1.5 py-0.5 font-mono text-[9px] uppercase text-ink-faint">
+                            <span className="mr-1.5 rounded-full bg-surface-2 px-1.5 py-0.5 text-xs text-ink-faint">
                               {ACTION_LABEL[c.action]}
                             </span>
                             <span className="font-medium text-ink">{c.before?.title ?? c.title}</span>
@@ -249,7 +249,7 @@ export function KnowledgeAiEditor({ history }: { history: AiEditEntry[] }) {
                     ))}
 
                     {t.proposal.dropped.length > 0 && (
-                      <p className="text-[11px] text-ink-faint">
+                      <p className="text-xs text-ink-faint">
                         No se propuso: {t.proposal.dropped.join("; ")}.
                       </p>
                     )}
@@ -329,7 +329,7 @@ export function KnowledgeAiEditor({ history }: { history: AiEditEntry[] }) {
         <ul className="mt-4 space-y-1.5 border-t border-border pt-3">
           {history.map((h) => (
             <li key={h.id} className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="rounded-full bg-surface-2 px-1.5 py-0.5 font-mono text-[9px] uppercase text-ink-faint">
+              <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-xs text-ink-faint">
                 {HISTORY_LABEL[h.action] ?? h.action}
               </span>
               <span className="min-w-0 flex-1 truncate text-ink" title={h.reason ?? undefined}>

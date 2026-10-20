@@ -33,11 +33,11 @@ export function OrgSwitcher({
         disabled={isPending}
         onClick={() => setOpen((v) => !v)}
         title="Cambiar de organización"
-        className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm text-ink-muted transition-colors hover:bg-surface-2/60 hover:text-ink disabled:opacity-50"
+        className="nav-item flex h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-medium text-[var(--sidebar-ink)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-ink-strong)] disabled:opacity-50"
       >
-        <Building2 size={16} className="shrink-0" />
-        <span className="flex-1 truncate text-left">{current?.organizationName ?? "Sin organización"}</span>
-        <ChevronDown size={14} className="shrink-0" />
+        <Building2 size={18} className="shrink-0" />
+        <span className="nav-label flex-1 truncate text-left">{current?.organizationName ?? "Sin organización"}</span>
+        <ChevronDown size={14} className="nav-extra shrink-0" />
       </button>
 
       {open && (

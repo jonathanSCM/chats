@@ -12,7 +12,7 @@ export default async function AdminSettingsPage() {
 
   return (
     <div className="max-w-xl animate-fade-up">
-      <h1 className="mb-1 font-display text-2xl font-semibold tracking-tight">Configuración</h1>
+      <h1 className="mb-1 text-2xl font-bold">Configuración</h1>
       <p className="mb-8 text-sm text-ink-muted">
         Credenciales de la app de Meta que usa toda la plataforma para Coexistence / Embedded
         Signup. Se guardan cifradas en la base de datos — cambiarlas aquí no requiere redesplegar.

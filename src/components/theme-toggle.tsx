@@ -21,11 +21,11 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm text-ink-muted transition-colors hover:bg-surface-2/60 hover:text-ink"
+      className="nav-item flex h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-medium text-[var(--sidebar-ink)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-ink-strong)]"
       title={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
     >
-      {isDark ? <Sun size={16} /> : <Moon size={16} />}
-      {isDark ? "Modo claro" : "Modo oscuro"}
+      {isDark ? <Sun size={18} /> : <Moon size={18} />}
+      <span className="nav-label">{isDark ? "Modo claro" : "Modo oscuro"}</span>
     </button>
   );
 }

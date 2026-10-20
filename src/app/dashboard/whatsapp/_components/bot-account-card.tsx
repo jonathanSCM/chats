@@ -198,7 +198,7 @@ export function BotAccountCard({
               {confirmActivate ? "¿Seguro? Toca de nuevo" : aiEnabled ? "Activado" : "Apagado"}
             </button>
             {confirmActivate && (
-              <p className="max-w-[12rem] text-right text-[10px] text-warning">
+              <p className="max-w-[12rem] text-right text-xs text-warning">
                 Sin teléfono de prueba, contesta a todos los leads nuevos ya mismo.
               </p>
             )}

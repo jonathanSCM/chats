@@ -56,13 +56,13 @@ export function BotAccessMatrix({
       <table className="w-full border-separate border-spacing-0 text-sm">
         <thead>
           <tr>
-            <th className="sticky left-0 border-b border-border bg-surface px-2 py-2 text-left font-mono text-[11px] uppercase tracking-wide text-ink-muted">
+            <th className="sticky left-0 border-b border-border bg-surface px-2 py-2 text-left text-xs text-ink-muted">
               Vendedor
             </th>
             {bots.map((bot) => (
               <th
                 key={bot.id}
-                className="whitespace-nowrap border-b border-border px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wide text-ink-muted"
+                className="whitespace-nowrap border-b border-border px-3 py-2 text-left text-xs text-ink-muted"
               >
                 {bot.name}
               </th>

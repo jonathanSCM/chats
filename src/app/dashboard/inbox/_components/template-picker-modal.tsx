@@ -181,7 +181,7 @@ export function TemplatePickerModal({
               ))}
 
               <div className="rounded-md bg-surface-2 p-3">
-                <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink-faint">
+                <p className="mb-1 text-xs font-medium text-ink-faint">
                   Vista previa
                 </p>
                 <p className="whitespace-pre-wrap text-sm text-ink">

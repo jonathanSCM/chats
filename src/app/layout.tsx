@@ -1,22 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Inter, IBM_Plex_Mono } from "next/font/google";
 import { StaleActionReload } from "@/components/stale-action-reload";
 import "./globals.css";
 
-const display = Bricolage_Grotesque({
-  variable: "--font-display",
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
-});
-
-const sans = IBM_Plex_Sans({
+// Inter es la única tipografía de la interfaz (guía de rediseño). La monoespaciada
+// queda solo para identificadores técnicos (`font-code`).
+const sans = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const mono = IBM_Plex_Mono({
-  variable: "--font-mono",
+const code = IBM_Plex_Mono({
+  variable: "--font-code",
   subsets: ["latin"],
   weight: ["400", "500"],
 });
@@ -39,7 +35,7 @@ export const metadata: Metadata = {
 // viewportFit cover + maximumScale evitan el zoom al enfocar inputs en iOS
 // y dejan que la app use la pantalla completa cuando se instala.
 export const viewport: Viewport = {
-  themeColor: "#0d0d0f",
+  themeColor: "#172333",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -69,7 +65,7 @@ export default function RootLayout({
     <html
       lang="es"
       suppressHydrationWarning
-      className={`${display.variable} ${sans.variable} ${mono.variable} h-full antialiased`}
+      className={`${sans.variable} ${code.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />

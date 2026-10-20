@@ -10,7 +10,7 @@ export default function TermsPage() {
         <Logo />
       </Link>
 
-      <h1 className="mb-2 font-display text-3xl font-bold tracking-tight text-ink">
+      <h1 className="mb-2 text-2xl font-bold text-ink">
         Términos de servicio
       </h1>
       <p className="mb-4 text-sm text-ink-faint">Última actualización: {new Date().toLocaleDateString("es")}</p>

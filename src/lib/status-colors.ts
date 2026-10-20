@@ -6,6 +6,8 @@ export const STATUS_COLOR = {
   success: "#00a884",
   danger: "#ef4444",
   warning: "#f59e0b",
+  orange: "#f97316",
+  purple: "#8b5cf6",
   info: "#3b82f6",
   neutral: "#64748b",
 } as const;

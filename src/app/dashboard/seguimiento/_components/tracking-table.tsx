@@ -31,6 +31,7 @@ import {
   Ban,
   Search,
   SlidersHorizontal,
+  MessageSquareText,
 } from "lucide-react";
 import {
   createOpportunityAction,
@@ -999,7 +1000,7 @@ function SortableTh({
     <th
       title={title}
       className={`sticky top-0 h-11 whitespace-nowrap border-b border-border bg-surface-2 px-1 text-left text-xs font-semibold ${
-        frozen ? "left-0 z-30 shadow-[2px_0_6px_-4px_rgba(15,23,42,0.35)]" : "z-20"
+        frozen ? "left-0 z-30 w-44 min-w-44 max-w-44 shadow-[2px_0_6px_-4px_rgba(15,23,42,0.35)]" : "z-20"
       } ${ai ? "text-accent" : "text-ink-muted"}`}
     >
       <button
@@ -1167,11 +1168,11 @@ function TableRow({
         {dateShort(row.registeredAt)}
       </Td>
 
-      <Td className="sticky left-0 z-10 max-w-[10rem] bg-surface shadow-[2px_0_6px_-4px_rgba(15,23,42,0.35)] group-hover:bg-surface-2">
+      <Td className="sticky left-0 z-10 w-44 min-w-44 max-w-44 overflow-hidden bg-surface shadow-[2px_0_6px_-4px_rgba(15,23,42,0.35)] group-hover:bg-surface-2">
         <button
           type="button"
           onClick={onOpen}
-          className="flex items-center gap-1 truncate text-left font-medium text-ink hover:text-accent"
+          className="flex w-full min-w-0 items-center gap-1 text-left font-medium text-ink hover:text-accent"
         >
           <span className="truncate">{row.client || "—"}</span>
           {alert.reasons.length > 0 && (
@@ -1181,12 +1182,12 @@ function TableRow({
           )}
         </button>
         {row.assignedTo ? (
-          <span className="mt-1 flex items-center gap-1.5 text-xs text-ink-faint">
+          <span className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-ink-faint">
             <span
-              className="h-1.5 w-1.5 rounded-full"
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
               style={{ backgroundColor: vendorColor(row.assignedTo.id, row.assignedTo.color) }}
             />
-            {row.assignedTo.name}
+            <span className="truncate">{row.assignedTo.name}</span>
           </span>
         ) : (
           <span className="mt-1 block text-xs italic text-ink-faint">Sin asignar</span>
@@ -1413,23 +1414,38 @@ function AnalyzeButton({
   );
 }
 
-function CopyableMessage({ text }: { text: string }) {
+function CopyableMessage({ text, full }: { text: string; full?: boolean }) {
   const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
+  // Detalle: mensaje completo y botón "Copiar" (referencia de la guía §6.3).
+  if (full) {
+    return (
+      <div>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-muted">{text}</p>
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={copy}
+            className="flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-border-strong bg-surface px-3.5 text-[13px] font-medium text-ink hover:bg-surface-2"
+          >
+            {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? "Copiado" : "Copiar"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Tabla: compacto (2 líneas); el texto completo está en el detalle.
   return (
-    <div className="flex items-start gap-1.5">
-      <p className="line-clamp-3 w-48 text-sm leading-relaxed text-ink">{text}</p>
-      <button
-        type="button"
-        onClick={() => {
-          navigator.clipboard.writeText(text);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        }}
-        title="Copiar mensaje"
-        className="shrink-0 cursor-pointer text-ink-faint hover:text-accent"
-      >
-        {copied ? <Check size={13} /> : <Copy size={13} />}
+    <div className="flex items-start gap-1.5" title={text}>
+      <p className="line-clamp-2 w-48 text-[13px] leading-snug text-ink">{text}</p>
+      <button type="button" onClick={copy} title="Copiar mensaje" className="shrink-0 cursor-pointer text-ink-faint hover:text-accent">
+        {copied ? <Check size={14} /> : <Copy size={14} />}
       </button>
     </div>
   );
@@ -1881,20 +1897,25 @@ function DetailPanel({
               </div>
             )}
 
-            <Field label="Recomendación para cerrar">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">
-                {row.aiRecommendation || "Todavía sin análisis."}
-              </p>
-            </Field>
-
-            <div className="mt-3">
-              <Field label="Mensaje sugerido">
+            <div className="rounded-lg border border-border bg-surface">
+              <div className="p-4">
+                <p className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-ink">
+                  <Sparkles size={16} className="text-[#8b5cf6]" /> Siguiente mejor acción
+                </p>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-muted">
+                  {row.aiRecommendation || "Todavía sin análisis."}
+                </p>
+              </div>
+              <div className="border-t border-border p-4">
+                <p className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-ink">
+                  <MessageSquareText size={16} className="text-ink-muted" /> Mensaje sugerido
+                </p>
                 {row.aiSuggestedMessage ? (
-                  <CopyableMessage text={row.aiSuggestedMessage} />
+                  <CopyableMessage text={row.aiSuggestedMessage} full />
                 ) : (
                   <p className="text-sm text-ink-faint">Todavía sin análisis.</p>
                 )}
-              </Field>
+              </div>
             </div>
 
             {row.aiMemory && (

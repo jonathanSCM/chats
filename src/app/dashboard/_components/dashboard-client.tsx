@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, CalendarDays, Layers, AlarmClock, CircleSlash, Flame, Trophy, Percent, Hourglass, type LucideIcon } from "lucide-react";
+import { Loader2, CalendarDays, Users, Clock, CalendarX, AlertTriangle, BarChart3, Flame, Trophy, Hourglass, type LucideIcon } from "lucide-react";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, Thead, Th, Td, Tr } from "@/components/ui/table";
 import { Input, Select } from "@/components/ui/input";
@@ -87,17 +87,10 @@ function Stat({
   color: string;
 }) {
   const content = (
-    <Card className={`flex h-full items-start justify-between gap-3 p-4 ${href ? "transition-colors duration-[180ms] hover:border-border-strong" : ""}`}>
-      <div className="min-w-0">
-        <CardDescription className="mb-1.5 text-xs font-medium">{label}</CardDescription>
-        <p className="text-[30px] font-bold leading-none text-ink">{value}</p>
-      </div>
-      <span
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-        style={{ color, backgroundColor: `${color}1a` }}
-      >
-        <Icon size={18} />
-      </span>
+    <Card className={`h-full p-4 ${href ? "transition-colors duration-[180ms] hover:border-border-strong" : ""}`}>
+      <Icon size={18} style={{ color }} className="mb-3" />
+      <p className="text-[30px] font-bold leading-none text-ink">{value}</p>
+      <CardDescription className="mt-1.5 text-xs font-medium">{label}</CardDescription>
     </Card>
   );
   return href ? (
@@ -114,13 +107,11 @@ function HealthRow({ href, icon: Icon, color, label, value }: { href: string; ic
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 text-sm transition-colors duration-[180ms] hover:bg-surface-2/60"
+      className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm transition-colors duration-[180ms] hover:bg-surface-2/60"
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ color, backgroundColor: `${color}1a` }}>
-        <Icon size={16} />
-      </span>
+      <Icon size={18} style={{ color }} className="shrink-0" />
       <span className="flex-1 font-medium text-ink">{label}</span>
-      <span className="text-lg font-bold" style={{ color: value > 0 ? color : undefined }}>
+      <span className="text-lg font-bold" style={{ color }}>
         {value}
       </span>
     </Link>
@@ -239,27 +230,27 @@ export function DashboardClient({
       {data && (
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-            <Stat label="Oportunidades activas" value={String(data.kpis.activas)} href={seguimientoHref({})} icon={Layers} color={STATUS_COLOR.info} />
+            <Stat label="Oportunidades activas" value={String(data.kpis.activas)} href={seguimientoHref({})} icon={Users} color={STATUS_COLOR.success} />
             <Stat
               label="Acciones vencidas"
               value={String(data.kpis.vencidas)}
               href={seguimientoHref({ quick: "vencidos" })}
-              icon={AlarmClock}
+              icon={Clock}
               color={STATUS_COLOR.danger}
             />
             <Stat
               label="Sin próxima acción"
               value={String(data.kpis.sinProximaAccion)}
               href={seguimientoHref({ quick: "sin_accion" })}
-              icon={CircleSlash}
-              color={STATUS_COLOR.warning}
+              icon={CalendarX}
+              color={STATUS_COLOR.orange}
             />
             <Stat
               label="Prioridad alta"
               value={String(data.kpis.altaPrioridad)}
               href={seguimientoHref({ quick: "alta" })}
               icon={Flame}
-              color={STATUS_COLOR.danger}
+              color={STATUS_COLOR.orange}
             />
             <Stat
               label="Ganadas"
@@ -272,7 +263,7 @@ export function DashboardClient({
               icon={Trophy}
               color={STATUS_COLOR.success}
             />
-            <Stat label="Tasa de conversión" value={pct(data.kpis.tasaConversion)} icon={Percent} color={STATUS_COLOR.info} />
+            <Stat label="Tasa de conversión" value={pct(data.kpis.tasaConversion)} icon={BarChart3} color={STATUS_COLOR.purple} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -318,9 +309,9 @@ export function DashboardClient({
             <Card>
               <CardTitle className="mb-4 text-base">Salud del pipeline</CardTitle>
               <div className="space-y-2">
-                <HealthRow href={seguimientoHref({ quick: "vencidos" })} icon={AlarmClock} color={STATUS_COLOR.danger} label="Acciones vencidas" value={data.kpis.vencidas} />
-                <HealthRow href={seguimientoHref({ quick: "sin_accion" })} icon={CircleSlash} color={STATUS_COLOR.warning} label="Sin próxima acción" value={data.kpis.sinProximaAccion} />
-                <HealthRow href={seguimientoHref({ quick: "atencion" })} icon={Hourglass} color={STATUS_COLOR.info} label="Oportunidades estancadas" value={data.kpis.estancadas} />
+                <HealthRow href={seguimientoHref({ quick: "vencidos" })} icon={AlertTriangle} color={STATUS_COLOR.danger} label="Acciones vencidas" value={data.kpis.vencidas} />
+                <HealthRow href={seguimientoHref({ quick: "sin_accion" })} icon={CalendarX} color={STATUS_COLOR.orange} label="Sin próxima acción" value={data.kpis.sinProximaAccion} />
+                <HealthRow href={seguimientoHref({ quick: "atencion" })} icon={Hourglass} color={STATUS_COLOR.purple} label="Oportunidades estancadas" value={data.kpis.estancadas} />
               </div>
             </Card>
           </div>

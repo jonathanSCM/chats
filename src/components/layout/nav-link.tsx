@@ -31,7 +31,7 @@ export function NavLink({
       className={cn(
         "nav-item flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
         active
-          ? "bg-[var(--sidebar-active)] text-[var(--sidebar-ink-strong)]"
+          ? "bg-[var(--sidebar-active)] font-semibold text-accent-dim"
           : "text-[var(--sidebar-ink)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-ink-strong)]",
       )}
     >

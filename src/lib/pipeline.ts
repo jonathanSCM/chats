@@ -156,8 +156,8 @@ export type Priority = "ALTA" | "MEDIA" | "BAJA";
 
 export const PRIORITY_COLOR: Record<Priority, string> = {
   ALTA: STATUS_COLOR.danger,
-  MEDIA: STATUS_COLOR.warning,
-  BAJA: STATUS_COLOR.neutral,
+  MEDIA: STATUS_COLOR.orange,
+  BAJA: STATUS_COLOR.purple,
 };
 
 /** Servicios de arranque para una organización nueva (ver server/services/services-catalog.ts). */

@@ -2,13 +2,19 @@
 
 import { DUE_COLOR, leadScoreColor } from "@/lib/status-colors";
 import { useRef, useState, useTransition } from "react";
-import { Sparkles, AlertTriangle, Bell, CalendarDays } from "lucide-react";
+import { Sparkles, AlertTriangle, Bell, CalendarDays, User } from "lucide-react";
 import { updateOpportunityFieldAction } from "@/server/actions/crm";
 import { PRIORITY_COLOR, hasCompleteNextAction, missingForStage } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 import { deriveAlerts, urgencyRank } from "@/lib/opportunity-alerts";
 import type { Row } from "./tracking-table";
 import type { PipelineStage } from "@/server/services/pipeline";
+
+/** Iniciales para el avatar de la tarjeta (máximo dos letras). */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[1][0] : "")).toUpperCase() || "?";
+}
 
 function dateShort(iso: string | null): string {
   if (!iso) return "";
@@ -192,84 +198,95 @@ export function KanbanBoard({
                         draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                       }`}
                     >
-                      <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-ink">
-                        <span className="truncate">{row.client || row.phone}</span>
-                        {(() => {
-                          const alert = deriveAlerts(row, todayStr);
-                          return (
-                            alert.reasons.length > 0 && (
-                              <span title={alert.reasons.join(" · ")} className="shrink-0">
-                                <Bell
-                                  size={13}
-                                  className={alert.severity === "alta" ? "text-danger" : "text-warning"}
-                                />
-                              </span>
-                            )
-                          );
-                        })()}
-                      </p>
-                      {row.service && <p className="mt-0.5 truncate text-xs text-ink-muted">{row.service}</p>}
-
-                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                        {row.priority && (
-                          <span
-                            className="rounded-full px-2 py-0.5 text-xs font-medium"
-                            style={{
-                              color: PRIORITY_COLOR[row.priority],
-                              backgroundColor: `${PRIORITY_COLOR[row.priority]}1a`,
-                            }}
-                          >
-                            {row.priority}
-                          </span>
-                        )}
-                        {row.leadScore !== null && (
-                          <span
-                            className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-                            style={{
-                              color: leadScoreColor(row.leadScore),
-                              backgroundColor: `${leadScoreColor(row.leadScore)}1a`,
-                            }}
-                          >
-                            <Sparkles size={12} /> {row.leadScore}
-                          </span>
-                        )}
+                      {/* Identidad del cliente */}
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#8b5cf6]/12 text-xs font-semibold text-[#8b5cf6]">
+                          {initials(row.client || row.phone)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                            <span className="truncate">{row.client || row.phone}</span>
+                            {(() => {
+                              const alert = deriveAlerts(row, todayStr);
+                              return (
+                                alert.reasons.length > 0 && (
+                                  <span title={alert.reasons.join(" · ")} className="shrink-0">
+                                    <Bell size={13} className={alert.severity === "alta" ? "text-danger" : "text-warning"} />
+                                  </span>
+                                )
+                              );
+                            })()}
+                          </p>
+                          {row.service && <p className="truncate text-xs text-ink-muted">{row.service}</p>}
+                        </div>
                       </div>
 
+                      {/* Prioridad y calificación */}
+                      {(row.priority || row.leadScore !== null) && (
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                          {row.priority && (
+                            <span
+                              className="rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                              style={{
+                                color: PRIORITY_COLOR[row.priority],
+                                backgroundColor: `${PRIORITY_COLOR[row.priority]}1a`,
+                              }}
+                            >
+                              {row.priority[0] + row.priority.slice(1).toLowerCase()}
+                            </span>
+                          )}
+                          {row.leadScore !== null && (
+                            <span
+                              className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                              style={{
+                                color: leadScoreColor(row.leadScore),
+                                backgroundColor: `${leadScoreColor(row.leadScore)}1a`,
+                              }}
+                            >
+                              <Sparkles size={12} /> {row.leadScore}/100
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Próxima acción */}
                       {hasCompleteNextAction(row) ? (
-                        <p className="mt-2.5 flex items-center gap-1.5 truncate border-t border-border pt-2.5 text-xs text-ink-muted">
-                          <CalendarDays size={13} className="shrink-0 text-ink-faint" />
+                        <p className="mt-3 flex items-center gap-2 text-[13px] text-ink-muted">
+                          <CalendarDays size={14} className="shrink-0 text-ink-faint" />
                           <span className="truncate">{row.nextAction}</span>
-                          {(() => {
-                            const badge = dueBadge(row.nextActionAt);
-                            return (
-                              badge && (
-                                <span className="font-semibold" style={{ color: badge.color }}>
-                                  {badge.text}
-                                </span>
-                              )
-                            );
-                          })()}
                         </p>
                       ) : (
-                        <p className="mt-2.5 flex items-center gap-1.5 border-t border-border pt-2.5 text-xs font-medium text-warning">
-                          <AlertTriangle size={13} />{" "}
+                        <p className="mt-3 flex items-center gap-2 text-xs font-medium text-warning">
+                          <AlertTriangle size={14} className="shrink-0" />
                           {row.nextAction && row.nextActionAt ? "Sin responsable asignado" : "Sin próxima acción"}
                         </p>
                       )}
 
-                      {row.assignedTo && (
-                        <div className="mt-2.5 flex items-center gap-2">
-                          <span
-                            className="h-5 w-5 shrink-0 rounded-full text-center text-[10px] font-semibold leading-5 text-white"
-                            style={{ backgroundColor: vendorColor(row.assignedTo.id, row.assignedTo.color) }}
-                          >
-                            {row.assignedTo.name.slice(0, 1).toUpperCase()}
-                          </span>
-                          <span className="truncate text-xs text-ink-muted">
-                            {row.assignedTo.id === currentUserId ? "Tú" : row.assignedTo.name}
-                          </span>
-                        </div>
-                      )}
+                      {/* Plazo y responsable */}
+                      {(() => {
+                        const badge = hasCompleteNextAction(row) ? dueBadge(row.nextActionAt) : null;
+                        if (!badge && !row.assignedTo) return null;
+                        return (
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            {badge ? (
+                              <span
+                                className="rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                                style={{ color: badge.color, backgroundColor: `color-mix(in srgb, ${badge.color} 12%, transparent)` }}
+                              >
+                                {badge.text}
+                              </span>
+                            ) : (
+                              <span />
+                            )}
+                            {row.assignedTo && (
+                              <span className="flex min-w-0 items-center gap-1.5 text-xs text-ink-muted">
+                                <User size={13} className="shrink-0" style={{ color: vendorColor(row.assignedTo.id, row.assignedTo.color) }} />
+                                <span className="truncate">{row.assignedTo.id === currentUserId ? "Tú" : row.assignedTo.name}</span>
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </button>
                   );
                 })}

@@ -288,6 +288,25 @@ textarea {
   padding-right: 0;
 }
 
+/* 768–1023 px: el menú queda contraído (solo íconos) para dejar espacio al contenido (guía §9). */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .app-sidebar,
+  :root[data-sidebar="closed"] .app-sidebar {
+    width: 68px;
+  }
+
+  .app-sidebar .nav-label,
+  .app-sidebar .nav-extra {
+    display: none;
+  }
+
+  .app-sidebar .nav-item {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
 /* El botón de plegado renderiza ambos íconos; el CSS muestra el correcto. */
 .icon-when-closed,
 :root[data-sidebar="closed"] .icon-when-open {

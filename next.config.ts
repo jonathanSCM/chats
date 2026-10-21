@@ -13,14 +13,6 @@ const nextConfig: NextConfig = {
   // hace que se cargue directo desde node_modules (el Dockerfile copia
   // node_modules completo, así que siempre está disponible).
   serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
-  // La raíz (/) muestra la landing estática (public/landing); /login sigue siendo el acceso al CRM.
-  async rewrites() {
-    return {
-      beforeFiles: [{ source: "/", destination: "/landing/index.html" }],
-      afterFiles: [],
-      fallback: [],
-    };
-  },
   experimental: {
     serverActions: {
       // El límite de Next.js por defecto es 1MB — muy por debajo de una

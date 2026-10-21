@@ -14,11 +14,8 @@ export function isMeetingBotEnabled(): boolean {
   return Boolean(process.env.VEXA_API_URL && process.env.VEXA_API_KEY);
 }
 
-/** El código de la reunión (lo que va después de "meet.google.com/"). */
-export function extractMeetCode(meetingUrl: string): string | null {
-  const match = meetingUrl.match(/meet\.google\.com\/([a-z0-9-]+)/i);
-  return match ? match[1] : null;
-}
+export { extractMeetCode } from "@/lib/meet-code";
+import { extractMeetCode } from "@/lib/meet-code";
 
 /**
  * Encola (o reprograma si ya estaba encolado) que el bot entre a esta

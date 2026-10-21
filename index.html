@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <script>document.documentElement.classList.add('js')</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#241338" />
+  <meta name="description" content="CRM ProShop: inteligencia comercial conectada a WhatsApp, Meta y reuniones. ProShop es Meta Tech Provider. Prioriza leads, recibe recomendaciones y activa el siguiente mejor seguimiento." />
+  <meta property="og:title" content="CRM ProShop | Menos dudas. Mejores acciones comerciales." />
+  <meta property="og:description" content="Una forma más inteligente de gestionar oportunidades, reuniones y seguimientos B2B." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ProShop" />
+  <link rel="icon" type="image/png" href="/logo-proshop.png" />
+  <title>CRM ProShop — Tu equipo sabe qué hacer después</title>
+  <style>
+    :root{--ink:#21172e;--midnight:#130e1c;--purple:#241338;--purple2:#3a2059;--violet:#7b58ed;--mint:#02fda4;--mintdark:#01c886;--cloud:#f6f5f9;--paper:#ffffff;--muted:#746e7e;--stroke:#eae6f0;--radius:24px;--shadow:0 28px 76px rgba(21,11,44,.13)}
+    *,*:before,*:after{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:88px}body{margin:0;color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.55;background:var(--paper);-webkit-font-smoothing:antialiased}button,input,select,textarea{font:inherit}a{color:inherit;text-decoration:none}button{cursor:pointer}img,svg{max-width:100%}::selection{background:var(--mint);color:var(--purple)}:focus-visible{outline:3px solid var(--mintdark);outline-offset:3px}
+    .wrap{width:min(1180px,calc(100% - 48px));margin-inline:auto}.eyebrow{font-weight:800;font-size:11px;letter-spacing:.16em;text-transform:uppercase;display:inline-flex;gap:9px;align-items:center}.eyebrow .dot{width:7px;height:7px;border-radius:100%;background:currentColor}.kicker{color:#7054a2}.section-title{font-weight:790;letter-spacing:-.048em;line-height:1.12;font-size:clamp(35px,4.35vw,56px);margin:16px 0 16px}.section-sub{font-size:17px;color:#6d6677;line-height:1.75;max-width:650px;margin:0}.section-head{max-width:730px}.section-head.center{text-align:center;margin-inline:auto}.section-head.center .section-sub{margin-inline:auto}.marker{color:#9879fe}.highlight{color:#8b63f0}.btn{min-height:49px;border:1px solid transparent;display:inline-flex;align-items:center;justify-content:center;gap:11px;padding:13px 20px;border-radius:12px;font-size:14px;font-weight:800;white-space:nowrap;transition:transform .18s,background .18s,box-shadow .18s}.btn svg{height:16px;width:16px;stroke-width:2.2}.btn:hover{transform:translateY(-2px)}.btn-primary{background:var(--mint);color:#10221e;box-shadow:0 8px 26px rgba(2,253,164,.17)}.btn-primary:hover{background:#5cffc0;box-shadow:0 10px 30px rgba(2,253,164,.23)}.btn-outline{border-color:rgba(255,255,255,.27);color:#fff;background:rgba(255,255,255,.035)}.btn-outline:hover{background:rgba(255,255,255,.11)}.btn-purple{color:#fff;background:var(--purple2)}.btn-purple:hover{background:#58337d}
+    .site-header{height:78px;position:sticky;top:0;z-index:20;background:rgba(30,17,47,.96);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.075)}.nav-wrap{display:flex;align-items:center;justify-content:space-between;height:100%;gap:20px}.brand{display:inline-flex;align-items:center;gap:10px;color:#fff;flex-shrink:0}.brand-symbol{width:31px;height:31px;display:grid;place-items:center;border:1px solid rgba(2,253,164,.48);border-radius:9px;transform:rotate(-7deg);background:linear-gradient(145deg,rgba(2,253,164,.14),rgba(2,253,164,.02))}.brand-symbol svg{width:19px;height:19px;color:var(--mint);transform:rotate(7deg)}.brand-name{font-size:22px;font-weight:860;letter-spacing:-.055em}.brand-name span{font-weight:450;color:#c6accf}.brand-chip{padding:4px 7px;border-radius:5px;background:rgba(2,253,164,.12);color:var(--mint);font-size:10px;font-weight:850;letter-spacing:.09em;margin-left:2px}.nav-links{display:flex;gap:31px;align-items:center}.nav-links a{font-size:13px;font-weight:650;color:#dad1e5;transition:color .2s}.nav-links a:hover{color:var(--mint)}.nav-action{display:flex;gap:8px;align-items:center}.menu-toggle{display:none;appearance:none;background:none;border:0;padding:9px;color:white}.menu-toggle svg{width:24px;height:24px}
+    .hero{background:radial-gradient(ellipse 610px 390px at 78% 30%,rgba(112,54,176,.35),transparent 75%),radial-gradient(ellipse 450px 300px at 25% 85%,rgba(72,42,111,.24),transparent 75%),linear-gradient(145deg,#241338 0%,#1c102b 50%,#120d1a 100%);color:#fff;overflow:hidden;position:relative;padding:100px 0 110px}.hero:after{content:"";position:absolute;inset:0;opacity:.17;background-image:linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px);background-size:80px 80px;mask-image:linear-gradient(to right,transparent,black);pointer-events:none}.hero .wrap{position:relative;z-index:1}.hero-grid{display:grid;grid-template-columns:45% 55%;align-items:center;gap:10px}.hero-copy{position:relative;z-index:3}.hero-kicker{font-size:11px;letter-spacing:.13em;font-weight:820;text-transform:uppercase;color:#b2ffd9;display:inline-flex;align-items:center;gap:9px;padding:9px 13px;border:1px solid rgba(2,253,164,.2);border-radius:99px;background:rgba(2,253,164,.06)}.hero-kicker:before{content:"";display:block;background:var(--mint);height:7px;width:7px;border-radius:50%;box-shadow:0 0 13px rgba(2,253,164,.9)}.hero h1{font-size:clamp(49px,5.2vw,74px);font-weight:850;line-height:1.065;letter-spacing:-.065em;max-width:610px;margin:27px 0 24px}.hero h1 em{color:var(--mint);font-style:normal}.hero-desc{color:#ccc2d9;font-size:17px;line-height:1.8;max-width:505px}.hero-actions{display:flex;flex-wrap:wrap;gap:12px;margin:32px 0 23px}.hero-note{display:flex;align-items:center;gap:9px;color:#bcaecb;font-size:12px}.hero-note svg{width:14px;height:14px;color:var(--mint)}
+    .hero-art{position:relative;width:calc(100% + 35px);margin-left:8px;min-height:534px;display:flex;align-items:center}.product-window{width:100%;max-width:695px;background:#f9f8fc;border:1px solid rgba(255,255,255,.28);border-radius:17px;box-shadow:0 42px 95px rgba(0,0,0,.46),0 0 0 8px rgba(255,255,255,.025);overflow:hidden;transform:perspective(1200px) rotateY(-5deg) rotateX(2deg);transform-origin:center}.window-head{display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid #efecf2;padding:12px 18px}.window-dots{display:flex;gap:5px}.window-dots i{display:block;width:7px;height:7px;border-radius:100%;background:#e6e1eb}.window-dots i:first-child{background:#dcbcc8}.window-dots i:nth-child(2){background:#f0d89d}.window-dots i:nth-child(3){background:#b4e1d1}.window-tag{font-size:9px;font-weight:800;color:#9688a7;letter-spacing:.06em}.mock-app{display:grid;grid-template-columns:155px 1fr;min-height:402px}.mock-side{background:#241338;padding:20px 12px;color:#baa8d1}.mock-side .mini-brand{color:#fff;font-size:15px;font-weight:850;letter-spacing:-.04em;margin:0 0 29px 6px}.mini-brand span{color:var(--mint)}.side-item{display:flex;align-items:center;gap:8px;padding:10px 9px;font-size:10px;font-weight:720;border-radius:8px;margin:3px 0}.side-item svg{width:12px;height:12px}.side-item.active{background:#3b2454;color:#fff}.side-item.active svg{color:var(--mint)}.side-last{margin-top:85px;opacity:.66}.mock-main{padding:24px 24px 16px;min-width:0;color:#281d32}.mock-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:10px}.mock-heading h3{font-size:17px;font-weight:850;letter-spacing:-.04em;margin:0}.mock-heading p{font-size:9px;color:#978da2;margin:2px 0 0}.mock-avatar{height:29px;width:29px;border-radius:50%;background:#efe4ff;color:#6d399f;font-size:11px;font-weight:850;display:grid;place-items:center}.mock-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.mock-stat{background:white;border:1px solid #eee9f2;padding:14px 12px;border-radius:10px}.mock-stat .label{display:block;font-size:9px;color:#8b8093;margin-bottom:7px}.mock-stat strong{font-size:24px;letter-spacing:-.055em;line-height:1}.mock-stat small{display:block;color:#7a6c85;font-size:8px;margin-top:5px}.mock-stat small.positive{color:#149a72}.mock-body{display:grid;grid-template-columns:1.06fr .94fr;gap:11px;margin-top:11px}.mock-panel{background:white;border:1px solid #eee9f2;border-radius:10px;padding:14px}.mock-panel h4{font-size:10px;font-weight:850;margin:0 0 12px}.mock-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #f3f0f5}.mock-row:first-of-type{border-top:none}.mock-person{width:24px;height:24px;border-radius:8px;background:#ece6f9;color:#7446a3;display:grid;place-items:center;font-size:8px;font-weight:800}.mock-person.alt{background:#e2fbf2;color:#189777}.mock-person.third{background:#fff0e0;color:#ad7428}.mock-personinfo{min-width:0;flex:1}.mock-personinfo b{font-size:9px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mock-personinfo span{font-size:8px;color:#9b90a4;display:block}.mock-score{font-size:11px;font-weight:800;color:#4b2b66}.mini-progress{height:5px;background:#eee8f1;border-radius:8px;overflow:hidden;margin:8px 0 16px}.mini-progress span{display:block;background:var(--mintdark);height:100%;border-radius:10px;width:73%}.mock-task{border-radius:8px;background:#f6f0ff;padding:11px}.mock-task span{display:block;font-size:8px;color:#916eaf;font-weight:800;text-transform:uppercase;letter-spacing:.06em}.mock-task b{display:block;font-size:10px;margin:5px 0}.mock-task p{margin:0;font-size:8px;color:#746b7b;line-height:1.5}.float-note{position:absolute;z-index:2;background:#fff;color:#2e2440;padding:16px 18px;border:1px solid #eee8f6;border-radius:14px;box-shadow:0 19px 48px rgba(10,2,23,.22);width:210px;right:-7px;bottom:4px;transform:rotate(3deg)}.float-note .label{font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#8063a5;font-weight:850}.float-note .big{font-size:22px;font-weight:850;letter-spacing:-.04em;line-height:1.7}.float-note p{margin:0;font-size:10px;color:#786e81;line-height:1.5}.float-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;background:#dffff1;color:#027953;position:absolute;right:13px;top:13px}.float-icon svg{width:17px;height:17px}.demo-stamp{position:absolute;right:12px;top:22px;z-index:3;color:#ddd0e9;font-size:10px;background:rgba(30,15,46,.55);padding:5px 9px;border-radius:30px}
+    .category-band{background:#fbfafc;border-bottom:1px solid #efedf2}.category-band .wrap{padding:26px 0;display:flex;align-items:center;justify-content:space-between;gap:25px}.category-band p{margin:0;font-size:12px;font-weight:760;color:#93889c;flex-shrink:0}.tags{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px}.tags span{display:inline-flex;gap:7px;align-items:center;font-size:12px;font-weight:750;color:#594e65;border:1px solid #e8e3ec;background:#fff;border-radius:99px;padding:8px 12px}.tags svg{width:14px;height:14px;color:#7955bc}
+    .pain{padding:110px 0}.pain-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:44px}.pain-card{border-radius:24px;padding:31px;border:1px solid var(--stroke)}.pain-card.old{background:#f8f7fa}.pain-card.new{background:linear-gradient(160deg,#2b1741,#1e112e);border-color:#42265d;color:#fff;box-shadow:0 22px 45px rgba(36,19,56,.13)}.pain-label{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:830;margin-bottom:23px}.pain-label svg{width:19px;height:19px}.pain-card.old .pain-label{color:#8c7f95}.pain-card.new .pain-label{color:var(--mint)}.pain-card ul{padding:0;margin:0;list-style:none;display:grid;gap:20px}.pain-card li{display:flex;align-items:flex-start;gap:13px;font-size:15px;line-height:1.5;font-weight:590}.pain-card li svg{flex-shrink:0;width:19px;height:19px;margin-top:2px}.pain-card.old li svg{color:#b9afc1}.pain-card.new li svg{color:var(--mint)}
+    .features{padding:106px 0 112px;background:var(--cloud)}.feature-grid{margin-top:45px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px}.feature-card{background:#fff;border:1px solid #eae6f0;border-radius:20px;padding:29px 27px 31px;min-height:248px;box-shadow:0 2px 12px rgba(31,18,44,.018);transition:transform .18s,box-shadow .18s}.feature-card:hover{transform:translateY(-4px);box-shadow:0 16px 30px rgba(31,18,44,.06)}.feature-icon{height:45px;width:45px;border-radius:14px;background:#f0e9fb;display:grid;place-items:center;color:#6b3ba7}.feature-icon svg{width:22px;height:22px;stroke-width:1.9}.feature-card h3{font-size:18px;letter-spacing:-.025em;line-height:1.35;margin:20px 0 9px}.feature-card p{color:#776e80;font-size:13px;line-height:1.8;margin:0}
+    .demo{padding:112px 0 110px}.demo .section-head{margin-bottom:39px}.demo-shell{border:1px solid #ebe5f0;border-radius:25px;overflow:hidden;background:#fff;box-shadow:var(--shadow)}.demo-topbar{background:#27163d;display:flex;align-items:center;justify-content:space-between;padding:18px 23px;gap:15px;color:white}.demo-topbar span{font-weight:800;font-size:13px}.demo-topbar .demo-disclaimer{font-size:11px;color:#c5b0da;font-weight:600}.demo-content{display:grid;grid-template-columns:315px 1fr;min-height:390px}.leads-list{background:#faf9fc;border-right:1px solid #eeeaf2;padding:25px 17px}.leads-list h3{margin:0 8px 17px;font-size:12px;color:#766b81;letter-spacing:.08em;text-transform:uppercase}.lead-btn{text-align:left;width:100%;background:transparent;border:1px solid transparent;border-radius:13px;padding:13px;display:flex;gap:12px;align-items:center;margin-bottom:8px;transition:background .2s,border .2s}.lead-btn:hover{background:#f1eaf9}.lead-btn.active{background:#fff;border-color:#ded0ee;box-shadow:0 5px 16px rgba(34,20,53,.05)}.lead-initial{display:grid;place-items:center;border-radius:11px;color:#634197;background:#ede4fb;height:40px;width:40px;flex-shrink:0;font-weight:800;font-size:13px}.lead-btn:nth-of-type(2) .lead-initial{background:#dff8ee;color:#278367}.lead-btn:nth-of-type(3) .lead-initial{background:#fff1dd;color:#a7792b}.lead-info{flex:1;min-width:0}.lead-info b{font-size:12px;display:block;color:#382943}.lead-info small{color:#948a9d;font-size:11px}.lead-chevron{height:16px;width:16px;color:#b4a6c0}.lead-detail{padding:30px 35px}.lead-heading{display:flex;justify-content:space-between;gap:15px;align-items:center}.lead-heading h3{font-size:23px;letter-spacing:-.04em;margin:0}.lead-heading p{font-size:12px;color:#948a9d;margin:4px 0 0}.status{font-size:10px;font-weight:850;color:#237a5e;background:#e2f9ed;border-radius:50px;padding:7px 10px}.detail-scores{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:25px 0}.score-block{border:1px solid #eee9f2;background:#fcfbfd;border-radius:13px;padding:18px}.score-block span{font-size:11px;font-weight:720;color:#84778c;display:block;min-height:32px}.score-block b{font-size:30px;line-height:1.15;font-weight:860;letter-spacing:-.06em}.score-block small{font-size:11px;color:#a49aac;font-weight:700}.scorebar{margin-top:10px;height:5px;border-radius:10px;background:#e9e3ee;overflow:hidden}.scorebar i{display:block;width:40%;height:100%;border-radius:10px;background:#7646b2;transition:width .3s}.score-block:nth-child(2) .scorebar i{background:var(--mintdark)}.score-block:nth-child(3) .scorebar i{background:#cbb4e5}.next-action{background:linear-gradient(130deg,#f2eafa,#f9f7fb);border:1px solid #e9d9f8;border-radius:15px;padding:21px 23px;display:flex;gap:13px}.next-action svg{height:22px;width:22px;color:#7c4dbd;flex-shrink:0}.next-action strong{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#7950a4}.next-action p{font-size:14px;line-height:1.6;margin:5px 0 6px;font-weight:700}.next-action small{font-size:12px;color:#7f7489}.demo-below{font-size:12px;color:#837889;margin:15px 3px 0}
+    .process{padding:96px 0;background:#251637;color:#fff}.process .section-sub{color:#d0c2dc}.process .kicker{color:#bfa2ef}.process-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:51px}.process-step{position:relative;border-top:1px solid rgba(255,255,255,.21);padding-top:22px}.step-no{font-size:11px;font-weight:850;color:var(--mint);letter-spacing:.1em}.process-step h3{font-size:20px;letter-spacing:-.03em;margin:17px 0 9px}.process-step p{font-size:13px;color:#c4b7d1;line-height:1.75;max-width:315px;margin:0}
+    .audience{padding:105px 0}.audience-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:65px;align-items:center}.audience-list{display:grid;gap:14px}.audience-item{display:flex;gap:15px;align-items:flex-start;background:#faf9fb;border:1px solid #eeeaf1;border-radius:15px;padding:18px}.audience-item svg{width:20px;height:20px;color:#7b4fac;flex-shrink:0;margin-top:2px}.audience-item h3{font-size:14px;margin:0 0 3px}.audience-item p{font-size:12px;color:#807686;margin:0;line-height:1.65}.audience .section-sub{margin-bottom:20px}
+    .faq{background:var(--cloud);padding:100px 0}.faq-layout{display:grid;grid-template-columns:.82fr 1.18fr;gap:75px}.faq .section-title{font-size:clamp(32px,3.5vw,46px)}.faq-items{display:grid;gap:10px}.faq-item{background:#fff;border:1px solid #e7e1ec;border-radius:13px;overflow:hidden}.faq-item summary{cursor:pointer;list-style:none;padding:19px 22px;font-weight:760;font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:10px}.faq-item summary::-webkit-details-marker{display:none}.faq-item summary svg{width:17px;height:17px;color:#875cac;transition:transform .2s;flex-shrink:0}.faq-item[open] summary svg{transform:rotate(45deg)}.faq-item p{border-top:1px solid #f1edf3;margin:0;padding:16px 22px 20px;color:#746a7e;font-size:13px;line-height:1.8}
+    .contact{background:#211330;padding:104px 0;position:relative;color:#fff;overflow:hidden}.contact:before{content:"";position:absolute;width:550px;height:550px;right:-250px;top:-150px;border-radius:50%;background:rgba(109,60,161,.23);filter:blur(10px)}.contact-grid{position:relative;display:grid;grid-template-columns:.9fr 1.1fr;align-items:center;gap:85px}.contact h2{font-size:clamp(38px,4.5vw,56px);letter-spacing:-.052em;line-height:1.13;margin:14px 0 19px}.contact h2 span{color:var(--mint)}.contact-copy{color:#ccbed9;line-height:1.85;font-size:16px}.contact-perks{display:grid;gap:14px;margin-top:29px}.contact-perks span{display:flex;gap:10px;align-items:center;font-size:13px;color:#e6dbee}.contact-perks svg{width:16px;height:16px;color:var(--mint)}.contact-form{background:white;color:var(--ink);padding:32px;border-radius:24px;box-shadow:0 30px 75px rgba(0,0,0,.2)}.contact-form h3{font-size:20px;margin:0 0 6px;letter-spacing:-.035em}.contact-form>p{font-size:12px;color:#8a7e90;margin:0 0 24px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}.field{display:flex;flex-direction:column;gap:7px;margin-bottom:15px}.field label{font-size:11px;font-weight:780;color:#62576c}.field input,.field select,.field textarea{width:100%;background:#fbfafc;border:1px solid #e5dfe9;border-radius:10px;padding:12px 13px;color:#34263e;outline:none;font-size:13px;transition:border .2s,box-shadow .2s}.field input:focus,.field select:focus,.field textarea:focus{border-color:#986ee8;box-shadow:0 0 0 3px rgba(152,110,232,.13)}.field textarea{min-height:94px;resize:vertical}.contact-form .btn{width:100%}.form-note{font-size:11px;color:#8b8192;line-height:1.55;margin:12px 0 0}.form-result{font-size:12px;font-weight:700;color:#634197;padding:9px 0 0;min-height:18px}.footer{background:#170e22;color:#bcaecb;border-top:1px solid rgba(255,255,255,.075)}.footer .wrap{padding:29px 0;display:flex;align-items:center;justify-content:space-between;gap:24px}.footer .brand-name{font-size:18px}.footer .brand-symbol{width:26px;height:26px;border-radius:7px}.footer .brand-symbol svg{width:17px;height:17px}.footer p{font-size:11px;margin:0}.footer a.mail-link{font-size:11px;color:#c6b7d8;text-decoration:underline;text-underline-offset:3px}
+    .brand-logo{display:block;width:144px;height:auto;object-fit:contain}.mini-brand{display:flex;align-items:center}.mini-logo{width:110px;height:auto;object-fit:contain}.footer .brand-logo{width:135px}.contact-channels{display:flex;flex-wrap:wrap;align-items:center;gap:14px 22px;margin-top:28px}.contact-channels a{color:#b8fce3;text-decoration:underline;text-underline-offset:4px;font-size:13px;font-weight:680}.contact-channels a:hover{color:#fff}.footer-links{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px}.footer-links a{font-size:11px;color:#c6b7d8;text-decoration:underline;text-underline-offset:3px}.footer-links a:hover{color:var(--mint)}
+    @media(max-width:1120px){.hero-grid{grid-template-columns:46% 54%}.hero h1{font-size:clamp(45px,5vw,63px)}.hero-art{transform:scale(.94);transform-origin:left center;width:calc(100% + 80px)}.mock-app{grid-template-columns:125px 1fr}.mock-main{padding:19px 15px}.mock-side{padding:19px 9px}.float-note{right:10px}.nav-links{gap:16px}}
+    @media(max-width:900px){.hero{padding:80px 0 65px}.hero-grid{grid-template-columns:1fr;gap:45px}.hero-copy{text-align:center}.hero h1{max-width:790px;margin-inline:auto;font-size:clamp(45px,7vw,65px)}.hero-desc{margin-inline:auto;max-width:620px}.hero-actions{justify-content:center}.hero-note{justify-content:center}.hero-art{max-width:700px;width:100%;margin-inline:auto;transform:none;min-height:430px}.product-window{transform:none}.float-note{right:-3px;bottom:-6px}.nav-links{display:none;position:absolute;top:78px;left:0;right:0;background:#241338;padding:19px 24px 25px;flex-direction:column;align-items:stretch;gap:6px;border-bottom:1px solid rgba(255,255,255,.1)}.nav-links.open{display:flex}.nav-links a{padding:12px 5px}.menu-toggle{display:grid;place-items:center}.nav-action .btn{display:none}.category-band .wrap{flex-direction:column;gap:14px}.tags{justify-content:center}.feature-grid{grid-template-columns:repeat(2,1fr)}.audience-grid{gap:32px}.contact-grid{gap:37px}.faq-layout{gap:37px}}
+    @media(max-width:650px){.wrap{width:min(100% - 32px,1180px)}.hero{padding:64px 0 68px}.hero h1{font-size:clamp(42px,10vw,55px);margin-top:23px}.hero-desc{font-size:15px}.hero-actions{flex-direction:column;align-items:stretch;max-width:350px;margin:28px auto 18px}.hero-actions .btn{width:100%}.hero-art{min-height:310px;margin-top:7px}.product-window{border-radius:12px}.mock-app{grid-template-columns:80px 1fr;min-height:280px}.mock-side{padding:13px 6px}.mock-side .mini-brand{font-size:11px;margin:0 0 20px 1px}.side-item{font-size:0;justify-content:center;padding:9px}.side-item svg{width:15px;height:15px}.side-last{margin-top:40px}.mock-main{padding:12px 11px}.mock-heading{margin-bottom:10px}.mock-heading h3{font-size:12px}.mock-heading p{font-size:7px}.mock-avatar{width:22px;height:22px}.mock-stats{gap:5px}.mock-stat{padding:10px 7px;border-radius:7px}.mock-stat .label{font-size:7px;margin-bottom:3px}.mock-stat strong{font-size:17px}.mock-stat small{font-size:6px}.mock-body{gap:6px;margin-top:7px}.mock-panel{padding:8px}.mock-panel h4{font-size:7px;margin-bottom:5px}.mock-row{padding:5px 0;gap:4px}.mock-person{height:18px;width:18px;font-size:6px;border-radius:5px}.mock-personinfo b{font-size:6px}.mock-personinfo span{font-size:6px}.mock-score{font-size:8px}.mock-task{padding:7px}.mock-task b{font-size:7px}.mock-task p{font-size:6px}.mock-task span{font-size:6px}.float-note{transform:scale(.76) rotate(3deg);transform-origin:bottom right;right:-8px;bottom:-20px}.demo-stamp{top:-20px;right:0}.category-band .wrap{padding:26px 0}.tags{gap:7px}.tags span{font-size:11px}.pain,.features,.demo,.audience,.faq{padding:76px 0}.section-title{font-size:clamp(34px,8vw,45px)}.section-sub{font-size:15px}.pain-grid{grid-template-columns:1fr;gap:13px;margin-top:29px}.pain-card{padding:25px}.pain-card li{font-size:14px}.feature-grid{grid-template-columns:1fr;margin-top:31px;gap:12px}.feature-card{min-height:auto;padding:25px}.feature-card h3{margin-top:15px}.demo-topbar{align-items:flex-start;flex-direction:column;gap:4px}.demo-content{grid-template-columns:1fr}.leads-list{border-right:none;border-bottom:1px solid #eeeaf2;padding:18px 15px}.leads-list h3{margin:0 7px 10px}.leads-wrapper{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.lead-btn{padding:10px 7px;flex-direction:column;align-items:flex-start;gap:5px;margin:0}.lead-initial{width:30px;height:30px;border-radius:8px;font-size:10px}.lead-info b{font-size:10px;line-height:1.3}.lead-info small{font-size:9px}.lead-chevron{display:none}.lead-detail{padding:20px 16px}.lead-heading h3{font-size:20px}.status{font-size:9px}.detail-scores{gap:6px;margin:19px 0}.score-block{padding:11px 8px}.score-block span{font-size:9px;min-height:42px}.score-block b{font-size:24px}.score-block small{font-size:9px}.next-action{padding:15px}.next-action p{font-size:12px}.next-action small{font-size:10px}.process{padding:76px 0}.process-grid{grid-template-columns:1fr;gap:30px;margin-top:35px}.process-step{padding-top:18px}.process-step h3{margin:9px 0 5px}.audience-grid,.faq-layout,.contact-grid{grid-template-columns:1fr;gap:30px}.audience-list{gap:9px}.contact{padding:76px 0}.contact h2{font-size:44px}.contact-form{padding:23px 18px}.form-grid{grid-template-columns:1fr;gap:0}.footer .wrap{align-items:flex-start;flex-direction:column;gap:16px}}
+    @media(max-width:650px){.brand-logo{width:137px}.mini-logo{width:68px}.footer .brand-logo{width:125px}.contact-channels{gap:12px 16px}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}
+  
+    /* ═══ Animaciones y explicaciones visuales (capa añadida sobre la landing actual) ═══ */
+    :root{--ease-out:cubic-bezier(.2,.8,.2,1)}
+    body{overflow-x:clip}
+
+    /* Barra de progreso de lectura */
+    .scroll-progress{position:fixed;top:0;left:0;height:3px;width:100%;z-index:60;transform-origin:left;transform:scaleX(0);background:linear-gradient(90deg,var(--violet),var(--mint));pointer-events:none}
+
+    /* Encabezado que se compacta al hacer scroll */
+    .site-header{transition:height .3s var(--ease-out),background .3s,box-shadow .3s}
+    .site-header.scrolled{height:64px;background:rgba(30,17,47,.98);box-shadow:0 10px 30px rgba(10,2,23,.28)}
+    .site-header .brand-logo{transition:width .3s var(--ease-out)}
+    .site-header.scrolled .brand-logo{width:124px}
+    .nav-links a{position:relative}
+    .nav-links a::after{content:"";position:absolute;left:0;right:0;bottom:-6px;height:2px;border-radius:2px;background:var(--mint);transform:scaleX(0);transform-origin:left;transition:transform .3s var(--ease-out)}
+    .nav-links a:hover::after,.nav-links a.is-active::after{transform:scaleX(1)}
+    .nav-links a.is-active{color:var(--mint)}
+
+    /* Revelado al hacer scroll (solo si hay JS) */
+    .js .rv{opacity:0;transform:translateY(34px);transition:opacity .9s var(--ease-out),transform .9s var(--ease-out);transition-delay:var(--d,0s)}
+    .js .rv.in{opacity:1;transform:none}
+    .js .rv.from-left{transform:translateX(-46px)}
+    .js .rv.from-right{transform:translateX(46px)}
+    .js .rv.zoom{transform:scale(.92)}
+    .js .rv.in.from-left,.js .rv.in.from-right,.js .rv.in.zoom{transform:none}
+
+    /* Hero: destellos, rejilla en movimiento y entrada de texto */
+    .hero .orb{position:absolute;border-radius:50%;filter:blur(70px);pointer-events:none;will-change:transform;z-index:0}
+    .hero .orb.o1{width:380px;height:380px;background:rgba(123,88,237,.5);left:-110px;top:60px;animation:orb1 15s ease-in-out infinite}
+    .hero .orb.o2{width:320px;height:320px;background:rgba(2,253,164,.2);right:-80px;bottom:-40px;animation:orb2 18s ease-in-out infinite}
+    @keyframes orb1{0%,100%{transform:translate(0,0)}50%{transform:translate(46px,-34px)}}
+    @keyframes orb2{0%,100%{transform:translate(0,0)}50%{transform:translate(-40px,30px)}}
+    .hero:after{animation:gridpan 22s linear infinite}
+    @keyframes gridpan{to{background-position:80px 80px}}
+    .hero-spot{position:absolute;inset:0;pointer-events:none;background:radial-gradient(420px circle at var(--sx,70%) var(--sy,30%),rgba(2,253,164,.09),transparent 60%);z-index:0;transition:background .15s}
+    .hero h1 .w{display:inline-block;opacity:0;transform:translateY(26px);animation:wordin .8s var(--ease-out) forwards;animation-delay:calc(var(--i)*.07s + .15s)}
+    @keyframes wordin{to{opacity:1;transform:none}}
+    .hero-kicker,.hero-desc,.hero-actions,.hero-note{opacity:0;transform:translateY(18px);animation:wordin .9s var(--ease-out) forwards}
+    .hero-kicker{animation-delay:.05s}.hero-desc{animation-delay:.7s}.hero-actions{animation-delay:.85s}.hero-note{animation-delay:1s}
+    .hero h1 em .w{color:var(--mint)}
+    .btn-primary{position:relative;overflow:hidden}
+    .btn-primary::after{content:"";position:absolute;top:0;bottom:0;width:46%;left:-60%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);transform:skewX(-20deg);animation:sweep 4.6s ease-in-out infinite}
+    @keyframes sweep{0%,55%{left:-60%}100%{left:140%}}
+
+    /* Ventana del producto: flota, y sus datos "cobran vida" */
+    .product-window{animation:winfloat 8s ease-in-out infinite}
+    @keyframes winfloat{0%,100%{transform:perspective(1200px) rotateY(-5deg) rotateX(2deg) translateY(0)}50%{transform:perspective(1200px) rotateY(-3.4deg) rotateX(1.4deg) translateY(-12px)}}
+    .float-note{animation:notefloat 6.5s ease-in-out infinite}
+    @keyframes notefloat{0%,100%{transform:rotate(3deg) translateY(0)}50%{transform:rotate(1.6deg) translateY(-10px)}}
+    .js .hero .mock-row,.js .hero .mock-stat,.js .hero .side-item{opacity:0;transform:translateX(-14px);animation:wordin .7s var(--ease-out) forwards;animation-delay:calc(var(--k,0)*.12s + 1.1s)}
+    .js .hero .mock-stat{transform:translateY(12px)}
+    .mini-progress span{width:0;animation:fillbar 1.6s var(--ease-out) 1.9s forwards}
+    @keyframes fillbar{to{width:73%}}
+    .mock-task{animation:taskpulse 3.2s ease-in-out 3s infinite}
+    @keyframes taskpulse{0%,100%{box-shadow:0 0 0 0 rgba(123,88,237,0)}50%{box-shadow:0 0 0 6px rgba(123,88,237,.14)}}
+    .window-dots i:nth-child(3){animation:dotblink 2.4s ease-in-out infinite}
+    @keyframes dotblink{50%{box-shadow:0 0 0 4px rgba(180,225,209,.55)}}
+
+    /* Puntos explicativos sobre la ventana del producto */
+    .hot{position:absolute;z-index:6;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:var(--mint);color:#10221e;font-size:11px;font-weight:850;display:grid;place-items:center;cursor:pointer;border:0;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+    .hot::before{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--mint);opacity:.0;animation:ping 2.2s ease-out infinite}
+    @keyframes ping{0%{transform:scale(.6);opacity:.8}100%{transform:scale(1.7);opacity:0}}
+    .hot.on{background:#fff}
+    .hot-tip{position:absolute;z-index:7;width:230px;background:#241338;color:#fff;border:1px solid rgba(2,253,164,.35);border-radius:13px;padding:13px 15px;box-shadow:0 18px 40px rgba(10,2,23,.45);opacity:0;pointer-events:none;transform:translateY(8px) scale(.96);transition:opacity .35s,transform .35s var(--ease-out)}
+    .hot-tip.show{opacity:1;transform:none}
+    .hot-tip b{display:block;font-size:12.5px;color:var(--mint);margin-bottom:4px;letter-spacing:-.01em}
+    .hot-tip p{margin:0;font-size:11px;line-height:1.55;color:#d8cde6}
+    @media(max-width:650px){.hot,.hot-tip{display:none}}
+
+    /* Franja de contexto: aparición escalonada y movimiento sutil */
+    .tags span{transition:transform .25s var(--ease-out),border-color .25s,box-shadow .25s}
+    .tags span:hover{transform:translateY(-3px);border-color:#c9b5ec;box-shadow:0 10px 20px rgba(80,40,140,.1)}
+    .tags span svg{transition:transform .4s var(--ease-out)}
+    .tags span:hover svg{transform:rotate(-12deg) scale(1.2)}
+
+    /* El problema: tarjetas que entran de lados y listas que se van marcando */
+    .pain-card{transition:transform .35s var(--ease-out),box-shadow .35s}
+    .pain-card:hover{transform:translateY(-5px)}
+    .pain-card li{opacity:0;transform:translateX(-12px);transition:opacity .6s var(--ease-out),transform .6s var(--ease-out);transition-delay:calc(var(--k,0)*.14s + .25s)}
+    .pain-card.in li{opacity:1;transform:none}
+    .pain-card.old.in li{animation:fadeold 1.4s ease calc(var(--k,0)*.14s + 1.6s) forwards}
+    @keyframes fadeold{to{opacity:.55}}
+    .pain-card.new li svg{transform:scale(0);transition:transform .5s cubic-bezier(.3,1.6,.5,1);transition-delay:calc(var(--k,0)*.14s + .5s)}
+    .pain-card.new.in li svg{transform:scale(1)}
+    .pain-card.new{position:relative;overflow:hidden}
+    .pain-card.new::after{content:"";position:absolute;inset:-1px;border-radius:inherit;background:linear-gradient(120deg,transparent 40%,rgba(2,253,164,.14) 50%,transparent 60%);background-size:250% 100%;animation:cardshine 6s ease-in-out infinite;pointer-events:none}
+    @keyframes cardshine{0%,60%{background-position:150% 0}100%{background-position:-100% 0}}
+
+    /* Funciones: brillo que sigue al cursor, ícono vivo, inclinación suave */
+    .feature-card{position:relative;overflow:hidden;transform-style:preserve-3d;transition:transform .2s ease-out,box-shadow .3s,border-color .3s}
+    .feature-card::before{content:"";position:absolute;inset:0;background:radial-gradient(260px circle at var(--mx,50%) var(--my,0%),rgba(123,88,237,.13),transparent 65%);opacity:0;transition:opacity .3s;pointer-events:none}
+    .feature-card:hover::before{opacity:1}
+    .feature-card:hover{border-color:#d6c5f2}
+    .feature-icon{transition:transform .5s var(--ease-out),background .3s,color .3s}
+    .feature-card:hover .feature-icon{transform:translateY(-4px) rotate(-8deg) scale(1.08);background:#6b3ba7;color:#fff}
+
+    /* Demostración: control con avance automático e indicadores animados */
+    .lead-btn{position:relative;overflow:hidden}
+    .lead-btn.active::after{content:"";position:absolute;left:0;bottom:0;height:3px;background:linear-gradient(90deg,var(--violet),var(--mint));width:0;animation:leadtimer var(--dur,5.5s) linear forwards}
+    .demo.paused .lead-btn.active::after{animation:none;width:100%}
+    @keyframes leadtimer{to{width:100%}}
+    .scorebar i{transition:width 1.1s var(--ease-out)!important}
+    .lead-detail .next-action{transition:transform .35s var(--ease-out)}
+    .lead-detail.swap .next-action,.lead-detail.swap .detail-scores{animation:swapin .55s var(--ease-out)}
+    @keyframes swapin{from{opacity:.2;transform:translateY(10px)}to{opacity:1;transform:none}}
+    .caret::after{content:"▍";color:#7c4dbd;margin-left:2px;animation:blinkc .8s steps(2) infinite}
+    @keyframes blinkc{50%{opacity:0}}
+    .demo-shell{transition:box-shadow .4s}
+    .demo-shell:hover{box-shadow:0 36px 90px rgba(21,11,44,.18)}
+
+    /* Proceso: línea que se dibuja y pasos que se encienden en orden */
+    .process-step{border-top-color:transparent}
+    .process-step::before{content:"";position:absolute;left:0;top:0;height:1px;width:100%;background:rgba(255,255,255,.21)}
+    .process-step::after{content:"";position:absolute;left:0;top:0;height:2px;width:0;background:linear-gradient(90deg,var(--mint),#9d84ff);transition:width 1.3s var(--ease-out);transition-delay:calc(var(--k,0)*.45s + .2s)}
+    .process-step.in::after{width:100%}
+    .process-step .step-no{display:inline-block;transition:transform .5s var(--ease-out),text-shadow .5s}
+    .process-step.in .step-no{animation:stepglow 2.4s ease calc(var(--k,0)*.45s + .8s) 1 both}
+    @keyframes stepglow{0%{text-shadow:0 0 0 rgba(2,253,164,0)}40%{text-shadow:0 0 18px rgba(2,253,164,.9);transform:translateX(6px)}100%{text-shadow:0 0 0 rgba(2,253,164,0);transform:none}}
+    .process-step:hover h3{color:var(--mint)}
+    .process-step h3{transition:color .25s}
+
+    /* Público: entrada escalonada */
+    .audience-item{transition:transform .3s var(--ease-out),box-shadow .3s,border-color .3s}
+    .audience-item:hover{transform:translateX(8px);border-color:#d6c5f2;box-shadow:0 14px 30px rgba(80,40,140,.08)}
+    .audience-item svg{transition:transform .4s var(--ease-out)}
+    .audience-item:hover svg{transform:scale(1.2) rotate(-8deg)}
+
+    /* Preguntas: apertura suave */
+    .faq-item{transition:border-color .25s,box-shadow .25s}
+    .faq-item:hover{border-color:#d6c5f2}
+    .faq-item[open]{box-shadow:0 14px 30px rgba(80,40,140,.08)}
+    .faq-item[open] p{animation:faqopen .45s var(--ease-out)}
+    @keyframes faqopen{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+
+    /* Contacto */
+    .contact:after{content:"";position:absolute;width:420px;height:420px;left:-180px;bottom:-200px;border-radius:50%;background:rgba(2,253,164,.08);filter:blur(30px);animation:orb2 16s ease-in-out infinite}
+    .contact-perks span svg{transition:transform .4s var(--ease-out)}
+    .contact-perks span:hover svg{transform:scale(1.35)}
+    .contact-form{transition:transform .4s var(--ease-out),box-shadow .4s}
+    .contact-form:hover{transform:translateY(-4px);box-shadow:0 40px 90px rgba(0,0,0,.28)}
+
+    @media(prefers-reduced-motion:reduce){
+      .js .rv,.js .hero .mock-row,.js .hero .mock-stat,.js .hero .side-item,.pain-card li,.hero h1 .w,.hero-kicker,.hero-desc,.hero-actions,.hero-note{opacity:1!important;transform:none!important}
+      .mini-progress span{width:73%}.process-step::after{width:100%}.pain-card.new li svg{transform:none}
+      .product-window{transform:perspective(1200px) rotateY(-5deg) rotateX(2deg)}
+    }
+
+    /* ═══ Sección "Míralo en acción": tablero que se mueve, chat y resumen de reunión ═══ */
+    .showcase{padding:108px 0 118px;background:#fff;overflow:hidden}
+    .show-row{display:grid;grid-template-columns:.78fr 1.22fr;gap:60px;align-items:center;margin-top:84px}
+    .show-row.rev{grid-template-columns:1.22fr .78fr}
+    .show-row.rev .show-copy{order:2}
+    .show-copy .feature-icon{margin-bottom:18px}
+    .show-copy h3{font-size:clamp(24px,2.6vw,32px);letter-spacing:-.04em;line-height:1.2;margin:0 0 12px}
+    .show-copy p{color:#776e80;font-size:15px;line-height:1.8;margin:0;max-width:430px}
+    .show-visual{position:relative;border-radius:24px;padding:30px 26px 26px;background:#faf9fc;border:1px solid #ebe5f0;box-shadow:var(--shadow)}
+    .show-visual.dark{background:linear-gradient(160deg,#2b1741,#1b0f2a);border-color:#42265d;color:#fff}
+    .show-stamp{position:absolute;top:10px;right:14px;font-size:10px;color:#a095ad;font-weight:650}
+    .show-visual.dark .show-stamp{color:#bba7d0}
+    @media(max-width:900px){.show-row,.show-row.rev{grid-template-columns:1fr;gap:30px;margin-top:60px}.show-row.rev .show-copy{order:0}.showcase{padding:76px 0 84px}}
+
+    /* Tablero */
+    .kb{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:6px}
+    .kb-col{background:#f1eef6;border-radius:14px;padding:10px 8px;min-height:230px}
+    .kb-col h4{margin:2px 4px 10px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#7b6f86;display:flex;justify-content:space-between;align-items:center;gap:4px}
+    .kb-col h4 b{font-size:10px;background:#fff;color:#6b3ba7;border-radius:99px;padding:1px 7px;transition:transform .4s var(--ease-out)}
+    .kb-col h4 b.bump{transform:scale(1.5)}
+    .kb-col[data-col="3"]{background:#e3f8ef}
+    .kb-col[data-col="3"] h4{color:#1c7a5c}
+    .kb-card{display:flex;align-items:center;gap:8px;background:#fff;border-radius:11px;padding:9px;margin-bottom:8px;box-shadow:0 2px 8px rgba(33,23,46,.08);position:relative;z-index:1}
+    .kb-card.moving{z-index:5;box-shadow:0 14px 30px rgba(80,40,140,.28)}
+    .kb-card .av{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:9px;font-weight:800;background:#ede4fb;color:#634197;flex:none}
+    .kb-card[data-k="sp"] .av{background:#fff1dd;color:#a7792b}
+    .kb-card[data-k="ga"] .av{background:#dff8ee;color:#278367}
+    .kb-card div{min-width:0;flex:1}
+    .kb-card b{display:block;font-size:10.5px;line-height:1.25}
+    .kb-card small{display:block;font-size:9px;line-height:1.25;color:#948a9d}
+    .kb-card em{font-style:normal;font-size:12px;font-weight:850;color:#4b2b66}
+    .kb-card.won{background:#e9fff6;box-shadow:0 0 0 2px rgba(2,200,134,.45),0 10px 24px rgba(2,200,134,.2)}
+    .kb-toast{margin-top:12px;min-height:34px;border-radius:10px;background:#241338;color:#fff;font-size:12px;font-weight:650;padding:9px 13px;display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(6px);transition:opacity .4s,transform .4s var(--ease-out)}
+    .kb-toast.show{opacity:1;transform:none}
+    .kb-toast::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 10px rgba(2,253,164,.9);flex:none}
+    @media(max-width:650px){.kb{grid-template-columns:repeat(2,minmax(0,1fr))}.kb-col{min-height:140px}}
+
+    /* Chat de WhatsApp */
+    .wa-head{display:flex;align-items:center;gap:11px;padding-bottom:14px;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,.1);font-size:14px}
+    .wa-head small{display:block;color:#b9a6cc;font-size:11px}
+    .wa-av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#7b58ed,#02fda4);font-size:12px;font-weight:850;color:#10221e}
+    .wa-chat{height:292px;display:flex;flex-direction:column;justify-content:flex-end;gap:7px;overflow:hidden;padding:6px 2px}
+    .wa-msg{max-width:82%;padding:8px 12px 7px;border-radius:13px;font-size:13px;line-height:1.4;animation:wapop .45s var(--ease-out) both}
+    .wa-msg.in{background:#2c1d3f;align-self:flex-start;border-top-left-radius:3px;color:#ece4f5}
+    .wa-msg.out{background:#005c4b;align-self:flex-end;border-top-right-radius:3px;color:#e9fff8}
+    .wa-msg.list{background:#16443b;border:1px solid rgba(2,253,164,.4)}
+    .wa-msg.list b{display:block;color:var(--mint);font-size:11.5px;margin-bottom:3px}
+    .wa-typing{align-self:flex-start;background:#2c1d3f;border-radius:13px;padding:10px 13px;display:flex;gap:4px}
+    .wa-typing i{width:6px;height:6px;border-radius:50%;background:#9d8bb4;animation:wablink 1.1s infinite}
+    .wa-typing i:nth-child(2){animation-delay:.18s}.wa-typing i:nth-child(3){animation-delay:.36s}
+    @keyframes wablink{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+    @keyframes wapop{from{opacity:0;transform:translateY(12px) scale(.94)}to{opacity:1;transform:none}}
+    .wa-chip{position:absolute;right:16px;bottom:-18px;display:flex;align-items:center;gap:10px;background:#fff;color:#2e2440;border-radius:14px;padding:10px 14px;box-shadow:0 18px 40px rgba(10,2,23,.28);opacity:0;transform:translateY(14px) scale(.94);transition:opacity .5s,transform .5s var(--ease-out)}
+    .wa-chip.show{opacity:1;transform:none}
+    .wa-chip svg{width:20px;height:20px;color:#027953;flex:none}
+    .wa-chip b{display:block;font-size:12px}.wa-chip small{display:block;font-size:10.5px;color:#786e81}
+
+    /* Resumen de reunión */
+    .sum-wave{display:flex;align-items:center;gap:3px;height:36px;margin:6px 0 16px}
+    .sum-wave i{flex:1;background:var(--mint);border-radius:3px;height:20%;animation:sumeq 1.2s ease-in-out infinite;opacity:.85}
+    @keyframes sumeq{0%,100%{height:16%}50%{height:100%}}
+    .sum-rows{display:grid;gap:9px}
+    .sum-row{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:13px;background:rgba(255,255,255,.07);opacity:0;transform:translateX(-18px);transition:opacity .6s var(--ease-out),transform .6s var(--ease-out)}
+    .sum-row.show{opacity:1;transform:none}
+    .sum-row i{flex:none;width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:rgba(2,253,164,.14);color:var(--mint)}
+    .sum-row i svg{width:15px;height:15px}
+    .sum-row b{display:block;font-size:12.5px;margin-bottom:2px}
+    .sum-row span{font-size:12px;color:#d3c6e2;line-height:1.5}
+
+    @media(prefers-reduced-motion:reduce){.sum-row{opacity:1;transform:none}.wa-chip,.kb-toast{opacity:1;transform:none}.sum-wave i{height:60%}}
+  </style>
+</head>
+<body>
+  <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4.2 4.2L19 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M5 5 19 19M19 5 5 19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 2 1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2ZM19 17l.7 2.3L22 20l-2.3.7L19 23l-.7-2.3L16 20l2.3-.7L19 17Z" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linejoin="round"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 5.5a3 3 0 0 1 0 5.6M18 14a5 5 0 0 1 3 4.6V20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4m0 16h16M8 16l4-5 3 2 5-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 3v4m10-4v4M3 10h18m-12 5h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M20 11.4c0 5-3.8 8.6-9 8.6-1.3 0-2.4-.2-3.3-.6L3 21l1.7-4.3A8.7 8.7 0 0 1 3 11.4C3 6.7 6.8 3 11.5 3S20 6.7 20 11.4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7.5 11.5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-brain" viewBox="0 0 24 24"><path d="M12 6a4 4 0 0 0-7.5 2.1A4 4 0 0 0 5 15.6a4 4 0 0 0 7 2.4m0-12a4 4 0 0 1 7.5 2.1 4 4 0 0 1-.5 7.5 4 4 0 0 1-7 2.4V6Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 9.5 12 12l3.5-2.5M12 12v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="11" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="11" cy="13" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m11 13 9-9m-4 0h4v4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 2 8 4v5c0 5.5-3.2 8.7-8 11-4.8-2.3-8-5.5-8-11V6l8-4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m8 12 3 3 5-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="m13.5 2-9 11H12l-1.5 9 9-12H12L13.5 2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </svg>
+
+  <header class="site-header">
+    <div class="wrap nav-wrap">
+      <a class="brand" href="#inicio" aria-label="CRM ProShop, volver al inicio">
+        <img class="brand-logo" src="/logo-proshop.png" width="144" height="36" alt="ProShop" /><span class="brand-chip">CRM + IA</span>
+      </a>
+      <nav class="nav-links" id="navLinks" aria-label="Navegación principal">
+        <a href="#beneficios">Beneficios</a><a href="#funciones">Funciones</a><a href="#demostracion">Cómo se ve</a><a href="#preguntas">Preguntas</a><a href="https://chats.proshop.lat/login">Iniciar sesión</a>
+      </nav>
+      <div class="nav-action"><a class="btn btn-primary" href="#contacto">Solicitar diagnóstico <svg><use href="#i-arrow"/></svg></a><button class="menu-toggle" type="button" id="menuToggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="navLinks"><svg><use href="#i-menu"/></svg></button></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="inicio">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <span class="hero-kicker">Inteligencia comercial para equipos B2B</span>
+          <h1>Tu vendedor no necesita más datos. <em>Necesita saber qué hacer.</em></h1>
+          <p class="hero-desc">WhatsApp, oportunidades, reuniones y seguimientos en un CRM con IA que te ayuda a identificar qué negocio merece atención y cuál es el próximo paso.</p>
+          <div class="hero-actions"><a class="btn btn-primary" href="#contacto">Solicitar diagnóstico de 20 min <svg><use href="#i-arrow"/></svg></a><a class="btn btn-outline" href="#demostracion">Ver cómo funciona <svg><use href="#i-chevron"/></svg></a></div>
+          <div class="hero-note"><svg><use href="#i-check"/></svg> Meta Tech Provider · Para negocios con un proceso de ventas real y oportunidades por atender.</div>
+        </div>
+        <div class="hero-art" aria-label="Vista ilustrativa del CRM ProShop con dashboard comercial">
+          <span class="demo-stamp">Interfaz ilustrativa · datos de ejemplo</span>
+          <div class="product-window">
+            <div class="window-head"><div class="window-dots"><i></i><i></i><i></i></div><span class="window-tag">PROSHOP / CENTRO DE VENTAS</span><span style="width:19px"></span></div>
+            <div class="mock-app">
+              <aside class="mock-side"><p class="mini-brand"><img class="mini-logo" src="/logo-proshop.png" width="110" height="28" alt="ProShop" /></p><div class="side-item active"><svg><use href="#i-chart"/></svg> Resumen</div><div class="side-item"><svg><use href="#i-users"/></svg> Oportunidades</div><div class="side-item"><svg><use href="#i-message"/></svg> Conversaciones</div><div class="side-item"><svg><use href="#i-calendar"/></svg> Agenda</div><div class="side-item"><svg><use href="#i-brain"/></svg> Coach IA</div><div class="side-item side-last"><svg><use href="#i-shield"/></svg> Configuración</div></aside>
+              <div class="mock-main">
+                <div class="mock-heading"><div><h3>Resumen comercial</h3><p>Tu pipeline, de un vistazo.</p></div><div class="mock-avatar">PS</div></div>
+                <div class="mock-stats"><div class="mock-stat"><span class="label">Oportunidades activas</span><strong>48</strong><small>En seguimiento</small></div><div class="mock-stat"><span class="label">Acciones pendientes</span><strong>12</strong><small>Por priorizar</small></div><div class="mock-stat"><span class="label">Reuniones agendadas</span><strong>08</strong><small class="positive">Esta semana</small></div></div>
+                <div class="mock-body"><div class="mock-panel"><h4>Prioridades del equipo</h4><div class="mock-row"><div class="mock-person">IN</div><div class="mock-personinfo"><b>Inmobiliaria Norte</b><span>Reunión pendiente</span></div><div class="mock-score">88</div></div><div class="mock-row"><div class="mock-person alt">GA</div><div class="mock-personinfo"><b>Grupo Andes</b><span>Propuesta enviada</span></div><div class="mock-score">76</div></div><div class="mock-row"><div class="mock-person third">SP</div><div class="mock-personinfo"><b>Servicios Pacífico</b><span>Diagnóstico inicial</span></div><div class="mock-score">91</div></div></div><div class="mock-panel"><h4>Asistente comercial</h4><div style="font-size:8px;color:#8b7b93">Información disponible</div><div class="mini-progress"><span></span></div><div class="mock-task"><span>Siguiente mejor acción</span><b>Confirmar reunión con decisor</b><p>Validar presupuesto y fecha de decisión antes de enviar la propuesta.</p></div></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="float-note"><span class="label">IA comercial</span><span class="float-icon"><svg><use href="#i-spark"/></svg></span><div class="big">Siguiente acción <span style="color:#12ab7d">↗</span></div><p>Prioriza el seguimiento con evidencia, no solo con intuición.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="category-band"><div class="wrap"><p>TODO TU CONTEXTO COMERCIAL, CONECTADO</p><div class="tags"><span><svg><use href="#i-message"/></svg> WhatsApp</span><span><svg><use href="#i-target"/></svg> Meta Ads</span><span><svg><use href="#i-spark"/></svg> Meta Tech Provider</span><span><svg><use href="#i-calendar"/></svg> Google Calendar y Meet</span><span><svg><use href="#i-chart"/></svg> Pipeline B2B</span></div></div></div>
+
+    <section class="pain" id="beneficios"><div class="wrap"><div class="section-head center"><div class="eyebrow kicker"><span class="dot"></span> El problema real</div><h2 class="section-title">Tus leads no se pierden solo por falta de interés. <span class="highlight">Se pierden por falta de seguimiento.</span></h2><p class="section-sub">Cuando las conversaciones están dispersas, al equipo le cuesta distinguir oportunidades reales de contactos que todavía no están listos.</p></div><div class="pain-grid"><div class="pain-card old"><div class="pain-label"><svg><use href="#i-x"/></svg> CUANDO TODO DEPENDE DE LA MEMORIA</div><ul><li><svg><use href="#i-x"/></svg> El historial queda disperso entre WhatsApp, planillas y reuniones.</li><li><svg><use href="#i-x"/></svg> Se contacta al lead más reciente, no siempre al más importante.</li><li><svg><use href="#i-x"/></svg> Los seguimientos vencen sin que nadie tome la iniciativa.</li><li><svg><use href="#i-x"/></svg> El gerente tiene poca visibilidad sobre lo que sucede en ventas.</li></ul></div><div class="pain-card new"><div class="pain-label"><svg><use href="#i-spark"/></svg> CON CRM PROSHOP + IA</div><ul><li><svg><use href="#i-check"/></svg> Conversaciones, reuniones y contexto organizados por oportunidad.</li><li><svg><use href="#i-check"/></svg> Calificación de leads y probabilidad de cierre por separado.</li><li><svg><use href="#i-check"/></svg> Próxima acción recomendada para que el equipo sepa cómo avanzar.</li><li><svg><use href="#i-check"/></svg> Pipeline, agenda y métricas comerciales para tomar decisiones.</li></ul></div></div></div></section>
+
+    <section class="features" id="funciones"><div class="wrap"><div class="section-head"><div class="eyebrow kicker"><span class="dot"></span> Más que un lugar donde guardar contactos</div><h2 class="section-title">Un CRM que <span class="highlight">piensa junto a tu equipo.</span></h2><p class="section-sub">La IA analiza el contexto comercial disponible para recomendar acciones útiles, mientras tus vendedores mantienen el control de cada relación.</p></div><div class="feature-grid">
+      <article class="feature-card"><div class="feature-icon"><svg><use href="#i-target"/></svg></div><h3>Calificación inteligente de leads</h3><p>Evalúa calidad del prospecto, cobertura de información y probabilidad de cierre con indicadores diferenciados y evidencia.</p></article>
+      <article class="feature-card"><div class="feature-icon"><svg><use href="#i-bolt"/></svg></div><h3>Próxima mejor acción</h3><p>Recibe orientación sobre a quién contactar, qué preguntar, qué mensaje preparar y cuándo hacer seguimiento.</p></article>
+      <article class="feature-card"><div class="feature-icon"><svg><use href="#i-message"/></svg></div><h3>Contexto de WhatsApp</h3><p>Utiliza la información de las conversaciones comerciales para enriquecer el historial y entender mejor las necesidades del cliente.</p></article>
+      <article class="feature-card"><div class="feature-icon"><svg><use href="#i-calendar"/></svg></div><h3>Reuniones y agenda</h3><p>Integra Calendar y Meet; incorpora registros y análisis de reuniones para fortalecer el seguimiento posterior.</p></article>
+      <article class="feature-card"><div class="feature-icon"><svg><use href="#i-chart"/></svg></div><h3>Pipeline y rendimiento</h3><p>Visualiza oportunidades, tareas, etapas configurables, rendimiento comercial y señales de tus campañas en Meta.</p></article>
+      <article class="feature-card"><div class="feature-icon"><svg><use href="#i-brain"/></svg></div><h3>Coaching y conocimiento</h3><p>Analiza acciones de ventas y ajusta las instrucciones y el conocimiento de la IA mediante una conversación.</p></article>
+    </div></div></section>
+
+    <section class="showcase" id="en-accion" aria-label="Vistas animadas del producto">
+      <div class="wrap">
+        <div class="section-head center"><div class="eyebrow kicker"><span class="dot"></span> Míralo en acción</div><h2 class="section-title">Así se mueve tu proceso comercial, <span class="highlight">paso a paso.</span></h2></div>
+
+        <div class="show-row">
+          <div class="show-copy"><div class="feature-icon"><svg><use href="#i-chart"/></svg></div><h3>Pipeline y rendimiento</h3><p>Visualiza oportunidades, tareas, etapas configurables, rendimiento comercial y señales de tus campañas en Meta.</p></div>
+          <div class="show-visual" aria-label="Tablero ilustrativo: las oportunidades avanzan de etapa automáticamente">
+            <span class="show-stamp">Interfaz ilustrativa · datos de ejemplo</span>
+            <div class="kb" id="kb">
+              <div class="kb-col" data-col="0"><h4>Por calificar <b>1</b></h4></div>
+              <div class="kb-col" data-col="1"><h4>Entrevista <b>1</b></h4></div>
+              <div class="kb-col" data-col="2"><h4>Propuesta <b>1</b></h4></div>
+              <div class="kb-col" data-col="3"><h4>Ganado <b>0</b></h4></div>
+            </div>
+            <div class="kb-toast" id="kbToast" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="show-row rev">
+          <div class="show-copy"><div class="feature-icon"><svg><use href="#i-message"/></svg></div><h3>Contexto de WhatsApp</h3><p>Utiliza la información de las conversaciones comerciales para enriquecer el historial y entender mejor las necesidades del cliente.</p></div>
+          <div class="show-visual dark" aria-label="Conversación ilustrativa de WhatsApp">
+            <span class="show-stamp">Conversación ilustrativa · datos de ejemplo</span>
+            <div class="wa-head"><div class="wa-av">IN</div><div><b>Inmobiliaria Norte</b><small id="waStatus">en línea</small></div></div>
+            <div class="wa-chat" id="waChat"></div>
+            <div class="wa-chip" id="waChip"><svg><use href="#i-target"/></svg><div><b>Lead calificado</b><small>Calidad 88 · Reunión pendiente</small></div></div>
+          </div>
+        </div>
+
+        <div class="show-row">
+          <div class="show-copy"><div class="feature-icon"><svg><use href="#i-calendar"/></svg></div><h3>Reuniones y agenda</h3><p>Integra Calendar y Meet; incorpora registros y análisis de reuniones para fortalecer el seguimiento posterior.</p></div>
+          <div class="show-visual dark" id="sumBox" aria-label="Resumen ilustrativo de una reunión">
+            <span class="show-stamp">Resumen ilustrativo · datos de ejemplo</span>
+            <div class="sum-wave" id="sumWave" aria-hidden="true"></div>
+            <div class="sum-rows">
+              <div class="sum-row"><i><svg><use href="#i-spark"/></svg></i><div><b>Resumen</b><span>Quieren ordenar el seguimiento de las consultas que llegan por WhatsApp.</span></div></div>
+              <div class="sum-row"><i><svg><use href="#i-check"/></svg></i><div><b>Decisiones</b><span>Probar primero con el equipo comercial.</span></div></div>
+              <div class="sum-row"><i><svg><use href="#i-arrow"/></svg></i><div><b>Próximos pasos</b><span>Enviar la propuesta y confirmar fecha de decisión.</span></div></div>
+              <div class="sum-row"><i><svg><use href="#i-target"/></svg></i><div><b>Información comercial</b><span>Equipo de 6 vendedores · decisor: gerente comercial.</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="demo" id="demostracion"><div class="wrap"><div class="section-head"><div class="eyebrow kicker"><span class="dot"></span> Mira cómo prioriza una oportunidad</div><h2 class="section-title">No todos los leads necesitan <span class="highlight">la misma acción.</span></h2><p class="section-sub">Explora una simulación del análisis comercial. La calidad de un lead no equivale automáticamente a su posibilidad de comprar hoy.</p></div><div class="demo-shell"><div class="demo-topbar"><span>Coach IA · Análisis de oportunidades</span><span class="demo-disclaimer">Demostración interactiva · empresas y datos ficticios</span></div><div class="demo-content"><div class="leads-list"><h3>Selecciona una oportunidad</h3><div class="leads-wrapper"><button type="button" class="lead-btn active" data-lead="0" aria-pressed="true"><span class="lead-initial">IN</span><span class="lead-info"><b>Inmobiliaria Norte</b><small>Calificada · Reunión por hacer</small></span><svg class="lead-chevron"><use href="#i-chevron"/></svg></button><button type="button" class="lead-btn" data-lead="1" aria-pressed="false"><span class="lead-initial">GA</span><span class="lead-info"><b>Grupo Andes</b><small>Propuesta en evaluación</small></span><svg class="lead-chevron"><use href="#i-chevron"/></svg></button><button type="button" class="lead-btn" data-lead="2" aria-pressed="false"><span class="lead-initial">SP</span><span class="lead-info"><b>Servicios Pacífico</b><small>Buen encaje · Sin decisión</small></span><svg class="lead-chevron"><use href="#i-chevron"/></svg></button></div></div><div class="lead-detail" aria-live="polite"><div class="lead-heading"><div><h3 id="leadName">Inmobiliaria Norte</h3><p id="leadState">Interés confirmado · Reunión pendiente</p></div><span class="status" id="leadBadge">Lead calificado</span></div><div class="detail-scores"><div class="score-block"><span>Calidad del lead</span><b id="qualityValue">88</b><small> / 100</small><div class="scorebar"><i id="qualityBar" style="width:88%"></i></div></div><div class="score-block"><span>Probabilidad de cierre</span><b id="probValue">42</b><small> %</small><div class="scorebar"><i id="probBar" style="width:42%"></i></div></div><div class="score-block"><span>Cobertura de información</span><b id="coverageValue">78</b><small> %</small><div class="scorebar"><i id="coverageBar" style="width:78%"></i></div></div></div><div class="next-action"><svg><use href="#i-spark"/></svg><div><strong>Recomendación del coach IA</strong><p id="leadAction">Confirmar una reunión de diagnóstico con el responsable de la decisión.</p><small id="leadReason">Falta validar el proceso de aprobación y la fecha prevista de compra.</small></div></div></div></div></div><p class="demo-below">* La información anterior es ilustrativa, no representa clientes, predicciones verificadas ni una captura real del software.</p></div></section>
+
+    <section class="process"><div class="wrap"><div class="section-head"><div class="eyebrow kicker"><span class="dot"></span> De los datos a la acción</div><h2 class="section-title">Menos tareas dispersas.<br><span style="color:var(--mint)">Más claridad para vender.</span></h2><p class="section-sub">Una forma simple de entender cómo trabaja la inteligencia comercial de ProShop.</p></div><div class="process-grid"><div class="process-step"><span class="step-no">01 / CONTEXTO</span><h3>Reúne las señales</h3><p>Conecta información de conversaciones, oportunidades, campañas, agenda y reuniones disponibles.</p></div><div class="process-step"><span class="step-no">02 / ANÁLISIS</span><h3>Entiende la oportunidad</h3><p>La IA distingue hechos confirmados de datos faltantes, califica el lead e identifica riesgos.</p></div><div class="process-step"><span class="step-no">03 / EJECUCIÓN</span><h3>Activa el siguiente paso</h3><p>El vendedor obtiene prioridades, preguntas sugeridas, seguimiento y apoyo para decidir mejor.</p></div></div></div></section>
+
+    <section class="audience"><div class="wrap audience-grid"><div><div class="eyebrow kicker"><span class="dot"></span> Diseñado para negocios en movimiento</div><h2 class="section-title">¿Tu equipo vive entre WhatsApp y Excel?</h2><p class="section-sub">Si tu empresa ya recibe consultas y necesita vender con un proceso más ordenado, vale la pena revisar dónde se están quedando tus oportunidades.</p><a href="#contacto" class="btn btn-purple" style="margin-top:27px">Revisar mi proceso comercial <svg><use href="#i-arrow"/></svg></a></div><div class="audience-list"><div class="audience-item"><svg><use href="#i-users"/></svg><div><h3>Equipos comerciales de 2 o más vendedores</h3><p>Necesitan asignar responsabilidades y mantener un seguimiento compartido.</p></div></div><div class="audience-item"><svg><use href="#i-message"/></svg><div><h3>Empresas que captan leads por WhatsApp y Meta</h3><p>Quieren convertir consultas en oportunidades mejor calificadas.</p></div></div><div class="audience-item"><svg><use href="#i-calendar"/></svg><div><h3>Ventas consultivas con reuniones y propuestas</h3><p>Tienen decisiones que requieren información, coordinación y varios contactos.</p></div></div><div class="audience-item"><svg><use href="#i-chart"/></svg><div><h3>Gerentes que necesitan visibilidad real</h3><p>Buscan identificar riesgos, estancamientos y las próximas prioridades del equipo.</p></div></div></div></div></section>
+
+    <section class="faq" id="preguntas"><div class="wrap faq-layout"><div><div class="eyebrow kicker"><span class="dot"></span> Preguntas frecuentes</div><h2 class="section-title">Lo importante, <span class="highlight">sin rodeos.</span></h2><p class="section-sub">El objetivo no es añadir otra herramienta al equipo, sino mejorar la manera en que se gestionan las oportunidades.</p></div><div class="faq-items"><details class="faq-item"><summary>¿CRM ProShop reemplaza a mis vendedores? <svg><use href="#i-plus"/></svg></summary><p>No. Está diseñado para apoyar al equipo comercial con contexto, calificación, recomendaciones y tareas de seguimiento. Las decisiones y relaciones con los clientes siguen en manos de las personas.</p></details><details class="faq-item"><summary>¿Sirve si mis clientes escriben por WhatsApp? <svg><use href="#i-plus"/></svg></summary><p>Sí. WhatsApp es uno de los canales centrales para recopilar contexto comercial, dar seguimiento y trabajar con oportunidades. Las integraciones concretas se revisan según la configuración de tu empresa.</p></details><details class="faq-item"><summary>¿La probabilidad de cierre es una garantía de venta? <svg><use href="#i-plus"/></svg></summary><p>No. Es una estimación de apoyo comercial, basada en las señales y evidencias disponibles. Se muestra separada de la calidad del lead y debe revisarse a medida que aparece nueva información.</p></details><details class="faq-item"><summary>¿Podemos adaptar el CRM a nuestras etapas de venta? <svg><use href="#i-plus"/></svg></summary><p>El pipeline admite etapas configurables. En el diagnóstico evaluamos el proceso actual de tu equipo, las fuentes de información y las integraciones necesarias.</p></details><details class="faq-item"><summary>¿Cómo sé si es adecuado para mi empresa? <svg><use href="#i-plus"/></svg></summary><p>En una revisión inicial de 20 minutos identificamos cómo llegan los leads, qué ocurre después de la primera consulta y dónde existen pérdidas de seguimiento. A partir de ahí se evalúa si el CRM encaja.</p></details></div></div></section>
+
+    <section class="contact" id="contacto"><div class="wrap contact-grid"><div><div class="eyebrow" style="color:var(--mint)"><span class="dot"></span> Hablemos de tu proceso comercial</div><h2>Tu próxima venta puede depender de <span>un mejor seguimiento.</span></h2><p class="contact-copy">Solicita una revisión inicial de 20 minutos. Queremos entender cómo vendes hoy, qué ocurre con tus leads y si CRM ProShop es adecuado para tu operación.</p><div class="contact-perks"><span><svg><use href="#i-check"/></svg> ProShop es Meta Tech Provider</span><span><svg><use href="#i-check"/></svg> Conversación enfocada en tu proceso real</span><span><svg><use href="#i-check"/></svg> Identificación de cuellos de botella comerciales</span><span><svg><use href="#i-check"/></svg> Sin promesas de resultados que no podamos demostrar</span></div><div class="contact-channels"><a href="https://wa.me/59162095357?text=Hola%2C%20quiero%20conocer%20CRM%20ProShop%20y%20coordinar%20un%20diagn%C3%B3stico%20de%2020%20minutos." target="_blank" rel="noopener noreferrer">Escríbenos por WhatsApp ↗</a><a href="mailto:soporte@proshop.lat">soporte@proshop.lat</a></div></div><form class="contact-form" id="contactForm"><h3>Solicita tu diagnóstico</h3><p>Cuéntanos sobre tu empresa y continúa por WhatsApp.</p><div class="form-grid"><div class="field"><label for="fullName">Tu nombre *</label><input id="fullName" name="fullName" type="text" placeholder="¿Cómo te llamas?" autocomplete="name" required maxlength="90" /></div><div class="field"><label for="company">Empresa *</label><input id="company" name="company" type="text" placeholder="Nombre del negocio" autocomplete="organization" required maxlength="110" /></div></div><div class="form-grid"><div class="field"><label for="email">Correo de contacto *</label><input id="email" name="email" type="email" placeholder="tu@empresa.com" autocomplete="email" required maxlength="160" /></div><div class="field"><label for="team">Tamaño del equipo comercial</label><select id="team" name="team"><option value="No especificado">Selecciona</option><option>Trabajo solo/a</option><option>2 a 5 vendedores</option><option>6 a 15 vendedores</option><option>Más de 15 vendedores</option></select></div></div><div class="field"><label for="challenge">¿Qué te gustaría mejorar?</label><textarea id="challenge" name="challenge" maxlength="500" placeholder="Ej.: Perdemos seguimiento de los leads que llegan por WhatsApp..."></textarea></div><button class="btn btn-primary" type="submit">Continuar por WhatsApp <svg><use href="#i-arrow"/></svg></button><p class="form-note">Se abrirá WhatsApp con tu solicitud prellenada. Revisa el mensaje y presiona Enviar. Esta página no almacena los datos ni envía el mensaje automáticamente.</p><div class="form-result" id="formResult" role="status" aria-live="polite"></div></form></div></section>
+  </main>
+  <footer class="footer"><div class="wrap"><a class="brand" href="#inicio" aria-label="ProShop, volver al inicio"><img class="brand-logo" src="/logo-proshop.png" width="144" height="36" alt="ProShop" /></a><p>© <span id="year">2026</span> ProShop · Tecnología que acompaña tus decisiones comerciales.</p><div class="footer-links"><a href="https://proshop.lat/" target="_blank" rel="noopener noreferrer">proshop.lat</a><a href="mailto:soporte@proshop.lat">soporte@proshop.lat</a><a href="https://wa.me/59162095357" target="_blank" rel="noopener noreferrer">WhatsApp</a></div></div></footer>
+  <script>
+    const leads=[
+      {name:'Inmobiliaria Norte',state:'Interés confirmado · Reunión pendiente',badge:'Oportunidad alta',quality:88,prob:42,coverage:78,action:'Confirmar una reunión de diagnóstico con el responsable de la decisión.',reason:'Falta validar el proceso de aprobación y la fecha prevista de compra.'},
+      {name:'Grupo Andes',state:'Diagnóstico realizado · Propuesta en evaluación',badge:'Lead calificado',quality:76,prob:68,coverage:86,action:'Contactar al decisor para resolver la objeción sobre implementación.',reason:'Hay una propuesta activa, pero aún no existe confirmación de aprobación.'},
+      {name:'Servicios Pacífico',state:'Buen encaje · Presupuesto aún desconocido',badge:'Oportunidad alta',quality:91,prob:28,coverage:63,action:'Preguntar cómo están presupuestando la solución y quién decide la compra.',reason:'El problema es claro, pero faltan señales de avance hacia la contratación.'}
+    ];
+    function setLead(i){const lead=leads[i];if(!lead)return;document.getElementById('leadName').textContent=lead.name;document.getElementById('leadState').textContent=lead.state;document.getElementById('leadBadge').textContent=lead.badge;document.getElementById('qualityValue').textContent=lead.quality;document.getElementById('probValue').textContent=lead.prob;document.getElementById('coverageValue').textContent=lead.coverage;document.getElementById('qualityBar').style.width=lead.quality+'%';document.getElementById('probBar').style.width=lead.prob+'%';document.getElementById('coverageBar').style.width=lead.coverage+'%';document.getElementById('leadAction').textContent=lead.action;document.getElementById('leadReason').textContent=lead.reason;document.querySelectorAll('.lead-btn').forEach((btn,j)=>{btn.classList.toggle('active',j===i);btn.setAttribute('aria-pressed',String(j===i))});}
+    document.querySelectorAll('.lead-btn').forEach(btn=>btn.addEventListener('click',()=>setLead(Number(btn.dataset.lead))));
+    const toggle=document.getElementById('menuToggle');const nav=document.getElementById('navLinks');toggle.addEventListener('click',()=>{const open=nav.classList.toggle('open');toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',open?'Cerrar menú':'Abrir menú')});nav.querySelectorAll('a').forEach(link=>link.addEventListener('click',()=>{nav.classList.remove('open');toggle.setAttribute('aria-expanded','false')}));
+    document.getElementById('year').textContent=new Date().getFullYear();
+    // Contacto comercial facilitado por ProShop. El envío requiere confirmación del visitante en WhatsApp.
+    const SALES_WHATSAPP='59162095357';
+    document.getElementById('contactForm').addEventListener('submit',e=>{
+      e.preventDefault(); const form=e.currentTarget;if(!form.reportValidity())return;
+      const get=id=>document.getElementById(id).value.trim();
+      const message=['Hola, quisiera solicitar una revisión inicial de 20 minutos para conocer CRM ProShop.','','Nombre: '+get('fullName'),'Empresa: '+get('company'),'Correo: '+get('email'),'Equipo comercial: '+get('team'),'Qué quiero mejorar: '+(get('challenge')||'Por definir'),'','Quedo atento/a para coordinar.'].join('\n');
+      const url='https://wa.me/'+SALES_WHATSAPP+'?text='+encodeURIComponent(message);
+      document.getElementById('formResult').textContent='Se abrirá WhatsApp. Revisa el mensaje y pulsa Enviar para completar la solicitud.';
+      window.location.href=url;
+    });
+
+    /* ═══ Animaciones y explicaciones visuales (capa añadida; no cambia ningún texto) ═══ */
+    (function(){
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var $ = function(s,c){return (c||document).querySelector(s)};
+      var $$ = function(s,c){return Array.prototype.slice.call((c||document).querySelectorAll(s))};
+
+      // Barra de progreso y encabezado compacto
+      var bar = document.createElement('div'); bar.className = 'scroll-progress'; document.body.appendChild(bar);
+      var header = $('.site-header');
+      function onScroll(){
+        var h = document.documentElement, max = h.scrollHeight - h.clientHeight;
+        bar.style.transform = 'scaleX(' + (max > 0 ? Math.min(1, h.scrollTop / max) : 0) + ')';
+        header.classList.toggle('scrolled', h.scrollTop > 30);
+      }
+      addEventListener('scroll', onScroll, {passive:true}); onScroll();
+
+      // Enlace activo del menú según la sección visible
+      var links = $$('#navLinks a[href^="#"]');
+      var secObs = new IntersectionObserver(function(es){
+        es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(a){ a.classList.toggle('is-active', a.getAttribute('href') === '#' + e.target.id) }) } });
+      }, {rootMargin:'-45% 0px -50% 0px'});
+      ['beneficios','funciones','demostracion','preguntas'].forEach(function(id){ var el = document.getElementById(id); if(el) secObs.observe(el) });
+
+      // ── Hero ───────────────────────────────────────────────────────
+      var hero = $('.hero');
+      ['o1','o2'].forEach(function(c){ var o = document.createElement('div'); o.className = 'orb ' + c; hero.insertBefore(o, hero.firstChild) });
+      var spot = document.createElement('div'); spot.className = 'hero-spot'; hero.insertBefore(spot, hero.firstChild);
+      if(!reduce) hero.addEventListener('mousemove', function(e){
+        var r = hero.getBoundingClientRect();
+        spot.style.setProperty('--sx', (e.clientX - r.left) + 'px'); spot.style.setProperty('--sy', (e.clientY - r.top) + 'px');
+      });
+
+      // Titular palabra por palabra (conserva el texto y el énfasis)
+      var h1 = $('.hero h1'), idx = 0;
+      (function split(node){
+        Array.prototype.slice.call(node.childNodes).forEach(function(n){
+          if(n.nodeType === 3){
+            var frag = document.createDocumentFragment();
+            n.textContent.split(/(\s+)/).forEach(function(part){
+              if(!part) return;
+              if(/^\s+$/.test(part)){ frag.appendChild(document.createTextNode(part)); return }
+              var s = document.createElement('span'); s.className = 'w'; s.style.setProperty('--i', idx++); s.textContent = part; frag.appendChild(s);
+            });
+            node.replaceChild(frag, n);
+          } else if(n.nodeType === 1 && n.tagName !== 'SPAN'){ split(n) }
+        });
+      })(h1);
+
+      // Escalonado de la ventana del producto y conteo de cifras
+      $$('.hero .mock-row').forEach(function(el,i){ el.style.setProperty('--k', i + 2) });
+      $$('.hero .mock-stat').forEach(function(el,i){ el.style.setProperty('--k', i + 1) });
+      $$('.hero .side-item').forEach(function(el,i){ el.style.setProperty('--k', i * .6) });
+      function countUp(el, delay){
+        var raw = el.textContent.trim(), target = parseInt(raw, 10); if(isNaN(target)) return;
+        var pad = raw.length > String(target).length ? raw.length : 0;
+        if(reduce){ return }
+        el.textContent = pad ? '0'.repeat(pad) : '0';
+        setTimeout(function(){
+          var t0 = performance.now(), dur = 1400;
+          (function tick(now){
+            var k = Math.min(1, (now - t0) / dur), v = Math.round(target * (1 - Math.pow(1 - k, 3)));
+            el.textContent = pad ? String(v).padStart(pad, '0') : String(v);
+            if(k < 1) requestAnimationFrame(tick);
+          })(t0);
+        }, delay);
+      }
+      $$('.hero .mock-stat strong').forEach(function(el,i){ countUp(el, 1300 + i * 150) });
+      $$('.hero .mock-score').forEach(function(el,i){ countUp(el, 1700 + i * 150) });
+
+      // Puntos explicativos: reutilizan los textos que ya están en "Funciones"
+      var cards = $$('.feature-card');
+      function cardText(i){ return { t: cards[i].querySelector('h3').textContent, d: cards[i].querySelector('p').textContent } }
+      var main = $('.mock-main'); main.style.position = 'relative';
+      function offsetIn(el, root){ var x = 0, y = 0; while(el && el !== root){ x += el.offsetLeft; y += el.offsetTop; el = el.offsetParent } return {x:x, y:y} }
+      var spots = [
+        { el: $('.mock-body .mock-panel'), card: 0, n: 1 },
+        { el: $('.mock-task'), card: 1, n: 2 },
+        { el: $$('.mock-stat')[2], card: 3, n: 3 }
+      ].filter(function(s){ return s.el && cards[s.card] });
+      var tip = document.createElement('div'); tip.className = 'hot-tip'; main.appendChild(tip);
+      var dots = spots.map(function(s){
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'hot'; b.textContent = s.n;
+        b.setAttribute('aria-label', cardText(s.card).t); main.appendChild(b); return b;
+      });
+      function place(){
+        spots.forEach(function(s,i){
+          var o = offsetIn(s.el, main); dots[i].style.left = (o.x + s.el.offsetWidth - 10) + 'px'; dots[i].style.top = (o.y + 10) + 'px';
+        });
+      }
+      var cur = -1, timer = null, hovering = false;
+      function show(i){
+        cur = i; var c = cardText(spots[i].card);
+        tip.innerHTML = '<b></b><p></p>'; tip.firstChild.textContent = c.t; tip.lastChild.textContent = c.d;
+        var o = offsetIn(spots[i].el, main), left = Math.max(8, Math.min(main.clientWidth - 238, o.x + spots[i].el.offsetWidth - 230));
+        var top = o.y + 26; if(top + 110 > main.clientHeight) top = Math.max(8, o.y - 112);
+        tip.style.left = left + 'px'; tip.style.top = top + 'px'; tip.classList.add('show');
+        dots.forEach(function(d,j){ d.classList.toggle('on', j === i) });
+      }
+      function loop(){ clearInterval(timer); timer = setInterval(function(){ if(!hovering) show((cur + 1) % spots.length) }, 4200) }
+      if(spots.length && !reduce){
+        place(); addEventListener('resize', function(){ place(); if(cur >= 0) show(cur) });
+        setTimeout(function(){ place(); show(0); loop() }, 3200);
+        dots.forEach(function(d,i){
+          d.addEventListener('click', function(){ show(i); loop() });
+          d.addEventListener('mouseenter', function(){ hovering = true; show(i) });
+          d.addEventListener('mouseleave', function(){ hovering = false });
+        });
+      } else { dots.forEach(function(d){ d.style.display = 'none' }); tip.style.display = 'none' }
+
+      // ── Revelado al hacer scroll ───────────────────────────────────
+      document.documentElement.classList.add('js');
+      function rv(el, extra, delay){ if(!el) return; el.classList.add('rv'); if(extra) el.classList.add(extra); if(delay) el.style.setProperty('--d', delay + 's') }
+      $$('.section-head').forEach(function(el){ rv(el) });
+      $$('.category-band .wrap > p').forEach(function(el){ rv(el) });
+      $$('.tags span').forEach(function(el,i){ rv(el, 'zoom', i * .08) });
+      rv($('.pain-card.old'), 'from-left'); rv($('.pain-card.new'), 'from-right', .12);
+      $$('.pain-card').forEach(function(card){ $$('li', card).forEach(function(li,i){ li.style.setProperty('--k', i) }) });
+      $$('.feature-card').forEach(function(el,i){ rv(el, null, (i % 3) * .12) });
+      rv($('.demo-shell'), 'zoom'); rv($('.demo-below'));
+      $$('.process-step').forEach(function(el,i){ el.style.setProperty('--k', i); rv(el, null, i * .15) });
+      rv($('.audience-grid > div:first-child'), 'from-left');
+      $$('.audience-item').forEach(function(el,i){ rv(el, 'from-right', i * .1) });
+      rv($('.faq-layout > div:first-child'), 'from-left');
+      $$('.faq-item').forEach(function(el,i){ rv(el, null, i * .08) });
+      rv($('.contact-grid > div:first-child'), 'from-left'); rv($('.contact-form'), 'from-right', .12);
+      $$('.contact-perks span').forEach(function(el,i){ rv(el, null, .2 + i * .1) });
+
+      var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target) } }) }, {threshold:.14, rootMargin:'0px 0px -40px 0px'});
+      $$('.rv').forEach(function(el){ io.observe(el) });
+      // Las tarjetas del problema y los pasos usan su propia clase "in" para encadenar sus listas
+      $$('.pain-card, .process-step').forEach(function(el){ if(!el.classList.contains('rv')){ io.observe(el) } });
+
+      // ── Funciones: brillo que sigue al cursor + inclinación suave ──
+      if(!reduce && matchMedia('(hover:hover)').matches){
+        $$('.feature-card').forEach(function(card){
+          card.addEventListener('mousemove', function(e){
+            var r = card.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+            card.style.setProperty('--mx', x + 'px'); card.style.setProperty('--my', y + 'px');
+            card.style.transform = 'perspective(800px) rotateX(' + ((.5 - y / r.height) * 5) + 'deg) rotateY(' + ((x / r.width - .5) * 6) + 'deg) translateY(-4px)';
+          });
+          card.addEventListener('mouseleave', function(){ card.style.transform = '' });
+        });
+      }
+
+      // ── Demostración: recorre las oportunidades sola hasta que el visitante interviene ──
+      var demo = $('.demo'), order = 0, auto = null, userTook = false;
+      var fields = ['qualityValue','probValue','coverageValue'];
+      var originalSet = window.setLead;
+      function tween(el, from, to){
+        if(reduce || from === to){ el.textContent = to; return }
+        var t0 = performance.now(), dur = 900;
+        (function tick(now){ var k = Math.min(1, (now - t0) / dur); el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3))); if(k < 1) requestAnimationFrame(tick) })(t0);
+      }
+      function typeText(el){
+        if(reduce) return; var full = el.textContent; el.textContent = ''; el.classList.add('caret'); var i = 0;
+        (function step(){ el.textContent = full.slice(0, ++i); if(i < full.length) setTimeout(step, 16); else el.classList.remove('caret') })();
+      }
+      window.setLead = function(i){
+        var prev = fields.map(function(id){ return parseInt(document.getElementById(id).textContent, 10) || 0 });
+        originalSet(i); order = i;
+        fields.forEach(function(id,j){ var el = document.getElementById(id), to = parseInt(el.textContent, 10); el.textContent = prev[j]; tween(el, prev[j], to) });
+        var d = $('.lead-detail'); d.classList.remove('swap'); void d.offsetWidth; d.classList.add('swap');
+        typeText(document.getElementById('leadAction'));
+        $$('.lead-btn').forEach(function(b){ b.style.setProperty('--dur', '5.5s') });
+      };
+      function startAuto(){
+        if(reduce || userTook || auto) return;
+        auto = setInterval(function(){ window.setLead((order + 1) % 3) }, 5500);
+      }
+      function stopAuto(){ clearInterval(auto); auto = null }
+      $$('.lead-btn').forEach(function(b){ b.addEventListener('click', function(){ userTook = true; demo.classList.add('paused'); stopAuto() }) });
+      new IntersectionObserver(function(es){ es[0].isIntersecting ? startAuto() : stopAuto() }, {threshold:.4}).observe($('.demo-shell'));
+    })();
+
+    /* ═══ Sección "Míralo en acción" (animaciones del tablero, el chat y el resumen) ═══ */
+    (function(){
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var $ = function(s,c){return (c||document).querySelector(s)};
+      var $$ = function(s,c){return Array.prototype.slice.call((c||document).querySelectorAll(s))};
+      var wait = function(ms){return new Promise(function(r){setTimeout(r,ms)})};
+      var root = $('#en-accion'); if(!root) return;
+
+      // Revelado de cada fila
+      $$('.show-row', root).forEach(function(row){
+        var rev = row.classList.contains('rev');
+        var c = $('.show-copy', row), v = $('.show-visual', row);
+        [[c, rev ? 'from-right' : 'from-left', 0], [v, rev ? 'from-left' : 'from-right', .12]].forEach(function(p){
+          p[0].classList.add('rv', p[1]); p[0].style.setProperty('--d', p[2] + 's');
+        });
+      });
+      var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target) } }) }, {threshold:.15});
+      $$('.show-copy, .show-visual', root).forEach(function(el){ io.observe(el) });
+
+      // Ejecuta un guion solo mientras su caja está en pantalla
+      function whileVisible(el, makeRun){
+        var token = 0;
+        new IntersectionObserver(function(es){
+          if(es[0].isIntersecting){ var my = ++token; makeRun(function(){ return my === token }) } else { token++ }
+        }, {threshold:.35}).observe(el);
+      }
+
+      // ── Tablero: las oportunidades avanzan de etapa solas ──────────
+      var kb = $('#kb'), toast = $('#kbToast');
+      var cols = $$('.kb-col', kb);
+      var data = {
+        sp:{n:'Servicios Pacífico', s:'Buen encaje', a:'SP', sc:91, start:0},
+        in:{n:'Inmobiliaria Norte', s:'Calificada', a:'IN', sc:88, start:1},
+        ga:{n:'Grupo Andes', s:'Propuesta en evaluación', a:'GA', sc:76, start:2}
+      };
+      var cards = {};
+      Object.keys(data).forEach(function(k){
+        var d = data[k], el = document.createElement('div');
+        el.className = 'kb-card'; el.dataset.k = k;
+        el.innerHTML = '<span class="av"></span><div><b></b><small></small></div><em></em>';
+        el.querySelector('.av').textContent = d.a; el.querySelector('b').textContent = d.n; el.querySelector('small').textContent = d.s; el.querySelector('em').textContent = d.sc;
+        cols[d.start].appendChild(el); cards[k] = el;
+      });
+      function counts(){ cols.forEach(function(c){ var b = c.querySelector('h4 b'), n = c.querySelectorAll('.kb-card').length; if(b.textContent !== String(n)){ b.textContent = n; b.classList.add('bump'); setTimeout(function(){ b.classList.remove('bump') }, 400) } }) }
+      function say(t){ toast.textContent = t; toast.classList.add('show') }
+      function move(card, colIdx){
+        var first = card.getBoundingClientRect();
+        cols[colIdx].appendChild(card);
+        if(!reduce){
+          var last = card.getBoundingClientRect();
+          card.style.transition = 'none';
+          card.style.transform = 'translate(' + (first.left - last.left) + 'px,' + (first.top - last.top) + 'px)';
+          void card.offsetWidth;
+          card.classList.add('moving');
+          card.style.transition = 'transform .9s cubic-bezier(.2,.8,.2,1), box-shadow .4s';
+          card.style.transform = '';
+          setTimeout(function(){ card.classList.remove('moving') }, 950);
+        }
+        counts();
+      }
+      function resetBoard(){ Object.keys(data).forEach(function(k){ cards[k].classList.remove('won'); move(cards[k], data[k].start) }); toast.classList.remove('show') }
+      counts();
+      if(reduce){ move(cards.ga, 3); cards.ga.classList.add('won'); say('Grupo Andes pasó a Ganado') }
+      else whileVisible(kb, async function(alive){
+        resetBoard(); await wait(1400);
+        while(alive()){
+          say('Servicios Pacífico pasó a Entrevista'); move(cards.sp, 1); await wait(2600); if(!alive()) return;
+          say('Inmobiliaria Norte pasó a Propuesta'); move(cards.in, 2); await wait(2600); if(!alive()) return;
+          say('Grupo Andes pasó a Ganado'); move(cards.ga, 3); cards.ga.classList.add('won'); await wait(3600); if(!alive()) return;
+          resetBoard(); await wait(1800);
+        }
+      });
+
+      // ── Chat de WhatsApp ───────────────────────────────────────────
+      var chat = $('#waChat'), status = $('#waStatus'), chip = $('#waChip');
+      function add(cls, html){ var d = document.createElement('div'); d.className = 'wa-msg ' + cls; d.innerHTML = html; chat.appendChild(d); while(chat.children.length > 6) chat.removeChild(chat.firstChild); return d }
+      async function reply(html, ms, cls){ var t = document.createElement('div'); t.className = 'wa-typing'; t.innerHTML = '<i></i><i></i><i></i>'; chat.appendChild(t); status.textContent = 'escribiendo…'; await wait(ms || 1100); t.remove(); status.textContent = 'en línea'; return add(cls || 'out', html) }
+      if(reduce){
+        add('in','Hola, quiero más información'); add('out','Listo ✅ Te espero el jueves a las 10:00.'); chip.classList.add('show');
+      } else whileVisible(chat, async function(alive){
+        while(alive()){
+          chat.innerHTML = ''; chip.classList.remove('show');
+          add('in','Hola, quiero más información'); await wait(1000); if(!alive()) return;
+          await reply('Hola 👋 Soy el asistente de ProShop. ¿Qué parte de tu empresa te gustaría mejorar?'); await wait(1300); if(!alive()) return;
+          add('in','El seguimiento de las consultas, todo está en WhatsApp y Excel'); if(!alive()) return;
+          await reply('Entiendo. ¿Te gustaría una reunión de 20 minutos para verlo?', 1300); chip.classList.add('show'); await wait(1300); if(!alive()) return;
+          add('in','Sí, dale'); await reply('<b>📅 Días disponibles</b>jue 15 · vie 16 · lun 19', 1000, 'out list'); await wait(1400); if(!alive()) return;
+          add('in','Jueves a las 10'); await reply('Listo ✅ Te espero el jueves a las 10:00.', 1000);
+          await wait(5200);
+        }
+      });
+
+      // ── Resumen de reunión ─────────────────────────────────────────
+      var wave = $('#sumWave');
+      for(var w = 0; w < 40; w++){ var s = document.createElement('i'); s.style.animationDelay = (w * .07) + 's'; s.style.animationDuration = (0.9 + Math.random() * 0.9) + 's'; wave.appendChild(s) }
+      var rows = $$('.sum-row', $('#sumBox'));
+      whileVisible($('#sumBox'), async function(alive){
+        rows.forEach(function(r){ r.classList.remove('show') });
+        for(var i = 0; i < rows.length; i++){ await wait(reduce ? 0 : 650); if(!alive()) return; rows[i].classList.add('show') }
+      });
+      if(reduce) rows.forEach(function(r){ r.classList.add('show') });
+    })();
+  </script>
+</body>
+</html>

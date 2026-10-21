@@ -24,10 +24,21 @@ export interface BusinessProfileData {
 export function BusinessProfileForm({
   botId,
   profile,
+  readOnly = false,
 }: {
   botId: string;
   profile: BusinessProfileData;
+  /** Número en Coexistence: Meta no deja editar el perfil por la API, solo desde la app de WhatsApp Business. */
+  readOnly?: boolean;
 }) {
+  return readOnly ? (
+    <BusinessProfileReadOnly profile={profile} />
+  ) : (
+    <BusinessProfileEditable botId={botId} profile={profile} />
+  );
+}
+
+function BusinessProfileEditable({ botId, profile }: { botId: string; profile: BusinessProfileData }) {
   const action = updateBusinessProfileAction.bind(null, botId);
   const [state, formAction, isPending] = useActionState(action, { error: null });
 
@@ -124,6 +135,52 @@ export function BusinessProfileForm({
           {isPending ? "Guardando…" : "Guardar perfil"}
         </Button>
       </form>
+    </Card>
+  );
+}
+
+function BusinessProfileReadOnly({ profile }: { profile: BusinessProfileData }) {
+  const verticalLabel = BUSINESS_VERTICALS.find((v) => v.value === profile.vertical)?.label;
+  const rows: { label: string; value: string }[] = [
+    { label: "Estado (about)", value: profile.about },
+    { label: "Descripción del negocio", value: profile.description },
+    { label: "Dirección", value: profile.address },
+    { label: "Correo de contacto", value: profile.email },
+    { label: "Sitios web", value: profile.websites.join(" · ") },
+    { label: "Categoría", value: profile.vertical === "UNDEFINED" ? "" : (verticalLabel ?? profile.vertical) },
+  ];
+
+  return (
+    <Card className="max-w-xl space-y-5">
+      <div>
+        <CardTitle className="text-sm">Perfil de WhatsApp</CardTitle>
+        <CardDescription>
+          Lo que ve el cliente al abrir el chat. Este número se usa también en la app de WhatsApp
+          Business, y Meta solo permite editar el perfil desde esa app: abre la app en el celular y
+          ve a Herramientas para el negocio → Perfil.
+        </CardDescription>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-2 text-ink-faint">
+          {profile.profilePictureUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={profile.profilePictureUrl} alt="Foto de perfil de WhatsApp" className="h-full w-full object-cover" />
+          ) : (
+            <Camera size={20} />
+          )}
+        </div>
+        <p className="text-sm text-ink">Foto de perfil</p>
+      </div>
+
+      <dl className="space-y-3">
+        {rows.map((r) => (
+          <div key={r.label} className="space-y-0.5">
+            <dt className="text-xs text-ink-faint">{r.label}</dt>
+            <dd className="text-sm text-ink">{r.value || <span className="text-ink-faint">Sin definir</span>}</dd>
+          </div>
+        ))}
+      </dl>
     </Card>
   );
 }

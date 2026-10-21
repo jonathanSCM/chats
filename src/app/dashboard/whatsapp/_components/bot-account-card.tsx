@@ -243,7 +243,7 @@ export function BotAccountCard({
 
       {businessProfile && (
         <div className="pt-2">
-          <BusinessProfileForm botId={bot.id} profile={businessProfile} />
+          <BusinessProfileForm botId={bot.id} profile={businessProfile} readOnly={Boolean(connection?.coexistence)} />
         </div>
       )}
       {businessProfileError && (

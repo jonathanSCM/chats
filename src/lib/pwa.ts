@@ -17,18 +17,54 @@ export function isIOSSafari(userAgent: string, maxTouchPoints = 0): boolean {
   return isIOSDevice(userAgent, maxTouchPoints) && !/crios|fxios|edgios|opios|gsa\//i.test(userAgent);
 }
 
-export interface InstallState {
-  standalone: boolean;
-  hasInstallEvent: boolean;
-  iosSafari: boolean;
-  dismissed: boolean;
-  /** Android 8 o menor: el WebAPK que fabrica Chrome no abre; no se ofrece instalar. */
-  unsupported?: boolean;
+/** Navegador interno de otra app (WhatsApp, Instagram, Facebook, TikTok...): ahí no se puede instalar. */
+export function isInAppBrowser(userAgent: string): boolean {
+  return /FBAN|FBAV|FB_IAB|Instagram|Line\/|MicroMessenger|TikTok|Snapchat|WhatsApp|;\s*wv\)/i.test(userAgent);
 }
 
-export function shouldOfferInstall(s: InstallState): boolean {
-  if (s.standalone || s.dismissed || s.unsupported) return false;
-  return s.hasInstallEvent || s.iosSafari;
+export function isMobileDevice(userAgent: string, maxTouchPoints = 0): boolean {
+  return /android|iphone|ipad|ipod/i.test(userAgent) || isIOSDevice(userAgent, maxTouchPoints);
+}
+
+/**
+ * Qué aviso de instalación corresponde en este dispositivo:
+ *  - native: el navegador entregó el evento de instalar -> botón "Instalar".
+ *  - ios-safari / ios-other-browser: iPhone/iPad (solo Safari puede agregar a inicio).
+ *  - in-app-browser: abierto dentro de WhatsApp/Instagram/etc.: hay que abrirlo en el navegador.
+ *  - legacy-android: Android 8 o menor; el WebAPK se cierra, se explica el acceso directo.
+ *  - android-menu: Android sin evento (p. ej. se descartó antes): se explica el menú del navegador.
+ * null = no mostrar nada (app instalada, escritorio, o todavía esperando el evento).
+ */
+export type InstallHintKind =
+  | "native"
+  | "ios-safari"
+  | "ios-other-browser"
+  | "in-app-browser"
+  | "legacy-android"
+  | "android-menu";
+
+export interface InstallHintState {
+  standalone: boolean;
+  hasInstallEvent: boolean;
+  /** Android 8 o menor (el WebAPK no abre). */
+  legacyAndroid: boolean;
+  userAgent: string;
+  maxTouchPoints: number;
+  /** Pasó el tiempo de gracia para que llegue el evento de instalar. */
+  waitedForEvent: boolean;
+}
+
+export function installHintKind(s: InstallHintState): InstallHintKind | null {
+  if (s.standalone) return null;
+  const mobile = isMobileDevice(s.userAgent, s.maxTouchPoints);
+
+  if (s.legacyAndroid) return "legacy-android";
+  if (s.hasInstallEvent) return "native";
+  if (!mobile) return null; // escritorio sin evento: nada que ofrecer
+  if (isInAppBrowser(s.userAgent)) return "in-app-browser";
+  if (isIOSSafari(s.userAgent, s.maxTouchPoints)) return "ios-safari";
+  if (isIOSDevice(s.userAgent, s.maxTouchPoints)) return "ios-other-browser";
+  return s.waitedForEvent ? "android-menu" : null;
 }
 
 /** Hay versión nueva si el servidor responde un identificador distinto al de este JS. */

@@ -3,31 +3,58 @@ import {
   isIOSDevice,
   isIOSSafari,
   isNewVersion,
-  shouldOfferInstall,
+  installHintKind,
+  isInAppBrowser,
+  isMobileDevice,
 } from "./pwa";
 
-describe("shouldOfferInstall", () => {
-  const base = { standalone: false, hasInstallEvent: true, iosSafari: false, dismissed: false };
-  it("ofrece cuando el navegador permite instalar", () => {
-    expect(shouldOfferInstall(base)).toBe(true);
+const ANDROID_CHROME = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36";
+const IOS_SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+const IOS_CHROME = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0 Mobile/15E148 Safari/604.1";
+const WHATSAPP_WEBVIEW = "Mozilla/5.0 (Linux; Android 12; SM-A525F; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.0.0 Mobile Safari/537.36";
+const INSTAGRAM_IOS = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 300.0";
+const DESKTOP = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36";
+
+describe("installHintKind", () => {
+  const base = { standalone: false, hasInstallEvent: false, legacyAndroid: false, userAgent: ANDROID_CHROME, maxTouchPoints: 5, waitedForEvent: false };
+
+  it("con el evento de instalar: botón Instalar", () => {
+    expect(installHintKind({ ...base, hasInstallEvent: true })).toBe("native");
   });
-  it("no ofrece si ya está instalada (abierta como app)", () => {
-    expect(shouldOfferInstall({ ...base, standalone: true })).toBe(false);
+  it("con la app ya instalada (abierta como app) no muestra nada", () => {
+    expect(installHintKind({ ...base, standalone: true, hasInstallEvent: true })).toBeNull();
   });
-  it("no ofrece mientras se descartó en esta misma vista", () => {
-    expect(shouldOfferInstall({ ...base, dismissed: true })).toBe(false);
+  it("Android sin evento: espera un poco y luego explica el menú", () => {
+    expect(installHintKind(base)).toBeNull();
+    expect(installHintKind({ ...base, waitedForEvent: true })).toBe("android-menu");
   });
-  it("al recargar la página (descartado vuelve a false) el aviso sale otra vez", () => {
-    expect(shouldOfferInstall({ ...base, dismissed: false })).toBe(true);
+  it("Android 8 o menor: explica el acceso directo aunque Chrome entregue el evento", () => {
+    expect(installHintKind({ ...base, legacyAndroid: true, hasInstallEvent: true })).toBe("legacy-android");
   });
-  it("no ofrece si el navegador no soporta instalar", () => {
-    expect(shouldOfferInstall({ ...base, hasInstallEvent: false })).toBe(false);
+  it("iPhone con Safari: pasos de Compartir, sin esperar", () => {
+    expect(installHintKind({ ...base, userAgent: IOS_SAFARI })).toBe("ios-safari");
   });
-  it("no ofrece instalar en Android 8 o menor (el WebAPK se cierra al abrir)", () => {
-    expect(shouldOfferInstall({ ...base, unsupported: true })).toBe(false);
+  it("iPhone con Chrome: pide abrir en Safari", () => {
+    expect(installHintKind({ ...base, userAgent: IOS_CHROME })).toBe("ios-other-browser");
   });
-  it("en Safari de iOS ofrece las instrucciones aunque no haya evento", () => {
-    expect(shouldOfferInstall({ ...base, hasInstallEvent: false, iosSafari: true })).toBe(true);
+  it("dentro de WhatsApp o Instagram: pide abrir en el navegador", () => {
+    expect(installHintKind({ ...base, userAgent: WHATSAPP_WEBVIEW })).toBe("in-app-browser");
+    expect(installHintKind({ ...base, userAgent: INSTAGRAM_IOS })).toBe("in-app-browser");
+  });
+  it("escritorio sin evento: nada", () => {
+    expect(installHintKind({ ...base, userAgent: DESKTOP, maxTouchPoints: 0, waitedForEvent: true })).toBeNull();
+  });
+  it("escritorio con evento: botón Instalar", () => {
+    expect(installHintKind({ ...base, userAgent: DESKTOP, maxTouchPoints: 0, hasInstallEvent: true })).toBe("native");
+  });
+});
+
+describe("detección de dispositivo", () => {
+  it("reconoce navegadores internos y móviles", () => {
+    expect(isInAppBrowser(WHATSAPP_WEBVIEW)).toBe(true);
+    expect(isInAppBrowser(ANDROID_CHROME)).toBe(false);
+    expect(isMobileDevice(ANDROID_CHROME)).toBe(true);
+    expect(isMobileDevice(DESKTOP)).toBe(false);
   });
 });
 

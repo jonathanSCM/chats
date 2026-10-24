@@ -1,18 +1,19 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
+<meta charset="utf-8"/>
   <script>document.documentElement.classList.add('js')</script>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#241338" />
-  <meta name="description" content="CRM ProShop: inteligencia comercial conectada a WhatsApp, Meta y reuniones. ProShop es Meta Tech Provider. Prioriza leads, recibe recomendaciones y activa el siguiente mejor seguimiento." />
-  <meta property="og:title" content="CRM ProShop | Menos dudas. Mejores acciones comerciales." />
-  <meta property="og:description" content="Una forma más inteligente de gestionar oportunidades, reuniones y seguimientos B2B." />
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="ProShop" />
-  <link rel="icon" type="image/png" href="/logo-proshop.png" />
-  <title>CRM ProShop — Tu equipo sabe qué hacer después</title>
-  <style>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="#241338" name="theme-color"/>
+<meta content="CRM ProShop conecta conversaciones, campañas y reuniones. Automatiza tareas comerciales y utiliza IA para priorizar oportunidades, anticipar riesgos y recomendar próximas acciones." name="description"/>
+<meta content="CRM ProShop | Menos tareas manuales. Máximo enfoque en cerrar ventas." property="og:title"/>
+<meta content="WhatsApp, Meta Ads, reuniones, seguimiento y coaching IA, conectados para equipos que venden soluciones de alto valor." property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="ProShop" property="og:site_name"/>
+<link href="logo-proshop.png" rel="icon" type="image/png"/>
+<title>CRM ProShop | Menos tareas manuales, máximo enfoque en cerrar ventas</title>
+<style>
     :root{--ink:#21172e;--midnight:#130e1c;--purple:#241338;--purple2:#3a2059;--violet:#7b58ed;--mint:#02fda4;--mintdark:#01c886;--cloud:#f6f5f9;--paper:#ffffff;--muted:#746e7e;--stroke:#eae6f0;--radius:24px;--shadow:0 28px 76px rgba(21,11,44,.13)}
     *,*:before,*:after{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:88px}body{margin:0;color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.55;background:var(--paper);-webkit-font-smoothing:antialiased}button,input,select,textarea{font:inherit}a{color:inherit;text-decoration:none}button{cursor:pointer}img,svg{max-width:100%}::selection{background:var(--mint);color:var(--purple)}:focus-visible{outline:3px solid var(--mintdark);outline-offset:3px}
     .wrap{width:min(1180px,calc(100% - 48px));margin-inline:auto}.eyebrow{font-weight:800;font-size:11px;letter-spacing:.16em;text-transform:uppercase;display:inline-flex;gap:9px;align-items:center}.eyebrow .dot{width:7px;height:7px;border-radius:100%;background:currentColor}.kicker{color:#7054a2}.section-title{font-weight:790;letter-spacing:-.048em;line-height:1.12;font-size:clamp(35px,4.35vw,56px);margin:16px 0 16px}.section-sub{font-size:17px;color:#6d6677;line-height:1.75;max-width:650px;margin:0}.section-head{max-width:730px}.section-head.center{text-align:center;margin-inline:auto}.section-head.center .section-sub{margin-inline:auto}.marker{color:#9879fe}.highlight{color:#8b63f0}.btn{min-height:49px;border:1px solid transparent;display:inline-flex;align-items:center;justify-content:center;gap:11px;padding:13px 20px;border-radius:12px;font-size:14px;font-weight:800;white-space:nowrap;transition:transform .18s,background .18s,box-shadow .18s}.btn svg{height:16px;width:16px;stroke-width:2.2}.btn:hover{transform:translateY(-2px)}.btn-primary{background:var(--mint);color:#10221e;box-shadow:0 8px 26px rgba(2,253,164,.17)}.btn-primary:hover{background:#5cffc0;box-shadow:0 10px 30px rgba(2,253,164,.23)}.btn-outline{border-color:rgba(255,255,255,.27);color:#fff;background:rgba(255,255,255,.035)}.btn-outline:hover{background:rgba(255,255,255,.11)}.btn-purple{color:#fff;background:var(--purple2)}.btn-purple:hover{background:#58337d}
@@ -34,6 +35,21 @@
     @media(max-width:650px){.brand-logo{width:137px}.mini-logo{width:68px}.footer .brand-logo{width:125px}.contact-channels{gap:12px 16px}}
     @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}
   
+/* CRM ProShop 2.0 — refinamientos del lanzamiento */
+.hero-grid{grid-template-columns:45% 55%}.hero h1{font-size:clamp(47px,5vw,68px);line-height:1.095}.hero-desc{max-width:525px}.hero-note{align-items:flex-start;line-height:1.5}
+.ecosystem{background:#faf9fc;padding:91px 0 85px;border-bottom:1px solid #ebe8f1}.ecosystem-head{max-width:760px;margin:0 auto 34px}.ecosystem .section-title{font-size:clamp(32px,4vw,53px);text-transform:uppercase;letter-spacing:-.045em;margin:14px 0}.ecosystem .section-sub{font-size:16px;max-width:690px;line-height:1.6}.ecosystem-eyebrow:before{content:'';width:31px;height:3px;background:var(--mintdark);border-radius:4px}.ecosystem-rail{display:flex;align-items:center;justify-content:center;border:1px solid #e6def5;border-radius:23px;padding:27px 25px;background:#fff;box-shadow:0 16px 55px rgba(57,34,92,.04);overflow-x:auto;scrollbar-width:thin}.ecosystem-step{flex:1;min-width:0;max-width:148px}.ecosystem-icon{border:1px solid #e7dff3;border-radius:17px;min-height:132px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:15px 8px;box-shadow:0 8px 22px rgba(73,37,121,.035);background:#fff}.ecosystem-icon img{height:56px;width:56px;object-fit:contain}.ecosystem-icon strong{font-size:11px;font-weight:790;line-height:1.25;text-align:center;white-space:normal}.ecosystem-arrow{width:25px;height:25px;flex:0 0 25px;display:grid;place-items:center;border:1px solid #dcd0fc;background:#fbf9ff;color:#7750e9;border-radius:50%;margin:0 7px}.ecosystem-arrow svg{height:16px;width:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}.eco-foot{font-size:11px;text-align:center;color:#8e839e;margin:18px 0 0}
+.pain{padding:106px 0 110px}.pain .section-title{max-width:810px;margin-left:auto;margin-right:auto}.pain-grid{position:relative;gap:20px;margin-top:44px}.pain-grid:after{content:'→';position:absolute;top:49%;left:50%;transform:translate(-50%,-50%);background:var(--paper);color:#7442b2;box-shadow:0 7px 20px rgba(43,18,68,.2);border-radius:50%;height:49px;width:49px;display:grid;place-items:center;font-size:25px;font-weight:700;z-index:2}.pain-card{padding:35px 33px 37px}.comparison-heading{text-align:center;padding:5px 0 20px;margin:0 0 23px;border-bottom:1px solid #e5dfe9}.comparison-kicker{display:inline-block;border-radius:40px;background:#e8e4eb;color:#716577;font-size:10px;font-weight:850;letter-spacing:.16em;padding:6px 13px}.comparison-heading h3{font-size:25px;line-height:1.15;letter-spacing:-.045em;margin:14px 0 6px}.comparison-heading p{color:#8b8091;font-size:12px;margin:0}.pain-card.new .comparison-heading{border-color:rgba(255,255,255,.14)}.pain-card.new .comparison-kicker{background:rgba(2,253,164,.13);color:var(--mint)}.pain-card.new .comparison-heading p{color:#b5a6c6}.pain-card li{font-size:14px}.pain-card.new{background:linear-gradient(153deg,#321b50 0%,#21132f 100%)}
+.features{padding:100px 0 110px}.feature-showcase{margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:18px}.showcase-card{background:#fff;border:1px solid #e3daf0;border-radius:23px;padding:31px 32px 25px;box-shadow:0 14px 40px rgba(49,27,79,.035)}.showcase-card-next{background:linear-gradient(145deg,#29163f,#20122e);border-color:#4d3067;color:#fff}.showcase-card-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.showcase-icon{display:grid;place-items:center;height:50px;width:50px;background:#f0eafd;color:#7848bc;border-radius:14px}.showcase-icon svg{height:24px;width:24px}.showcase-card-next .showcase-icon{background:rgba(2,253,164,.11);color:var(--mint)}.showcase-tag{font-weight:850;font-size:11px;letter-spacing:.11em;color:#8b65bb}.showcase-card-next .showcase-tag{color:var(--mint)}.showcase-card h3{font-size:26px;letter-spacing:-.045em;margin:22px 0 10px}.showcase-card p{font-size:14px;line-height:1.75;color:#71667a;margin:0;min-height:72px}.showcase-card-next p{color:#cfc2db}.showcase-card p strong{color:inherit}.showcase-metrics{margin-top:24px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.showcase-metrics>div{background:#faf8fd;border:1px solid #ebe6f3;border-radius:12px;padding:13px 11px}.showcase-metrics span{font-size:10px;color:#807489;display:block;min-height:33px;font-weight:700;line-height:1.35}.showcase-metrics strong{font-size:28px;letter-spacing:-.06em;line-height:1.15}.showcase-metrics small{font-size:11px;color:#988ca1}.showcase-caption{font-size:10px;color:#8b8092;display:block;margin-top:13px}.showcase-recommend{display:flex;flex-direction:column;gap:7px;background:rgba(255,255,255,.085);border:1px solid rgba(255,255,255,.13);border-radius:15px;padding:20px;margin-top:25px}.rec-label{color:var(--mint);font-size:10px;letter-spacing:.13em;font-weight:830}.showcase-recommend b{font-size:17px}.showcase-recommend>span:not(.rec-label){font-size:12px;color:#d3c5e3}.showcase-recommend small{font-size:11px;color:var(--mint);font-weight:750}.feature-grid-secondary{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:16px}.feature-grid-secondary .feature-card{min-height:245px;padding:23px 19px}.feature-grid-secondary .feature-card h3{font-size:16px}.feature-grid-secondary .feature-card p{font-size:12px;line-height:1.65}
+.meeting-feature{background:#fff;padding:113px 0 118px}.meeting-layout{display:grid;grid-template-columns:.88fr 1.12fr;gap:57px;align-items:center}.meeting-copy .section-title{font-size:clamp(37px,4.15vw,53px)}.meeting-copy .section-sub{font-size:15px;line-height:1.85}.meeting-benefits{display:grid;gap:18px;margin-top:27px}.meeting-benefits>div{display:flex;gap:13px;align-items:flex-start}.mb-num{height:30px;width:30px;display:grid;place-items:center;flex-shrink:0;background:#eee7fb;color:#7951b2;font-size:11px;font-weight:850;border-radius:9px}.meeting-benefits strong{font-size:14px}.meeting-benefits p{font-size:12px;color:#7b7085;margin:3px 0 0;line-height:1.6}.meeting-cta{margin-top:28px}.meeting-art{background:linear-gradient(155deg,#2e1949,#1c112d);color:#fff;border:1px solid #513371;border-radius:24px;padding:21px;box-shadow:0 32px 65px rgba(36,18,59,.17)}.meeting-app-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:20px}.meeting-live{font-size:11px;font-weight:780;display:inline-flex;align-items:center;gap:9px}.meeting-live>span{width:8px;height:8px;background:#02fda4;border-radius:50%}.meeting-app-state{font-size:10px;color:#b8ffdc;background:#225044;border-radius:99px;padding:6px 9px}.meeting-app-main{background:#fbfafe;color:#251935;border-radius:17px;padding:22px}.meeting-participants{display:flex;gap:12px;align-items:center;border-bottom:1px solid #eeeaf4;padding-bottom:20px;margin-bottom:17px}.participant-avatar{width:42px;height:42px;background:#e9dcf9;color:#7d51b4;border-radius:12px;display:grid;place-items:center;font-size:13px;font-weight:850}.meeting-participants>div{display:grid;gap:2px}.meeting-participants strong{font-size:14px}.meeting-participants small{font-size:11px;color:#877b90}.meeting-done{margin-left:auto;background:#dcf9ec;color:#117d55;font-size:10px;font-weight:800;border-radius:99px;padding:6px 9px;white-space:nowrap}.transcript-card{background:#fff;border:1px solid #eee8f4;border-radius:14px;padding:17px 18px}.mini-h{display:flex;align-items:center;gap:8px}.mini-h strong{font-size:13px}.mini-icon{height:26px;width:26px;background:#f0e8fd;color:#7144b1;border-radius:8px;display:grid;place-items:center}.meeting-label{margin-left:auto;font-size:9px;color:#7e50bc;font-weight:800}.transcript-card>p{font-size:12px;color:#746a7c;line-height:1.65;margin:13px 0 14px}.meeting-bullet{font-size:11px;color:#544960;line-height:1.55;display:flex;gap:8px;margin:7px 0}.meeting-bullet span{color:#0bb37e;font-weight:950}.meeting-ai{display:flex;gap:12px;margin-top:13px;background:#f0eafa;border:1px solid #e5d7f5;border-radius:13px;padding:16px}.sparkle{height:27px;width:27px;display:grid;place-items:center;background:#e5d6f8;color:#7946bd;border-radius:7px}.meeting-ai>div{display:flex;flex-direction:column;gap:6px}.meeting-ai small{font-size:10px;letter-spacing:.08em;color:#7f54a6;font-weight:800}.meeting-ai strong{font-size:13px;line-height:1.45}.meeting-ai span:not(.sparkle){font-size:11px;color:#71647d}.meeting-caption{font-size:9px;color:#8a8092;line-height:1.5;margin:13px 0 0}
+.next-action{align-items:flex-start;flex-wrap:wrap}.next-action>div:first-of-type{flex:1;min-width:175px}.coach-deadline{margin-left:35px;align-self:center;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:7px 11px;border-radius:9px;background:white;border:1px solid #e4d3f3}.coach-deadline span{font-size:10px;color:#897793}.coach-deadline b{font-size:12px;color:#52306b}.demo .section-head{max-width:760px}
+@media(max-width:1200px){.ecosystem-rail{justify-content:flex-start}.ecosystem-step{flex:1 0 105px}.ecosystem-icon{min-height:123px}.ecosystem-arrow{margin:0 4px;width:22px;height:22px;flex-basis:22px}}
+@media(max-width:1000px){.ecosystem-rail{justify-content:flex-start}.ecosystem-step{flex:0 0 112px}.feature-grid-secondary{grid-template-columns:repeat(2,minmax(0,1fr))}.meeting-layout{grid-template-columns:1fr;gap:35px}.meeting-copy{max-width:750px}.meeting-art{max-width:760px;width:100%;margin:0 auto}.hero h1{font-size:clamp(43px,5.6vw,66px)}}
+@media(max-width:650px){.hero h1{font-size:clamp(39px,10.2vw,53px);line-height:1.08}.hero-note{max-width:360px;margin:auto;font-size:11px}.ecosystem{padding:70px 0 66px}.ecosystem .section-title{font-size:clamp(30px,8vw,40px)}.ecosystem .section-sub{font-size:14px}.ecosystem-head{margin-bottom:25px}.ecosystem-rail{padding:18px 12px;border-radius:17px;scroll-snap-type:x mandatory}.ecosystem-step{flex-basis:108px;scroll-snap-align:start}.ecosystem-icon{padding:12px 6px;min-height:119px}.ecosystem-icon strong{font-size:11px}.ecosystem-arrow{flex-basis:20px;margin:0 4px}.eco-foot{font-size:10px}.pain-grid:after{content:'↓';top:50%;height:40px;width:40px;font-size:24px}.comparison-heading h3{font-size:22px}.pain-card{padding:24px}.feature-showcase{grid-template-columns:1fr;gap:14px}.showcase-card{padding:25px 22px}.showcase-card h3{font-size:23px}.showcase-card p{min-height:0}.showcase-metrics strong{font-size:26px}.feature-grid-secondary{grid-template-columns:1fr}.meeting-feature{padding:75px 0}.meeting-copy .section-title{font-size:clamp(34px,8vw,44px)}.meeting-art{padding:13px}.meeting-app-main{padding:13px}.meeting-app-top{align-items:flex-start;flex-direction:column}.meeting-done{font-size:9px}.meeting-participants strong{font-size:12px}.meeting-participants small{font-size:10px}.transcript-card{padding:14px}.meeting-label{display:none}.meeting-ai{padding:12px}.coach-deadline{margin-left:34px}.next-action{gap:12px}}
+
+.ecosystem-scroll-hint{display:none}
+@media(max-width:900px){.hero-grid{grid-template-columns:1fr}.hero-copy{text-align:center}.hero-art{margin:0 auto;width:100%;max-width:700px;transform:none}.hero h1{max-width:750px;margin-left:auto;margin-right:auto}.hero-note{justify-content:center}}
+@media(max-width:650px){.hero-grid{grid-template-columns:minmax(0,1fr);gap:38px}.hero{overflow:hidden}.hero-copy,.hero-art{width:100%;min-width:0}.hero h1{font-size:clamp(38px,10vw,48px);max-width:360px}.hero-desc{max-width:345px;margin-left:auto;margin-right:auto}.hero-actions{width:100%;max-width:360px;margin:26px auto 16px}.hero-actions .btn{width:100%}.hero-art{max-width:390px;min-height:325px;margin:0 auto;overflow:visible}.product-window{width:100%;max-width:100%;transform:none}.float-note{right:-6px}.demo-stamp{right:0}.ecosystem-scroll-hint{display:block;margin:10px 0 0;color:#7962a2;font-size:11px;text-align:center;font-weight:750}.ecosystem-rail{overflow-x:auto;-webkit-overflow-scrolling:touch}}
+
     /* ═══ Animaciones y explicaciones visuales (capa añadida sobre la landing actual) ═══ */
     :root{--ease-out:cubic-bezier(.2,.8,.2,1)}
     body{overflow-x:clip}
@@ -180,6 +196,32 @@
       .product-window{transform:perspective(1200px) rotateY(-5deg) rotateX(2deg)}
     }
 
+    /* ═══ Animaciones específicas de la V2 ═══ */
+    /* Ecosistema: la cadena se enciende paso a paso y los íconos flotan suavemente */
+    .ecosystem-icon{transition:transform .35s var(--ease-out),box-shadow .35s}
+    .ecosystem-step:hover .ecosystem-icon{transform:translateY(-6px) scale(1.06);box-shadow:0 16px 30px rgba(80,40,140,.16)}
+    .js .ecosystem-step.in .ecosystem-icon{animation:ecofloat 5.5s ease-in-out infinite;animation-delay:calc(var(--d,0s) * 2)}
+    @keyframes ecofloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+    .js .ecosystem-arrow.in{animation:arrowpulse 2.6s ease-in-out infinite;animation-delay:calc(var(--d,0s) + .6s)}
+    @keyframes arrowpulse{0%,100%{box-shadow:0 0 0 0 rgba(119,80,233,0)}50%{box-shadow:0 0 0 6px rgba(119,80,233,.14)}}
+
+    /* Tarjetas de funciones principales */
+    .showcase-card{position:relative;overflow:hidden;transform-style:preserve-3d;transition:transform .2s ease-out,box-shadow .3s,border-color .3s}
+    .showcase-card::before{content:"";position:absolute;inset:0;background:radial-gradient(300px circle at var(--mx,50%) var(--my,0%),rgba(123,88,237,.12),transparent 65%);opacity:0;transition:opacity .3s;pointer-events:none}
+    .showcase-card:hover::before{opacity:1}
+    .showcase-card:hover{border-color:#cdb9f0;box-shadow:0 22px 50px rgba(49,27,79,.1)}
+    .showcase-icon{transition:transform .5s var(--ease-out)}
+    .showcase-card:hover .showcase-icon{transform:rotate(-8deg) scale(1.1)}
+
+    /* Reuniones */
+    .js .meeting-art.in{animation:meetfloat 8s ease-in-out 1s infinite}
+    @keyframes meetfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+    .js .meeting-benefits > *{transition-delay:var(--d,0s)}
+    .meeting-bullet{transition:transform .3s var(--ease-out)}
+    .meeting-bullet:hover{transform:translateX(5px)}
+
+    @media(prefers-reduced-motion:reduce){.js .meeting-art.in,.js .ecosystem-step.in .ecosystem-icon,.js .ecosystem-arrow.in{animation:none}}
+
     /* ═══ Sección "Míralo en acción": tablero que se mueve, chat y resumen de reunión ═══ */
     .showcase{padding:108px 0 118px;background:#fff;overflow:hidden}
     .show-row{display:grid;grid-template-columns:.78fr 1.22fr;gap:60px;align-items:center;margin-top:84px}
@@ -253,83 +295,83 @@
   </style>
 </head>
 <body>
-  <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
-    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4.2 4.2L19 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="i-x" viewBox="0 0 24 24"><path d="M5 5 19 19M19 5 5 19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-    <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 2 1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2ZM19 17l.7 2.3L22 20l-2.3.7L19 23l-.7-2.3L16 20l2.3-.7L19 17Z" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linejoin="round"/></symbol>
-    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 5.5a3 3 0 0 1 0 5.6M18 14a5 5 0 0 1 3 4.6V20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4m0 16h16M8 16l4-5 3 2 5-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 3v4m10-4v4M3 10h18m-12 5h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-    <symbol id="i-message" viewBox="0 0 24 24"><path d="M20 11.4c0 5-3.8 8.6-9 8.6-1.3 0-2.4-.2-3.3-.6L3 21l1.7-4.3A8.7 8.7 0 0 1 3 11.4C3 6.7 6.8 3 11.5 3S20 6.7 20 11.4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7.5 11.5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-    <symbol id="i-brain" viewBox="0 0 24 24"><path d="M12 6a4 4 0 0 0-7.5 2.1A4 4 0 0 0 5 15.6a4 4 0 0 0 7 2.4m0-12a4 4 0 0 1 7.5 2.1 4 4 0 0 1-.5 7.5 4 4 0 0 1-7 2.4V6Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 9.5 12 12l3.5-2.5M12 12v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="11" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="11" cy="13" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m11 13 9-9m-4 0h4v4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 2 8 4v5c0 5.5-3.2 8.7-8 11-4.8-2.3-8-5.5-8-11V6l8-4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m8 12 3 3 5-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="m13.5 2-9 11H12l-1.5 9 9-12H12L13.5 2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
-    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-  </svg>
-
-  <header class="site-header">
-    <div class="wrap nav-wrap">
-      <a class="brand" href="#inicio" aria-label="CRM ProShop, volver al inicio">
-        <img class="brand-logo" src="/logo-proshop.png" width="144" height="36" alt="ProShop" /><span class="brand-chip">CRM + IA</span>
-      </a>
-      <nav class="nav-links" id="navLinks" aria-label="Navegación principal">
-        <a href="#beneficios">Beneficios</a><a href="#funciones">Funciones</a><a href="#demostracion">Cómo se ve</a><a href="#preguntas">Preguntas</a><a href="https://chats.proshop.lat/login">Iniciar sesión</a>
-      </nav>
-      <div class="nav-action"><a class="btn btn-primary" href="#contacto">Solicitar diagnóstico <svg><use href="#i-arrow"/></svg></a><button class="menu-toggle" type="button" id="menuToggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="navLinks"><svg><use href="#i-menu"/></svg></button></div>
-    </div>
-  </header>
-
-  <main>
-    <section class="hero" id="inicio">
-      <div class="wrap hero-grid">
-        <div class="hero-copy">
-          <span class="hero-kicker">Inteligencia comercial para equipos B2B</span>
-          <h1>Tu vendedor no necesita más datos. <em>Necesita saber qué hacer.</em></h1>
-          <p class="hero-desc">WhatsApp, oportunidades, reuniones y seguimientos en un CRM con IA que te ayuda a identificar qué negocio merece atención y cuál es el próximo paso.</p>
-          <div class="hero-actions"><a class="btn btn-primary" href="#contacto">Solicitar diagnóstico de 20 min <svg><use href="#i-arrow"/></svg></a><a class="btn btn-outline" href="#demostracion">Ver cómo funciona <svg><use href="#i-chevron"/></svg></a></div>
-          <div class="hero-note"><svg><use href="#i-check"/></svg> Meta Tech Provider · Para negocios con un proceso de ventas real y oportunidades por atender.</div>
-        </div>
-        <div class="hero-art" aria-label="Vista ilustrativa del CRM ProShop con dashboard comercial">
-          <span class="demo-stamp">Interfaz ilustrativa · datos de ejemplo</span>
-          <div class="product-window">
-            <div class="window-head"><div class="window-dots"><i></i><i></i><i></i></div><span class="window-tag">PROSHOP / CENTRO DE VENTAS</span><span style="width:19px"></span></div>
-            <div class="mock-app">
-              <aside class="mock-side"><p class="mini-brand"><img class="mini-logo" src="/logo-proshop.png" width="110" height="28" alt="ProShop" /></p><div class="side-item active"><svg><use href="#i-chart"/></svg> Resumen</div><div class="side-item"><svg><use href="#i-users"/></svg> Oportunidades</div><div class="side-item"><svg><use href="#i-message"/></svg> Conversaciones</div><div class="side-item"><svg><use href="#i-calendar"/></svg> Agenda</div><div class="side-item"><svg><use href="#i-brain"/></svg> Coach IA</div><div class="side-item side-last"><svg><use href="#i-shield"/></svg> Configuración</div></aside>
-              <div class="mock-main">
-                <div class="mock-heading"><div><h3>Resumen comercial</h3><p>Tu pipeline, de un vistazo.</p></div><div class="mock-avatar">PS</div></div>
-                <div class="mock-stats"><div class="mock-stat"><span class="label">Oportunidades activas</span><strong>48</strong><small>En seguimiento</small></div><div class="mock-stat"><span class="label">Acciones pendientes</span><strong>12</strong><small>Por priorizar</small></div><div class="mock-stat"><span class="label">Reuniones agendadas</span><strong>08</strong><small class="positive">Esta semana</small></div></div>
-                <div class="mock-body"><div class="mock-panel"><h4>Prioridades del equipo</h4><div class="mock-row"><div class="mock-person">IN</div><div class="mock-personinfo"><b>Inmobiliaria Norte</b><span>Reunión pendiente</span></div><div class="mock-score">88</div></div><div class="mock-row"><div class="mock-person alt">GA</div><div class="mock-personinfo"><b>Grupo Andes</b><span>Propuesta enviada</span></div><div class="mock-score">76</div></div><div class="mock-row"><div class="mock-person third">SP</div><div class="mock-personinfo"><b>Servicios Pacífico</b><span>Diagnóstico inicial</span></div><div class="mock-score">91</div></div></div><div class="mock-panel"><h4>Asistente comercial</h4><div style="font-size:8px;color:#8b7b93">Información disponible</div><div class="mini-progress"><span></span></div><div class="mock-task"><span>Siguiente mejor acción</span><b>Confirmar reunión con decisor</b><p>Validar presupuesto y fecha de decisión antes de enviar la propuesta.</p></div></div></div>
-              </div>
-            </div>
-          </div>
-          <div class="float-note"><span class="label">IA comercial</span><span class="float-icon"><svg><use href="#i-spark"/></svg></span><div class="big">Siguiente acción <span style="color:#12ab7d">↗</span></div><p>Prioriza el seguimiento con evidencia, no solo con intuición.</p></div>
-        </div>
-      </div>
-    </section>
-
-    <div class="category-band"><div class="wrap"><p>TODO TU CONTEXTO COMERCIAL, CONECTADO</p><div class="tags"><span><svg><use href="#i-message"/></svg> WhatsApp</span><span><svg><use href="#i-target"/></svg> Meta Ads</span><span><svg><use href="#i-spark"/></svg> Meta Tech Provider</span><span><svg><use href="#i-calendar"/></svg> Google Calendar y Meet</span><span><svg><use href="#i-chart"/></svg> Pipeline B2B</span></div></div></div>
-
-    <section class="pain" id="beneficios"><div class="wrap"><div class="section-head center"><div class="eyebrow kicker"><span class="dot"></span> El problema real</div><h2 class="section-title">Tus leads no se pierden solo por falta de interés. <span class="highlight">Se pierden por falta de seguimiento.</span></h2><p class="section-sub">Cuando las conversaciones están dispersas, al equipo le cuesta distinguir oportunidades reales de contactos que todavía no están listos.</p></div><div class="pain-grid"><div class="pain-card old"><div class="pain-label"><svg><use href="#i-x"/></svg> CUANDO TODO DEPENDE DE LA MEMORIA</div><ul><li><svg><use href="#i-x"/></svg> El historial queda disperso entre WhatsApp, planillas y reuniones.</li><li><svg><use href="#i-x"/></svg> Se contacta al lead más reciente, no siempre al más importante.</li><li><svg><use href="#i-x"/></svg> Los seguimientos vencen sin que nadie tome la iniciativa.</li><li><svg><use href="#i-x"/></svg> El gerente tiene poca visibilidad sobre lo que sucede en ventas.</li></ul></div><div class="pain-card new"><div class="pain-label"><svg><use href="#i-spark"/></svg> CON CRM PROSHOP + IA</div><ul><li><svg><use href="#i-check"/></svg> Conversaciones, reuniones y contexto organizados por oportunidad.</li><li><svg><use href="#i-check"/></svg> Calificación de leads y probabilidad de cierre por separado.</li><li><svg><use href="#i-check"/></svg> Próxima acción recomendada para que el equipo sepa cómo avanzar.</li><li><svg><use href="#i-check"/></svg> Pipeline, agenda y métricas comerciales para tomar decisiones.</li></ul></div></div></div></section>
-
-    <section class="features" id="funciones"><div class="wrap"><div class="section-head"><div class="eyebrow kicker"><span class="dot"></span> Más que un lugar donde guardar contactos</div><h2 class="section-title">Un CRM que <span class="highlight">piensa junto a tu equipo.</span></h2><p class="section-sub">La IA analiza el contexto comercial disponible para recomendar acciones útiles, mientras tus vendedores mantienen el control de cada relación.</p></div><div class="feature-grid">
-      <article class="feature-card"><div class="feature-icon"><svg><use href="#i-target"/></svg></div><h3>Calificación inteligente de leads</h3><p>Evalúa calidad del prospecto, cobertura de información y probabilidad de cierre con indicadores diferenciados y evidencia.</p></article>
-      <article class="feature-card"><div class="feature-icon"><svg><use href="#i-bolt"/></svg></div><h3>Próxima mejor acción</h3><p>Recibe orientación sobre a quién contactar, qué preguntar, qué mensaje preparar y cuándo hacer seguimiento.</p></article>
-      <article class="feature-card"><div class="feature-icon"><svg><use href="#i-message"/></svg></div><h3>Contexto de WhatsApp</h3><p>Utiliza la información de las conversaciones comerciales para enriquecer el historial y entender mejor las necesidades del cliente.</p></article>
-      <article class="feature-card"><div class="feature-icon"><svg><use href="#i-calendar"/></svg></div><h3>Reuniones y agenda</h3><p>Integra Calendar y Meet; incorpora registros y análisis de reuniones para fortalecer el seguimiento posterior.</p></article>
-      <article class="feature-card"><div class="feature-icon"><svg><use href="#i-chart"/></svg></div><h3>Pipeline y rendimiento</h3><p>Visualiza oportunidades, tareas, etapas configurables, rendimiento comercial y señales de tus campañas en Meta.</p></article>
-      <article class="feature-card"><div class="feature-icon"><svg><use href="#i-brain"/></svg></div><h3>Coaching y conocimiento</h3><p>Analiza acciones de ventas y ajusta las instrucciones y el conocimiento de la IA mediante una conversación.</p></article>
-    </div></div></section>
-
-    <section class="showcase" id="en-accion" aria-label="Vistas animadas del producto">
+<svg aria-hidden="true" height="0" style="position:absolute;overflow:hidden" width="0" xmlns="http://www.w3.org/2000/svg">
+<symbol id="i-arrow" viewbox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></symbol>
+<symbol id="i-check" viewbox="0 0 24 24"><path d="m5 12 4.2 4.2L19 6.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></symbol>
+<symbol id="i-x" viewbox="0 0 24 24"><path d="M5 5 19 19M19 5 5 19" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"></path></symbol>
+<symbol id="i-spark" viewbox="0 0 24 24"><path d="m12 2 1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2ZM19 17l.7 2.3L22 20l-2.3.7L19 23l-.7-2.3L16 20l2.3-.7L19 17Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.65"></path></symbol>
+<symbol id="i-users" viewbox="0 0 24 24"><circle cx="9" cy="8" fill="none" r="3" stroke="currentColor" stroke-width="1.8"></circle><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 5.5a3 3 0 0 1 0 5.6M18 14a5 5 0 0 1 3 4.6V20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"></path></symbol>
+<symbol id="i-chart" viewbox="0 0 24 24"><path d="M4 20V4m0 16h16M8 16l4-5 3 2 5-7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path></symbol>
+<symbol id="i-calendar" viewbox="0 0 24 24"><rect fill="none" height="16" rx="2" stroke="currentColor" stroke-width="1.8" width="18" x="3" y="5"></rect><path d="M7 3v4m10-4v4M3 10h18m-12 5h2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"></path></symbol>
+<symbol id="i-message" viewbox="0 0 24 24"><path d="M20 11.4c0 5-3.8 8.6-9 8.6-1.3 0-2.4-.2-3.3-.6L3 21l1.7-4.3A8.7 8.7 0 0 1 3 11.4C3 6.7 6.8 3 11.5 3S20 6.7 20 11.4Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.8"></path><path d="M7.5 11.5h8" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"></path></symbol>
+<symbol id="i-brain" viewbox="0 0 24 24"><path d="M12 6a4 4 0 0 0-7.5 2.1A4 4 0 0 0 5 15.6a4 4 0 0 0 7 2.4m0-12a4 4 0 0 1 7.5 2.1 4 4 0 0 1-.5 7.5 4 4 0 0 1-7 2.4V6Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.8"></path><path d="M8.5 9.5 12 12l3.5-2.5M12 12v6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"></path></symbol>
+<symbol id="i-target" viewbox="0 0 24 24"><circle cx="11" cy="13" fill="none" r="8" stroke="currentColor" stroke-width="1.7"></circle><circle cx="11" cy="13" fill="none" r="4" stroke="currentColor" stroke-width="1.7"></circle><path d="m11 13 9-9m-4 0h4v4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"></path></symbol>
+<symbol id="i-shield" viewbox="0 0 24 24"><path d="m12 2 8 4v5c0 5.5-3.2 8.7-8 11-4.8-2.3-8-5.5-8-11V6l8-4Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.8"></path><path d="m8 12 3 3 5-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"></path></symbol>
+<symbol id="i-bolt" viewbox="0 0 24 24"><path d="m13.5 2-9 11H12l-1.5 9 9-12H12L13.5 2Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.8"></path></symbol>
+<symbol id="i-menu" viewbox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"></path></symbol>
+<symbol id="i-plus" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"></path></symbol>
+<symbol id="i-chevron" viewbox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></symbol>
+</svg>
+<header class="site-header">
+<div class="wrap nav-wrap">
+<a aria-label="CRM ProShop, volver al inicio" class="brand" href="#inicio">
+<img alt="ProShop" class="brand-logo" height="36" src="logo-proshop.png" width="144"/><span class="brand-chip">CRM + IA</span>
+</a>
+<nav aria-label="Navegación principal" class="nav-links" id="navLinks">
+<a href="#beneficios">Beneficios</a><a href="#funciones">Funciones</a><a href="#demostracion">Cómo se ve</a><a href="#preguntas">Preguntas</a>
+</nav>
+<div class="nav-action"><a class="btn btn-primary" href="#contacto">Solicitar diagnóstico <svg><use href="#i-arrow"></use></svg></a><button aria-controls="navLinks" aria-expanded="false" aria-label="Abrir menú" class="menu-toggle" id="menuToggle" type="button"><svg><use href="#i-menu"></use></svg></button></div>
+</div>
+</header>
+<main>
+<section class="hero" id="inicio">
+<div class="wrap hero-grid">
+<div class="hero-copy">
+<span class="hero-kicker">Inteligencia comercial para equipos B2B</span>
+<h1>Menos tareas manuales. <em>Máximo enfoque en cerrar ventas.</em></h1>
+<p class="hero-desc">ProShop conecta tus conversaciones, campañas y reuniones, automatiza tareas comerciales y utiliza IA para analizar oportunidades, anticipar riesgos y recomendar acciones que impulsan tus ventas.</p>
+<div class="hero-actions"><a class="btn btn-primary" href="#contacto">Solicitar diagnóstico de 20 min <svg><use href="#i-arrow"></use></svg></a><a class="btn btn-outline" href="#demostracion">Ver cómo funciona <svg><use href="#i-chevron"></use></svg></a></div>
+<div class="hero-note"><svg><use href="#i-check"></use></svg> Meta Tech Provider · Tecnología inteligente para ventas de alto valor.</div>
+</div>
+<div aria-label="Vista ilustrativa del CRM ProShop con dashboard comercial" class="hero-art">
+<span class="demo-stamp">Interfaz ilustrativa · datos de ejemplo</span>
+<div class="product-window">
+<div class="window-head"><div class="window-dots"><i></i><i></i><i></i></div><span class="window-tag">PROSHOP / CENTRO DE VENTAS</span><span style="width:19px"></span></div>
+<div class="mock-app">
+<aside class="mock-side"><p class="mini-brand"><img alt="ProShop" class="mini-logo" height="28" src="logo-proshop.png" width="110"/></p><div class="side-item active"><svg><use href="#i-chart"></use></svg> Resumen</div><div class="side-item"><svg><use href="#i-users"></use></svg> Oportunidades</div><div class="side-item"><svg><use href="#i-message"></use></svg> Conversaciones</div><div class="side-item"><svg><use href="#i-calendar"></use></svg> Agenda</div><div class="side-item"><svg><use href="#i-brain"></use></svg> Coach IA</div><div class="side-item side-last"><svg><use href="#i-shield"></use></svg> Configuración</div></aside>
+<div class="mock-main">
+<div class="mock-heading"><div><h3>Resumen comercial</h3><p>Tu pipeline, de un vistazo.</p></div><div class="mock-avatar">PS</div></div>
+<div class="mock-stats"><div class="mock-stat"><span class="label">Oportunidades activas</span><strong>48</strong><small>En seguimiento</small></div><div class="mock-stat"><span class="label">Acciones pendientes</span><strong>12</strong><small>Por priorizar</small></div><div class="mock-stat"><span class="label">Reuniones agendadas</span><strong>08</strong><small class="positive">Esta semana</small></div></div>
+<div class="mock-body"><div class="mock-panel"><h4>Prioridades del equipo</h4><div class="mock-row"><div class="mock-person">IN</div><div class="mock-personinfo"><b>Inmobiliaria Norte</b><span>Reunión pendiente</span></div><div class="mock-score">88</div></div><div class="mock-row"><div class="mock-person alt">GA</div><div class="mock-personinfo"><b>Grupo Andes</b><span>Propuesta enviada</span></div><div class="mock-score">76</div></div><div class="mock-row"><div class="mock-person third">SP</div><div class="mock-personinfo"><b>Servicios Pacífico</b><span>Diagnóstico inicial</span></div><div class="mock-score">91</div></div></div><div class="mock-panel"><h4>Asistente comercial</h4><div style="font-size:8px;color:#8b7b93">Información disponible</div><div class="mini-progress"><span></span></div><div class="mock-task"><span>Siguiente mejor acción</span><b>Confirmar reunión con decisor</b><p>Validar presupuesto y fecha de decisión antes de enviar la propuesta.</p></div></div></div>
+</div>
+</div>
+</div>
+<div class="float-note"><span class="label">IA comercial</span><span class="float-icon"><svg><use href="#i-spark"></use></svg></span><div class="big">Siguiente acción <span style="color:#12ab7d">↗</span></div><p>Prioriza el seguimiento con evidencia, no solo con intuición.</p></div>
+</div>
+</div>
+</section>
+<section aria-labelledby="eco-title" class="ecosystem" id="ecosistema"><div class="wrap">
+<div class="section-head center ecosystem-head"><div class="eyebrow kicker ecosystem-eyebrow">Ecosistema integrado</div>
+<h2 class="section-title" id="eco-title">Todo tu contexto comercial, <span class="highlight">conectado.</span></h2>
+<p class="section-sub">Desde la captación de leads hasta la conversión, tus herramientas trabajan juntas en un solo lugar.</p></div>
+<div aria-label="Ecosistema conectado de CRM ProShop" class="ecosystem-rail" role="group"><div class="ecosystem-step"><div class="ecosystem-icon"><img alt="" height="58" loading="lazy" src="brand-meta-ads.png" width="58"/><strong>Meta Ads</strong></div></div><div aria-hidden="true" class="ecosystem-arrow"><svg viewbox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg></div><div class="ecosystem-step"><div class="ecosystem-icon"><img alt="" height="58" loading="lazy" src="brand-whatsapp.png" width="58"/><strong>WhatsApp</strong></div></div><div aria-hidden="true" class="ecosystem-arrow"><svg viewbox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg></div><div class="ecosystem-step"><div class="ecosystem-icon"><img alt="" height="58" loading="lazy" src="brand-meta-provider.png" width="58"/><strong>Meta Tech Provider</strong></div></div><div aria-hidden="true" class="ecosystem-arrow"><svg viewbox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg></div><div class="ecosystem-step"><div class="ecosystem-icon"><img alt="" height="58" loading="lazy" src="brand-calendar.png" width="58"/><strong>Google Calendar</strong></div></div><div aria-hidden="true" class="ecosystem-arrow"><svg viewbox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg></div><div class="ecosystem-step"><div class="ecosystem-icon"><img alt="" height="58" loading="lazy" src="brand-meet.png" width="58"/><strong>Google Meet</strong></div></div><div aria-hidden="true" class="ecosystem-arrow"><svg viewbox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg></div><div class="ecosystem-step"><div class="ecosystem-icon"><img alt="" height="58" loading="lazy" src="brand-openai.png" width="58"/><strong>OpenAI</strong></div></div><div aria-hidden="true" class="ecosystem-arrow"><svg viewbox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg></div><div class="ecosystem-step"><div class="ecosystem-icon"><img alt="" height="58" loading="lazy" src="brand-pipeline.png" width="58"/><strong>Pipeline B2B</strong></div></div></div>
+<p class="ecosystem-scroll-hint">Desliza para ver todo el recorrido <span aria-hidden="true">→</span></p><p class="eco-foot">Conexiones disponibles según la configuración y los permisos de cada empresa. ProShop es Meta Tech Provider.</p>
+</div></section>
+<section class="pain" id="beneficios"><div class="wrap"><div class="section-head center"><div class="eyebrow kicker"><span class="dot"></span> El problema real</div><h2 class="section-title">Tus leads se enfrían <span class="highlight">cuando falta seguimiento.</span></h2><p class="section-sub">No basta con generar interés: si las conversaciones, reuniones y tareas quedan dispersas, las mejores oportunidades pueden perder impulso.</p></div><div class="pain-grid"><div class="pain-card old"><header class="comparison-heading"><span class="comparison-kicker">ANTES</span><h3>Todo depende de la memoria</h3><p>Sin un sistema conectado</p></header><ul><li><svg><use href="#i-x"></use></svg> El historial queda disperso entre WhatsApp, planillas y reuniones.</li><li><svg><use href="#i-x"></use></svg> Se contacta al lead más reciente, no siempre al más importante.</li><li><svg><use href="#i-x"></use></svg> Los seguimientos vencen sin que nadie tome la iniciativa.</li><li><svg><use href="#i-x"></use></svg> El gerente tiene poca visibilidad sobre lo que sucede en ventas.</li></ul></div><div class="pain-card new"><header class="comparison-heading"><span class="comparison-kicker">DESPUÉS</span><h3>Cada oportunidad tiene un siguiente paso</h3><p>Con CRM ProShop + IA</p></header><ul><li><svg><use href="#i-check"></use></svg> Conversaciones, reuniones y contexto organizados por oportunidad.</li><li><svg><use href="#i-check"></use></svg> Calificación de leads y probabilidad de cierre por separado.</li><li><svg><use href="#i-check"></use></svg> Próxima acción recomendada para que el equipo sepa cómo avanzar.</li><li><svg><use href="#i-check"></use></svg> Pipeline, agenda y métricas comerciales para tomar decisiones.</li></ul></div></div></div></section>
+<section class="features" id="funciones"><div class="wrap"><div class="section-head"><div class="eyebrow kicker"><span class="dot"></span> Más que un lugar donde guardar contactos</div><h2 class="section-title">Un CRM que <span class="highlight">piensa junto a tu equipo.</span></h2><p class="section-sub">La IA analiza el contexto comercial disponible para recomendar acciones útiles, mientras tus vendedores mantienen el control de cada relación.</p></div><div class="feature-showcase">
+<article class="showcase-card"><div class="showcase-card-top"><span class="showcase-icon"><svg><use href="#i-target"></use></svg></span><span class="showcase-tag">01 · PRIORIZACIÓN</span></div><h3>Calificación inteligente de leads</h3><p>La IA analiza la evidencia disponible y diferencia <strong>calidad del lead, probabilidad de cierre y cobertura de información</strong> para identificar dónde concentrar el esfuerzo.</p><div class="showcase-metrics"><div><span>Calidad</span><strong>88<small>/100</small></strong></div><div><span>Posibilidad de cierre</span><strong>42<small>%</small></strong></div><div><span>Datos disponibles</span><strong>78<small>%</small></strong></div></div><span class="showcase-caption">Ejemplo ilustrativo · no es una predicción real</span></article>
+<article class="showcase-card showcase-card-next"><div class="showcase-card-top"><span class="showcase-icon"><svg><use href="#i-bolt"></use></svg></span><span class="showcase-tag">02 · EJECUCIÓN</span></div><h3>Próxima mejor acción</h3><p>No te entrega solo un puntaje: recomienda <strong>a quién contactar, qué preguntar, qué mensaje enviar y cuándo actuar.</strong></p><div class="showcase-recommend"><span class="rec-label">COACH IA · EJEMPLO</span><b>Confirmar la reunión con el decisor</b><span>Verificar presupuesto y fecha de decisión.</span><small>Plazo sugerido: próximas 48 horas</small></div></article></div>
+<div class="feature-grid feature-grid-secondary">
+<article class="feature-card"><div class="feature-icon"><svg><use href="#i-message"></use></svg></div><h3>Conversaciones en contexto</h3><p>Centraliza información de WhatsApp y las oportunidades para evitar volver a empezar en cada contacto.</p></article>
+<article class="feature-card"><div class="feature-icon"><svg><use href="#i-calendar"></use></svg></div><h3>Agenda y reuniones conectadas</h3><p>Programa sesiones desde el CRM y vincula sus acuerdos, transcripciones y seguimientos a cada oportunidad.</p></article>
+<article class="feature-card"><div class="feature-icon"><svg><use href="#i-chart"></use></svg></div><h3>Pipeline y resultados</h3><p>Gestiona etapas de venta configurables, rendimiento del equipo y señales de las campañas de Meta.</p></article>
+<article class="feature-card"><div class="feature-icon"><svg><use href="#i-brain"></use></svg></div><h3>Coaching y conocimiento</h3><p>Recibe orientación a partir de conversaciones y reuniones, y ajusta la base de conocimiento de la IA mediante chat.</p></article>
+</div></div></section><section class="showcase" id="en-accion" aria-label="Vistas animadas del producto">
       <div class="wrap">
         <div class="section-head center"><div class="eyebrow kicker"><span class="dot"></span> Míralo en acción</div><h2 class="section-title">Así se mueve tu proceso comercial, <span class="highlight">paso a paso.</span></h2></div>
 
         <div class="show-row">
-          <div class="show-copy"><div class="feature-icon"><svg><use href="#i-chart"/></svg></div><h3>Pipeline y rendimiento</h3><p>Visualiza oportunidades, tareas, etapas configurables, rendimiento comercial y señales de tus campañas en Meta.</p></div>
+          <div class="show-copy"><div class="feature-icon"><svg><use href="#i-chart"/></svg></div><h3>Pipeline y resultados</h3><p>Gestiona etapas de venta configurables, rendimiento del equipo y señales de las campañas de Meta.</p></div>
           <div class="show-visual" aria-label="Tablero ilustrativo: las oportunidades avanzan de etapa automáticamente">
             <span class="show-stamp">Interfaz ilustrativa · datos de ejemplo</span>
             <div class="kb" id="kb">
@@ -343,7 +385,7 @@
         </div>
 
         <div class="show-row rev">
-          <div class="show-copy"><div class="feature-icon"><svg><use href="#i-message"/></svg></div><h3>Contexto de WhatsApp</h3><p>Utiliza la información de las conversaciones comerciales para enriquecer el historial y entender mejor las necesidades del cliente.</p></div>
+          <div class="show-copy"><div class="feature-icon"><svg><use href="#i-message"/></svg></div><h3>Conversaciones en contexto</h3><p>Centraliza información de WhatsApp y las oportunidades para evitar volver a empezar en cada contacto.</p></div>
           <div class="show-visual dark" aria-label="Conversación ilustrativa de WhatsApp">
             <span class="show-stamp">Conversación ilustrativa · datos de ejemplo</span>
             <div class="wa-head"><div class="wa-av">IN</div><div><b>Inmobiliaria Norte</b><small id="waStatus">en línea</small></div></div>
@@ -353,7 +395,7 @@
         </div>
 
         <div class="show-row">
-          <div class="show-copy"><div class="feature-icon"><svg><use href="#i-calendar"/></svg></div><h3>Reuniones y agenda</h3><p>Integra Calendar y Meet; incorpora registros y análisis de reuniones para fortalecer el seguimiento posterior.</p></div>
+          <div class="show-copy"><div class="feature-icon"><svg><use href="#i-calendar"/></svg></div><h3>Agenda y reuniones conectadas</h3><p>Programa sesiones desde el CRM y vincula sus acuerdos, transcripciones y seguimientos a cada oportunidad.</p></div>
           <div class="show-visual dark" id="sumBox" aria-label="Resumen ilustrativo de una reunión">
             <span class="show-stamp">Resumen ilustrativo · datos de ejemplo</span>
             <div class="sum-wave" id="sumWave" aria-hidden="true"></div>
@@ -368,25 +410,35 @@
       </div>
     </section>
 
-    <section class="demo" id="demostracion"><div class="wrap"><div class="section-head"><div class="eyebrow kicker"><span class="dot"></span> Mira cómo prioriza una oportunidad</div><h2 class="section-title">No todos los leads necesitan <span class="highlight">la misma acción.</span></h2><p class="section-sub">Explora una simulación del análisis comercial. La calidad de un lead no equivale automáticamente a su posibilidad de comprar hoy.</p></div><div class="demo-shell"><div class="demo-topbar"><span>Coach IA · Análisis de oportunidades</span><span class="demo-disclaimer">Demostración interactiva · empresas y datos ficticios</span></div><div class="demo-content"><div class="leads-list"><h3>Selecciona una oportunidad</h3><div class="leads-wrapper"><button type="button" class="lead-btn active" data-lead="0" aria-pressed="true"><span class="lead-initial">IN</span><span class="lead-info"><b>Inmobiliaria Norte</b><small>Calificada · Reunión por hacer</small></span><svg class="lead-chevron"><use href="#i-chevron"/></svg></button><button type="button" class="lead-btn" data-lead="1" aria-pressed="false"><span class="lead-initial">GA</span><span class="lead-info"><b>Grupo Andes</b><small>Propuesta en evaluación</small></span><svg class="lead-chevron"><use href="#i-chevron"/></svg></button><button type="button" class="lead-btn" data-lead="2" aria-pressed="false"><span class="lead-initial">SP</span><span class="lead-info"><b>Servicios Pacífico</b><small>Buen encaje · Sin decisión</small></span><svg class="lead-chevron"><use href="#i-chevron"/></svg></button></div></div><div class="lead-detail" aria-live="polite"><div class="lead-heading"><div><h3 id="leadName">Inmobiliaria Norte</h3><p id="leadState">Interés confirmado · Reunión pendiente</p></div><span class="status" id="leadBadge">Lead calificado</span></div><div class="detail-scores"><div class="score-block"><span>Calidad del lead</span><b id="qualityValue">88</b><small> / 100</small><div class="scorebar"><i id="qualityBar" style="width:88%"></i></div></div><div class="score-block"><span>Probabilidad de cierre</span><b id="probValue">42</b><small> %</small><div class="scorebar"><i id="probBar" style="width:42%"></i></div></div><div class="score-block"><span>Cobertura de información</span><b id="coverageValue">78</b><small> %</small><div class="scorebar"><i id="coverageBar" style="width:78%"></i></div></div></div><div class="next-action"><svg><use href="#i-spark"/></svg><div><strong>Recomendación del coach IA</strong><p id="leadAction">Confirmar una reunión de diagnóstico con el responsable de la decisión.</p><small id="leadReason">Falta validar el proceso de aprobación y la fecha prevista de compra.</small></div></div></div></div></div><p class="demo-below">* La información anterior es ilustrativa, no representa clientes, predicciones verificadas ni una captura real del software.</p></div></section>
-
-    <section class="process"><div class="wrap"><div class="section-head"><div class="eyebrow kicker"><span class="dot"></span> De los datos a la acción</div><h2 class="section-title">Menos tareas dispersas.<br><span style="color:var(--mint)">Más claridad para vender.</span></h2><p class="section-sub">Una forma simple de entender cómo trabaja la inteligencia comercial de ProShop.</p></div><div class="process-grid"><div class="process-step"><span class="step-no">01 / CONTEXTO</span><h3>Reúne las señales</h3><p>Conecta información de conversaciones, oportunidades, campañas, agenda y reuniones disponibles.</p></div><div class="process-step"><span class="step-no">02 / ANÁLISIS</span><h3>Entiende la oportunidad</h3><p>La IA distingue hechos confirmados de datos faltantes, califica el lead e identifica riesgos.</p></div><div class="process-step"><span class="step-no">03 / EJECUCIÓN</span><h3>Activa el siguiente paso</h3><p>El vendedor obtiene prioridades, preguntas sugeridas, seguimiento y apoyo para decidir mejor.</p></div></div></div></section>
-
-    <section class="audience"><div class="wrap audience-grid"><div><div class="eyebrow kicker"><span class="dot"></span> Diseñado para negocios en movimiento</div><h2 class="section-title">¿Tu equipo vive entre WhatsApp y Excel?</h2><p class="section-sub">Si tu empresa ya recibe consultas y necesita vender con un proceso más ordenado, vale la pena revisar dónde se están quedando tus oportunidades.</p><a href="#contacto" class="btn btn-purple" style="margin-top:27px">Revisar mi proceso comercial <svg><use href="#i-arrow"/></svg></a></div><div class="audience-list"><div class="audience-item"><svg><use href="#i-users"/></svg><div><h3>Equipos comerciales de 2 o más vendedores</h3><p>Necesitan asignar responsabilidades y mantener un seguimiento compartido.</p></div></div><div class="audience-item"><svg><use href="#i-message"/></svg><div><h3>Empresas que captan leads por WhatsApp y Meta</h3><p>Quieren convertir consultas en oportunidades mejor calificadas.</p></div></div><div class="audience-item"><svg><use href="#i-calendar"/></svg><div><h3>Ventas consultivas con reuniones y propuestas</h3><p>Tienen decisiones que requieren información, coordinación y varios contactos.</p></div></div><div class="audience-item"><svg><use href="#i-chart"/></svg><div><h3>Gerentes que necesitan visibilidad real</h3><p>Buscan identificar riesgos, estancamientos y las próximas prioridades del equipo.</p></div></div></div></div></section>
-
-    <section class="faq" id="preguntas"><div class="wrap faq-layout"><div><div class="eyebrow kicker"><span class="dot"></span> Preguntas frecuentes</div><h2 class="section-title">Lo importante, <span class="highlight">sin rodeos.</span></h2><p class="section-sub">El objetivo no es añadir otra herramienta al equipo, sino mejorar la manera en que se gestionan las oportunidades.</p></div><div class="faq-items"><details class="faq-item"><summary>¿CRM ProShop reemplaza a mis vendedores? <svg><use href="#i-plus"/></svg></summary><p>No. Está diseñado para apoyar al equipo comercial con contexto, calificación, recomendaciones y tareas de seguimiento. Las decisiones y relaciones con los clientes siguen en manos de las personas.</p></details><details class="faq-item"><summary>¿Sirve si mis clientes escriben por WhatsApp? <svg><use href="#i-plus"/></svg></summary><p>Sí. WhatsApp es uno de los canales centrales para recopilar contexto comercial, dar seguimiento y trabajar con oportunidades. Las integraciones concretas se revisan según la configuración de tu empresa.</p></details><details class="faq-item"><summary>¿La probabilidad de cierre es una garantía de venta? <svg><use href="#i-plus"/></svg></summary><p>No. Es una estimación de apoyo comercial, basada en las señales y evidencias disponibles. Se muestra separada de la calidad del lead y debe revisarse a medida que aparece nueva información.</p></details><details class="faq-item"><summary>¿Podemos adaptar el CRM a nuestras etapas de venta? <svg><use href="#i-plus"/></svg></summary><p>El pipeline admite etapas configurables. En el diagnóstico evaluamos el proceso actual de tu equipo, las fuentes de información y las integraciones necesarias.</p></details><details class="faq-item"><summary>¿Cómo sé si es adecuado para mi empresa? <svg><use href="#i-plus"/></svg></summary><p>En una revisión inicial de 20 minutos identificamos cómo llegan los leads, qué ocurre después de la primera consulta y dónde existen pérdidas de seguimiento. A partir de ahí se evalúa si el CRM encaja.</p></details></div></div></section>
-
-    <section class="contact" id="contacto"><div class="wrap contact-grid"><div><div class="eyebrow" style="color:var(--mint)"><span class="dot"></span> Hablemos de tu proceso comercial</div><h2>Tu próxima venta puede depender de <span>un mejor seguimiento.</span></h2><p class="contact-copy">Solicita una revisión inicial de 20 minutos. Queremos entender cómo vendes hoy, qué ocurre con tus leads y si CRM ProShop es adecuado para tu operación.</p><div class="contact-perks"><span><svg><use href="#i-check"/></svg> ProShop es Meta Tech Provider</span><span><svg><use href="#i-check"/></svg> Conversación enfocada en tu proceso real</span><span><svg><use href="#i-check"/></svg> Identificación de cuellos de botella comerciales</span><span><svg><use href="#i-check"/></svg> Sin promesas de resultados que no podamos demostrar</span></div><div class="contact-channels"><a href="https://wa.me/59162095357?text=Hola%2C%20quiero%20conocer%20CRM%20ProShop%20y%20coordinar%20un%20diagn%C3%B3stico%20de%2020%20minutos." target="_blank" rel="noopener noreferrer">Escríbenos por WhatsApp ↗</a><a href="mailto:soporte@proshop.lat">soporte@proshop.lat</a></div></div><form class="contact-form" id="contactForm"><h3>Solicita tu diagnóstico</h3><p>Cuéntanos sobre tu empresa y continúa por WhatsApp.</p><div class="form-grid"><div class="field"><label for="fullName">Tu nombre *</label><input id="fullName" name="fullName" type="text" placeholder="¿Cómo te llamas?" autocomplete="name" required maxlength="90" /></div><div class="field"><label for="company">Empresa *</label><input id="company" name="company" type="text" placeholder="Nombre del negocio" autocomplete="organization" required maxlength="110" /></div></div><div class="form-grid"><div class="field"><label for="email">Correo de contacto *</label><input id="email" name="email" type="email" placeholder="tu@empresa.com" autocomplete="email" required maxlength="160" /></div><div class="field"><label for="team">Tamaño del equipo comercial</label><select id="team" name="team"><option value="No especificado">Selecciona</option><option>Trabajo solo/a</option><option>2 a 5 vendedores</option><option>6 a 15 vendedores</option><option>Más de 15 vendedores</option></select></div></div><div class="field"><label for="challenge">¿Qué te gustaría mejorar?</label><textarea id="challenge" name="challenge" maxlength="500" placeholder="Ej.: Perdemos seguimiento de los leads que llegan por WhatsApp..."></textarea></div><button class="btn btn-primary" type="submit">Continuar por WhatsApp <svg><use href="#i-arrow"/></svg></button><p class="form-note">Se abrirá WhatsApp con tu solicitud prellenada. Revisa el mensaje y presiona Enviar. Esta página no almacena los datos ni envía el mensaje automáticamente.</p><div class="form-result" id="formResult" role="status" aria-live="polite"></div></form></div></section>
-  </main>
-  <footer class="footer"><div class="wrap"><a class="brand" href="#inicio" aria-label="ProShop, volver al inicio"><img class="brand-logo" src="/logo-proshop.png" width="144" height="36" alt="ProShop" /></a><p>© <span id="year">2026</span> ProShop · Tecnología que acompaña tus decisiones comerciales.</p><div class="footer-links"><a href="https://proshop.lat/" target="_blank" rel="noopener noreferrer">proshop.lat</a><a href="mailto:soporte@proshop.lat">soporte@proshop.lat</a><a href="https://wa.me/59162095357" target="_blank" rel="noopener noreferrer">WhatsApp</a></div></div></footer>
-  <script>
+    <section class="meeting-feature" id="reuniones"><div class="wrap meeting-layout">
+<div class="meeting-copy"><div class="eyebrow kicker"><span class="dot"></span> Reuniones que se convierten en acciones</div>
+<h2 class="section-title">Tu reunión termina. <span class="highlight">El seguimiento ya está encaminado.</span></h2>
+<p class="section-sub">Agenda con Calendar y Meet desde el CRM. Con la grabación y los permisos habilitados, ProShop incorpora la transcripción, documenta acuerdos y permite a la IA recomendar el próximo paso comercial.</p>
+<div class="meeting-benefits"><div><span class="mb-num">01</span><div><strong>Agenda y coordina</strong><p>Gestiona reuniones sin perder el contexto de la oportunidad.</p></div></div><div><span class="mb-num">02</span><div><strong>Registra lo que se habló</strong><p>Transcripción, necesidades, objeciones y acuerdos asociados al lead.</p></div></div><div><span class="mb-num">03</span><div><strong>Actúa sobre lo acordado</strong><p>La IA propone tareas, mensajes y fechas de seguimiento.</p></div></div></div>
+<a class="btn btn-purple meeting-cta" href="#contacto">Descubre cómo funciona <svg><use href="#i-arrow"></use></svg></a></div>
+<div aria-label="Ejemplo ilustrativo de resumen de reunión analizado con IA" class="meeting-art"><div class="meeting-app-top"><span class="meeting-live"><span></span> Google Meet · Reunión finalizada</span><span class="meeting-app-state">Resumen generado con IA</span></div>
+<div class="meeting-app-main"><div class="meeting-participants"><span class="participant-avatar">IN</span><div><strong>Inmobiliaria Norte</strong><small>Diagnóstico comercial · 24 min</small></div><span class="meeting-done">✓ Documentada</span></div>
+<div class="transcript-card"><div class="mini-h"><span class="mini-icon purple">▤</span><strong>Transcripción y acuerdos</strong><span class="meeting-label">AUTOMÁTICO</span></div><p>“El equipo recibe consultas desde anuncios y WhatsApp, pero falta visibilidad del seguimiento por asesor”.</p><div class="meeting-bullet"><span>✓</span> Necesidad detectada: control de oportunidades</div><div class="meeting-bullet"><span>✓</span> Objeción: tiempo de implementación</div><div class="meeting-bullet"><span>✓</span> Acuerdo: revisar propuesta con gerencia</div></div>
+<div class="meeting-ai"><span class="sparkle">✦</span><div><small>RECOMENDACIÓN DEL COACH IA</small><strong>Enviar propuesta y confirmar revisión con gerencia.</strong><span>Prioridad alta · Plazo sugerido: 48 horas</span></div></div>
+<p class="meeting-caption">Interfaz y conversación ficticias para ilustrar el proceso. El acceso a grabaciones y transcripciones depende de la configuración, consentimiento e integraciones habilitadas.</p></div></div>
+</div></section>
+<section class="demo" id="demostracion"><div class="wrap"><div class="section-head"><div class="eyebrow kicker"><span class="dot"></span> Mira cómo prioriza una oportunidad</div><h2 class="section-title">No todos los leads necesitan <span class="highlight">la misma acción.</span></h2><p class="section-sub">Selecciona un prospecto y descubre cómo el coach IA diferencia calidad, posibilidades de cierre y siguientes acciones. Los ejemplos son simulaciones.</p></div><div class="demo-shell"><div class="demo-topbar"><span>Coach IA · Análisis de oportunidades</span><span class="demo-disclaimer">Demostración interactiva · empresas y datos ficticios</span></div><div class="demo-content"><div class="leads-list"><h3>Selecciona una oportunidad</h3><div class="leads-wrapper"><button aria-pressed="true" class="lead-btn active" data-lead="0" type="button"><span class="lead-initial">IN</span><span class="lead-info"><b>Inmobiliaria Norte</b><small>Calificada · Reunión por hacer</small></span><svg class="lead-chevron"><use href="#i-chevron"></use></svg></button><button aria-pressed="false" class="lead-btn" data-lead="1" type="button"><span class="lead-initial">GA</span><span class="lead-info"><b>Grupo Andes</b><small>Propuesta en evaluación</small></span><svg class="lead-chevron"><use href="#i-chevron"></use></svg></button><button aria-pressed="false" class="lead-btn" data-lead="2" type="button"><span class="lead-initial">SP</span><span class="lead-info"><b>Servicios Pacífico</b><small>Buen encaje · Sin decisión</small></span><svg class="lead-chevron"><use href="#i-chevron"></use></svg></button></div></div><div aria-live="polite" class="lead-detail"><div class="lead-heading"><div><h3 id="leadName">Inmobiliaria Norte</h3><p id="leadState">Interés confirmado · Reunión pendiente</p></div><span class="status" id="leadBadge">Lead calificado</span></div><div class="detail-scores"><div class="score-block"><span>Calidad del lead</span><b id="qualityValue">88</b><small> / 100</small><div class="scorebar"><i id="qualityBar" style="width:88%"></i></div></div><div class="score-block"><span>Probabilidad de cierre</span><b id="probValue">42</b><small> %</small><div class="scorebar"><i id="probBar" style="width:42%"></i></div></div><div class="score-block"><span>Cobertura de información</span><b id="coverageValue">78</b><small> %</small><div class="scorebar"><i id="coverageBar" style="width:78%"></i></div></div></div><div class="next-action"><svg><use href="#i-spark"></use></svg><div><strong>Acción recomendada por el coach IA</strong><p id="leadAction">Confirmar una reunión de diagnóstico con el responsable de la decisión.</p><small id="leadReason">Falta validar el proceso de aprobación y la fecha prevista de compra.</small></div><div class="coach-deadline"><span>Fecha máxima sugerida:</span><b id="leadDeadline">Dentro de 48 horas</b></div></div></div></div></div><p class="demo-below">* La información anterior es ilustrativa, no representa clientes, predicciones verificadas ni una captura real del software.</p></div></section>
+<section class="process"><div class="wrap"><div class="section-head"><div class="eyebrow kicker"><span class="dot"></span> De los datos a la acción</div><h2 class="section-title">Menos tareas dispersas.<br/><span style="color:var(--mint)">Más claridad para vender.</span></h2><p class="section-sub">Una forma simple de entender cómo trabaja la inteligencia comercial de ProShop.</p></div><div class="process-grid"><div class="process-step"><span class="step-no">01 / CONTEXTO</span><h3>Reúne las señales</h3><p>Conecta información de conversaciones, oportunidades, campañas, agenda y reuniones disponibles.</p></div><div class="process-step"><span class="step-no">02 / ANÁLISIS</span><h3>Entiende la oportunidad</h3><p>La IA distingue hechos confirmados de datos faltantes, califica el lead e identifica riesgos.</p></div><div class="process-step"><span class="step-no">03 / EJECUCIÓN</span><h3>Activa el siguiente paso</h3><p>El vendedor obtiene prioridades, preguntas sugeridas, seguimiento y apoyo para decidir mejor.</p></div></div></div></section>
+<section class="audience"><div class="wrap audience-grid"><div><div class="eyebrow kicker"><span class="dot"></span> Diseñado para negocios en movimiento</div><h2 class="section-title">¿Tu equipo vive entre WhatsApp y Excel?</h2><p class="section-sub">Si tu empresa ya recibe consultas y necesita vender con un proceso más ordenado, vale la pena revisar dónde se están quedando tus oportunidades.</p><a class="btn btn-purple" href="#contacto" style="margin-top:27px">Revisar mi proceso comercial <svg><use href="#i-arrow"></use></svg></a></div><div class="audience-list"><div class="audience-item"><svg><use href="#i-users"></use></svg><div><h3>Equipos comerciales de 2 o más vendedores</h3><p>Necesitan asignar responsabilidades y mantener un seguimiento compartido.</p></div></div><div class="audience-item"><svg><use href="#i-message"></use></svg><div><h3>Empresas que captan leads por WhatsApp y Meta</h3><p>Quieren convertir consultas en oportunidades mejor calificadas.</p></div></div><div class="audience-item"><svg><use href="#i-calendar"></use></svg><div><h3>Ventas consultivas con reuniones y propuestas</h3><p>Tienen decisiones que requieren información, coordinación y varios contactos.</p></div></div><div class="audience-item"><svg><use href="#i-chart"></use></svg><div><h3>Gerentes que necesitan visibilidad real</h3><p>Buscan identificar riesgos, estancamientos y las próximas prioridades del equipo.</p></div></div></div></div></section>
+<section class="faq" id="preguntas"><div class="wrap faq-layout"><div><div class="eyebrow kicker"><span class="dot"></span> Preguntas frecuentes</div><h2 class="section-title">Lo importante, <span class="highlight">sin rodeos.</span></h2><p class="section-sub">El objetivo no es añadir otra herramienta al equipo, sino mejorar la manera en que se gestionan las oportunidades.</p></div><div class="faq-items"><details class="faq-item"><summary>¿CRM ProShop reemplaza a mis vendedores? <svg><use href="#i-plus"></use></svg></summary><p>No. Está diseñado para apoyar al equipo comercial con contexto, calificación, recomendaciones y tareas de seguimiento. Las decisiones y relaciones con los clientes siguen en manos de las personas.</p></details><details class="faq-item"><summary>¿Sirve si mis clientes escriben por WhatsApp? <svg><use href="#i-plus"></use></svg></summary><p>Sí. WhatsApp es uno de los canales centrales para recopilar contexto comercial, dar seguimiento y trabajar con oportunidades. Las integraciones concretas se revisan según la configuración de tu empresa.</p></details><details class="faq-item"><summary>¿La probabilidad de cierre es una garantía de venta? <svg><use href="#i-plus"></use></svg></summary><p>No. Es una estimación de apoyo comercial, basada en las señales y evidencias disponibles. Se muestra separada de la calidad del lead y debe revisarse a medida que aparece nueva información.</p></details><details class="faq-item"><summary>¿Podemos adaptar el CRM a nuestras etapas de venta? <svg><use href="#i-plus"></use></svg></summary><p>El pipeline admite etapas configurables. En el diagnóstico evaluamos el proceso actual de tu equipo, las fuentes de información y las integraciones necesarias.</p></details><details class="faq-item"><summary>¿Cómo sé si es adecuado para mi empresa? <svg><use href="#i-plus"></use></svg></summary><p>En una revisión inicial de 20 minutos identificamos cómo llegan los leads, qué ocurre después de la primera consulta y dónde existen pérdidas de seguimiento. A partir de ahí se evalúa si el CRM encaja.</p></details><details class="faq-item"><summary>¿Qué significa coaching de IA para mi equipo? <svg><use href="#i-plus"></use></svg></summary><p>El coach analiza la información disponible de cada oportunidad y puede recomendar una acción concreta, la pregunta o mensaje sugerido, la justificación y una fecha de seguimiento. El asesor revisa y decide cómo ejecutarla.</p></details>
+<details class="faq-item"><summary>¿Las reuniones se transcriben automáticamente? <svg><use href="#i-plus"></use></svg></summary><p>Con las integraciones, permisos y grabación habilitados, ProShop puede registrar transcripciones, extraer acuerdos y proponer seguimientos desde la reunión. La disponibilidad específica se confirma en la implementación.</p></details></div></div></section>
+<section class="contact" id="contacto"><div class="wrap contact-grid"><div><div class="eyebrow" style="color:var(--mint)"><span class="dot"></span> Hablemos de tu proceso comercial</div><h2>Tu próxima venta puede depender de <span>un mejor seguimiento.</span></h2><p class="contact-copy">Solicita una revisión inicial de 20 minutos. Queremos entender cómo vendes hoy, qué ocurre con tus leads y si CRM ProShop es adecuado para tu operación.</p><div class="contact-perks"><span><svg><use href="#i-check"></use></svg> ProShop es Meta Tech Provider</span><span><svg><use href="#i-check"></use></svg> Conversación enfocada en tu proceso real</span><span><svg><use href="#i-check"></use></svg> Identificación de cuellos de botella comerciales</span><span><svg><use href="#i-check"></use></svg> Sin promesas de resultados que no podamos demostrar</span></div><div class="contact-channels"><a href="https://wa.me/59162095357?text=Hola%2C%20quiero%20conocer%20CRM%20ProShop%20y%20coordinar%20un%20diagn%C3%B3stico%20de%2020%20minutos." rel="noopener noreferrer" target="_blank">Escríbenos por WhatsApp ↗</a><a href="mailto:soporte@proshop.lat">soporte@proshop.lat</a></div></div><form class="contact-form" id="contactForm"><h3>Solicita tu diagnóstico</h3><p>Cuéntanos sobre tu empresa y continúa por WhatsApp.</p><div class="form-grid"><div class="field"><label for="fullName">Tu nombre *</label><input autocomplete="name" id="fullName" maxlength="90" name="fullName" placeholder="¿Cómo te llamas?" required="" type="text"/></div><div class="field"><label for="company">Empresa *</label><input autocomplete="organization" id="company" maxlength="110" name="company" placeholder="Nombre del negocio" required="" type="text"/></div></div><div class="form-grid"><div class="field"><label for="email">Correo de contacto *</label><input autocomplete="email" id="email" maxlength="160" name="email" placeholder="tu@empresa.com" required="" type="email"/></div><div class="field"><label for="team">Tamaño del equipo comercial</label><select id="team" name="team"><option value="No especificado">Selecciona</option><option>Trabajo solo/a</option><option>2 a 5 vendedores</option><option>6 a 15 vendedores</option><option>Más de 15 vendedores</option></select></div></div><div class="field"><label for="challenge">¿Qué te gustaría mejorar?</label><textarea id="challenge" maxlength="500" name="challenge" placeholder="Ej.: Perdemos seguimiento de los leads que llegan por WhatsApp..."></textarea></div><button class="btn btn-primary" type="submit">Continuar por WhatsApp <svg><use href="#i-arrow"></use></svg></button><p class="form-note">Se abrirá WhatsApp con tu solicitud prellenada. Revisa el mensaje y presiona Enviar. Esta página no almacena los datos ni envía el mensaje automáticamente.</p><div aria-live="polite" class="form-result" id="formResult" role="status"></div></form></div></section>
+</main>
+<footer class="footer"><div class="wrap"><a aria-label="ProShop, volver al inicio" class="brand" href="#inicio"><img alt="ProShop" class="brand-logo" height="36" src="logo-proshop.png" width="144"/></a><p>© <span id="year">2026</span> ProShop · Tecnología que acompaña tus decisiones comerciales.</p><div class="footer-links"><a href="https://proshop.lat/" rel="noopener noreferrer" target="_blank">proshop.lat</a><a href="mailto:soporte@proshop.lat">soporte@proshop.lat</a><a href="https://wa.me/59162095357" rel="noopener noreferrer" target="_blank">WhatsApp</a></div></div></footer>
+<script>
     const leads=[
-      {name:'Inmobiliaria Norte',state:'Interés confirmado · Reunión pendiente',badge:'Oportunidad alta',quality:88,prob:42,coverage:78,action:'Confirmar una reunión de diagnóstico con el responsable de la decisión.',reason:'Falta validar el proceso de aprobación y la fecha prevista de compra.'},
-      {name:'Grupo Andes',state:'Diagnóstico realizado · Propuesta en evaluación',badge:'Lead calificado',quality:76,prob:68,coverage:86,action:'Contactar al decisor para resolver la objeción sobre implementación.',reason:'Hay una propuesta activa, pero aún no existe confirmación de aprobación.'},
-      {name:'Servicios Pacífico',state:'Buen encaje · Presupuesto aún desconocido',badge:'Oportunidad alta',quality:91,prob:28,coverage:63,action:'Preguntar cómo están presupuestando la solución y quién decide la compra.',reason:'El problema es claro, pero faltan señales de avance hacia la contratación.'}
+      {name:'Inmobiliaria Norte',state:'Interés confirmado · Reunión pendiente',badge:'Oportunidad alta',quality:88,prob:42,coverage:78,action:'Confirmar una reunión de diagnóstico con el responsable de la decisión.',reason:'Pregunta sugerida: ¿Quién debe aprobar la solución y cuándo podemos revisar la propuesta?',days:2},
+      {name:'Grupo Andes',state:'Diagnóstico realizado · Propuesta en evaluación',badge:'Lead calificado',quality:76,prob:68,coverage:86,action:'Contactar al decisor para resolver la objeción sobre implementación.',reason:'Pregunta sugerida: ¿Qué necesita tu equipo para tomar una decisión sobre la propuesta?',days:1},
+      {name:'Servicios Pacífico',state:'Buen encaje · Presupuesto aún desconocido',badge:'Oportunidad alta',quality:91,prob:28,coverage:63,action:'Preguntar cómo están presupuestando la solución y quién decide la compra.',reason:'Pregunta sugerida: ¿Tienen un presupuesto estimado para resolver este problema?',days:3}
     ];
-    function setLead(i){const lead=leads[i];if(!lead)return;document.getElementById('leadName').textContent=lead.name;document.getElementById('leadState').textContent=lead.state;document.getElementById('leadBadge').textContent=lead.badge;document.getElementById('qualityValue').textContent=lead.quality;document.getElementById('probValue').textContent=lead.prob;document.getElementById('coverageValue').textContent=lead.coverage;document.getElementById('qualityBar').style.width=lead.quality+'%';document.getElementById('probBar').style.width=lead.prob+'%';document.getElementById('coverageBar').style.width=lead.coverage+'%';document.getElementById('leadAction').textContent=lead.action;document.getElementById('leadReason').textContent=lead.reason;document.querySelectorAll('.lead-btn').forEach((btn,j)=>{btn.classList.toggle('active',j===i);btn.setAttribute('aria-pressed',String(j===i))});}
+    function setLead(i){const lead=leads[i];if(!lead)return;document.getElementById('leadName').textContent=lead.name;document.getElementById('leadState').textContent=lead.state;document.getElementById('leadBadge').textContent=lead.badge;document.getElementById('qualityValue').textContent=lead.quality;document.getElementById('probValue').textContent=lead.prob;document.getElementById('coverageValue').textContent=lead.coverage;document.getElementById('qualityBar').style.width=lead.quality+'%';document.getElementById('probBar').style.width=lead.prob+'%';document.getElementById('coverageBar').style.width=lead.coverage+'%';document.getElementById('leadAction').textContent=lead.action;document.getElementById('leadReason').textContent=lead.reason;const deadline=new Date();deadline.setDate(deadline.getDate()+(lead.days||2));document.getElementById('leadDeadline').textContent=deadline.toLocaleDateString('es-BO',{day:'numeric',month:'short',year:'numeric'});document.querySelectorAll('.lead-btn').forEach((btn,j)=>{btn.classList.toggle('active',j===i);btn.setAttribute('aria-pressed',String(j===i))});}
     document.querySelectorAll('.lead-btn').forEach(btn=>btn.addEventListener('click',()=>setLead(Number(btn.dataset.lead))));
+    setLead(0);
     const toggle=document.getElementById('menuToggle');const nav=document.getElementById('navLinks');toggle.addEventListener('click',()=>{const open=nav.classList.toggle('open');toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',open?'Cerrar menú':'Abrir menú')});nav.querySelectorAll('a').forEach(link=>link.addEventListener('click',()=>{nav.classList.remove('open');toggle.setAttribute('aria-expanded','false')}));
     document.getElementById('year').textContent=new Date().getFullYear();
     // Contacto comercial facilitado por ProShop. El envío requiere confirmación del visitante en WhatsApp.
@@ -400,7 +452,7 @@
       window.location.href=url;
     });
 
-    /* ═══ Animaciones y explicaciones visuales (capa añadida; no cambia ningún texto) ═══ */
+    /* ═══ Capa de animaciones (no cambia ningún texto de la landing) ═══ */
     (function(){
       var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       var $ = function(s,c){return (c||document).querySelector(s)};
@@ -412,16 +464,16 @@
       function onScroll(){
         var h = document.documentElement, max = h.scrollHeight - h.clientHeight;
         bar.style.transform = 'scaleX(' + (max > 0 ? Math.min(1, h.scrollTop / max) : 0) + ')';
-        header.classList.toggle('scrolled', h.scrollTop > 30);
+        if(header) header.classList.toggle('scrolled', h.scrollTop > 30);
       }
       addEventListener('scroll', onScroll, {passive:true}); onScroll();
 
-      // Enlace activo del menú según la sección visible
+      // Enlace activo del menú
       var links = $$('#navLinks a[href^="#"]');
       var secObs = new IntersectionObserver(function(es){
         es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(a){ a.classList.toggle('is-active', a.getAttribute('href') === '#' + e.target.id) }) } });
       }, {rootMargin:'-45% 0px -50% 0px'});
-      ['beneficios','funciones','demostracion','preguntas'].forEach(function(id){ var el = document.getElementById(id); if(el) secObs.observe(el) });
+      $$('main section[id]').forEach(function(s){ secObs.observe(s) });
 
       // ── Hero ───────────────────────────────────────────────────────
       var hero = $('.hero');
@@ -432,7 +484,6 @@
         spot.style.setProperty('--sx', (e.clientX - r.left) + 'px'); spot.style.setProperty('--sy', (e.clientY - r.top) + 'px');
       });
 
-      // Titular palabra por palabra (conserva el texto y el énfasis)
       var h1 = $('.hero h1'), idx = 0;
       (function split(node){
         Array.prototype.slice.call(node.childNodes).forEach(function(n){
@@ -448,14 +499,12 @@
         });
       })(h1);
 
-      // Escalonado de la ventana del producto y conteo de cifras
       $$('.hero .mock-row').forEach(function(el,i){ el.style.setProperty('--k', i + 2) });
       $$('.hero .mock-stat').forEach(function(el,i){ el.style.setProperty('--k', i + 1) });
       $$('.hero .side-item').forEach(function(el,i){ el.style.setProperty('--k', i * .6) });
       function countUp(el, delay){
-        var raw = el.textContent.trim(), target = parseInt(raw, 10); if(isNaN(target)) return;
+        var raw = el.textContent.trim(), target = parseInt(raw, 10); if(isNaN(target) || reduce) return;
         var pad = raw.length > String(target).length ? raw.length : 0;
-        if(reduce){ return }
         el.textContent = pad ? '0'.repeat(pad) : '0';
         setTimeout(function(){
           var t0 = performance.now(), dur = 1400;
@@ -469,36 +518,33 @@
       $$('.hero .mock-stat strong').forEach(function(el,i){ countUp(el, 1300 + i * 150) });
       $$('.hero .mock-score').forEach(function(el,i){ countUp(el, 1700 + i * 150) });
 
-      // Puntos explicativos: reutilizan los textos que ya están en "Funciones"
-      var cards = $$('.feature-card');
-      function cardText(i){ return { t: cards[i].querySelector('h3').textContent, d: cards[i].querySelector('p').textContent } }
+      // Puntos explicativos sobre la ventana: usan los textos que ya están en la sección de funciones
+      var showcase = $$('.showcase-card'), secondary = $$('.feature-grid-secondary .feature-card');
+      var sources = [showcase[0], showcase[1], secondary[1]].filter(Boolean);
+      function srcText(el){ return { t: el.querySelector('h3').textContent, d: (el.querySelector('p') || {}).textContent || '' } }
       var main = $('.mock-main'); main.style.position = 'relative';
       function offsetIn(el, root){ var x = 0, y = 0; while(el && el !== root){ x += el.offsetLeft; y += el.offsetTop; el = el.offsetParent } return {x:x, y:y} }
       var spots = [
-        { el: $('.mock-body .mock-panel'), card: 0, n: 1 },
-        { el: $('.mock-task'), card: 1, n: 2 },
-        { el: $$('.mock-stat')[2], card: 3, n: 3 }
-      ].filter(function(s){ return s.el && cards[s.card] });
+        { el: $('.mock-body .mock-panel'), src: sources[0], n: 1 },
+        { el: $('.mock-task'), src: sources[1], n: 2 },
+        { el: $$('.mock-stat')[2], src: sources[2], n: 3 }
+      ].filter(function(s){ return s.el && s.src });
       var tip = document.createElement('div'); tip.className = 'hot-tip'; main.appendChild(tip);
       var dots = spots.map(function(s){
         var b = document.createElement('button'); b.type = 'button'; b.className = 'hot'; b.textContent = s.n;
-        b.setAttribute('aria-label', cardText(s.card).t); main.appendChild(b); return b;
+        b.setAttribute('aria-label', srcText(s.src).t); main.appendChild(b); return b;
       });
-      function place(){
-        spots.forEach(function(s,i){
-          var o = offsetIn(s.el, main); dots[i].style.left = (o.x + s.el.offsetWidth - 10) + 'px'; dots[i].style.top = (o.y + 10) + 'px';
-        });
-      }
+      function place(){ spots.forEach(function(s,i){ var o = offsetIn(s.el, main); dots[i].style.left = (o.x + s.el.offsetWidth - 10) + 'px'; dots[i].style.top = (o.y + 10) + 'px' }) }
       var cur = -1, timer = null, hovering = false;
       function show(i){
-        cur = i; var c = cardText(spots[i].card);
+        cur = i; var c = srcText(spots[i].src);
         tip.innerHTML = '<b></b><p></p>'; tip.firstChild.textContent = c.t; tip.lastChild.textContent = c.d;
         var o = offsetIn(spots[i].el, main), left = Math.max(8, Math.min(main.clientWidth - 238, o.x + spots[i].el.offsetWidth - 230));
-        var top = o.y + 26; if(top + 110 > main.clientHeight) top = Math.max(8, o.y - 112);
+        var top = o.y + 26; if(top + 130 > main.clientHeight) top = Math.max(8, o.y - 132);
         tip.style.left = left + 'px'; tip.style.top = top + 'px'; tip.classList.add('show');
         dots.forEach(function(d,j){ d.classList.toggle('on', j === i) });
       }
-      function loop(){ clearInterval(timer); timer = setInterval(function(){ if(!hovering) show((cur + 1) % spots.length) }, 4200) }
+      function loop(){ clearInterval(timer); timer = setInterval(function(){ if(!hovering) show((cur + 1) % spots.length) }, 4600) }
       if(spots.length && !reduce){
         place(); addEventListener('resize', function(){ place(); if(cur >= 0) show(cur) });
         setTimeout(function(){ place(); show(0); loop() }, 3200);
@@ -510,41 +556,48 @@
       } else { dots.forEach(function(d){ d.style.display = 'none' }); tip.style.display = 'none' }
 
       // ── Revelado al hacer scroll ───────────────────────────────────
-      document.documentElement.classList.add('js');
       function rv(el, extra, delay){ if(!el) return; el.classList.add('rv'); if(extra) el.classList.add(extra); if(delay) el.style.setProperty('--d', delay + 's') }
-      $$('.section-head').forEach(function(el){ rv(el) });
-      $$('.category-band .wrap > p').forEach(function(el){ rv(el) });
-      $$('.tags span').forEach(function(el,i){ rv(el, 'zoom', i * .08) });
+      $$('main section:not(.hero)').forEach(function(sec){
+        $$('.eyebrow, .section-title, .section-sub, .comparison-heading', sec).forEach(function(el){ if(!el.closest('.rv')) rv(el) });
+      });
+      // Ecosistema: la cadena se enciende de a un paso
+      $$('.ecosystem-step').forEach(function(el,i){ rv(el, 'zoom', i * .12) });
+      $$('.ecosystem-arrow').forEach(function(el,i){ rv(el, 'zoom', i * .12 + .06) });
+      // El problema
       rv($('.pain-card.old'), 'from-left'); rv($('.pain-card.new'), 'from-right', .12);
       $$('.pain-card').forEach(function(card){ $$('li', card).forEach(function(li,i){ li.style.setProperty('--k', i) }) });
-      $$('.feature-card').forEach(function(el,i){ rv(el, null, (i % 3) * .12) });
+      // Funciones
+      rv(showcase[0], 'from-left'); rv(showcase[1], 'from-right', .12);
+      $$('.feature-grid-secondary .feature-card').forEach(function(el,i){ rv(el, null, (i % 4) * .1) });
+      // Reuniones
+      rv($('.meeting-copy'), 'from-left'); rv($('.meeting-art'), 'from-right', .12);
+      $$('.meeting-benefits > *').forEach(function(el,i){ rv(el, null, .15 + i * .12) });
+      // Demo, proceso, público, preguntas, contacto
       rv($('.demo-shell'), 'zoom'); rv($('.demo-below'));
       $$('.process-step').forEach(function(el,i){ el.style.setProperty('--k', i); rv(el, null, i * .15) });
-      rv($('.audience-grid > div:first-child'), 'from-left');
+      $$('.audience-grid > div:first-child .btn').forEach(function(el){ rv(el) });
       $$('.audience-item').forEach(function(el,i){ rv(el, 'from-right', i * .1) });
-      rv($('.faq-layout > div:first-child'), 'from-left');
-      $$('.faq-item').forEach(function(el,i){ rv(el, null, i * .08) });
+      $$('.faq-item').forEach(function(el,i){ rv(el, null, i * .07) });
       rv($('.contact-grid > div:first-child'), 'from-left'); rv($('.contact-form'), 'from-right', .12);
       $$('.contact-perks span').forEach(function(el,i){ rv(el, null, .2 + i * .1) });
 
       var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target) } }) }, {threshold:.14, rootMargin:'0px 0px -40px 0px'});
       $$('.rv').forEach(function(el){ io.observe(el) });
-      // Las tarjetas del problema y los pasos usan su propia clase "in" para encadenar sus listas
-      $$('.pain-card, .process-step').forEach(function(el){ if(!el.classList.contains('rv')){ io.observe(el) } });
+      $$('.pain-card, .process-step').forEach(function(el){ if(!el.classList.contains('rv')) io.observe(el) });
 
-      // ── Funciones: brillo que sigue al cursor + inclinación suave ──
+      // Funciones: brillo que sigue al cursor + inclinación suave
       if(!reduce && matchMedia('(hover:hover)').matches){
-        $$('.feature-card').forEach(function(card){
+        $$('.showcase-card, .feature-card').forEach(function(card){
           card.addEventListener('mousemove', function(e){
             var r = card.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
             card.style.setProperty('--mx', x + 'px'); card.style.setProperty('--my', y + 'px');
-            card.style.transform = 'perspective(800px) rotateX(' + ((.5 - y / r.height) * 5) + 'deg) rotateY(' + ((x / r.width - .5) * 6) + 'deg) translateY(-4px)';
+            card.style.transform = 'perspective(800px) rotateX(' + ((.5 - y / r.height) * 4) + 'deg) rotateY(' + ((x / r.width - .5) * 5) + 'deg) translateY(-4px)';
           });
           card.addEventListener('mouseleave', function(){ card.style.transform = '' });
         });
       }
 
-      // ── Demostración: recorre las oportunidades sola hasta que el visitante interviene ──
+      // Demostración: recorre las oportunidades sola hasta que el visitante interviene
       var demo = $('.demo'), order = 0, auto = null, userTook = false;
       var fields = ['qualityValue','probValue','coverageValue'];
       var originalSet = window.setLead;
@@ -557,21 +610,19 @@
         if(reduce) return; var full = el.textContent; el.textContent = ''; el.classList.add('caret'); var i = 0;
         (function step(){ el.textContent = full.slice(0, ++i); if(i < full.length) setTimeout(step, 16); else el.classList.remove('caret') })();
       }
-      window.setLead = function(i){
-        var prev = fields.map(function(id){ return parseInt(document.getElementById(id).textContent, 10) || 0 });
-        originalSet(i); order = i;
-        fields.forEach(function(id,j){ var el = document.getElementById(id), to = parseInt(el.textContent, 10); el.textContent = prev[j]; tween(el, prev[j], to) });
-        var d = $('.lead-detail'); d.classList.remove('swap'); void d.offsetWidth; d.classList.add('swap');
-        typeText(document.getElementById('leadAction'));
-        $$('.lead-btn').forEach(function(b){ b.style.setProperty('--dur', '5.5s') });
-      };
-      function startAuto(){
-        if(reduce || userTook || auto) return;
-        auto = setInterval(function(){ window.setLead((order + 1) % 3) }, 5500);
+      if(typeof originalSet === 'function'){
+        window.setLead = function(i){
+          var prev = fields.map(function(id){ return parseInt(document.getElementById(id).textContent, 10) || 0 });
+          originalSet(i); order = i;
+          fields.forEach(function(id,j){ var el = document.getElementById(id), to = parseInt(el.textContent, 10); el.textContent = prev[j]; tween(el, prev[j], to) });
+          var d = $('.lead-detail'); d.classList.remove('swap'); void d.offsetWidth; d.classList.add('swap');
+          typeText(document.getElementById('leadAction'));
+        };
+        $$('.lead-btn').forEach(function(b){ b.addEventListener('click', function(){ userTook = true; demo.classList.add('paused'); stopAuto() }) });
+        new IntersectionObserver(function(es){ es[0].isIntersecting ? startAuto() : stopAuto() }, {threshold:.4}).observe($('.demo-shell'));
       }
+      function startAuto(){ if(reduce || userTook || auto) return; auto = setInterval(function(){ window.setLead((order + 1) % 3) }, 5500) }
       function stopAuto(){ clearInterval(auto); auto = null }
-      $$('.lead-btn').forEach(function(b){ b.addEventListener('click', function(){ userTook = true; demo.classList.add('paused'); stopAuto() }) });
-      new IntersectionObserver(function(es){ es[0].isIntersecting ? startAuto() : stopAuto() }, {threshold:.4}).observe($('.demo-shell'));
     })();
 
     /* ═══ Sección "Míralo en acción" (animaciones del tablero, el chat y el resumen) ═══ */

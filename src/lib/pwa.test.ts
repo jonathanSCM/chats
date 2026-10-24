@@ -52,6 +52,9 @@ describe("shouldOfferInstall", () => {
   it("no ofrece si el navegador no soporta instalar", () => {
     expect(shouldOfferInstall({ ...base, hasInstallEvent: false })).toBe(false);
   });
+  it("no ofrece instalar en Android 8 o menor (el WebAPK se cierra al abrir)", () => {
+    expect(shouldOfferInstall({ ...base, unsupported: true })).toBe(false);
+  });
   it("en Safari de iOS ofrece las instrucciones aunque no haya evento", () => {
     expect(shouldOfferInstall({ ...base, hasInstallEvent: false, iosSafari: true })).toBe(true);
   });

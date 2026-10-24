@@ -43,7 +43,7 @@ function isStandalone(): boolean {
  */
 export function PwaPrompts() {
   // El evento de instalación se comparte con el botón "Instalar en mi dispositivo" del perfil.
-  const { event: installEvent, installed } = useSyncExternalStore(
+  const { event: installEvent, installed, legacyAndroid } = useSyncExternalStore(
     subscribeInstall,
     getInstallSnapshot,
     () => SERVER_INSTALL_SNAPSHOT,
@@ -111,6 +111,7 @@ export function PwaPrompts() {
 
   const offerInstall = shouldOfferInstall({
     standalone: standalone || installed,
+    unsupported: legacyAndroid !== null,
     hasInstallEvent: installEvent !== null,
     iosSafari,
     dismissed,

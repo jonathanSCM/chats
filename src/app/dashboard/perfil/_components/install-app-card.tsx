@@ -57,6 +57,24 @@ export function InstallAppCard() {
     );
   }
 
+  if (install.legacyAndroid) {
+    return (
+      <div className="space-y-2 text-sm text-ink-muted">
+        <p>
+          Tu teléfono usa <b className="text-ink">Android {install.legacyAndroid}</b>. En ese Android, la app
+          instalada desde Chrome se cierra al abrirla: es una limitación de Chrome, no de ProShop, por eso
+          no te ofrecemos instalarla.
+        </p>
+        <p>
+          Para tener un acceso directo en la pantalla de inicio: en Chrome toca los tres puntos →{" "}
+          <b className="text-ink">Agregar a pantalla de inicio</b> y, si te da a elegir, escoge{" "}
+          <b className="text-ink">Crear acceso directo</b> (no «Instalar»). Se abrirá en Chrome.
+        </p>
+        <p>Si ya instalaste la app y se cierra, mantén presionado su ícono y desinstálala.</p>
+      </div>
+    );
+  }
+
   if (install.event) {
     return (
       <Button onClick={handleInstall} disabled={busy}>

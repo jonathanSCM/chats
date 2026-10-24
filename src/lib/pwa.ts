@@ -56,10 +56,12 @@ export interface InstallState {
   hasInstallEvent: boolean;
   iosSafari: boolean;
   dismissed: boolean;
+  /** Android 8 o menor: el WebAPK que fabrica Chrome no abre; no se ofrece instalar. */
+  unsupported?: boolean;
 }
 
 export function shouldOfferInstall(s: InstallState): boolean {
-  if (s.standalone || s.dismissed) return false;
+  if (s.standalone || s.dismissed || s.unsupported) return false;
   return s.hasInstallEvent || s.iosSafari;
 }
 

@@ -11,9 +11,13 @@ export interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+import { detectLegacyAndroid } from "./android-version";
+
 export interface InstallSnapshot {
   event: BeforeInstallPromptEvent | null;
   installed: boolean;
+  /** Versión de Android ("8.1.0") si este teléfono no puede abrir una app instalada desde Chrome; null si sí. */
+  legacyAndroid: string | null;
 }
 
 declare global {
@@ -38,14 +42,14 @@ export const PWA_EARLY_CAPTURE_SCRIPT = `
 })();
 `;
 
-export const SERVER_INSTALL_SNAPSHOT: InstallSnapshot = { event: null, installed: false };
+export const SERVER_INSTALL_SNAPSHOT: InstallSnapshot = { event: null, installed: false, legacyAndroid: null };
 
 let snapshot: InstallSnapshot = SERVER_INSTALL_SNAPSHOT;
 let started = false;
 const listeners = new Set<() => void>();
 
-function emit(next: InstallSnapshot) {
-  snapshot = next;
+function emit(next: Omit<InstallSnapshot, "legacyAndroid">) {
+  snapshot = { ...next, legacyAndroid: snapshot.legacyAndroid };
   listeners.forEach((l) => l());
 }
 
@@ -53,7 +57,14 @@ function start() {
   if (started || typeof window === "undefined") return;
   started = true;
 
-  if (window.__pwaInstallEvent) snapshot = { event: window.__pwaInstallEvent, installed: false };
+  if (window.__pwaInstallEvent) snapshot = { ...snapshot, event: window.__pwaInstallEvent };
+
+  // La versión real de Android sale de forma asíncrona; cuando llega se avisa a quien escucha.
+  void detectLegacyAndroid().then((version) => {
+    if (version === null) return;
+    snapshot = { ...snapshot, legacyAndroid: version };
+    listeners.forEach((l) => l());
+  });
 
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault(); // lo ofrecemos con nuestros propios botones

@@ -63,7 +63,7 @@ describe("pwa-install-store", () => {
 
     await expect(store.promptInstall()).resolves.toBe("accepted");
     expect(ev.prompt).toHaveBeenCalledOnce();
-    expect(store.getInstallSnapshot()).toEqual({ event: null, installed: true });
+    expect(store.getInstallSnapshot()).toMatchObject({ event: null, installed: true });
   });
 
   it("si se descarta el diálogo, no queda instalada y se libera el evento", async () => {
@@ -74,7 +74,7 @@ describe("pwa-install-store", () => {
     fire("beforeinstallprompt", installEvent("dismissed"));
 
     await expect(store.promptInstall()).resolves.toBe("dismissed");
-    expect(store.getInstallSnapshot()).toEqual({ event: null, installed: false });
+    expect(store.getInstallSnapshot()).toMatchObject({ event: null, installed: false });
   });
 
   it("sin evento disponible no hace nada", async () => {
@@ -91,7 +91,7 @@ describe("pwa-install-store", () => {
     store.getInstallSnapshot();
     fire("beforeinstallprompt", installEvent("accepted"));
     fire("appinstalled", {});
-    expect(store.getInstallSnapshot()).toEqual({ event: null, installed: true });
+    expect(store.getInstallSnapshot()).toMatchObject({ event: null, installed: true });
   });
 
   it("el script temprano es ES5 y válido", () => {

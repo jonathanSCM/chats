@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Download, RefreshCw, Share, X } from "lucide-react";
 import {
   BUILD_ID,
@@ -10,12 +10,12 @@ import {
   parseDismissRecord,
   shouldOfferInstall,
 } from "@/lib/pwa";
-
-// Evento no estándar de Chrome/Edge/Samsung Internet para instalar la app.
-interface BeforeInstallPromptEvent extends Event {
-  prompt(): Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
+import {
+  SERVER_INSTALL_SNAPSHOT,
+  getInstallSnapshot,
+  promptInstall,
+  subscribeInstall,
+} from "@/lib/pwa-install-store";
 
 const DISMISS_KEY = "pwa-install-dismissed";
 const CHECK_EVERY_MS = 5 * 60_000;
@@ -42,7 +42,12 @@ function isStandalone(): boolean {
  * Nada de esto bloquea la pantalla y todo se puede descartar.
  */
 export function PwaPrompts() {
-  const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  // El evento de instalación se comparte con el botón "Instalar en mi dispositivo" del perfil.
+  const { event: installEvent, installed } = useSyncExternalStore(
+    subscribeInstall,
+    getInstallSnapshot,
+    () => SERVER_INSTALL_SNAPSHOT,
+  );
   const [standalone, setStandalone] = useState(true); // true hasta comprobar: evita parpadeo
   const [iosSafari, setIosSafari] = useState(false);
   const [dismissed, setDismissed] = useState(true);
@@ -55,21 +60,6 @@ export function PwaPrompts() {
     setStandalone(isStandalone());
     setIosSafari(isIOSSafari(navigator.userAgent, navigator.maxTouchPoints));
     setDismissed(readDismissed());
-
-    const onBeforeInstall = (e: Event) => {
-      e.preventDefault(); // guardamos el evento para ofrecerlo con nuestro propio botón
-      setInstallEvent(e as BeforeInstallPromptEvent);
-    };
-    const onInstalled = () => {
-      setInstallEvent(null);
-      setStandalone(true);
-    };
-    window.addEventListener("beforeinstallprompt", onBeforeInstall);
-    window.addEventListener("appinstalled", onInstalled);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
   }, []);
 
   // ¿Hay una versión nueva desplegada? Se mira cada pocos minutos y al volver a la app.
@@ -112,17 +102,15 @@ export function PwaPrompts() {
 
   const install = useCallback(async () => {
     if (installEvent) {
-      await installEvent.prompt();
-      const choice = await installEvent.userChoice;
-      setInstallEvent(null);
-      if (choice.outcome === "dismissed") dismissInstall();
+      const outcome = await promptInstall();
+      if (outcome === "dismissed") dismissInstall();
       return;
     }
     setShowIosHelp(true); // iOS: no hay botón de instalar, se explican los pasos
   }, [installEvent, dismissInstall]);
 
   const offerInstall = shouldOfferInstall({
-    standalone,
+    standalone: standalone || installed,
     hasInstallEvent: installEvent !== null,
     iosSafari,
     dismissed,

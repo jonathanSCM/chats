@@ -6,6 +6,7 @@ import { NameForm } from "./_components/name-form";
 import { PasswordForm } from "./_components/password-form";
 import { ColorPicker } from "./_components/color-picker";
 import { GoogleCalendarCard } from "./_components/google-calendar-card";
+import { InstallAppCard } from "./_components/install-app-card";
 
 export default async function ProfilePage({
   searchParams,
@@ -69,6 +70,14 @@ export default async function ProfilePage({
           Pedimos la actual para confirmar que sos vos, aunque ya tengas sesión iniciada.
         </CardDescription>
         <PasswordForm />
+      </Card>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Instalar en mi dispositivo</CardTitle>
+        <CardDescription className="mb-4">
+          Acceso directo en tu pantalla de inicio, pantalla completa y avisos de mensajes nuevos.
+        </CardDescription>
+        <InstallAppCard />
       </Card>
     </div>
   );

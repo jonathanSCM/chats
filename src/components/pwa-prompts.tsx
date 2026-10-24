@@ -30,14 +30,20 @@ function hintText(kind: InstallHintKind): { body: string; steps: React.ReactNode
         body: "Acceso directo con un toque, pantalla completa y avisos de mensajes nuevos.",
         steps: (
           <>
-            Toca <Share size={13} className="inline align-text-bottom" /> <b>Compartir</b> y luego <b>Agregar a pantalla de inicio</b>.
+            Toca <Share size={13} className="inline align-text-bottom" /> <b>Compartir</b> → <b>Agregar a pantalla de inicio</b> (si no lo ves,
+            toca <b>Ver más</b>). Deja activado <b>Abrir como app web</b> y toca <b>Agregar</b>.
           </>
         ),
       };
     case "ios-other-browser":
       return {
-        body: "En iPhone solo se puede instalar desde Safari.",
-        steps: <>Abre esta página en <b>Safari</b> y toca <b>Compartir</b> → <b>Agregar a pantalla de inicio</b>.</>,
+        body: "Acceso directo con un toque, pantalla completa y avisos de mensajes nuevos.",
+        steps: (
+          <>
+            Toca <Share size={13} className="inline align-text-bottom" /> <b>Compartir</b> (o el menú <b>⋯</b>) → <b>Agregar a pantalla de inicio</b>.
+            Si no te aparece, abre esta página en <b>Safari</b>.
+          </>
+        ),
       };
     case "in-app-browser":
       return {

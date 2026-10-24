@@ -9,11 +9,13 @@ import {
   promptInstall,
   subscribeInstall,
 } from "@/lib/pwa-install-store";
-import { isIOSSafari } from "@/lib/pwa";
+import { isInAppBrowser, isIOSDevice, isIOSSafari } from "@/lib/pwa";
 
 interface Device {
   standalone: boolean;
   iosSafari: boolean;
+  ios: boolean;
+  inApp: boolean;
   oldBrowser: boolean;
 }
 
@@ -32,6 +34,8 @@ export function InstallAppCard() {
     setDevice({
       standalone: window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true,
       iosSafari: isIOSSafari(navigator.userAgent, navigator.maxTouchPoints),
+      ios: isIOSDevice(navigator.userAgent, navigator.maxTouchPoints),
+      inApp: isInAppBrowser(navigator.userAgent),
       oldBrowser: Boolean((window as Window & { __legacyBrowser?: boolean }).__legacyBrowser),
     });
   }, []);
@@ -84,12 +88,29 @@ export function InstallAppCard() {
     );
   }
 
-  if (device.iosSafari) {
+  if (device.inApp) {
     return (
-      <p className="flex flex-wrap items-center gap-1 text-sm text-ink">
-        En iPhone o iPad: toca <Share size={14} className="inline" /> <b>Compartir</b> y luego{" "}
-        <b>Agregar a pantalla de inicio</b>.
+      <p className="text-sm text-ink-muted">
+        Estás dentro de otra app (WhatsApp, Instagram…) y desde ahí no se puede instalar. Toca los tres puntos y
+        elige <b className="text-ink">Abrir en el navegador</b> (Chrome o Safari); luego vuelve a esta pantalla.
       </p>
+    );
+  }
+
+  if (device.ios) {
+    return (
+      <div className="space-y-2 text-sm text-ink-muted">
+        <p>
+          En iPhone o iPad: toca <Share size={14} className="inline align-text-bottom" />{" "}
+          <b className="text-ink">Compartir</b> (o el menú <b className="text-ink">⋯</b>) →{" "}
+          <b className="text-ink">Agregar a pantalla de inicio</b>. Si no lo ves, toca <b className="text-ink">Ver más</b>.
+        </p>
+        <p>
+          Deja activado <b className="text-ink">Abrir como app web</b> y toca <b className="text-ink">Agregar</b>: así se
+          abre en pantalla completa y puede recibir avisos de mensajes nuevos.
+          {!device.iosSafari && " Si tu navegador no muestra esa opción, ábrelo en Safari."}
+        </p>
+      </div>
     );
   }
 

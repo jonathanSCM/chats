@@ -12,7 +12,7 @@ export function isIOSDevice(userAgent: string, maxTouchPoints = 0): boolean {
   return /iphone|ipad|ipod/i.test(userAgent) || (/macintosh/i.test(userAgent) && maxTouchPoints > 1);
 }
 
-/** En iOS solo Safari puede "Agregar a inicio"; Chrome/Firefox para iOS no. */
+/** Safari de iPhone/iPad (no Chrome, Firefox, Edge, Opera ni Google App, que en iOS también usan WebKit). */
 export function isIOSSafari(userAgent: string, maxTouchPoints = 0): boolean {
   return isIOSDevice(userAgent, maxTouchPoints) && !/crios|fxios|edgios|opios|gsa\//i.test(userAgent);
 }
@@ -29,7 +29,8 @@ export function isMobileDevice(userAgent: string, maxTouchPoints = 0): boolean {
 /**
  * Qué aviso de instalación corresponde en este dispositivo:
  *  - native: el navegador entregó el evento de instalar -> botón "Instalar".
- *  - ios-safari / ios-other-browser: iPhone/iPad (solo Safari puede agregar a inicio).
+ *  - ios-safari / ios-other-browser: iPhone/iPad. Desde iOS 16.4 también Chrome, Edge y Firefox pueden
+ *    "Agregar a pantalla de inicio" desde Compartir; iOS nunca entrega el evento de instalar.
  *  - in-app-browser: abierto dentro de WhatsApp/Instagram/etc.: hay que abrirlo en el navegador.
  *  - legacy-android: Android 8 o menor; el WebAPK se cierra, se explica el acceso directo.
  *  - android-menu: Android sin evento (p. ej. se descartó antes): se explica el menú del navegador.

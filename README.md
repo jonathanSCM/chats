@@ -4,7 +4,7 @@ Sitio estático (un solo `index.html`) servido con nginx. Vive en esta rama (`la
 
 ## Archivos
 - `index.html`: la página completa (HTML, CSS y JS dentro). Es la V2 de la landing más las animaciones y la sección "Así se mueve tu proceso comercial, paso a paso".
-- `logo-proshop.png` y `brand-*.png`: logo e íconos del ecosistema (Meta, WhatsApp, Google, OpenAI).
+- `logo-proshop.png` y `brand-*.svg`: logo e íconos del ecosistema (Meta, WhatsApp, Google, OpenAI).
 - `robots.txt`
 - `nginx.conf` y `Dockerfile`: imagen del sitio.
 

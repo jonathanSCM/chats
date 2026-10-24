@@ -6,6 +6,12 @@ import { withSentryConfig } from "@sentry/nextjs";
 // correr scripts administrativos (prisma migrate deploy, seed) directo en
 // el contenedor desplegado. Ver Dockerfile.
 const nextConfig: NextConfig = {
+  // Identificador de la versión desplegada: la app abierta lo compara con el del
+  // servidor (/api/version) para avisar "hay una versión nueva" y volver a ofrecer
+  // instalarla. Coolify entrega el commit en SOURCE_COMMIT; si no está, la hora del build.
+  env: {
+    NEXT_PUBLIC_BUILD_ID: process.env.SOURCE_COMMIT || process.env.GIT_COMMIT || String(Date.now()),
+  },
   // pdf-parse (vía pdfjs-dist) resuelve su worker como un archivo aparte en
   // disco en vez de un import estático — si Next lo empaqueta igual que el
   // resto del server, ese archivo no termina en .next/server y falla en

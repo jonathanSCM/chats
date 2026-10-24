@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, IBM_Plex_Mono } from "next/font/google";
 import { StaleActionReload } from "@/components/stale-action-reload";
+import { PwaPrompts } from "@/components/pwa-prompts";
+import { LEGACY_BROWSER_NOTICE_SCRIPT } from "@/lib/legacy-browser-notice";
 import "./globals.css";
 
 // Inter es la única tipografía de la interfaz (guía de rediseño). La monoespaciada
@@ -69,10 +71,12 @@ export default function RootLayout({
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script dangerouslySetInnerHTML={{ __html: LEGACY_BROWSER_NOTICE_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col bg-canvas text-ink font-sans">
         <StaleActionReload />
         {children}
+        <PwaPrompts />
       </body>
     </html>
   );

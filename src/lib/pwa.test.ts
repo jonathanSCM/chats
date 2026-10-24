@@ -1,42 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  DISMISS_DAYS,
-  isInstallDismissed,
   isIOSDevice,
   isIOSSafari,
   isNewVersion,
-  parseDismissRecord,
   shouldOfferInstall,
 } from "./pwa";
-
-const DAY = 86_400_000;
-const NOW = Date.UTC(2026, 9, 23, 12, 0, 0);
-
-describe("parseDismissRecord", () => {
-  it("lee un registro válido", () => {
-    expect(parseDismissRecord(JSON.stringify({ v: "abc", t: 5 }))).toEqual({ v: "abc", t: 5 });
-  });
-  it("ignora datos vacíos o corruptos", () => {
-    expect(parseDismissRecord(null)).toBeNull();
-    expect(parseDismissRecord("no es json")).toBeNull();
-    expect(parseDismissRecord(JSON.stringify({ v: 1, t: "x" }))).toBeNull();
-  });
-});
-
-describe("isInstallDismissed", () => {
-  it("respeta el 'Ahora no' en la misma versión", () => {
-    expect(isInstallDismissed({ v: "v1", t: NOW - 2 * DAY }, "v1", NOW)).toBe(true);
-  });
-  it("vuelve a ofrecer cuando hay una versión nueva", () => {
-    expect(isInstallDismissed({ v: "v1", t: NOW - DAY }, "v2", NOW)).toBe(false);
-  });
-  it("vuelve a ofrecer cuando pasó el tiempo", () => {
-    expect(isInstallDismissed({ v: "v1", t: NOW - (DISMISS_DAYS + 1) * DAY }, "v1", NOW)).toBe(false);
-  });
-  it("sin registro no está descartado", () => {
-    expect(isInstallDismissed(null, "v1", NOW)).toBe(false);
-  });
-});
 
 describe("shouldOfferInstall", () => {
   const base = { standalone: false, hasInstallEvent: true, iosSafari: false, dismissed: false };
@@ -46,8 +14,11 @@ describe("shouldOfferInstall", () => {
   it("no ofrece si ya está instalada (abierta como app)", () => {
     expect(shouldOfferInstall({ ...base, standalone: true })).toBe(false);
   });
-  it("no ofrece si se descartó", () => {
+  it("no ofrece mientras se descartó en esta misma vista", () => {
     expect(shouldOfferInstall({ ...base, dismissed: true })).toBe(false);
+  });
+  it("al recargar la página (descartado vuelve a false) el aviso sale otra vez", () => {
+    expect(shouldOfferInstall({ ...base, dismissed: false })).toBe(true);
   });
   it("no ofrece si el navegador no soporta instalar", () => {
     expect(shouldOfferInstall({ ...base, hasInstallEvent: false })).toBe(false);

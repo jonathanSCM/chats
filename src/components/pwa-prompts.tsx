@@ -2,14 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Download, RefreshCw, Share, X } from "lucide-react";
-import {
-  BUILD_ID,
-  isInstallDismissed,
-  isIOSSafari,
-  isNewVersion,
-  parseDismissRecord,
-  shouldOfferInstall,
-} from "@/lib/pwa";
+import { BUILD_ID, isIOSSafari, isNewVersion, shouldOfferInstall } from "@/lib/pwa";
 import {
   SERVER_INSTALL_SNAPSHOT,
   getInstallSnapshot,
@@ -17,16 +10,7 @@ import {
   subscribeInstall,
 } from "@/lib/pwa-install-store";
 
-const DISMISS_KEY = "pwa-install-dismissed";
 const CHECK_EVERY_MS = 5 * 60_000;
-
-function readDismissed(): boolean {
-  try {
-    return isInstallDismissed(parseDismissRecord(localStorage.getItem(DISMISS_KEY)), BUILD_ID, Date.now());
-  } catch {
-    return false;
-  }
-}
 
 function isStandalone(): boolean {
   const nav = navigator as Navigator & { standalone?: boolean };
@@ -50,7 +34,8 @@ export function PwaPrompts() {
   );
   const [standalone, setStandalone] = useState(true); // true hasta comprobar: evita parpadeo
   const [iosSafari, setIosSafari] = useState(false);
-  const [dismissed, setDismissed] = useState(true);
+  // "Ahora no" solo oculta el aviso hasta que se recargue la página: no se guarda.
+  const [dismissed, setDismissed] = useState(false);
   const [showIosHelp, setShowIosHelp] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
@@ -59,7 +44,6 @@ export function PwaPrompts() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- lecturas únicas del navegador al montar
     setStandalone(isStandalone());
     setIosSafari(isIOSSafari(navigator.userAgent, navigator.maxTouchPoints));
-    setDismissed(readDismissed());
   }, []);
 
   // ¿Hay una versión nueva desplegada? Se mira cada pocos minutos y al volver a la app.
@@ -93,11 +77,6 @@ export function PwaPrompts() {
   const dismissInstall = useCallback(() => {
     setDismissed(true);
     setShowIosHelp(false);
-    try {
-      localStorage.setItem(DISMISS_KEY, JSON.stringify({ v: BUILD_ID, t: Date.now() }));
-    } catch {
-      // modo privado: solo se oculta en esta sesión
-    }
   }, []);
 
   const install = useCallback(async () => {

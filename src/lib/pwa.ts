@@ -7,40 +7,6 @@
 /** Cada despliegue trae un identificador de versión distinto (ver next.config.ts). */
 export const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
 
-/** Cuánto tiempo se respeta un "Ahora no" sobre la misma versión. */
-export const DISMISS_DAYS = 30;
-const DAY_MS = 86_400_000;
-
-export interface DismissRecord {
-  /** Versión de la app en la que la persona dijo "Ahora no". */
-  v: string;
-  /** Cuándo (ms desde 1970). */
-  t: number;
-}
-
-export function parseDismissRecord(raw: string | null): DismissRecord | null {
-  if (!raw) return null;
-  try {
-    const data = JSON.parse(raw) as Partial<DismissRecord>;
-    if (typeof data.v === "string" && typeof data.t === "number" && Number.isFinite(data.t)) {
-      return { v: data.v, t: data.t };
-    }
-  } catch {
-    // dato corrupto: se ignora
-  }
-  return null;
-}
-
-/**
- * El "Ahora no" vale solo para la misma versión y por un tiempo limitado:
- * cuando se despliega una versión nueva, la invitación a instalar vuelve a salir.
- */
-export function isInstallDismissed(record: DismissRecord | null, buildId: string, now: number): boolean {
-  if (!record) return false;
-  if (record.v !== buildId) return false;
-  return now - record.t < DISMISS_DAYS * DAY_MS;
-}
-
 export function isIOSDevice(userAgent: string, maxTouchPoints = 0): boolean {
   // iPadOS 13+ se presenta como Mac pero con pantalla táctil.
   return /iphone|ipad|ipod/i.test(userAgent) || (/macintosh/i.test(userAgent) && maxTouchPoints > 1);

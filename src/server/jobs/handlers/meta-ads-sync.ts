@@ -71,7 +71,7 @@ export async function runMetaAdsSync(rawPayload: unknown): Promise<MetaAdsSyncRe
 
   let rows: number;
   try {
-    rows = await syncAdAccountSpend(organizationId, org.metaAdAccountId, accessToken, datePreset);
+    rows = await syncAdAccountSpend(organizationId, org.metaAdAccountId, accessToken, datePreset, info?.timezone);
   } catch (error) {
     // 190 = token vencido/revocado: reintentar no sirve, hay que reconectar.
     // Se borra el token (la pantalla pasa a "Reconectar") y no se reintenta.

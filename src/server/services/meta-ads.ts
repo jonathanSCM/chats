@@ -1,4 +1,5 @@
 import { GRAPH_API_VERSION } from "@/server/services/whatsapp";
+import { adInsightsRange } from "@/lib/meta-ads-window";
 import { prisma } from "@/server/db/client";
 
 /**
@@ -191,15 +192,19 @@ export async function syncAdAccountSpend(
   adAccountId: string,
   accessToken: string,
   datePreset?: string,
+  accountTimeZone?: string | null,
 ): Promise<number> {
   let rowCount = 0;
   // La primera vez trae 90 días de historia (una campaña puede haber empezado
   // hace semanas); después alcanza con 7 (ver arriba). `datePreset` fuerza otra ventana.
+  // IMPORTANTE: el rango termina HOY (zona horaria de la cuenta). Con `date_preset=last_7d`
+  // Meta deja afuera el día en curso y una campaña creada hoy no aparecía hasta mañana.
   const hasHistory = (await prisma.adSpendSnapshot.count({ where: { organizationId } })) > 0;
+  const range = adInsightsRange(datePreset, hasHistory, accountTimeZone);
   let url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${adAccountId}/insights`);
   url.searchParams.set("level", "ad");
   url.searchParams.set("time_increment", "1");
-  url.searchParams.set("date_preset", datePreset ?? (hasHistory ? "last_7d" : "last_90d"));
+  url.searchParams.set("time_range", JSON.stringify(range));
   url.searchParams.set(
     "fields",
     "campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency",
@@ -355,14 +360,15 @@ export async function extendAccessToken(params: {
 export async function getAdAccountInfo(
   adAccountId: string,
   accessToken: string,
-): Promise<{ name: string | null; currency: string | null } | null> {
+): Promise<{ name: string | null; currency: string | null; timezone: string | null } | null> {
   try {
-    const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${adAccountId}?fields=name,currency`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    const res = await fetch(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${adAccountId}?fields=name,currency,timezone_name`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
     if (!res.ok) return null;
-    const data = (await res.json()) as { name?: string; currency?: string };
-    return { name: data.name ?? null, currency: data.currency ?? null };
+    const data = (await res.json()) as { name?: string; currency?: string; timezone_name?: string };
+    return { name: data.name ?? null, currency: data.currency ?? null, timezone: data.timezone_name ?? null };
   } catch {
     return null;
   }

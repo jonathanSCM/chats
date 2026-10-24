@@ -6,7 +6,9 @@ import { prisma } from "@/server/db/client";
 import { emitSettledMeetingTranscripts } from "@/server/integrations/domain-events";
 import { isMarketingEnabled } from "@/lib/features";
 
-const META_ADS_SYNC_INTERVAL_HOURS = 20;
+// El gasto de HOY cambia durante el día: se refresca varias veces (cada ~5 h), no una.
+const META_ADS_SYNC_INTERVAL_HOURS = 5;
+const META_ADS_SYNC_BUCKET_HOURS = 6;
 const MEETING_SUMMARY_BATCH = 5;
 const MEETING_SETTLE_MINUTES = 10;
 
@@ -67,7 +69,7 @@ async function syncMetaAdsIfDue(): Promise<void> {
       payload: { organizationId: org.id },
       // Con fecha en la clave: una clave fija chocaba para siempre con un job
       // viejo ya terminado o fallido y el sync nunca volvía a encolarse.
-      uniqueKey: `meta-ads-sync-${org.id}-${new Date().toISOString().slice(0, 10)}`,
+      uniqueKey: `meta-ads-sync-${org.id}-${new Date().toISOString().slice(0, 10)}-${Math.floor(new Date().getUTCHours() / META_ADS_SYNC_BUCKET_HOURS)}`,
     });
   }
 }

@@ -15,6 +15,8 @@ import { chooseNextAssignee, slaAction } from "@/lib/lead-assignment";
  */
 
 const WAITING_WINDOW_MS = 24 * 60 * 60 * 1000;
+// Un chat asignado cuenta como trabajo mientras haya tenido actividad en la última semana.
+const ACTIVE_CHAT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface OrgAssignSettings {
   autoAssignEnabled: boolean;
@@ -36,15 +38,37 @@ async function pickSeller(
   if (members.length === 0) return null;
 
   const ids = members.map((m) => m.userId);
-  const open = await tx.opportunity.groupBy({
-    by: ["assignedToId"],
+
+  // Carga = oportunidades abiertas + chats activos que todavía no son oportunidad. Un chat cuyo
+  // contacto ya tiene una oportunidad abierta del mismo vendedor no se cuenta dos veces.
+  const openOpps = await tx.opportunity.findMany({
     where: { organizationId, assignedToId: { in: ids }, archivedAt: null, stage: { role: null } },
-    _count: { _all: true },
+    select: { assignedToId: true, contactId: true },
   });
-  const openByUser = new Map(open.map((o) => [o.assignedToId, o._count._all]));
+  const activeChats = await tx.conversation.findMany({
+    where: {
+      bot: { organizationId },
+      assignedToId: { in: ids },
+      lastMessageAt: { gt: new Date(Date.now() - ACTIVE_CHAT_WINDOW_MS) },
+    },
+    select: { assignedToId: true, contactId: true },
+  });
+
+  const load = new Map<string, number>(ids.map((id) => [id, 0]));
+  const oppContacts = new Set<string>();
+  for (const o of openOpps) {
+    if (!o.assignedToId) continue;
+    load.set(o.assignedToId, (load.get(o.assignedToId) ?? 0) + 1);
+    oppContacts.add(`${o.assignedToId}:${o.contactId}`);
+  }
+  for (const c of activeChats) {
+    if (!c.assignedToId) continue;
+    if (c.contactId && oppContacts.has(`${c.assignedToId}:${c.contactId}`)) continue;
+    load.set(c.assignedToId, (load.get(c.assignedToId) ?? 0) + 1);
+  }
 
   return chooseNextAssignee(
-    ids.map((userId) => ({ userId, openCount: openByUser.get(userId) ?? 0 })),
+    ids.map((userId) => ({ userId, load: load.get(userId) ?? 0 })),
     lastUserId,
     settings.autoAssignMaxOpen,
     excludeUserIds,

@@ -81,8 +81,9 @@ export function AutoAssignSettings({
           <span>
             <b>Asignar los leads nuevos automáticamente</b>
             <span className="block text-xs text-ink-faint">
-              Cuando el bot califica un lead (o llega un chat sin bot) se asigna por turnos a quien esté
-              disponible. Si alguien lo asigna a mano, el sistema no lo cambia. Disponibles ahora: {eligible}.
+              Cuando el bot califica un lead (o llega un chat sin bot) se asigna a quien tenga menos trabajo
+              (oportunidades abiertas y chats activos); si hay empate, por turnos. Si alguien lo asigna a
+              mano, el sistema no lo cambia. Disponibles ahora: {eligible}.
             </span>
           </span>
         </label>
@@ -114,7 +115,9 @@ export function AutoAssignSettings({
               defaultValue={maxOpen ?? ""}
               placeholder="Sin tope"
             />
-            <p className="text-xs text-ink-faint">Quien llega al tope se saltea en el reparto. Vacío = sin tope.</p>
+            <p className="text-xs text-ink-faint">
+              Cuenta oportunidades abiertas y chats activos. Quien llega al tope se saltea. Vacío = sin tope.
+            </p>
           </div>
         </div>
 

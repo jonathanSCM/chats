@@ -6,30 +6,35 @@
 
 export interface Candidate {
   userId: string;
-  /** Oportunidades abiertas que ya tiene (para el tope). */
-  openCount: number;
+  /** Trabajo que ya tiene: oportunidades abiertas + chats activos suyos (ver el servicio). */
+  load: number;
 }
 
 /**
- * Reparto por turnos: el siguiente después del último que recibió, en un orden
- * estable. Se saltea a quien ya llegó al tope. Si nadie puede recibir, null.
- * `excludeUserIds` sirve para reasignar sin volver a dar el lead a quien no respondió.
+ * Reparto equilibrado: gana quien tenga MENOS carga; si varios empatan, el que sigue por turnos
+ * después del último que recibió (en un orden estable). Se saltea a quien llegó al tope
+ * (`maxLoad`, null = sin tope). `excludeUserIds` sirve para reasignar sin devolver el lead a
+ * quien no respondió. Si nadie puede recibir, null.
  */
 export function chooseNextAssignee(
   candidates: Candidate[],
   lastUserId: string | null,
-  maxOpen: number | null,
+  maxLoad: number | null,
   excludeUserIds: string[] = [],
 ): string | null {
   const ordered = [...candidates].sort((a, b) => a.userId.localeCompare(b.userId));
-  if (ordered.length === 0) return null;
+  const eligible = ordered.filter(
+    (c) => !excludeUserIds.includes(c.userId) && (maxLoad === null || c.load < maxLoad),
+  );
+  if (eligible.length === 0) return null;
+
+  const minLoad = Math.min(...eligible.map((c) => c.load));
+  const tied = new Set(eligible.filter((c) => c.load === minLoad).map((c) => c.userId));
 
   const start = lastUserId ? ordered.findIndex((c) => c.userId === lastUserId) + 1 : 0;
   for (let i = 0; i < ordered.length; i++) {
     const c = ordered[(start + i) % ordered.length];
-    if (excludeUserIds.includes(c.userId)) continue;
-    if (maxOpen !== null && c.openCount >= maxOpen) continue;
-    return c.userId;
+    if (tied.has(c.userId)) return c.userId;
   }
   return null;
 }

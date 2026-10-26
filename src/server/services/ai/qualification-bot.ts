@@ -7,6 +7,7 @@ import { getOrgStages, defaultEntryStage } from "@/server/services/pipeline";
 import { getAvailableDays, getAvailableSlots, hasSchedulingConflict, formatSlotLabel } from "@/server/services/availability";
 import { createCalendarEvent, getOrCreateOrgCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
 import { linkAttributionToOpportunity } from "@/server/services/meta-attribution";
+import { autoAssignLead } from "@/server/services/lead-assignment";
 import { MODELS, runStructured } from "./client";
 import {
   clientAnsweredMeetingInvitation,
@@ -333,6 +334,8 @@ async function ensureOpportunity(
     select: { id: true },
   });
   await linkAttributionToOpportunity(conversation.id, created.id);
+  // Asignación automática (si la organización la tiene encendida): reparte el lead por turnos.
+  await autoAssignLead({ conversationId: conversation.id, opportunityId: created.id });
   return created.id;
 }
 

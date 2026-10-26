@@ -25,40 +25,49 @@ enum UserRole {
 }
 
 model Organization {
-  id                     String   @id @default(cuid())
+  id                     String    @id @default(cuid())
   name                   String
-  slug                   String   @unique
-  suspended              Boolean  @default(false) // desactivada por el superadmin (ej. impago, abuso)
+  slug                   String    @unique
+  suspended              Boolean   @default(false) // desactivada por el superadmin (ej. impago, abuso)
   // Jefe de Operaciones (API de integración, webhooks y tareas en la ficha): lo activa el
   // superadmin por organización. Apagado no borra nada: claves y webhook quedan guardados.
-  jefeEnabled            Boolean  @default(false)
+  jefeEnabled            Boolean   @default(false)
   // Cuántos mensajes recientes de WhatsApp se le mandan al asesor IA por
   // análisis (ajustable por el dueño en /dashboard/organization). Más
   // mensajes = más contexto pero más costo por análisis.
-  aiMessageLimit         Int      @default(25)
+  aiMessageLimit         Int       @default(25)
   // Calendario secundario de Google (no el "primary" de la cuenta
   // compartida de todo el bot) donde se crean las reuniones de ESTA
   // organización — separa a cada cliente de la plataforma para poder
   // compartir el calendario sin filtrar reuniones entre organizaciones.
   // Se crea recién la primera vez que hace falta (ver getOrCreateOrgCalendar).
   googleCalendarId       String?
-  googleCalendarShares   String[] @default([]) // correos con los que está compartido (solo lectura)
+  googleCalendarShares   String[]  @default([]) // correos con los que está compartido (solo lectura)
   // Token opaco (no cifrado, mismo criterio que CRON_SECRET/BOT_SERVICE_SECRET
   // — un secreto de portador, no un dato personal) que la extensión de Chrome
   // de subtítulos pega en su config para autenticarse contra
   // api/extension/transcript. Se genera desde /dashboard/organization; null
   // hasta que alguien lo pide por primera vez.
-  meetExtensionToken     String?  @unique
+  meetExtensionToken     String?   @unique
   // Horario habilitado para que el bot de calificación ofrezca reuniones --
   // configurable desde /dashboard/organization. Reemplaza la variable de
   // entorno MEETING_SLOT_HOURS, que era una sola franja fija para todas las
   // organizaciones sin importar el negocio. Ver server/services/availability.ts.
-  timezone               String   @default("America/La_Paz")
-  bookingDays            Int[]    @default([1, 2, 3, 4, 5]) // 0=domingo ... 6=sábado
-  bookingStartHour       Int      @default(9)
-  bookingEndHour         Int      @default(18)
-  bookingDurationMinutes Int      @default(30)
-  bookingLeadHours       Int      @default(4) // anticipación mínima antes de poder ofrecer un horario
+  timezone               String    @default("America/La_Paz")
+  bookingDays            Int[]     @default([1, 2, 3, 4, 5]) // 0=domingo ... 6=sábado
+  bookingStartHour       Int       @default(9)
+  bookingEndHour         Int       @default(18)
+  bookingDurationMinutes Int       @default(30)
+  bookingLeadHours       Int       @default(4) // anticipación mínima antes de poder ofrecer un horario
+  // Asignación automática de leads (F14): apagada por defecto. Reparte por turnos entre los
+  // vendedores marcados como disponibles (OrganizationMembership.availableForLeads).
+  autoAssignEnabled      Boolean   @default(false)
+  // Tope de oportunidades abiertas por vendedor; null = sin tope.
+  autoAssignMaxOpen      Int?
+  // Minutos que un cliente puede esperar respuesta humana antes de avisar (y, al doble, reasignar).
+  autoAssignSlaMinutes   Int       @default(15)
+  // Último vendedor al que se le asignó: el próximo turno es el que sigue.
+  autoAssignLastUserId   String?
   // Cuenta publicitaria de Meta (formato act_XXXXXXXXX) de donde se
   // sincroniza el gasto/impresiones/alcance para el dashboard de marketing
   // (Fase 4). Null = esa organización no tiene Meta Ads conectado, se omite
@@ -70,15 +79,15 @@ model Organization {
   // Token del usuario que autorizó "Conectar con Facebook" (ads_read), cifrado
   // con encrypt(). Null con metaAdAccountId seteado = hay que reconectar
   // (venció o Meta lo invalidó).
-  metaAdsAccessToken     String?  @db.Text
+  metaAdsAccessToken     String?   @db.Text
   metaAdsTokenExpiresAt  DateTime?
   metaAdsConnectedAt     DateTime?
   // Última vez que syncMetaAdsIfDue() (api/cron/tick) encoló el sync de
   // gasto de esta organización -- evita re-encolar cada minuto; se
   // resincroniza cada ~20h. Null = nunca corrió.
   metaAdsLastSyncedAt    DateTime?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   users                  User[]
   bots                   Bot[]
@@ -104,14 +113,14 @@ model Organization {
 }
 
 model User {
-  id                 String        @id @default(cuid())
-  email              String        @unique
+  id                 String                   @id @default(cuid())
+  email              String                   @unique
   passwordHash       String?
   name               String?
   // MEMBER, no OWNER: el default debe ser el rol menos privilegiado. Los dos
   // flujos que crean usuarios (signup.ts, team.ts) siempre pasan `role`
   // explícito, así que esto solo protege un camino futuro que lo olvide.
-  role               UserRole      @default(MEMBER)
+  role               UserRole                 @default(MEMBER)
   emailVerified      DateTime?
   // Color fijo para identificar al vendedor de un vistazo (asignaciones,
   // avatares, notas). Si es null, se deriva un color determinístico del id
@@ -122,17 +131,17 @@ model User {
   // sos sin pedirte usuario/contraseña -- se genera solo la primera vez que
   // entrás a /dashboard/extension-authorize desde la extensión, reusando tu
   // sesión ya iniciada del CRM (ver src/app/dashboard/extension-authorize).
-  meetExtensionToken String?       @unique
+  meetExtensionToken String?                  @unique
   // Organización ACTIVA ahora mismo -- desde que existe OrganizationMembership
   // (más abajo), esto es un puntero/caché de cuál de las membresías del
   // usuario está usando, no la única organización posible. onDelete: SetNull
   // (no Cascade): borrar una organización no debe borrar a un usuario que
   // también pertenece a otra.
   organizationId     String?
-  organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organization       Organization?            @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   memberships        OrganizationMembership[]
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
 
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
@@ -160,13 +169,15 @@ model User {
 // server/actions/organization-switch.ts). El rol es por organización: se
 // puede ser OWNER en una y MEMBER en otra.
 model OrganizationMembership {
-  id             String       @id @default(cuid())
-  userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  role           UserRole     @default(MEMBER)
-  createdAt      DateTime     @default(now())
+  id                String       @id @default(cuid())
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role              UserRole     @default(MEMBER)
+  // Recibe leads de la asignación automática (solo aplica si la organización la tiene encendida).
+  availableForLeads Boolean      @default(true)
+  createdAt         DateTime     @default(now())
 
   @@unique([userId, organizationId])
   @@map("organization_memberships")
@@ -407,8 +418,14 @@ model Conversation {
   // primer vendedor que responde. Mientras sea null, cualquier vendedor la
   // ve en su bandeja como "sin asignar"; una vez asignada, solo ese
   // vendedor (y los admins/OWNER) la ven.
-  assignedToId String?
-  assignedTo   User?   @relation("ConversationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedToId    String?
+  assignedTo      User?     @relation("ConversationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  // Asignación automática (F14): cuándo se asignó, si fue el sistema (una asignación manual
+  // nunca se reasigna sola) y los avisos de "cliente esperando respuesta".
+  assignedAt      DateTime?
+  autoAssigned    Boolean   @default(false)
+  slaAlertedAt    DateTime?
+  slaReassignedAt DateTime?
 
   // Se enlaza al contacto del CRM por teléfono. Es nullable porque el
   // mensaje entra por el webhook antes de que exista ficha de CRM.
@@ -1110,9 +1127,9 @@ model AiAnalysis {
 // ni redesplegar. Si está vacía, el código cae a las variables de entorno
 // (WHATSAPP_APP_ID, etc.) — así no rompe despliegues que ya las tenían ahí.
 model PlatformSetting {
-  id                  String   @id @default("singleton")
+  id                  String    @id @default("singleton")
   whatsappAppId       String?
-  whatsappAppSecret   String?  @db.Text // cifrado, igual que WhatsAppConnection.accessToken
+  whatsappAppSecret   String?   @db.Text // cifrado, igual que WhatsAppConnection.accessToken
   whatsappConfigId    String?
   whatsappVerifyToken String?
   // Configuración de Facebook Login for Business que pide solo ads_read
@@ -1124,7 +1141,7 @@ model PlatformSetting {
   // un error viejo ya resuelto.
   aiQuotaAlertAt      DateTime?
   aiQuotaAlertMessage String?   @db.Text
-  updatedAt           DateTime @updatedAt
+  updatedAt           DateTime  @updatedAt
 
   @@map("platform_settings")
 }
@@ -1175,16 +1192,16 @@ model IntegrationWebhook {
 // Respuesta guardada de una escritura con Idempotency-Key: repetirla devuelve
 // lo mismo en vez de crear otra cosa.
 model IdempotencyRecord {
-  id              String       @id @default(cuid())
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  idempotencyKey  String
-  method          String
-  path            String
-  requestHash     String
-  responseStatus  Int
-  responseBody    Json
-  createdAt       DateTime     @default(now())
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  idempotencyKey String
+  method         String
+  path           String
+  requestHash    String
+  responseStatus Int
+  responseBody   Json
+  createdAt      DateTime     @default(now())
 
   @@unique([organizationId, idempotencyKey])
   @@index([createdAt])

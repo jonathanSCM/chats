@@ -126,7 +126,7 @@ export async function sendInboxMessageAction(
     // Auto-asignación: si nadie la tenía, el primero que responde se queda con ella.
     prisma.conversation.updateMany({
       where: { id: conversationId, assignedToId: null },
-      data: { assignedToId: session.user.id },
+      data: { assignedToId: session.user.id, assignedAt: new Date(), autoAssigned: false },
     }),
   ]);
   await maybeActivateFreeEntryPoint(conversationId);
@@ -247,7 +247,7 @@ export async function sendInboxLocationAction(
     }),
     prisma.conversation.updateMany({
       where: { id: conversationId, assignedToId: null },
-      data: { assignedToId: session.user.id },
+      data: { assignedToId: session.user.id, assignedAt: new Date(), autoAssigned: false },
     }),
   ]);
   await maybeActivateFreeEntryPoint(conversationId);
@@ -386,7 +386,7 @@ export async function sendInboxAttachmentAction(
     }),
     prisma.conversation.updateMany({
       where: { id: conversationId, assignedToId: null },
-      data: { assignedToId: session.user.id },
+      data: { assignedToId: session.user.id, assignedAt: new Date(), autoAssigned: false },
     }),
   ]);
   await maybeActivateFreeEntryPoint(conversationId);
@@ -460,7 +460,7 @@ export async function sendTemplateMessageAction(
     }),
     prisma.conversation.updateMany({
       where: { id: conversationId, assignedToId: null },
-      data: { assignedToId: session.user.id },
+      data: { assignedToId: session.user.id, assignedAt: new Date(), autoAssigned: false },
     }),
   ]);
   await maybeActivateFreeEntryPoint(conversationId);

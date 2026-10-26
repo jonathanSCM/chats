@@ -314,7 +314,7 @@ export async function transferConversationAction(
 
   await prisma.conversation.update({
     where: { id: conversationId },
-    data: { assignedToId: userId },
+    data: { assignedToId: userId, assignedAt: new Date(), autoAssigned: false, slaAlertedAt: null, slaReassignedAt: null },
   });
 
   await audit({

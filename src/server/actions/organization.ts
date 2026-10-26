@@ -130,6 +130,95 @@ export async function updateBookingSettingsAction(
   return { error: null, message: "Horario de citas actualizado." };
 }
 
+// ─── Asignación automática de leads (F14) ───────────────────────────────
+
+const autoAssignSchema = z.object({
+  autoAssignSlaMinutes: z.coerce.number().int().min(1, "Mínimo 1 minuto").max(240, "Máximo 240 minutos"),
+  // Vacío = sin tope.
+  autoAssignMaxOpen: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? null : v),
+    z.coerce.number().int().min(1, "El tope debe ser al menos 1").max(500).nullable(),
+  ),
+});
+
+export async function updateAutoAssignSettingsAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireSession();
+  if (session.user.role !== "OWNER" || !session.user.organizationId) {
+    return { error: "Solo el dueño de la organización puede cambiar este dato" };
+  }
+  const organizationId = session.user.organizationId;
+
+  const parsed = autoAssignSchema.safeParse({
+    autoAssignSlaMinutes: formData.get("autoAssignSlaMinutes"),
+    autoAssignMaxOpen: formData.get("autoAssignMaxOpen"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+  const enabled = formData.get("autoAssignEnabled") === "on";
+
+  const before = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { autoAssignEnabled: true, autoAssignMaxOpen: true, autoAssignSlaMinutes: true },
+  });
+
+  if (enabled) {
+    const sellers = await prisma.organizationMembership.count({
+      where: { organizationId, availableForLeads: true, user: { role: { notIn: ["SYSTEM", "SUPERADMIN"] } } },
+    });
+    if (sellers === 0) {
+      return { error: "Marca al menos a un integrante como disponible para recibir leads antes de activarlo." };
+    }
+  }
+
+  const data = { autoAssignEnabled: enabled, ...parsed.data };
+  await prisma.organization.update({ where: { id: organizationId }, data });
+  await audit({
+    entityType: "Organization",
+    entityId: organizationId,
+    action: "auto_assign_settings_updated",
+    userId: session.user.id,
+    organizationId,
+    before,
+    after: data,
+  });
+
+  revalidatePath("/dashboard/organization");
+  return {
+    error: null,
+    message: enabled ? "Asignación automática activada." : "Asignación automática desactivada.",
+  };
+}
+
+/** Marca si un integrante entra o no al reparto de leads. */
+export async function setMemberAvailabilityAction(userId: string, available: boolean): Promise<ActionState> {
+  const session = await requireSession();
+  if (session.user.role !== "OWNER" || !session.user.organizationId) {
+    return { error: "Solo el dueño de la organización puede cambiar este dato" };
+  }
+  const organizationId = session.user.organizationId;
+
+  const updated = await prisma.organizationMembership.updateMany({
+    where: { organizationId, userId },
+    data: { availableForLeads: available },
+  });
+  if (updated.count === 0) return { error: "Esa persona no está en tu equipo" };
+
+  await audit({
+    entityType: "OrganizationMembership",
+    entityId: userId,
+    action: available ? "lead_availability_on" : "lead_availability_off",
+    userId: session.user.id,
+    organizationId,
+  });
+
+  revalidatePath("/dashboard/organization");
+  return { error: null };
+}
+
 /**
  * Elige cuál de las cuentas publicitarias autorizadas en "Conectar con
  * Facebook" usa esta organización. Se vuelve a listar con el token guardado

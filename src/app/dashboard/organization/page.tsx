@@ -7,6 +7,7 @@ import { RenameOrgForm } from "./_components/rename-org-form";
 import { MembersList } from "./_components/members-list";
 import { InvitePanel } from "./_components/invite-panel";
 import { AiSettingsForm } from "./_components/ai-settings-form";
+import { AutoAssignSettings } from "./_components/auto-assign-settings";
 import { BookingSettingsForm } from "./_components/booking-settings-form";
 import { PipelineStagesList } from "./_components/pipeline-stages-list";
 import { ServicesList } from "./_components/services-list";
@@ -94,6 +95,7 @@ export default async function OrganizationSettingsPage({
     email: m.user.email,
     color: m.user.color,
     role: m.role,
+    availableForLeads: m.availableForLeads,
   }));
   const vendedores = members.filter((m) => m.role === "MEMBER");
 
@@ -172,6 +174,26 @@ export default async function OrganizationSettingsPage({
           currentEndHour={org.bookingEndHour}
           currentDurationMinutes={org.bookingDurationMinutes}
           currentLeadHours={org.bookingLeadHours}
+        />
+      </Card>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Asignación automática de leads</CardTitle>
+        <CardDescription className="mb-4">
+          Reparte los leads nuevos por turnos entre tu equipo y avisa cuando un cliente se queda esperando
+          respuesta.
+        </CardDescription>
+        <AutoAssignSettings
+          enabled={org.autoAssignEnabled}
+          slaMinutes={org.autoAssignSlaMinutes}
+          maxOpen={org.autoAssignMaxOpen}
+          members={members.map((m) => ({
+            id: m.id,
+            name: m.name,
+            email: m.email,
+            role: m.role,
+            availableForLeads: m.availableForLeads,
+          }))}
         />
       </Card>
 

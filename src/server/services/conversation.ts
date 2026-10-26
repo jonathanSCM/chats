@@ -1,5 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { emitMessageCreated } from "@/server/integrations/domain-events";
+import { autoAssignLead } from "@/server/services/lead-assignment";
 import { prisma } from "@/server/db/client";
 import type {
   ParsedInboundMessage,
@@ -496,6 +497,8 @@ async function findOrCreateConversation(
       adReferral: enrichedAdReferral,
     });
   }
+  // Sin bot que lo atienda, el chat es de una persona desde el primer mensaje: se reparte ya.
+  if (!botActiveForThisPhone) await autoAssignLead({ conversationId: created.id });
   return created.id;
 }
 

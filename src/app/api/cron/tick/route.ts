@@ -4,6 +4,7 @@ import { processJobs, enqueue } from "@/server/jobs";
 import { renewExpiringGoogleCalendarWatches } from "@/server/services/google-calendar-user";
 import { prisma } from "@/server/db/client";
 import { emitSettledMeetingTranscripts } from "@/server/integrations/domain-events";
+import { sweepLeadSla } from "@/server/services/lead-assignment";
 import { isMarketingEnabled } from "@/lib/features";
 
 // El gasto de HOY cambia durante el día: se refresca varias veces (cada ~5 h), no una.
@@ -106,6 +107,11 @@ export async function POST(req: NextRequest) {
   });
 
   const result = await processJobs();
+
+  // Asignación automática: reintenta lo que quedó sin dueño y vigila el tiempo de respuesta.
+  await sweepLeadSla().catch((error) => {
+    console.error("[cron] Error en el barrido de asignación de leads:", error);
+  });
 
   // Barato la mayoría de los ticks (sin cuentas por vencer, es un SELECT
   // vacío) -- no vale la pena un job aparte solo para esto.

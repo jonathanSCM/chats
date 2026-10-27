@@ -1,5 +1,6 @@
 "use server";
 
+import { normalizeMeetUrl } from "@/lib/meet-code";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
@@ -490,7 +491,7 @@ export async function createMeetingAction(
   }
 
   const durationMinutes = parsed.data.durationMinutes ?? 30;
-  let meetingUrl = parsed.data.meetingUrl || null;
+  let meetingUrl = normalizeMeetUrl(parsed.data.meetingUrl);
   let googleEventId: string | null = null;
   let googleCalendarOwnerId: string | null = null;
   const botEnabled = parsed.data.botEnabled ?? true;
@@ -705,7 +706,7 @@ export async function updateMeetingAction(meetingId: string, formData: FormData)
     return { error: "Fecha inválida" };
   }
   const botEnabled = parsed.data.botEnabled ?? false;
-  const meetingUrl = parsed.data.meetingUrl?.trim() || null;
+  const meetingUrl = normalizeMeetUrl(parsed.data.meetingUrl);
 
   if (meeting.googleEventId) {
     const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { googleCalendarId: true } });

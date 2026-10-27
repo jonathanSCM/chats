@@ -1,5 +1,6 @@
 "use server";
 
+import { normalizeMeetUrl } from "@/lib/meet-code";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
@@ -99,7 +100,7 @@ export async function createMeetingFromConversationAction(
   }
 
   const durationMinutes = parsed.data.durationMinutes ?? 30;
-  let meetingUrl = parsed.data.meetingUrl?.trim() || null;
+  let meetingUrl = normalizeMeetUrl(parsed.data.meetingUrl);
   let googleEventId: string | null = null;
   let googleCalendarOwnerId: string | null = null;
   const botEnabled = parsed.data.botEnabled ?? true;

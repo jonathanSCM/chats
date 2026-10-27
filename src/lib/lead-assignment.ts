@@ -1,4 +1,11 @@
 /**
+ * Interruptor general de la asignación automática de leads (F14). Está APAGADO por decisión de
+ * producto: todo el código sigue en pie, pero no se asigna ni se avisa nada y la tarjeta de
+ * Organización no se muestra. Para volver a usarlo basta con poner `true`.
+ */
+export const LEAD_AUTO_ASSIGN_AVAILABLE = false;
+
+/**
  * Lógica pura de la asignación automática de leads (F14): quién sigue en el
  * reparto por turnos y cuándo corresponde avisar o reasignar por falta de
  * respuesta. Sin base de datos, para poder probarla.

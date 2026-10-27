@@ -1,7 +1,7 @@
 import { prisma } from "@/server/db/client";
 import { audit } from "@/server/services/audit";
 import { sendPushToUser } from "@/server/services/push";
-import { chooseNextAssignee, slaAction } from "@/lib/lead-assignment";
+import { chooseNextAssignee, slaAction, LEAD_AUTO_ASSIGN_AVAILABLE } from "@/lib/lead-assignment";
 
 /**
  * Asignación automática de leads (F14).
@@ -87,6 +87,7 @@ export async function autoAssignLead(params: {
   /** Reasignación por falta de respuesta: se permite aunque ya tenga dueño automático. */
   reassignFrom?: string | null;
 }): Promise<string | null> {
+  if (!LEAD_AUTO_ASSIGN_AVAILABLE) return null;
   try {
     const conv = await prisma.conversation.findUnique({
       where: { id: params.conversationId },
@@ -278,6 +279,7 @@ async function sweepOrganization(organizationId: string, slaMinutes: number): Pr
 
 /** Lo llama el cron en cada pasada; barato: solo mira organizaciones que encendieron la función. */
 export async function sweepLeadSla(): Promise<void> {
+  if (!LEAD_AUTO_ASSIGN_AVAILABLE) return;
   const orgs = await prisma.organization.findMany({
     where: { autoAssignEnabled: true, suspended: false },
     select: { id: true, autoAssignSlaMinutes: true },

@@ -58,11 +58,20 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
     }),
   });
 
-  if (!response.ok) {
+  // 409 = Vexa ya tiene un bot en esa sala (el pedido anterior sí entró). No es un fallo: reintentar
+  // solo generaba errores en cadena, y al agotarse los reintentos la reunión quedaba marcada como
+  // FALLIDA con el bot dentro -- o volvía a pedirlo cuando el bot ya había salido.
+  const alreadyThere = response.status === 409;
+  if (!response.ok && !alreadyThere) {
     throw new Error(`El servicio del bot respondió ${response.status} al pedirle que se una.`);
   }
 
-  await prisma.meeting.update({ where: { id: meetingId }, data: { botStatus: "JOINING" } });
+  await prisma.meeting.updateMany({
+    where: alreadyThere
+      ? { id: meetingId, OR: [{ botStatus: null }, { botStatus: "PENDING" }] }
+      : { id: meetingId },
+    data: { botStatus: "JOINING" },
+  });
 
   await enqueueOrReschedule({
     type: "vexa_bot_poll",

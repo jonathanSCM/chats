@@ -2,6 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { SlowActionNotice, useSlowPending } from "@/components/slow-action-notice";
 import {
   X,
   StickyNote,
@@ -594,6 +595,7 @@ function AddToTrackingForm({
   onCreated: (opportunityId: string) => void;
 }) {
   const [state, formAction, isPending] = useActionState(createOpportunityAction, { error: null });
+  const slow = useSlowPending(isPending);
 
   useEffect(() => {
     if (state.opportunityId) onCreated(state.opportunityId);
@@ -625,6 +627,7 @@ function AddToTrackingForm({
         />
       </div>
       {state.error && <p className="text-xs text-danger">{state.error}</p>}
+      <SlowActionNotice show={slow} />
       <div className="flex gap-2">
         <Button type="submit" disabled={isPending} className="flex-1 py-1.5 text-xs">
           {isPending ? "Agregando…" : "Agregar y ver"}
@@ -649,6 +652,7 @@ function ContactForm({
     { error: null },
   );
   const saved = Boolean(state.message) && !isPending;
+  const slow = useSlowPending(isPending);
 
   useEffect(() => {
     if (saved) onSaved();
@@ -662,12 +666,14 @@ function ContactForm({
   // este mismo recargado con los valores ya guardados).
   const [fullName, setFullName] = useState(contact.fullName ?? "");
   const [city, setCity] = useState(contact.city ?? "");
+  const [company, setCompany] = useState(contact.company?.name ?? "");
   const [jobTitle, setJobTitle] = useState(contact.jobTitle ?? "");
   const [email, setEmail] = useState(contact.email ?? "");
 
   useEffect(() => {
     setFullName(contact.fullName ?? "");
     setCity(contact.city ?? "");
+    setCompany(contact.company?.name ?? "");
     setJobTitle(contact.jobTitle ?? "");
     setEmail(contact.email ?? "");
   }, [contact]);
@@ -692,6 +698,13 @@ function ContactForm({
         className="py-1.5 text-xs"
       />
       <Input
+        name="company"
+        value={company}
+        onChange={(e) => setCompany(e.target.value)}
+        placeholder="Empresa"
+        className="py-1.5 text-xs"
+      />
+      <Input
         name="jobTitle"
         value={jobTitle}
         onChange={(e) => setJobTitle(e.target.value)}
@@ -708,6 +721,7 @@ function ContactForm({
       />
 
       {state.error && <p className="text-xs text-danger">{state.error}</p>}
+      <SlowActionNotice show={slow} />
 
       <Button
         type="submit"
@@ -744,7 +758,8 @@ function MeetingsPanel({
   const [adding, setAdding] = useState(false);
   const [withGoogleMeet, setWithGoogleMeet] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [state, formAction] = useActionState(createMeetingFromConversationAction, { error: null });
+  const [state, formAction, createPending] = useActionState(createMeetingFromConversationAction, { error: null });
+  const createSlow = useSlowPending(createPending);
   const [handledMessage, setHandledMessage] = useState<string | undefined>(undefined);
   if (state.message && state.message !== handledMessage) {
     setHandledMessage(state.message);
@@ -866,14 +881,15 @@ function MeetingsPanel({
             />
           )}
           <Input
-            type="url"
+            type="text"
             name="meetingUrl"
             placeholder="Pegá el link de la reunión (Meet, Zoom, etc.)"
             className="py-1.5 text-xs"
           />
           {state.error && <p className="text-xs text-danger">{state.error}</p>}
+          <SlowActionNotice show={createSlow} />
           <div className="flex gap-2">
-            <Button type="submit" size="sm" className="text-xs">
+            <Button type="submit" size="sm" disabled={createPending} className="text-xs">
               Guardar reunión
             </Button>
             <Button type="button" size="sm" variant="secondary" className="text-xs" onClick={() => setAdding(false)}>
@@ -974,7 +990,7 @@ function MeetingsPanel({
                     />
                   </div>
                   <Input
-                    type="url"
+                    type="text"
                     name="meetingUrl"
                     placeholder="Link de la reunión"
                     defaultValue={m.meetingUrl ?? ""}

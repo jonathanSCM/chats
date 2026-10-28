@@ -107,6 +107,27 @@ export function PwaPrompts() {
     };
   }, []);
 
+  // Una acción vieja que el servidor ya no reconoce (pestaña abierta desde antes de un despliegue):
+  // Next lo lanza como error y la pantalla se queda "cargando". Se avisa con el mismo banner.
+  useEffect(() => {
+    const isStaleAction = (reason: unknown) => {
+      const text = reason instanceof Error ? `${reason.name} ${reason.message}` : String(reason ?? "");
+      return /UnrecognizedActionError|was not found on the server|Failed to find Server Action/i.test(text);
+    };
+    const onRejection = (e: PromiseRejectionEvent) => {
+      if (isStaleAction(e.reason)) setUpdateAvailable(true);
+    };
+    const onError = (e: ErrorEvent) => {
+      if (isStaleAction(e.error ?? e.message)) setUpdateAvailable(true);
+    };
+    window.addEventListener("unhandledrejection", onRejection);
+    window.addEventListener("error", onError);
+    return () => {
+      window.removeEventListener("unhandledrejection", onRejection);
+      window.removeEventListener("error", onError);
+    };
+  }, []);
+
   // ¿Hay una versión nueva desplegada? Se mira cada pocos minutos y al volver a la app.
   useEffect(() => {
     let stopped = false;

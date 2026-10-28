@@ -2234,7 +2234,7 @@ function MeetingsSection({
             />
           )}
           <Input
-            type="url"
+            type="text"
             name="meetingUrl"
             placeholder="Pegá el link de la reunión (Meet, Zoom, etc.)"
             className="py-1.5 text-xs"
@@ -2482,7 +2482,7 @@ function MeetingsSection({
                       />
                     </div>
                     <Input
-                      type="url"
+                      type="text"
                       name="meetingUrl"
                       placeholder="Link de la reunión"
                       defaultValue={m.meetingUrl ?? ""}

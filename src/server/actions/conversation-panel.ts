@@ -402,6 +402,7 @@ const contactSchema = z.object({
   fullName: z.string().max(120).optional(),
   email: z.string().email("Correo inválido").optional().or(z.literal("")),
   city: z.string().max(80).optional(),
+  company: z.string().max(120).optional(),
   jobTitle: z.string().max(80).optional(),
 });
 
@@ -421,10 +422,24 @@ export async function updateContactAction(
     fullName: formData.get("fullName") || undefined,
     email: formData.get("email") || undefined,
     city: formData.get("city") || undefined,
+    company: formData.get("company") || undefined,
     jobTitle: formData.get("jobTitle") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  // La empresa es un registro propio de la organización: se reutiliza si ya existe con ese nombre.
+  let companyId: string | null = null;
+  const companyName = parsed.data.company?.trim();
+  if (companyName) {
+    const existing = await prisma.company.findFirst({
+      where: { organizationId: contact.organizationId, name: { equals: companyName, mode: "insensitive" } },
+      select: { id: true },
+    });
+    companyId =
+      existing?.id ??
+      (await prisma.company.create({ data: { organizationId: contact.organizationId, name: companyName }, select: { id: true } })).id;
   }
 
   await prisma.contact.update({
@@ -433,6 +448,7 @@ export async function updateContactAction(
       fullName: parsed.data.fullName || null,
       email: parsed.data.email || null,
       city: parsed.data.city || null,
+      companyId,
       jobTitle: parsed.data.jobTitle || null,
     },
   });

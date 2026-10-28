@@ -120,8 +120,7 @@ export interface Row {
     botLeftAt: string | null;
     botEnabled: boolean;
     notes: string;
-    transcript: string;
-    audioTranscript: string;
+    hasTranscript: boolean;
     aiSummary: string;
     aiSummaryData: unknown;
     aiSummaryAt: string | null;
@@ -2374,7 +2373,7 @@ function MeetingsSection({
                 data={m.aiSummaryData}
                 text={m.aiSummary}
                 summarizedAt={m.aiSummaryAt}
-                hasTranscript={Boolean(m.transcript || m.audioTranscript)}
+                hasTranscript={m.hasTranscript}
                 canApply
               />
             </PanelSection>
@@ -2392,7 +2391,7 @@ function MeetingsSection({
                     <PhoneOff size={11} /> {stoppingId === m.id ? "Deteniendo…" : "Detener bot"}
                   </button>
                 )}
-                {(m.transcript || m.audioTranscript) && !pdfAttachment && (
+                {m.hasTranscript && !pdfAttachment && (
                   <button
                     type="button"
                     disabled={isPending || actionPendingId === m.id}

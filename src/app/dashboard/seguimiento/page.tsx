@@ -78,8 +78,6 @@ export default async function SeguimientoPage({
             botLeftAt: true,
             botEnabled: true,
             notes: true,
-            transcript: true,
-            audioTranscript: true,
             aiSummary: true,
             aiSummaryData: true,
             aiSummaryAt: true,
@@ -113,6 +111,27 @@ export default async function SeguimientoPage({
     getAiSpendToday(organizationId),
   ]);
   const canCreateGoogleMeet = await hasGoogleCalendarConnected(session.user.id);
+
+  // La tabla solo necesita saber SI hay transcripción. Mandar el texto de todas las reuniones al
+  // navegador volvía enorme la respuesta de la página (y de cada acción que la revalida), y los
+  // botones se quedaban "cargando".
+  const meetingIds = opportunities.flatMap((o) => o.meetings.map((m) => m.id));
+  const withTranscript = new Set(
+    meetingIds.length === 0
+      ? []
+      : (
+          await prisma.meeting.findMany({
+            where: {
+              id: { in: meetingIds },
+              OR: [
+                { AND: [{ transcript: { not: null } }, { transcript: { not: "" } }] },
+                { AND: [{ audioTranscript: { not: null } }, { audioTranscript: { not: "" } }] },
+              ],
+            },
+            select: { id: true },
+          })
+        ).map((m) => m.id),
+  );
 
   const rows = opportunities.map((o) => ({
     id: o.id,
@@ -162,8 +181,7 @@ export default async function SeguimientoPage({
       botLeftAt: m.botLeftAt?.toISOString() ?? null,
       botEnabled: m.botEnabled,
       notes: m.notes ?? "",
-      transcript: m.transcript ?? "",
-      audioTranscript: m.audioTranscript ?? "",
+      hasTranscript: withTranscript.has(m.id),
       aiSummary: m.aiSummary ?? "",
       aiSummaryData: m.aiSummaryData ?? null,
       aiSummaryAt: m.aiSummaryAt?.toISOString() ?? null,

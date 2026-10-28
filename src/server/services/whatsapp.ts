@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { firstUrl } from "@/lib/urls";
+import { recipientField, senderIdentifier } from "@/lib/whatsapp-recipient";
 
 // Meta jubila versiones ~2 años después de su salida (v19/v20 ya
 // expiraron a mediados de 2026) — hay que subir esto de vez en cuando.
@@ -70,15 +71,19 @@ const inboundSchema = z.object({
             contacts: z
               .array(
                 z.object({
-                  wa_id: z.string(),
-                  profile: z.object({ name: z.string() }).optional(),
+                  // Con nombre de usuario de WhatsApp puede faltar el teléfono (wa_id) y llegar
+                  // solo el BSUID (user_id).
+                  wa_id: z.string().optional(),
+                  user_id: z.string().optional(),
+                  profile: z.object({ name: z.string().optional(), username: z.string().optional() }).optional(),
                 }),
               )
               .optional(),
             messages: z
               .array(
                 z.object({
-                  from: z.string(),
+                  from: z.string().optional(),
+                  from_user_id: z.string().optional(),
                   id: z.string(),
                   timestamp: z.string(),
                   type: z.string(),
@@ -253,11 +258,17 @@ export function parseInboundPayload(payload: unknown): ParsedInboundMessage[] {
 
       const namesByWaId = new Map<string, string>();
       for (const contact of change.value.contacts ?? []) {
-        if (contact.profile?.name) namesByWaId.set(contact.wa_id, contact.profile.name);
+        const label = contact.profile?.name || contact.profile?.username;
+        if (!label) continue;
+        if (contact.wa_id) namesByWaId.set(contact.wa_id, label);
+        if (contact.user_id) namesByWaId.set(contact.user_id, label);
       }
 
-      for (const message of change.value.messages ?? []) {
-        const customerName = namesByWaId.get(message.from) ?? null;
+      for (const rawMessage of change.value.messages ?? []) {
+        const from = senderIdentifier(rawMessage);
+        if (!from) continue;
+        const message = { ...rawMessage, from };
+        const customerName = namesByWaId.get(from) ?? (rawMessage.from_user_id ? namesByWaId.get(rawMessage.from_user_id) : undefined) ?? null;
         const fromAd = Boolean(message.referral);
         const adReferral: AdReferralInfo | null = message.referral
           ? {
@@ -562,8 +573,10 @@ const echoSchema = z.object({
             message_echoes: z
               .array(
                 z.object({
-                  from: z.string(),
-                  to: z.string(),
+                  from: z.string().optional(),
+                  to: z.string().optional(),
+                  // Cliente con nombre de usuario: puede venir solo el BSUID.
+                  to_user_id: z.string().optional(),
                   id: z.string(),
                   timestamp: z.string(),
                   type: z.string(),
@@ -604,7 +617,10 @@ export function parseMessageEchoes(payload: unknown): ParsedEcho[] {
     for (const change of entry.changes) {
       if (!isFieldMatch(change.field, "smb_message_echoes")) continue;
       const { phone_number_id } = change.value.metadata;
-      for (const echo of change.value.message_echoes ?? []) {
+      for (const rawEcho of change.value.message_echoes ?? []) {
+        const to = rawEcho.to?.trim() || rawEcho.to_user_id?.trim();
+        if (!to) continue;
+        const echo = { ...rawEcho, to };
         if (echo.type === "text" && echo.text?.body) {
           results.push({
             phoneNumberId: phone_number_id,
@@ -883,7 +899,7 @@ export async function sendInteractiveListMessage(params: {
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to,
+        ...recipientField(to),
         type: "interactive",
         interactive: {
           type: "list",
@@ -927,7 +943,7 @@ export async function sendTextMessage(params: {
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to,
+        ...recipientField(to),
         type: "text",
         // preview_url: si el texto tiene un link, el cliente ve una
         // tarjetita con el preview en su propio WhatsApp -- gratis, Meta ya
@@ -971,7 +987,7 @@ export async function sendReactionMessage(params: {
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to,
+        ...recipientField(to),
         type: "reaction",
         reaction: { message_id: messageExternalId, emoji },
       }),
@@ -1008,7 +1024,7 @@ export async function sendLocationMessage(params: {
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to,
+        ...recipientField(to),
         type: "location",
         location: { latitude, longitude, name, address },
       }),
@@ -1115,7 +1131,7 @@ export async function sendMediaMessage(params: {
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to,
+        ...recipientField(to),
         type,
         [type]: mediaPayload,
       }),
@@ -1506,7 +1522,7 @@ export async function sendTemplateMessage(params: {
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to,
+        ...recipientField(to),
         type: "template",
         template: {
           name: templateName,

@@ -13,7 +13,8 @@ import { sendMail } from "@/server/services/mailer";
 import { inviteEmail } from "@/server/services/email-templates";
 import { removeMembership } from "@/server/services/organization-membership";
 import { seatBlockedMessage } from "@/server/services/org-limits";
-import { resolveBrand } from "@/lib/brand";
+import { BRAND_PARENT_SELECT, resolveOrgBrand } from "@/lib/brand";
+import { syncChildrenForMember } from "@/server/services/suborganizations";
 import { audit } from "@/server/services/audit";
 import type { ActionState } from "./types";
 
@@ -66,8 +67,11 @@ export async function createInviteAction(
 
   if (parsed.data.email) {
     try {
-      const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId } });
-      const brand = resolveBrand(org);
+      const org = await prisma.organization.findUniqueOrThrow({
+        where: { id: organizationId },
+        include: { parent: { select: BRAND_PARENT_SELECT } },
+      });
+      const brand = resolveOrgBrand(org, org.parent);
       const { subject, text, html } = inviteEmail({
         orgName: org.name,
         inviteUrl,
@@ -186,7 +190,7 @@ export async function changeMemberRoleAction(
   }
 
   if (membership.role !== parsedRole.data) {
-    const blocked = await seatBlockedMessage(organizationId, parsedRole.data);
+    const blocked = await seatBlockedMessage(organizationId, parsedRole.data, { userId: memberId });
     if (blocked) return { error: blocked };
   }
 
@@ -198,6 +202,7 @@ export async function changeMemberRoleAction(
   if (member?.organizationId === organizationId) {
     await prisma.user.update({ where: { id: memberId }, data: { role: parsedRole.data } });
   }
+  await syncChildrenForMember(organizationId, memberId, parsedRole.data);
 
   await audit({
     entityType: "Membership",
@@ -269,7 +274,9 @@ export async function acceptInviteAction(
   }
 
   // Pudo llenarse el plan después de mandar la invitación.
-  const blocked = await seatBlockedMessage(invite.organizationId, invite.role === "OWNER" ? "OWNER" : "MEMBER");
+  const blocked = await seatBlockedMessage(invite.organizationId, invite.role === "OWNER" ? "OWNER" : "MEMBER", {
+    userId: existing?.id,
+  });
   if (blocked) return { error: `No se pudo aceptar la invitación: ${blocked}` };
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -313,6 +320,9 @@ export async function acceptInviteAction(
     ]);
   }
 
+  const joinedUser = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  if (joinedUser) await syncChildrenForMember(invite.organizationId, joinedUser.id, invite.role === "OWNER" ? "OWNER" : "MEMBER");
+
   try {
     await signIn("credentials", { email, password, redirectTo: "/dashboard" });
     return { error: null };
@@ -354,7 +364,9 @@ export async function acceptInviteWithCurrentSessionAction(token: string): Promi
     return { error: "Ya sos miembro de esta organización." };
   }
 
-  const blocked = await seatBlockedMessage(invite.organizationId, invite.role === "OWNER" ? "OWNER" : "MEMBER");
+  const blocked = await seatBlockedMessage(invite.organizationId, invite.role === "OWNER" ? "OWNER" : "MEMBER", {
+    userId: session.user.id,
+  });
   if (blocked) return { error: `No se pudo aceptar la invitación: ${blocked}` };
 
   await prisma.$transaction([
@@ -367,6 +379,8 @@ export async function acceptInviteWithCurrentSessionAction(token: string): Promi
     }),
     prisma.organizationInvite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }),
   ]);
+
+  await syncChildrenForMember(invite.organizationId, session.user.id, invite.role === "OWNER" ? "OWNER" : "MEMBER");
 
   // Mismo cuidado que switchOrganizationAction: invalida toda la app, no
   // solo /dashboard, para que el router del cliente no muestre una versión

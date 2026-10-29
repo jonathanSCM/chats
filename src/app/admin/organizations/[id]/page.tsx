@@ -27,6 +27,8 @@ export default async function AdminOrganizationDetailPage({
   const org = await prisma.organization.findUnique({
     where: { id },
     include: {
+      parent: { select: { id: true, name: true } },
+      children: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } },
       bots: { include: { whatsappConnection: true, _count: { select: { conversations: true } } } },
       integrationKeys: { where: { revokedAt: null }, select: { id: true } },
       integrationWebhooks: { select: { enabled: true, lastSuccessAt: true, lastError: true } },
@@ -51,6 +53,15 @@ export default async function AdminOrganizationDetailPage({
         <div>
           <h1 className="text-2xl font-bold">{org.name}</h1>
           <p className="font-code text-xs text-ink-faint">{org.slug}</p>
+          {org.parent && (
+            <p className="mt-1 text-xs text-ink-muted">
+              Suborganización de{" "}
+              <Link href={`/admin/organizations/${org.parent.id}`} className="text-accent hover:underline">
+                {org.parent.name}
+              </Link>
+              . Su plan de usuarios, su marca y su clave de OpenAI son los de la organización principal.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {org.suspended && <Badge tone="danger">Suspendida</Badge>}
@@ -76,6 +87,21 @@ export default async function AdminOrganizationDetailPage({
           usage={{ admins: seats.admins, sellers: seats.sellers, subOrgs }}
         />
       </Card>
+
+      {org.children.length > 0 && (
+        <Card className="mb-6">
+          <CardTitle className="mb-3">Suborganizaciones</CardTitle>
+          <ul className="space-y-1 text-sm">
+            {org.children.map((c) => (
+              <li key={c.id}>
+                <Link href={`/admin/organizations/${c.id}`} className="text-accent hover:underline">
+                  {c.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <Card className="mb-6">
         <div className="flex items-start justify-between gap-4">

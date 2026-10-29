@@ -448,6 +448,11 @@ export async function deleteOrganizationAction(
     select: { id: true, name: true },
   });
 
+  const childCount = await prisma.organization.count({ where: { parentId: org.id } });
+  if (childCount > 0) {
+    return { error: "Esta organización tiene suborganizaciones. Elimínalas primero (entra a cada una y bórrala)." };
+  }
+
   const confirmation = String(formData.get("confirmName") ?? "");
   if (confirmation !== org.name) {
     return { error: `Escribe exactamente "${org.name}" para confirmar` };

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { enqueueOrReschedule } from "../queue";
 import { extractMeetCode } from "@/server/services/meeting-bot";
-import { assistantDisplayName, resolveBrand } from "@/lib/brand";
+import { assistantDisplayName, BRAND_PARENT_SELECT, resolveOrgBrand } from "@/lib/brand";
 
 export const meetingBotJoinPayload = z.object({
   meetingId: z.string(),
@@ -47,6 +47,7 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
           brandColor: true,
           assistantName: true,
           brandLogoVersion: true,
+          parent: { select: BRAND_PARENT_SELECT },
         },
       },
     },
@@ -64,7 +65,7 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
     body: JSON.stringify({
       platform: "google_meet",
       native_meeting_id: code,
-      bot_name: assistantDisplayName(resolveBrand(meeting.organization), meeting.organization.name),
+      bot_name: assistantDisplayName(resolveOrgBrand(meeting.organization, meeting.organization.parent), meeting.organization.name),
       language: "es",
     }),
   });

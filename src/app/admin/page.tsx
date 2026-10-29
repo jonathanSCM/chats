@@ -11,6 +11,7 @@ export default async function AdminOrganizationsPage() {
 
   const organizations = await prisma.organization.findMany({
     include: {
+      parent: { select: { name: true } },
       bots: { select: { id: true, status: true } },
       users: { select: { id: true } },
     },
@@ -106,6 +107,7 @@ export default async function AdminOrganizationsPage() {
                   {org.name}
                 </Link>
                 <p className="font-code text-xs text-ink-faint">{org.slug}</p>
+                {org.parent && <p className="text-xs text-ink-muted">Suborganización de {org.parent.name}</p>}
               </Td>
               <Td>
                 {org.suspended ? (

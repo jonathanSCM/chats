@@ -12,6 +12,7 @@ import { inviteEmail } from "@/server/services/email-templates";
 import { addMembership, removeMembership } from "@/server/services/organization-membership";
 import { audit } from "@/server/services/audit";
 import { seatBlockedMessage } from "@/server/services/org-limits";
+import { syncChildrenForMember } from "@/server/services/suborganizations";
 import type { ActionState } from "./types";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 días — mismo plazo que las invitaciones normales de equipo.
@@ -211,11 +212,12 @@ export async function setUserOrgRoleAction(
   }
 
   if (!existing || existing.role !== role) {
-    const blocked = await seatBlockedMessage(organizationId, role);
+    const blocked = await seatBlockedMessage(organizationId, role, { userId });
     if (blocked) return { error: blocked };
   }
 
   await addMembership(userId, organizationId, role);
+  await syncChildrenForMember(organizationId, userId, role);
   await audit({
     entityType: "Membership",
     entityId: userId,

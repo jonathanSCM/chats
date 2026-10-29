@@ -4,6 +4,8 @@
  * apaga, la marca propia deja de verse pero NO se borra (al reactivarlo vuelve).
  */
 
+import { pickBrandSource } from "@/lib/org-hierarchy";
+
 export const PLATFORM_BRAND_NAME = "WhatsApp ProShop";
 /** Nombre corto que usa el bot en sus saludos cuando la organización no puso uno propio. */
 export const PLATFORM_SHORT_NAME = "ProShop";
@@ -38,6 +40,27 @@ export function resolveBrand(org: BrandSource & { id: string }): ResolvedBrand {
   const color = org.brandColor && isUsableBrandColor(org.brandColor) ? org.brandColor : null;
   const assistantName = org.assistantName?.trim() || null;
   return { custom: Boolean(name || color || assistantName || logoPath), name, color, assistantName, logoPath };
+}
+
+/** Campos de la organización padre que hacen falta para heredar su marca. */
+export const BRAND_PARENT_SELECT = {
+  id: true,
+  canCustomizeBrand: true,
+  brandName: true,
+  brandColor: true,
+  assistantName: true,
+  brandLogoVersion: true,
+} as const;
+
+/**
+ * Marca de una organización teniendo en cuenta a su padre: una suborganización usa su propia marca
+ * si su plan la permite y cargó algo; si no, hereda la del padre.
+ */
+export function resolveOrgBrand(
+  org: BrandSource & { id: string },
+  parent: (BrandSource & { id: string }) | null | undefined,
+): ResolvedBrand {
+  return pickBrandSource(resolveBrand(org), parent ? resolveBrand(parent) : null);
 }
 
 /** Nombre con el que se presenta el asistente: el propio, o "Asistente de {marca}". */

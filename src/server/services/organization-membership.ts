@@ -21,12 +21,12 @@ export async function getUserMemberships(
 ): Promise<{ organizationId: string; organizationName: string; role: string }[]> {
   const memberships = await prisma.organizationMembership.findMany({
     where: { userId },
-    include: { organization: { select: { name: true } } },
+    include: { organization: { select: { name: true, parent: { select: { name: true } } } } },
     orderBy: { createdAt: "asc" },
   });
   return memberships.map((m) => ({
     organizationId: m.organizationId,
-    organizationName: m.organization.name,
+    organizationName: m.organization.parent ? `${m.organization.parent.name} › ${m.organization.name}` : m.organization.name,
     role: m.role,
   }));
 }
@@ -43,6 +43,10 @@ export async function removeMembership(userId: string, organizationId: string): 
   if (!membership) return false;
 
   await prisma.organizationMembership.delete({ where: { id: membership.id } });
+
+  // Quien sale de una organización padre también sale de sus suborganizaciones.
+  const children = await prisma.organization.findMany({ where: { parentId: organizationId }, select: { id: true } });
+  for (const child of children) await removeMembership(userId, child.id);
 
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { organizationId: true } });
   if (user?.organizationId === organizationId) {

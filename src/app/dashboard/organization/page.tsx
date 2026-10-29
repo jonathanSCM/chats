@@ -22,7 +22,13 @@ import { decrypt } from "@/lib/crypto";
 import { getPlatformSettings } from "@/server/services/platform-settings";
 import { isMarketingEnabled } from "@/lib/features";
 import { DangerZone } from "./_components/danger-zone";
-import { getSeatCounts } from "@/server/services/org-limits";
+import { getSeatPlan } from "@/server/services/org-limits";
+import { SubOrgsPanel } from "./_components/suborgs-panel";
+import {
+  ensureParentAdminsInChildren,
+  listParentSellers,
+  listSubOrganizations,
+} from "@/server/services/suborganizations";
 import { formatSeatUsage } from "@/lib/org-limits";
 import { IntegrationApiPanel } from "./_components/integration-api-panel";
 import { INTEGRATION_EVENT_TYPES } from "@/server/integrations/events";
@@ -32,6 +38,7 @@ const TABS = [
   { key: "equipo", label: "Equipo" },
   { key: "ventas", label: "Ventas" },
   { key: "integraciones", label: "Integraciones" },
+  { key: "suborganizaciones", label: "Suborganizaciones" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -42,13 +49,12 @@ export default async function OrganizationSettingsPage({
   searchParams: Promise<{ seccion?: string }>;
 }) {
   const { seccion } = await searchParams;
-  const tab: TabKey = TABS.some((t) => t.key === seccion) ? (seccion as TabKey) : "general";
 
   const session = await auth();
   if (!session?.user.organizationId) redirect("/dashboard");
   if (session.user.role !== "OWNER") redirect("/dashboard");
 
-  const seatCounts = await getSeatCounts(session.user.organizationId);
+  const seatPlan = await getSeatPlan(session.user.organizationId);
   const [org, memberships, invites, bots, botMembers, pipelineStages, services] = await Promise.all([
     prisma.organization.findUniqueOrThrow({ where: { id: session.user.organizationId } }),
     // Vía OrganizationMembership, no User.organizationId directo: alguien
@@ -84,6 +90,20 @@ export default async function OrganizationSettingsPage({
       orderBy: { order: "asc" },
     }),
   ]);
+
+  // La pestaña de suborganizaciones solo existe para una organización principal con esa opción en su plan.
+  const showSubOrgs = org.canHaveSubOrgs && !org.parentId;
+  const visibleTabs = TABS.filter((t) => t.key !== "suborganizaciones" || showSubOrgs);
+  const tab: TabKey = visibleTabs.some((t) => t.key === seccion) ? (seccion as TabKey) : "general";
+  const parent = org.parentId ? await prisma.organization.findUnique({ where: { id: org.parentId }, select: { name: true } }) : null;
+
+  let subOrgs: Awaited<ReturnType<typeof listSubOrganizations>> = [];
+  let parentSellers: Awaited<ReturnType<typeof listParentSellers>> = [];
+  if (tab === "suborganizaciones") {
+    // Al día los accesos de los administradores antes de mostrar (por si alguien llegó después).
+    await ensureParentAdminsInChildren(org.id);
+    [subOrgs, parentSellers] = await Promise.all([listSubOrganizations(org.id), listParentSellers(org.id)]);
+  }
 
   // Conectó con Facebook pero todavía no eligió cuenta (autorizó varias): se
   // vuelve a listar para mostrar el selector aunque haya recargado la página.
@@ -124,8 +144,15 @@ export default async function OrganizationSettingsPage({
       <h1 className="mb-1 text-2xl font-bold">Organización</h1>
       <p className="mb-6 text-sm text-ink-muted">Datos, equipo, ventas e integraciones.</p>
 
+      {parent && (
+        <p className="mb-6 rounded-control border border-border px-3 py-2 text-sm text-ink-muted">
+          Esta es una suborganización de <b className="text-ink">{parent.name}</b>. Su plan de usuarios, su marca y su
+          clave de OpenAI son los de la organización principal.
+        </p>
+      )}
+
       <nav className="mb-6 flex gap-1 overflow-x-auto border-b border-border" aria-label="Secciones de la organización">
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <Link
             key={t.key}
             href={`/dashboard/organization?seccion=${t.key}`}
@@ -253,6 +280,21 @@ export default async function OrganizationSettingsPage({
         </>
       )}
 
+      {tab === "suborganizaciones" && showSubOrgs && (
+        <Card className="mb-6">
+          <CardTitle className="mb-1">Suborganizaciones</CardTitle>
+          <CardDescription className="mb-4">
+            Cada una tiene sus propios chats, contactos y números de WhatsApp, separados de los tuyos. Tú eliges qué
+            vendedores trabajan en cada una; los administradores entran a todas.
+          </CardDescription>
+          <SubOrgsPanel
+            subOrgs={subOrgs.map((s) => ({ id: s.id, name: s.name, sellerIds: s.sellerIds }))}
+            sellers={parentSellers}
+            maxSubOrgs={org.maxSubOrgs}
+          />
+        </Card>
+      )}
+
       {tab === "integraciones" && (
         <>
       {org.aiOwnKeyEnabled && (
@@ -336,10 +378,11 @@ export default async function OrganizationSettingsPage({
         <CardDescription className="mb-4">
           Todos los que tienen acceso a tus bots y conversaciones.
         </CardDescription>
-        {(org.maxAdmins !== null || org.maxSellers !== null) && (
+        {(seatPlan.limits.maxAdmins !== null || seatPlan.limits.maxSellers !== null) && (
           <p className="mb-3 rounded-control border border-border px-3 py-2 text-xs text-ink-muted">
-            Tu plan — administradores: {formatSeatUsage(seatCounts.admins, org.maxAdmins)} · vendedores:{" "}
-            {formatSeatUsage(seatCounts.sellers, org.maxSellers)}
+            Tu plan{seatPlan.isGroup ? " (compartido con tus suborganizaciones)" : ""} — administradores:{" "}
+            {formatSeatUsage(seatPlan.counts.admins, seatPlan.limits.maxAdmins)} · vendedores:{" "}
+            {formatSeatUsage(seatPlan.counts.sellers, seatPlan.limits.maxSellers)}
           </p>
         )}
         <MembersList members={members} currentUserId={session.user.id} />

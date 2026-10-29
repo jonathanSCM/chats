@@ -27,7 +27,7 @@ import { ServerClock } from "@/components/layout/server-clock";
 import { OrgSwitcher } from "@/components/layout/org-switcher";
 import { getUserMemberships } from "@/server/services/organization-membership";
 import { isMarketingEnabled } from "@/lib/features";
-import { accentStyle, resolveBrand } from "@/lib/brand";
+import { accentStyle, BRAND_PARENT_SELECT, resolveOrgBrand } from "@/lib/brand";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -45,9 +45,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   const org = session?.user.organizationId
-    ? await prisma.organization.findUnique({ where: { id: session.user.organizationId } })
+    ? await prisma.organization.findUnique({
+        where: { id: session.user.organizationId },
+        include: { parent: { select: BRAND_PARENT_SELECT } },
+      })
     : null;
-  const brand = org ? resolveBrand(org) : null;
+  const brand = org ? resolveOrgBrand(org, org.parent) : null;
   const memberships = session?.user.id
     ? await getUserMemberships(session.user.id).then((m) =>
         m.map((mm) => ({ organizationId: mm.organizationId, organizationName: mm.organizationName })),

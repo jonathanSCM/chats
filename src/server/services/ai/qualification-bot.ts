@@ -1,4 +1,4 @@
-import { botCompanyName, resolveBrand } from "@/lib/brand";
+import { BRAND_PARENT_SELECT, botCompanyName, resolveOrgBrand } from "@/lib/brand";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { decrypt } from "@/lib/crypto";
@@ -189,7 +189,12 @@ export async function loadConversation(conversationId: string): Promise<Conversa
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
-      bot: { include: { organization: true, whatsappConnection: true } },
+      bot: {
+        include: {
+          organization: { include: { parent: { select: BRAND_PARENT_SELECT } } },
+          whatsappConnection: true,
+        },
+      },
       contact: { select: { id: true, fullName: true, phone: true, jobTitle: true } },
     },
   });
@@ -209,8 +214,8 @@ export async function loadConversation(conversationId: string): Promise<Conversa
     accessToken: conversation.bot.whatsappConnection.accessToken,
     aiQualificationEnabled: conversation.bot.aiQualificationEnabled,
     aiTestPhone: conversation.bot.aiTestPhone,
-    brandCompany: botCompanyName(resolveBrand(conversation.bot.organization)),
-    brandAssistant: resolveBrand(conversation.bot.organization).assistantName,
+    brandCompany: botCompanyName(resolveOrgBrand(conversation.bot.organization, conversation.bot.organization.parent)),
+    brandAssistant: resolveOrgBrand(conversation.bot.organization, conversation.bot.organization.parent).assistantName,
     contact: conversation.contact,
   };
 }

@@ -4,17 +4,18 @@ import { decrypt } from "@/lib/crypto";
 import { chooseKey, classifyKeyError, parseAiMode, type AiMode } from "@/lib/ai-key";
 import { checkMonthlyLimit, monthStartUtc, type MonthlyLimits } from "@/lib/ai-limit";
 
-// Un cliente por clave (la de la plataforma y las propias de cada organización).
-const clients = new Map<string, OpenAI>();
+// Solo el cliente de la clave de la PLATAFORMA se reutiliza. Las claves de las organizaciones (propia o
+// personalizada) nunca se guardan en memoria entre llamadas: se crea un cliente descartable por pedido, así
+// una clave cambiada o quitada no queda viva en el servidor y un cliente nunca puede reusar el de otra organización.
+let platformClient: { key: string; client: OpenAI } | null = null;
 
 function getClient(apiKey: string | undefined): OpenAI {
   const key = apiKey ?? "";
-  let c = clients.get(key);
-  if (!c) {
-    c = new OpenAI({ apiKey: key });
-    clients.set(key, c);
+  if (key !== "" && key === process.env.OPENAI_API_KEY) {
+    if (!platformClient || platformClient.key !== key) platformClient = { key, client: new OpenAI({ apiKey: key }) };
+    return platformClient.client;
   }
-  return c;
+  return new OpenAI({ apiKey: key });
 }
 
 /** Cliente de OpenAI con una clave dada (para comprobar una clave nueva antes de guardarla). */
@@ -122,8 +123,39 @@ async function recordOwnKeyFailure(ownerOrgId: string, error: unknown): Promise<
   }
 }
 
+/** Interruptor general de la plataforma (AI_ENABLED=false apaga la IA para todas las organizaciones). */
+export function isAiGloballyEnabled(): boolean {
+  return process.env.AI_ENABLED !== "false";
+}
+
+/** La clave de la PLATAFORMA está disponible y la IA no está apagada. No dice nada de las claves de las organizaciones. */
 export function isAiEnabled(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY) && process.env.AI_ENABLED !== "false";
+  return Boolean(process.env.OPENAI_API_KEY) && isAiGloballyEnabled();
+}
+
+export type AiKeySource = "platform" | "own" | "custom";
+
+/** De dónde sale la IA de esta organización y si está detenida por una falla de su clave (sin descifrar nada). */
+export async function getAiKeySource(organizationId: string): Promise<{ source: AiKeySource; blocked: boolean }> {
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { ...KEY_FIELDS, parent: { select: KEY_FIELDS } },
+  });
+  if (!org) return { source: "platform", blocked: false };
+  const choice = chooseKey(holderOf(org), org.parent ? holderOf(org.parent) : null);
+  if (choice.source === "platform") return { source: "platform", blocked: false };
+  if (choice.source === "blocked") return { source: choice.kind, blocked: true };
+  return { source: choice.source, blocked: false };
+}
+
+/**
+ * ¿Puede ESTA organización usar IA? Mira su propia clave: una organización con clave propia o personalizada
+ * sigue funcionando aunque la clave de la plataforma falte, y una que usa la de la plataforma depende de ella.
+ */
+export async function isAiEnabledFor(organizationId: string): Promise<boolean> {
+  if (!isAiGloballyEnabled()) return false;
+  const { source } = await getAiKeySource(organizationId);
+  return source !== "platform" || Boolean(process.env.OPENAI_API_KEY);
 }
 
 /**
@@ -199,6 +231,14 @@ export class AiOwnKeyError extends AiBudgetExceededError {
   constructor(message: string) {
     super(message);
     this.name = "AiOwnKeyError";
+  }
+}
+
+/** Esta organización no tiene ninguna clave de IA disponible (ni propia ni de la plataforma): se omite sin reintentar. */
+export class AiNotConfiguredError extends AiBudgetExceededError {
+  constructor() {
+    super("La IA no está configurada (falta la clave de OpenAI)");
+    this.name = "AiNotConfiguredError";
   }
 }
 
@@ -280,8 +320,8 @@ export interface RunOptions<T> {
  */
 export async function runStructured<T>(options: RunOptions<T>): Promise<T> {
   const key = await resolveKey(options.organizationId);
-  if (!key.apiKey || process.env.AI_ENABLED === "false") {
-    throw new Error("La IA no está configurada (falta OPENAI_API_KEY)");
+  if (!key.apiKey || !isAiGloballyEnabled()) {
+    throw new AiNotConfiguredError();
   }
 
   // El tope diario protege el saldo de la plataforma: con la clave propia el gasto es del cliente.

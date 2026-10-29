@@ -1,6 +1,6 @@
 import { prisma } from "@/server/db/client";
 import { emitMeetingSummaryReady } from "@/server/integrations/domain-events";
-import { runStructured, MODELS, isAiEnabled } from "@/server/services/ai/client";
+import { runStructured, MODELS, isAiEnabledFor } from "@/server/services/ai/client";
 import {
   MEETING_SUMMARY_VERSION,
   MIN_TRANSCRIPT_CHARS,
@@ -109,8 +109,6 @@ export type GenerateResult =
  * excede el presupuesto diario (el job de la cola reintenta).
  */
 export async function generateMeetingSummary(meetingId: string): Promise<GenerateResult> {
-  if (!isAiEnabled()) return { status: "ai_disabled" };
-
   const meeting = await prisma.meeting.findUnique({
     where: { id: meetingId },
     select: {
@@ -127,6 +125,7 @@ export async function generateMeetingSummary(meetingId: string): Promise<Generat
     },
   });
   if (!meeting) return { status: "not_found" };
+  if (!(await isAiEnabledFor(meeting.organizationId))) return { status: "ai_disabled" };
 
   const raw = pickTranscript(meeting.transcript, meeting.audioTranscript);
   if (!raw) return { status: "no_transcript" };

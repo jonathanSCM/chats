@@ -1,6 +1,6 @@
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
-import { isAiEnabled, AiBudgetExceededError } from "@/server/services/ai/client";
+import { isAiEnabledFor, AiBudgetExceededError } from "@/server/services/ai/client";
 import { renderMeetingSummaryPdf, type MeetingSummary } from "@/server/services/meeting-summary-pdf";
 import { ensureMeetingSummaryData } from "@/server/services/meeting-summary";
 
@@ -14,7 +14,7 @@ export async function requestMeetingSummaryPdf(
   meetingId: string,
   organizationId: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!isAiEnabled()) {
+  if (!(await isAiEnabledFor(organizationId))) {
     return { ok: false, error: "La IA no está configurada en el servidor." };
   }
 

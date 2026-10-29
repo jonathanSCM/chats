@@ -9,7 +9,7 @@ import { audit } from "@/server/services/audit";
 import { ALL_LOSS_REASONS, type LossReason } from "@/lib/pipeline";
 import { getOrgStages, defaultEntryStage, type PipelineStage } from "@/server/services/pipeline";
 import { analyzeFollowUp } from "@/server/services/ai/follow-up";
-import { isAiEnabled, isWithinBudget, spentToday } from "@/server/services/ai/client";
+import { getAiKeySource, isAiEnabledFor, isWithinBudget, spentToday, type AiKeySource } from "@/server/services/ai/client";
 import { saveMediaFile, deleteMediaFile } from "@/lib/media-storage";
 import { parseGuestEmails } from "@/lib/guest-emails";
 import {
@@ -1113,11 +1113,13 @@ export async function analyzeOpportunityAction(
     return { error: "Este cliente está asignado a otro vendedor." };
   }
 
-  if (!isAiEnabled()) {
-    return { error: "El asesor IA no está configurado. Falta OPENAI_API_KEY." };
+  if (!(await isAiEnabledFor(organizationId))) {
+    return { error: "El asesor IA no está configurado: falta la clave de OpenAI." };
   }
 
-  if (!(await isWithinBudget(organizationId))) {
+  // El tope diario es de la plataforma: solo se aplica a quien usa su clave. Las claves propias y personalizadas
+  // tienen su propia regla (ver runStructured) y avisan por su cuenta.
+  if ((await getAiKeySource(organizationId)).source === "platform" && !(await isWithinBudget(organizationId))) {
     return {
       error: "Se alcanzó el tope de gasto diario de IA. Vuelve a intentar mañana.",
     };
@@ -1135,10 +1137,18 @@ export async function analyzeOpportunityAction(
 }
 
 /** Gasto de IA de hoy, para mostrarlo junto al tope configurado. */
-export async function getAiSpendToday(organizationId: string) {
+export async function getAiSpendToday(organizationId: string): Promise<{
+  spent: number;
+  budget: number | null;
+  enabled: boolean;
+  source: AiKeySource;
+}> {
+  const { source } = await getAiKeySource(organizationId);
   return {
     spent: await spentToday(organizationId),
-    budget: Number(process.env.AI_DAILY_BUDGET_USD ?? 2),
-    enabled: isAiEnabled(),
+    // El tope diario es de la plataforma: quien usa su propia clave o la personalizada no lo tiene.
+    budget: source === "platform" ? Number(process.env.AI_DAILY_BUDGET_USD ?? 2) : null,
+    enabled: await isAiEnabledFor(organizationId),
+    source,
   };
 }

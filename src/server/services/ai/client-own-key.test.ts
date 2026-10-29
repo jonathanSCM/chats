@@ -36,7 +36,15 @@ vi.mock("openai", () => ({
   },
 }));
 
-import { AiBudgetExceededError, AiMonthlyLimitError, AiOwnKeyError, runStructured } from "./client";
+import {
+  AiBudgetExceededError,
+  AiMonthlyLimitError,
+  AiNotConfiguredError,
+  AiOwnKeyError,
+  getAiKeySource,
+  isAiEnabledFor,
+  runStructured,
+} from "./client";
 
 const options = {
   organizationId: "org1",
@@ -232,5 +240,89 @@ describe("runStructured con clave personalizada y tope mensual", () => {
     m.aggregate.mockResolvedValue({ _sum: { costEstimate: 50, inputTokens: 0, outputTokens: 0 } });
     await runStructured(options);
     expect(m.responsesCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("aislamiento entre organizaciones", () => {
+  const byId = (rows: Record<string, ReturnType<typeof orgWith>>) =>
+    m.orgFind.mockImplementation(async ({ where }: { where: { id: string } }) => rows[where.id] ?? null);
+
+  it("llamadas simultáneas de organizaciones distintas usan cada una SU clave", async () => {
+    byId({
+      a: orgWith({ id: "a", aiMode: "own", openaiKeyEnc: "AAA" }),
+      b: orgWith({ id: "b", aiMode: "custom", customKeyEnc: "BBB" }),
+      c: orgWith({ id: "c" }),
+      d: orgWith({ id: "d", aiMode: "own", openaiKeyEnc: "DDD" }),
+    });
+    await Promise.all(["a", "b", "c", "d", "a", "c", "b", "d"].map((id) => runStructured({ ...options, organizationId: id })));
+    expect(m.keysSeen.filter((k) => k === "sk-own-AAA")).toHaveLength(2);
+    expect(m.keysSeen.filter((k) => k === "sk-own-BBB")).toHaveLength(2);
+    expect(m.keysSeen.filter((k) => k === "sk-own-DDD")).toHaveLength(2);
+    expect(m.keysSeen.filter((k) => k === "sk-platform")).toHaveLength(2); // solo la organización "c"
+  });
+
+  it("una organización con clave propia NUNCA toca la de la plataforma, ni al reintentar tras un fallo", async () => {
+    byId({ a: orgWith({ id: "a", aiMode: "own", openaiKeyEnc: "AAA" }) });
+    m.responsesCreate.mockRejectedValue({ status: 500, message: "boom" });
+    await expect(runStructured({ ...options, organizationId: "a" })).rejects.toBeTruthy();
+    expect(m.keysSeen.length).toBeGreaterThanOrEqual(2); // hubo reintento...
+    expect(new Set(m.keysSeen)).toEqual(new Set(["sk-own-AAA"])); // ...siempre con SU clave
+  });
+
+  it("si cambia o quita su clave, la siguiente llamada ya usa la nueva (no queda guardada la vieja)", async () => {
+    byId({ a: orgWith({ id: "a", aiMode: "own", openaiKeyEnc: "VIEJA" }) });
+    await runStructured({ ...options, organizationId: "a" });
+    byId({ a: orgWith({ id: "a", aiMode: "own", openaiKeyEnc: "NUEVA" }) });
+    await runStructured({ ...options, organizationId: "a" });
+    byId({ a: orgWith({ id: "a", aiMode: "platform", openaiKeyEnc: "NUEVA" }) });
+    await runStructured({ ...options, organizationId: "a" });
+    expect(m.keysSeen).toEqual(["sk-own-VIEJA", "sk-own-NUEVA", "sk-platform"]);
+  });
+
+  it("sin clave de la plataforma, una organización con clave propia sigue funcionando", async () => {
+    delete process.env.OPENAI_API_KEY;
+    byId({ a: orgWith({ id: "a", aiMode: "own", openaiKeyEnc: "AAA" }) });
+    await runStructured({ ...options, organizationId: "a" });
+    expect(m.keysSeen).toEqual(["sk-own-AAA"]);
+  });
+
+  it("sin clave de la plataforma, una organización que depende de ella se omite sin llamar a OpenAI", async () => {
+    delete process.env.OPENAI_API_KEY;
+    byId({ c: orgWith({ id: "c" }) });
+    await expect(runStructured({ ...options, organizationId: "c" })).rejects.toBeInstanceOf(AiNotConfiguredError);
+    expect(m.responsesCreate).not.toHaveBeenCalled();
+  });
+
+  it("el interruptor general AI_ENABLED=false apaga la IA de todas, también las de clave propia", async () => {
+    process.env.AI_ENABLED = "false";
+    byId({ a: orgWith({ id: "a", aiMode: "own", openaiKeyEnc: "AAA" }) });
+    await expect(runStructured({ ...options, organizationId: "a" })).rejects.toBeInstanceOf(AiNotConfiguredError);
+    expect(await isAiEnabledFor("a")).toBe(false);
+    expect(m.responsesCreate).not.toHaveBeenCalled();
+  });
+
+  it("isAiEnabledFor mira la clave de cada organización, no solo la de la plataforma", async () => {
+    byId({
+      propia: orgWith({ id: "propia", aiMode: "own", openaiKeyEnc: "X" }),
+      plataforma: orgWith({ id: "plataforma" }),
+    });
+    expect(await isAiEnabledFor("propia")).toBe(true);
+    expect(await isAiEnabledFor("plataforma")).toBe(true);
+    delete process.env.OPENAI_API_KEY;
+    expect(await isAiEnabledFor("propia")).toBe(true);
+    expect(await isAiEnabledFor("plataforma")).toBe(false);
+  });
+
+  it("getAiKeySource dice qué clave usa cada una y si está detenida por falla de su clave", async () => {
+    byId({
+      a: orgWith({ id: "a", aiMode: "own", openaiKeyEnc: "X" }),
+      b: orgWith({ id: "b", aiMode: "custom", customKeyEnc: "X", aiKeyAlertMessage: "sin saldo" }),
+      c: orgWith({ id: "c" }),
+      hija: orgWith({ id: "hija", parent: parentWith({ aiMode: "custom", customKeyEnc: "P" }) }),
+    });
+    expect(await getAiKeySource("a")).toEqual({ source: "own", blocked: false });
+    expect(await getAiKeySource("b")).toEqual({ source: "custom", blocked: true });
+    expect(await getAiKeySource("c")).toEqual({ source: "platform", blocked: false });
+    expect(await getAiKeySource("hija")).toEqual({ source: "custom", blocked: false });
   });
 });

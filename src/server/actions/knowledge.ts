@@ -6,7 +6,7 @@ import { PDFParse } from "pdf-parse";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { audit } from "@/server/services/audit";
-import { AiBudgetExceededError, isAiEnabled } from "@/server/services/ai/client";
+import { AiBudgetExceededError, isAiEnabledFor } from "@/server/services/ai/client";
 import { proposeKnowledgeChanges, type ChatTurn } from "@/server/services/ai/knowledge-editor";
 import {
   MAX_CHANGES,
@@ -215,7 +215,7 @@ export async function proposeKnowledgeChangesAction(
   }
   const parsedHistory = historySchema.safeParse(history);
   if (!parsedHistory.success) return { ...empty, error: "La conversación es demasiado larga. Empezá una nueva." };
-  if (!isAiEnabled()) return { ...empty, error: "La IA no está configurada en el servidor." };
+  if (!(await isAiEnabledFor(organizationId))) return { ...empty, error: "La IA no está configurada en el servidor." };
 
   const rows = await prisma.knowledgeItem.findMany({
     where: { organizationId },

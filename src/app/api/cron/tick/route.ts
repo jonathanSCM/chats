@@ -20,7 +20,8 @@ const MEETING_SETTLE_MINUTES = 10;
  * Pocas por tick para no pegar un pico de gasto de IA.
  */
 async function enqueueMeetingSummaries(): Promise<void> {
-  if (process.env.AI_ENABLED === "false" || !process.env.OPENAI_API_KEY) return;
+  // Solo el interruptor general: cada organización decide con SU clave si puede resumir (ver generateMeetingSummary).
+  if (process.env.AI_ENABLED === "false") return;
 
   const settledBefore = new Date(Date.now() - MEETING_SETTLE_MINUTES * 60_000);
   const candidates = await prisma.meeting.findMany({

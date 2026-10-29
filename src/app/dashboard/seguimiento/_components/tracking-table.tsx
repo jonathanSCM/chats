@@ -187,7 +187,7 @@ interface Props {
     highPriorityCount: number;
     noNextActionCount: number;
   };
-  ai: { spent: number; budget: number; enabled: boolean };
+  ai: { spent: number; budget: number | null; enabled: boolean; source: "platform" | "own" | "custom" };
 }
 
 type QuickFilter = "hoy" | "vencidos" | "semana" | "alta" | "sin_accion" | "atencion" | null;
@@ -919,10 +919,12 @@ export function TrackingTable({
               Las últimas cinco columnas las propone el asesor IA; el vendedor decide.
               {ai.enabled ? (
                 <span className="">
-                  · Gasto de hoy: {ai.spent.toFixed(3)} / {ai.budget.toFixed(2)} US$
+                  · Gasto de hoy: {ai.spent.toFixed(3)}
+                  {ai.budget !== null ? ` / ${ai.budget.toFixed(2)}` : ""} US$
+                  {ai.source === "own" ? " (con tu clave de OpenAI)" : ai.source === "custom" ? " (plan con límite mensual)" : ""}
                 </span>
               ) : (
-                <span className="text-warning">· Asesor IA sin configurar (falta OPENAI_API_KEY)</span>
+                <span className="text-warning">· Asesor IA sin configurar (falta la clave de OpenAI)</span>
               )}
             </p>
           </div>
@@ -1390,7 +1392,7 @@ function AnalyzeButton({
       <button
         type="button"
         disabled={disabled || isPending}
-        title={title ?? (disabled ? "Falta configurar OPENAI_API_KEY" : "Pedir análisis al asesor IA")}
+        title={title ?? (disabled ? "Falta configurar la clave de OpenAI" : "Pedir análisis al asesor IA")}
         onClick={() =>
           startTransition(async () => {
             setError(null);

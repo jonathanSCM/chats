@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { runQualificationTurn } from "@/server/services/ai/qualification-bot";
-import { AiBudgetExceededError, isAiEnabled } from "@/server/services/ai/client";
+import { AiBudgetExceededError, isAiGloballyEnabled } from "@/server/services/ai/client";
 
 export const botReplyPayload = z.object({
   conversationId: z.string(),
@@ -9,7 +9,8 @@ export const botReplyPayload = z.object({
 export async function handleBotReply(rawPayload: unknown): Promise<void> {
   const { conversationId } = botReplyPayload.parse(rawPayload);
 
-  if (!isAiEnabled()) return;
+  // Solo el interruptor general: si esta organización no tiene clave disponible, runStructured la omite por su cuenta.
+  if (!isAiGloballyEnabled()) return;
 
   try {
     await runQualificationTurn(conversationId);

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { analyzeFollowUp } from "@/server/services/ai/follow-up";
-import { AiBudgetExceededError, isAiEnabled } from "@/server/services/ai/client";
+import { AiBudgetExceededError, isAiGloballyEnabled } from "@/server/services/ai/client";
 
 export const analyzeFollowUpPayload = z.object({
   opportunityId: z.string(),
@@ -9,7 +9,8 @@ export const analyzeFollowUpPayload = z.object({
 export async function handleAnalyzeFollowUp(rawPayload: unknown): Promise<void> {
   const { opportunityId } = analyzeFollowUpPayload.parse(rawPayload);
 
-  if (!isAiEnabled()) return;
+  // Solo el interruptor general: si esta organización no tiene clave disponible, runStructured la omite por su cuenta.
+  if (!isAiGloballyEnabled()) return;
 
   try {
     await analyzeFollowUp(opportunityId);

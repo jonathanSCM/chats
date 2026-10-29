@@ -144,6 +144,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </header>
 
         <main className="flex-1 overflow-y-auto bg-canvas px-4 py-5 md:px-6 md:py-6">
+          {org?.aiKeyAlertAt && session?.user.role === "OWNER" && (
+            <div className="mb-4 rounded-lg border border-danger/40 bg-danger-dim px-4 py-3 text-sm text-ink">
+              <b className="text-danger">La IA de tu organización está detenida.</b> {org.aiKeyAlertMessage}{" "}
+              <Link href="/dashboard/organization?seccion=integraciones" className="font-medium text-accent underline">
+                Actualizar la clave de OpenAI
+              </Link>
+            </div>
+          )}
           {org?.suspended ? (
             <div className="mx-auto max-w-md rounded-lg border border-danger/40 bg-danger-dim px-6 py-8 text-center">
               <p className="mb-1 font-display text-lg font-semibold text-ink">

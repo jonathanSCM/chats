@@ -5,6 +5,7 @@ import { prisma } from "@/server/db/client";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { RenameOrgForm } from "./_components/rename-org-form";
 import { BrandForm } from "./_components/brand-form";
+import { OpenAiKeyForm } from "./_components/openai-key-form";
 import { resolveBrand } from "@/lib/brand";
 import { MembersList } from "./_components/members-list";
 import { InvitePanel } from "./_components/invite-panel";
@@ -254,6 +255,16 @@ export default async function OrganizationSettingsPage({
 
       {tab === "integraciones" && (
         <>
+      {org.aiOwnKeyEnabled && (
+        <Card className="mb-6">
+          <CardTitle className="mb-1">Clave de OpenAI</CardTitle>
+          <CardDescription className="mb-4">
+            El bot de WhatsApp, el asesor y los resúmenes de reuniones pueden funcionar con tu propia cuenta de
+            OpenAI en vez de la de la plataforma.
+          </CardDescription>
+          <OpenAiKeyForm last4={org.openaiKeyLast4} alertMessage={org.aiKeyAlertMessage} />
+        </Card>
+      )}
       {isMarketingEnabled() && (
         <Card className="mb-6">
           <CardTitle className="mb-1">Meta Ads</CardTitle>

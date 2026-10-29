@@ -46,6 +46,13 @@ model Organization {
   assistantName          String?
   brandLogoVersion       Int                    @default(0) // 0 = sin logo propio; sube en cada cambio (rompe la caché)
   brandLogo              OrganizationBrandLogo?
+  // Clave de OpenAI propia (solo si aiOwnKeyEnabled): cifrada, nunca se devuelve al navegador.
+  openaiKeyEnc           String?                @db.Text
+  openaiKeyLast4         String?
+  // Aviso para el dueño cuando su clave falla (inválida o sin saldo). Con aviso activo la IA de esta
+  // organización se detiene: NO se cae a la clave de la plataforma. Se limpia al guardar una clave nueva.
+  aiKeyAlertAt           DateTime?
+  aiKeyAlertMessage      String?
   // Organización padre (suborganizaciones). null = organización de primer nivel.
   parentId               String?
   parent                 Organization?          @relation("OrgHierarchy", fields: [parentId], references: [id], onDelete: Restrict)

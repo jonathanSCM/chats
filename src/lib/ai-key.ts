@@ -3,30 +3,43 @@
  * poder probar la decisión de "qué clave usar" y "qué errores son definitivos".
  */
 
+/**
+ * Cómo usa la IA una organización (lo elige el superadmin):
+ *  - "platform": la clave de la plataforma, con su tope diario (el de siempre).
+ *  - "custom": una clave que pone el superadmin para esa organización, con tope de gasto y/o de tokens por mes.
+ *  - "own": la clave que guarda la propia organización; el gasto es suyo y no hay tope de la plataforma.
+ */
+export const AI_MODES = ["platform", "custom", "own"] as const;
+export type AiMode = (typeof AI_MODES)[number];
+
+export function parseAiMode(value: unknown): AiMode {
+  return AI_MODES.find((m) => m === value) ?? "platform";
+}
+
 export interface KeyHolder {
-  aiOwnKeyEnabled: boolean;
+  mode: AiMode;
   hasKey: boolean;
   alertMessage: string | null;
 }
 
 export type KeyChoice =
   | { source: "platform" }
-  | { source: "own"; holder: "self" | "parent" }
-  | { source: "blocked"; holder: "self" | "parent"; message: string };
+  | { source: "own" | "custom"; holder: "self" | "parent" }
+  | { source: "blocked"; kind: "own" | "custom"; holder: "self" | "parent"; message: string };
 
 /**
- * Qué clave usa una organización: la propia (si su plan lo permite y la guardó), la de su
- * organización padre (las hijas la heredan) o la de la plataforma. Si la clave propia tiene un
- * aviso de falla activo NO se cae a la de la plataforma: se bloquea hasta que la corrijan.
+ * Qué clave usa una organización: la propia o la personalizada (según su modo y si ya hay una
+ * guardada), la de su organización padre (las hijas la heredan) o la de la plataforma. Si esa
+ * clave tiene un aviso de falla activo NO se cae a la de la plataforma: se bloquea hasta que se corrija.
  */
 export function chooseKey(self: KeyHolder, parent: KeyHolder | null): KeyChoice {
   const candidates: Array<[KeyHolder, "self" | "parent"]> = [[self, "self"]];
   if (parent) candidates.push([parent, "parent"]);
   for (const [holder, who] of candidates) {
-    if (holder.aiOwnKeyEnabled && holder.hasKey) {
+    if (holder.mode !== "platform" && holder.hasKey) {
       return holder.alertMessage
-        ? { source: "blocked", holder: who, message: holder.alertMessage }
-        : { source: "own", holder: who };
+        ? { source: "blocked", kind: holder.mode, holder: who, message: holder.alertMessage }
+        : { source: holder.mode, holder: who };
     }
   }
   return { source: "platform" };

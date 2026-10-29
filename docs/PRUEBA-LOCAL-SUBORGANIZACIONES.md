@@ -23,15 +23,17 @@ Después arranca la app (`npm run dev`) y abre <http://localhost:3000/login>.
 | `admin2@demo.local` | Beto, segundo administrador de Demo Financiera |
 | `vendedor1@demo.local` · `vendedor2@demo.local` · `vendedor3@demo.local` | Vendedores de Demo Financiera |
 | `cliente-simple@demo.local` | Dueño de **Demo Cliente Simple** (plan con 1 admin y 1 vendedor, sin extras) |
+| `ia-con-tope@demo.local` | Dueño de **Demo IA con cupo**: IA personalizada con tope de USD 10 al mes (lleva USD 3.20) |
+| `ia-agotada@demo.local` | Dueño de **Demo IA agotada**: IA personalizada con tope de USD 1 al mes, ya superado: ve el aviso rojo |
 
 **Demo Financiera** nace con: suborganizaciones (hasta 3), 2 administradores, 4 vendedores,
-marca propia permitida y clave de OpenAI propia permitida.
+marca propia permitida y modo de IA "clave propia de la organización".
 
 ## Recorrido sugerido
 
 1. **Plan (superadmin).** Entra como `superadmin@demo.local` → Organizaciones → *Demo Financiera*.
    Verás la tarjeta **Plan de la organización**: topes de administradores/vendedores (con el uso
-   actual), suborganizaciones, marca propia y clave de OpenAI propia. Cambia un número, guarda y
+   actual), suborganizaciones y marca propia. Cambia un número, guarda y
    mira cómo cambia lo que ve el dueño.
 2. **Suborganizaciones.** Entra como `admin@demo.local` → Organización → pestaña
    **Suborganizaciones**. Crea "Sucursal Norte" marcando qué vendedores la usarán. Cambia los
@@ -46,10 +48,18 @@ marca propia permitida y clave de OpenAI propia permitida.
 5. **Marca.** En Demo Financiera → Organización → General → tarjeta **Marca**: sube un logo
    (PNG/JPG/WebP, hasta 400 KB), pon un nombre y un color. Cambia a la hija con el selector: hereda
    la marca del padre.
-6. **Clave de OpenAI.** Organización → Integraciones → **Clave de OpenAI** (aparece solo si el plan
-   lo permite). Con una clave inválida verás el mensaje de rechazo; no se guarda. Una clave real
-   se prueba contra OpenAI antes de guardarse y queda cifrada.
-7. **Plan simple.** Entra como `cliente-simple@demo.local`: no tiene pestaña Suborganizaciones,
+6. **Tres modos de IA (superadmin).** En el detalle de cada organización, tarjeta **Inteligencia
+   artificial**: *clave de la plataforma* (la de siempre, con su tope diario), *clave personalizada*
+   (tú le pones una clave y un tope de gasto y/o de tokens por mes) o *clave propia* (el dueño pega la
+   suya). Entra como `superadmin@demo.local` a *Demo IA agotada*, sube el límite de gasto y guarda:
+   el aviso rojo del dueño desaparece. La clave personalizada se prueba contra OpenAI antes de guardarse.
+7. **Clave propia (dueño).** En *Demo Financiera* → Organización → Integraciones → **Clave de OpenAI**
+   (aparece solo en el modo "propia"). Una clave inválida se rechaza con el motivo; una real queda cifrada.
+8. **Avisos de IA detenida.** Con `ia-agotada@demo.local` verás un recuadro rojo arriba de todo el panel
+   y, en Integraciones, "Este mes: USD 1.50 de USD 1.00". Con `ia-con-tope@demo.local` no hay aviso.
+9. **Tamaño del logo.** En Marca hay un deslizador de 50% a 300% y una vista previa "Así se verá en el
+   menú" (usa el mismo componente del menú). Sube un logo chico y agrándalo.
+10. **Plan simple.** Entra como `cliente-simple@demo.local`: no tiene pestaña Suborganizaciones,
    tarjeta Marca ni Clave de OpenAI, y el tope de 1 vendedor se hace cumplir.
 
 ## Pruebas automáticas

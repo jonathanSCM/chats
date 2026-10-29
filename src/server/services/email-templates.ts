@@ -20,6 +20,7 @@ export interface EmailBrand {
   color: string | null;
   display?: "both" | "logo" | "name";
   logoShape?: "square" | "round";
+  logoScale?: number;
 }
 
 function escapeHtml(text: string): string {
@@ -48,11 +49,12 @@ function layout({
   const showLogo = display !== "name" || !brand?.name;
   const showName = Boolean(brand?.name) && (display !== "logo" || !hasOwnLogo);
   const round = brand?.logoShape === "round";
+  const px = Math.min(72, Math.round((36 * (brand?.logoScale ?? 100)) / 100));
   const logoImg = showLogo
     ? round && hasOwnLogo
-      ? `<img src="${logoUrl}" width="36" height="36" alt="" style="display:block; width:36px; height:36px; border-radius:50%; object-fit:cover;" />`
+      ? `<img src="${logoUrl}" width="${px}" height="${px}" alt="" style="display:block; width:${px}px; height:${px}px; border-radius:50%; object-fit:cover;" />`
       : hasOwnLogo
-        ? `<img src="${logoUrl}" height="36" alt="" style="display:block; height:36px; width:auto; max-width:126px; border-radius:8px; object-fit:contain;" />`
+        ? `<img src="${logoUrl}" height="${px}" alt="" style="display:block; height:${px}px; width:auto; max-width:${Math.round(px * 3.5)}px; border-radius:8px; object-fit:contain;" />`
         : `<img src="${logoUrl}" width="36" height="36" alt="${escapeHtml(brand?.name ?? BRAND_NAME)}" style="display:block; border-radius:8px;" />`
     : "";
   const nameText = showName

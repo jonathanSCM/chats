@@ -47,6 +47,7 @@ model Organization {
   brandLogoVersion       Int                    @default(0) // 0 = sin logo propio; sube en cada cambio (rompe la caché)
   brandDisplay           String                 @default("both") // qué se ve en el menú: "both" (logo y nombre), "logo" o "name"
   brandLogoShape         String                 @default("square") // "square" o "round"
+  brandLogoScale         Int                    @default(100) // tamaño del logo en el menú, en % (100 = normal)
   brandLogo              OrganizationBrandLogo?
   // Clave de OpenAI propia (solo si aiOwnKeyEnabled): cifrada, nunca se devuelve al navegador.
   openaiKeyEnc           String?                @db.Text
@@ -55,6 +56,13 @@ model Organization {
   // organización se detiene: NO se cae a la clave de la plataforma. Se limpia al guardar una clave nueva.
   aiKeyAlertAt           DateTime?
   aiKeyAlertMessage      String?
+  // Cómo usa la IA esta organización (lo elige el superadmin): "platform" = la clave de la plataforma (con su tope diario),
+  // "custom" = una clave que pone el superadmin, con tope de gasto y/o tokens por mes, "own" = la propia de la organización.
+  aiMode                 String                 @default("platform")
+  customKeyEnc           String?                @db.Text // clave personalizada (modo custom), cifrada
+  customKeyLast4         String?
+  aiMonthlyBudgetUsd     Float? // tope de gasto por mes en USD (modo custom); null = sin tope
+  aiMonthlyTokenLimit    Int? // tope de tokens por mes (modo custom); null = sin tope
   // Organización padre (suborganizaciones). null = organización de primer nivel.
   parentId               String?
   parent                 Organization?          @relation("OrgHierarchy", fields: [parentId], references: [id], onDelete: Restrict)

@@ -32,7 +32,7 @@ function form(key: string): FormData {
 beforeEach(() => {
   vi.clearAllMocks();
   m.session.mockResolvedValue({ user: { id: "u1", role: "OWNER", organizationId: "org1" } });
-  m.orgFind.mockResolvedValue({ aiOwnKeyEnabled: true, openaiKeyLast4: null });
+  m.orgFind.mockResolvedValue({ aiMode: "own", openaiKeyLast4: null });
   m.orgUpdate.mockResolvedValue({});
   m.audit.mockResolvedValue(undefined);
   m.create.mockResolvedValue({});
@@ -46,7 +46,7 @@ describe("saveOpenAiKeyAction", () => {
   });
 
   it("solo si el superadmin habilitó la opción en el plan", async () => {
-    m.orgFind.mockResolvedValue({ aiOwnKeyEnabled: false, openaiKeyLast4: null });
+    m.orgFind.mockResolvedValue({ aiMode: "platform", openaiKeyLast4: null });
     expect((await saveOpenAiKeyAction({ error: null }, form(KEY))).error).toMatch(/plan/i);
     expect(m.create).not.toHaveBeenCalled();
   });

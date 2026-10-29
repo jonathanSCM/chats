@@ -37,7 +37,6 @@ const BEFORE = {
   maxAdmins: null,
   maxSellers: null,
   canCustomizeBrand: false,
-  aiOwnKeyEnabled: false,
 };
 
 beforeEach(() => {
@@ -59,7 +58,7 @@ describe("updateOrgPlanAction", () => {
     const r = await updateOrgPlanAction(
       "org1",
       { error: null },
-      form({ maxAdmins: "2", maxSellers: "", canCustomizeBrand: "on", aiOwnKeyEnabled: "on" }),
+      form({ maxAdmins: "2", maxSellers: "", canCustomizeBrand: "on" }),
     );
     expect(r.error).toBeNull();
     expect(m.orgUpdate).toHaveBeenCalledWith({
@@ -70,7 +69,6 @@ describe("updateOrgPlanAction", () => {
         maxAdmins: 2,
         maxSellers: null,
         canCustomizeBrand: true,
-        aiOwnKeyEnabled: true,
       },
     });
     expect(m.audit.mock.calls[0][0]).toMatchObject({ action: "plan_updated", before: BEFORE, userId: "sa1" });

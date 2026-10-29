@@ -19,6 +19,21 @@ export type BrandDisplay = (typeof BRAND_DISPLAYS)[number];
 export const LOGO_SHAPES = ["square", "round"] as const;
 export type LogoShape = (typeof LOGO_SHAPES)[number];
 
+/** Tamaño del logo en el menú, en % del normal. Se acota para que un valor raro no rompa el diseño. */
+export const LOGO_SCALE_MIN = 50;
+export const LOGO_SCALE_MAX = 300;
+export function clampLogoScale(value: unknown): number {
+  if (value === null || value === undefined || value === "") return 100;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return 100;
+  return Math.min(LOGO_SCALE_MAX, Math.max(LOGO_SCALE_MIN, Math.round(n)));
+}
+
+/** Alto en píxeles del logo: el base de cada lugar por el porcentaje elegido, con un tope para que no desborde el menú. */
+export function scaledLogoSize(base: number, scale: number, max = 72): number {
+  return Math.min(max, Math.round((base * clampLogoScale(scale)) / 100));
+}
+
 export function parseBrandDisplay(value: unknown): BrandDisplay {
   return BRAND_DISPLAYS.find((d) => d === value) ?? "both";
 }
@@ -34,6 +49,7 @@ export interface BrandSource {
   brandLogoVersion: number;
   brandDisplay?: string | null;
   brandLogoShape?: string | null;
+  brandLogoScale?: number | null;
 }
 
 export interface ResolvedBrand {
@@ -49,11 +65,13 @@ export interface ResolvedBrand {
   display: BrandDisplay;
   /** Forma del logo: cuadrado (se respeta su proporción) o redondo (se recorta en círculo). */
   logoShape: LogoShape;
+  /** Tamaño del logo en el menú, en % (100 = normal). */
+  logoScale: number;
 }
 
 export function resolveBrand(org: BrandSource & { id: string }): ResolvedBrand {
   if (!org.canCustomizeBrand) {
-    return { custom: false, name: null, color: null, assistantName: null, logoPath: null, display: "both", logoShape: "square" };
+    return { custom: false, name: null, color: null, assistantName: null, logoPath: null, display: "both", logoShape: "square", logoScale: 100 };
   }
   const logoPath = org.brandLogoVersion > 0 ? `/api/brand-logo/${org.id}?v=${org.brandLogoVersion}` : null;
   const name = org.brandName?.trim() || null;
@@ -67,6 +85,7 @@ export function resolveBrand(org: BrandSource & { id: string }): ResolvedBrand {
     logoPath,
     display: parseBrandDisplay(org.brandDisplay),
     logoShape: parseLogoShape(org.brandLogoShape),
+    logoScale: clampLogoScale(org.brandLogoScale ?? 100),
   };
 }
 
@@ -80,6 +99,7 @@ export const BRAND_PARENT_SELECT = {
   brandLogoVersion: true,
   brandDisplay: true,
   brandLogoShape: true,
+  brandLogoScale: true,
 } as const;
 
 /**

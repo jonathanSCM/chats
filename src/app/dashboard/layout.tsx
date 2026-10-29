@@ -28,6 +28,7 @@ import { OrgSwitcher } from "@/components/layout/org-switcher";
 import { getUserMemberships } from "@/server/services/organization-membership";
 import { isMarketingEnabled } from "@/lib/features";
 import { accentStyle, BRAND_PARENT_SELECT, resolveOrgBrand } from "@/lib/brand";
+import { getAiNotice } from "@/server/services/ai/notice";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -51,6 +52,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
       })
     : null;
   const brand = org ? resolveOrgBrand(org, org.parent) : null;
+  // Solo el dueño ve el aviso de IA detenida, y solo se consulta si la organización no usa la clave de la plataforma.
+  const aiNotice =
+    org && session?.user.role === "OWNER" && (org.aiMode !== "platform" || org.parentId) ? await getAiNotice(org.id) : null;
   const memberships = session?.user.id
     ? await getUserMemberships(session.user.id).then((m) =>
         m.map((mm) => ({ organizationId: mm.organizationId, organizationName: mm.organizationName })),
@@ -68,8 +72,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // Mismo contenido para el sidebar de escritorio y el drawer de móvil.
   const navContent = (
     <>
-      <Link href="/dashboard" className="nav-item mb-6 flex h-10 items-center px-2">
-        <Logo onDark brandName={brand?.name} logoSrc={brand?.logoPath} display={brand?.display} logoShape={brand?.logoShape} />
+      <Link href="/dashboard" className="nav-item mb-6 flex min-h-10 items-center px-2 py-1">
+        <Logo
+          onDark
+          brandName={brand?.name}
+          logoSrc={brand?.logoPath}
+          display={brand?.display}
+          logoShape={brand?.logoShape}
+          logoScale={brand?.logoScale}
+        />
       </Link>
 
       <nav className="flex flex-1 flex-col gap-0.5">
@@ -142,17 +153,28 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <MobileNav>{navContent}</MobileNav>
           <SidebarToggle />
           <span className="md:hidden">
-            <Logo size="sm" brandName={brand?.name} logoSrc={brand?.logoPath} display={brand?.display} logoShape={brand?.logoShape} />
+            <Logo
+              size="sm"
+              brandName={brand?.name}
+              logoSrc={brand?.logoPath}
+              display={brand?.display}
+              logoShape={brand?.logoShape}
+              logoScale={brand?.logoScale}
+            />
           </span>
         </header>
 
         <main className="flex-1 overflow-y-auto bg-canvas px-4 py-5 md:px-6 md:py-6">
-          {org?.aiKeyAlertAt && session?.user.role === "OWNER" && (
+          {aiNotice && (
             <div className="mb-4 rounded-lg border border-danger/40 bg-danger-dim px-4 py-3 text-sm text-ink">
-              <b className="text-danger">La IA de tu organización está detenida.</b> {org.aiKeyAlertMessage}{" "}
-              <Link href="/dashboard/organization?seccion=integraciones" className="font-medium text-accent underline">
-                Actualizar la clave de OpenAI
-              </Link>
+              <b className="text-danger">La IA de tu organización está detenida.</b> {aiNotice.message}{" "}
+              {aiNotice.kind === "key-own" ? (
+                <Link href="/dashboard/organization?seccion=integraciones" className="font-medium text-accent underline">
+                  Actualizar la clave de OpenAI
+                </Link>
+              ) : (
+                <span className="text-ink-muted">Avísale al administrador de la plataforma.</span>
+              )}
             </div>
           )}
           {org?.suspended ? (

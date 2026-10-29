@@ -5,6 +5,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/server/db/client";
 import { DEFAULT_PIPELINE_STAGES, DEFAULT_SERVICES } from "@/lib/pipeline";
+import { encrypt } from "@/lib/crypto";
 
 const PASSWORD = "DemoLocal#2026";
 const DOMAIN = "demo.local";
@@ -17,6 +18,8 @@ const USERS = {
   seller2: { email: `vendedor2@${DOMAIN}`, name: "Diego (vendedor)" },
   seller3: { email: `vendedor3@${DOMAIN}`, name: "Elena (vendedora)" },
   solo: { email: `cliente-simple@${DOMAIN}`, name: "Dueño de un plan simple" },
+  conTope: { email: `ia-con-tope@${DOMAIN}`, name: "Dueño con IA personalizada (con cupo)" },
+  agotada: { email: `ia-agotada@${DOMAIN}`, name: "Dueño con IA personalizada (tope agotado)" },
 } as const;
 
 async function seedOrgDefaults(organizationId: string) {
@@ -37,7 +40,7 @@ async function seedOrgDefaults(organizationId: string) {
 
 async function main() {
   // Limpieza de una corrida anterior (primero las hijas: el padre no se puede borrar con hijas).
-  const old = await prisma.organization.findMany({ where: { slug: { in: ["demo-financiera", "demo-cliente-simple"] } }, select: { id: true } });
+  const old = await prisma.organization.findMany({ where: { slug: { in: ["demo-financiera", "demo-cliente-simple", "demo-ia-con-tope", "demo-ia-agotada"] } }, select: { id: true } });
   const oldIds = old.map((o) => o.id);
   await prisma.organization.deleteMany({ where: { parentId: { in: oldIds } } });
   await prisma.organization.deleteMany({ where: { id: { in: oldIds } } });
@@ -57,6 +60,7 @@ async function main() {
       maxAdmins: 2,
       maxSellers: 4,
       canCustomizeBrand: true,
+      aiMode: "own", // el dueño puede guardar su propia clave en Integraciones
       aiOwnKeyEnabled: true,
     },
   });
@@ -80,6 +84,44 @@ async function main() {
   await seedOrgDefaults(solo.id);
   const soloOwner = await mk(USERS.solo, "OWNER", solo.id);
   await prisma.organizationMembership.create({ data: { userId: soloOwner.id, organizationId: solo.id, role: "OWNER" } });
+
+  // Dos organizaciones con IA "personalizada": una con cupo y otra con el tope del mes agotado.
+  // La clave es de mentira (nunca se usa: el tope se revisa antes de llamar a OpenAI).
+  for (const [slug, name, user, budget, spent] of [
+    ["demo-ia-con-tope", "Demo IA con cupo", USERS.conTope, 10, 3.2],
+    ["demo-ia-agotada", "Demo IA agotada", USERS.agotada, 1, 1.5],
+  ] as const) {
+    const org = await prisma.organization.create({
+      data: {
+        name,
+        slug,
+        aiMode: "custom",
+        customKeyEnc: encrypt("sk-demo-clave-de-mentira-0000000000000000"),
+        customKeyLast4: "0000",
+        aiMonthlyBudgetUsd: budget,
+        aiMonthlyTokenLimit: 500_000,
+      },
+    });
+    await seedOrgDefaults(org.id);
+    const owner = await mk(user, "OWNER", org.id);
+    await prisma.organizationMembership.create({ data: { userId: owner.id, organizationId: org.id, role: "OWNER" } });
+    await prisma.aiAnalysis.create({
+      data: {
+        organizationId: org.id,
+        entityType: "Demo",
+        entityId: "demo",
+        analysisType: "demo",
+        model: "gpt-demo",
+        promptVersion: "demo",
+        inputTokens: 80_000,
+        outputTokens: 40_000,
+        cachedTokens: 0,
+        costEstimate: spent,
+        result: {},
+        durationMs: 1,
+      },
+    });
+  }
 
   await mk(USERS.superadmin, "SUPERADMIN", null);
 

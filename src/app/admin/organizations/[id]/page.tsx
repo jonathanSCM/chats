@@ -8,6 +8,10 @@ import { SuspendToggle } from "./_components/suspend-toggle";
 import { JefeToggle } from "./_components/jefe-toggle";
 import { DisconnectWhatsAppButton } from "./_components/disconnect-whatsapp-button";
 import { PlanForm } from "./_components/plan-form";
+import { AiForm } from "./_components/ai-form";
+import { getMonthUsage } from "@/server/services/ai/client";
+import { checkMonthlyLimit, describeMonthlyUsage } from "@/lib/ai-limit";
+import { parseAiMode } from "@/lib/ai-key";
 import { getSeatCounts } from "@/server/services/org-limits";
 import type { BotStatus } from "@/generated/prisma/enums";
 
@@ -46,6 +50,10 @@ export default async function AdminOrganizationDetailPage({
     getSeatCounts(org.id),
     prisma.organization.count({ where: { parentId: org.id } }),
   ]);
+  const aiMode = parseAiMode(org.aiMode);
+  const aiLimits = { budgetUsd: org.aiMonthlyBudgetUsd, tokens: org.aiMonthlyTokenLimit };
+  const aiUsage = aiMode === "custom" ? await getMonthUsage(org.id) : null;
+  const aiStatus = aiUsage ? checkMonthlyLimit(aiLimits, aiUsage) : null;
 
   return (
     <div className="max-w-3xl animate-fade-up">
@@ -82,9 +90,25 @@ export default async function AdminOrganizationDetailPage({
             maxAdmins: org.maxAdmins,
             maxSellers: org.maxSellers,
             canCustomizeBrand: org.canCustomizeBrand,
-            aiOwnKeyEnabled: org.aiOwnKeyEnabled,
           }}
           usage={{ admins: seats.admins, sellers: seats.sellers, subOrgs }}
+        />
+      </Card>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Inteligencia artificial</CardTitle>
+        <p className="mb-4 text-sm text-ink-muted">
+          De dónde sale la clave de OpenAI que usa esta organización para el bot, el asesor y los resúmenes.
+          {org.parent ? " Las suborganizaciones usan la clave de su organización principal." : ""}
+        </p>
+        <AiForm
+          orgId={org.id}
+          mode={aiMode}
+          customKeyLast4={org.customKeyLast4}
+          budgetUsd={org.aiMonthlyBudgetUsd}
+          tokenLimit={org.aiMonthlyTokenLimit}
+          usageText={aiUsage ? describeMonthlyUsage(aiLimits, aiUsage) : null}
+          limitReachedMessage={aiStatus && !aiStatus.ok ? aiStatus.message : null}
         />
       </Card>
 

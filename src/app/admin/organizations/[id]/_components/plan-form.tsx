@@ -12,7 +12,6 @@ interface Plan {
   maxAdmins: number | null;
   maxSellers: number | null;
   canCustomizeBrand: boolean;
-  aiOwnKeyEnabled: boolean;
 }
 
 export function PlanForm({
@@ -97,20 +96,6 @@ export function PlanForm({
           </span>
         </label>
 
-        <label className="flex items-start gap-2 text-sm text-ink">
-          <input
-            type="checkbox"
-            name="aiOwnKeyEnabled"
-            defaultChecked={plan.aiOwnKeyEnabled}
-            className="mt-0.5 h-4 w-4"
-          />
-          <span>
-            <b>Usa su propia clave de OpenAI</b>
-            <span className="block text-xs text-ink-faint">
-              El dueño verá en Integraciones dónde guardarla. Sin esto, usa la clave de la plataforma.
-            </span>
-          </span>
-        </label>
       </div>
 
       {state.error && <p className="text-sm text-danger">{state.error}</p>}

@@ -10,6 +10,7 @@ import {
   detectLogoType,
   isHexColor,
   isUsableBrandColor,
+  clampLogoScale,
   parseBrandDisplay,
   parseLogoShape,
 } from "@/lib/brand";
@@ -42,6 +43,7 @@ export async function updateBrandAction(_prevState: ActionState, formData: FormD
       brandLogoVersion: true,
       brandDisplay: true,
       brandLogoShape: true,
+      brandLogoScale: true,
     },
   });
   if (!org) return { error: "Organización no encontrada." };
@@ -78,6 +80,7 @@ export async function updateBrandAction(_prevState: ActionState, formData: FormD
 
   const brandDisplay = parseBrandDisplay(formData.get("brandDisplay"));
   const brandLogoShape = parseLogoShape(formData.get("brandLogoShape"));
+  const brandLogoScale = clampLogoScale(formData.get("brandLogoScale") ?? 100);
   const nextVersion = newLogo ? org.brandLogoVersion + 1 : removeLogo ? 0 : org.brandLogoVersion;
 
   await prisma.$transaction(async (tx) => {
@@ -90,6 +93,7 @@ export async function updateBrandAction(_prevState: ActionState, formData: FormD
         brandLogoVersion: nextVersion,
         brandDisplay,
         brandLogoShape,
+        brandLogoScale,
       },
     });
     if (newLogo) {
@@ -115,8 +119,9 @@ export async function updateBrandAction(_prevState: ActionState, formData: FormD
       assistantName: org.assistantName,
       brandDisplay: org.brandDisplay,
       brandLogoShape: org.brandLogoShape,
+      brandLogoScale: org.brandLogoScale,
     },
-    after: { brandDisplay, brandLogoShape, brandName: brandName || null, brandColor: brandColor || null, assistantName: assistantName || null, logoChanged: Boolean(newLogo), logoRemoved: removeLogo },
+    after: { brandDisplay, brandLogoShape, brandLogoScale, brandName: brandName || null, brandColor: brandColor || null, assistantName: assistantName || null, logoChanged: Boolean(newLogo), logoRemoved: removeLogo },
   });
 
   revalidatePath("/", "layout");

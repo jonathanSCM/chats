@@ -32,7 +32,6 @@ const planSchema = z.object({
   maxAdmins: limit,
   maxSellers: limit,
   canCustomizeBrand: z.boolean(),
-  aiOwnKeyEnabled: z.boolean(),
 });
 
 /**
@@ -52,7 +51,6 @@ export async function updateOrgPlanAction(
     maxAdmins: formData.get("maxAdmins"),
     maxSellers: formData.get("maxSellers"),
     canCustomizeBrand: formData.get("canCustomizeBrand") === "on",
-    aiOwnKeyEnabled: formData.get("aiOwnKeyEnabled") === "on",
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -66,7 +64,6 @@ export async function updateOrgPlanAction(
       maxAdmins: true,
       maxSellers: true,
       canCustomizeBrand: true,
-      aiOwnKeyEnabled: true,
     },
   });
   if (!before) return { error: "Organización no encontrada" };

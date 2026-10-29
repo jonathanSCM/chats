@@ -1,7 +1,8 @@
 import OpenAI from "openai";
 import { prisma } from "@/server/db/client";
 import { decrypt } from "@/lib/crypto";
-import { chooseKey, classifyKeyError } from "@/lib/ai-key";
+import { chooseKey, classifyKeyError, parseAiMode, type AiMode } from "@/lib/ai-key";
+import { checkMonthlyLimit, monthStartUtc, type MonthlyLimits } from "@/lib/ai-limit";
 
 // Un cliente por clave (la de la plataforma y las propias de cada organización).
 const clients = new Map<string, OpenAI>();
@@ -31,36 +32,80 @@ export function openAiClientFor(apiKey: string): OpenAI {
 
 interface ResolvedKey {
   apiKey: string | undefined;
-  /** Organización dueña de la clave propia en uso (para avisarle si falla); null = la de la plataforma. */
+  /** Organización dueña de la clave en uso (para avisarle si falla); null = la de la plataforma. */
   ownerOrgId: string | null;
+  /** Qué modo se está usando; null = la clave de la plataforma. */
+  mode: Exclude<AiMode, "platform"> | null;
+  /** Solo en modo "custom": los topes mensuales de la organización dueña de la clave. */
+  limits: MonthlyLimits | null;
 }
 
-/** Qué clave de OpenAI corresponde a esta organización (la propia, la de su padre o la de la plataforma). */
+const KEY_FIELDS = {
+  id: true,
+  aiMode: true,
+  openaiKeyEnc: true,
+  customKeyEnc: true,
+  aiKeyAlertMessage: true,
+  aiMonthlyBudgetUsd: true,
+  aiMonthlyTokenLimit: true,
+} as const;
+
+interface KeyRow {
+  id: string;
+  aiMode: string;
+  openaiKeyEnc: string | null;
+  customKeyEnc: string | null;
+  aiKeyAlertMessage: string | null;
+  aiMonthlyBudgetUsd: number | null;
+  aiMonthlyTokenLimit: number | null;
+}
+
+function holderOf(o: KeyRow) {
+  const mode = parseAiMode(o.aiMode);
+  return {
+    mode,
+    hasKey: mode === "own" ? Boolean(o.openaiKeyEnc) : mode === "custom" ? Boolean(o.customKeyEnc) : false,
+    alertMessage: o.aiKeyAlertMessage,
+  };
+}
+
+/** Qué clave de OpenAI corresponde a esta organización (la propia, la personalizada, la de su padre o la de la plataforma). */
 async function resolveKey(organizationId: string): Promise<ResolvedKey> {
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: {
-      aiOwnKeyEnabled: true,
-      openaiKeyEnc: true,
-      aiKeyAlertMessage: true,
-      parent: { select: { id: true, aiOwnKeyEnabled: true, openaiKeyEnc: true, aiKeyAlertMessage: true } },
-    },
+    select: { ...KEY_FIELDS, parent: { select: KEY_FIELDS } },
   });
-  if (!org) return { apiKey: process.env.OPENAI_API_KEY, ownerOrgId: null };
+  const platform: ResolvedKey = { apiKey: process.env.OPENAI_API_KEY, ownerOrgId: null, mode: null, limits: null };
+  if (!org) return platform;
 
-  const holder = (o: { aiOwnKeyEnabled: boolean; openaiKeyEnc: string | null; aiKeyAlertMessage: string | null }) => ({
-    aiOwnKeyEnabled: o.aiOwnKeyEnabled,
-    hasKey: Boolean(o.openaiKeyEnc),
-    alertMessage: o.aiKeyAlertMessage,
-  });
-  const choice = chooseKey(holder(org), org.parent ? holder(org.parent) : null);
+  const choice = chooseKey(holderOf(org), org.parent ? holderOf(org.parent) : null);
+  if (choice.source === "platform") return platform;
 
-  if (choice.source === "platform") return { apiKey: process.env.OPENAI_API_KEY, ownerOrgId: null };
-  const owner = choice.holder === "self" ? { id: organizationId, enc: org.openaiKeyEnc } : { id: org.parent!.id, enc: org.parent!.openaiKeyEnc };
   if (choice.source === "blocked") {
     throw new AiOwnKeyError(`La IA está detenida: ${choice.message}`);
   }
-  return { apiKey: decrypt(owner.enc!), ownerOrgId: owner.id };
+  const owner = choice.holder === "self" ? org : org.parent!;
+  const enc = choice.source === "custom" ? owner.customKeyEnc : owner.openaiKeyEnc;
+  return {
+    apiKey: decrypt(enc!),
+    ownerOrgId: owner.id,
+    mode: choice.source,
+    limits:
+      choice.source === "custom" ? { budgetUsd: owner.aiMonthlyBudgetUsd, tokens: owner.aiMonthlyTokenLimit } : null,
+  };
+}
+
+/** Gasto estimado y tokens del mes en curso de una organización y todas sus suborganizaciones (comparten la clave del padre). */
+export async function getMonthUsage(rootOrgId: string, now = new Date()): Promise<{ costUsd: number; tokens: number }> {
+  const children = await prisma.organization.findMany({ where: { parentId: rootOrgId }, select: { id: true } });
+  const result = await prisma.aiAnalysis.aggregate({
+    where: { organizationId: { in: [rootOrgId, ...children.map((c) => c.id)] }, createdAt: { gte: monthStartUtc(now) } },
+    _sum: { costEstimate: true, inputTokens: true, outputTokens: true },
+  });
+  return {
+    costUsd: Number(result._sum.costEstimate ?? 0),
+    tokens: (result._sum.inputTokens ?? 0) + (result._sum.outputTokens ?? 0),
+  };
 }
 
 /** Falla de una clave propia: si es definitiva (inválida, revocada, sin saldo) se deja el aviso para el dueño. */
@@ -157,6 +202,14 @@ export class AiOwnKeyError extends AiBudgetExceededError {
   }
 }
 
+/** Se llegó al tope mensual de IA (gasto o tokens) de una organización con clave personalizada. */
+export class AiMonthlyLimitError extends AiBudgetExceededError {
+  constructor(message: string) {
+    super(message);
+    this.name = "AiMonthlyLimitError";
+  }
+}
+
 /**
  * Distingue "sin créditos" de cualquier otro fallo (red, esquema inválido,
  * rate limit pasajero) -- solo lo primero amerita un aviso en /admin,
@@ -234,6 +287,12 @@ export async function runStructured<T>(options: RunOptions<T>): Promise<T> {
   // El tope diario protege el saldo de la plataforma: con la clave propia el gasto es del cliente.
   if (key.ownerOrgId === null && !(await isWithinBudget(options.organizationId))) {
     throw new AiBudgetExceededError();
+  }
+
+  // Clave personalizada: tope de gasto y/o tokens por mes (de toda la organización y sus hijas).
+  if (key.mode === "custom" && key.limits && key.ownerOrgId) {
+    const status = checkMonthlyLimit(key.limits, await getMonthUsage(key.ownerOrgId));
+    if (!status.ok) throw new AiMonthlyLimitError(status.message);
   }
 
   const startedAt = Date.now();

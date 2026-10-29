@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { scaledLogoSize } from "@/lib/brand";
 
 // Ícono de marca: el rayo de la app, como tile cuadrado redondeado.
 export function LogoMark({ className, size = 22, src = "/logo-mark.png" }: { className?: string; size?: number; src?: string }) {
@@ -73,6 +74,7 @@ export function Logo({
   logoSrc,
   display = "both",
   logoShape = "square",
+  logoScale = 100,
 }: {
   size?: keyof typeof wordmarkSizes;
   className?: string;
@@ -81,13 +83,19 @@ export function Logo({
   logoSrc?: string | null;
   display?: "both" | "logo" | "name";
   logoShape?: "square" | "round";
+  /** Tamaño del logo en %, para logos chicos que se ven pequeños (100 = normal). */
+  logoScale?: number;
   /** Sobre el menú lateral oscuro: texto blanco y sin nombre cuando el menú está contraído. */
   onDark?: boolean;
 }) {
   return (
     <span className={cn("inline-flex items-center gap-1.5", className)}>
       {logoSrc && display !== "name" ? (
-        <BrandLogoImage src={logoSrc} shape={logoShape} size={markSizes[size] + (display === "logo" ? 8 : 0)} />
+        <BrandLogoImage
+          src={logoSrc}
+          shape={logoShape}
+          size={scaledLogoSize(markSizes[size] + (display === "logo" ? 8 : 0), logoScale)}
+        />
       ) : logoSrc ? null : (
         <LogoMark size={markSizes[size]} />
       )}

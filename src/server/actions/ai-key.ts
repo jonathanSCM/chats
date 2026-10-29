@@ -16,10 +16,10 @@ async function requireOwnerWithOption() {
   }
   const org = await prisma.organization.findUnique({
     where: { id: session.user.organizationId },
-    select: { aiOwnKeyEnabled: true, openaiKeyLast4: true },
+    select: { aiMode: true, openaiKeyLast4: true },
   });
   if (!org) return { ok: false, error: "Organización no encontrada." } as const;
-  if (!org.aiOwnKeyEnabled) return { ok: false, error: "Tu plan no incluye usar tu propia clave de OpenAI." } as const;
+  if (org.aiMode !== "own") return { ok: false, error: "Tu plan no incluye usar tu propia clave de OpenAI." } as const;
   return { ok: true, session, organizationId: session.user.organizationId, org } as const;
 }
 

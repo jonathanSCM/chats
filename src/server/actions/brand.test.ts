@@ -44,6 +44,7 @@ const ORG = {
   brandLogoVersion: 0,
   brandDisplay: "both",
   brandLogoShape: "square",
+  brandLogoScale: 100,
 };
 
 beforeEach(() => {
@@ -86,6 +87,7 @@ describe("updateBrandAction", () => {
         brandLogoVersion: 0,
         brandDisplay: "both",
         brandLogoShape: "square",
+        brandLogoScale: 100,
       },
     });
     await updateBrandAction({ error: null }, form({ brandName: "", assistantName: "", brandColor: "" }));
@@ -97,6 +99,15 @@ describe("updateBrandAction", () => {
     expect(m.orgUpdate.mock.calls[0][0].data).toMatchObject({ brandDisplay: "logo", brandLogoShape: "round" });
     await updateBrandAction({ error: null }, form({ brandDisplay: "hackeado", brandLogoShape: "triangulo" }));
     expect(m.orgUpdate.mock.calls[1][0].data).toMatchObject({ brandDisplay: "both", brandLogoShape: "square" });
+  });
+
+  it("guarda el tamaño del logo; fuera de rango se acota y un valor raro vuelve a 100%", async () => {
+    await updateBrandAction({ error: null }, form({ brandLogoScale: "180" }));
+    expect(m.orgUpdate.mock.calls[0][0].data.brandLogoScale).toBe(180);
+    await updateBrandAction({ error: null }, form({ brandLogoScale: "9999" }));
+    expect(m.orgUpdate.mock.calls[1][0].data.brandLogoScale).toBe(300);
+    await updateBrandAction({ error: null }, form({ brandLogoScale: "xx" }));
+    expect(m.orgUpdate.mock.calls[2][0].data.brandLogoScale).toBe(100);
   });
 
   it("rechaza colores mal escritos o demasiado claros", async () => {

@@ -6,6 +6,8 @@ import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { RenameOrgForm } from "./_components/rename-org-form";
 import { BrandForm } from "./_components/brand-form";
 import { OpenAiKeyForm } from "./_components/openai-key-form";
+import { getMonthUsage } from "@/server/services/ai/client";
+import { describeMonthlyUsage } from "@/lib/ai-limit";
 import { resolveBrand } from "@/lib/brand";
 import { MembersList } from "./_components/members-list";
 import { InvitePanel } from "./_components/invite-panel";
@@ -96,6 +98,15 @@ export default async function OrganizationSettingsPage({
   const visibleTabs = TABS.filter((t) => t.key !== "suborganizaciones" || showSubOrgs);
   const tab: TabKey = visibleTabs.some((t) => t.key === seccion) ? (seccion as TabKey) : "general";
   const parent = org.parentId ? await prisma.organization.findUnique({ where: { id: org.parentId }, select: { name: true } }) : null;
+
+  // Modo "custom": el dueño ve cuánto lleva usado de su tope mensual (solo lectura).
+  const aiUsageText =
+    tab === "integraciones" && org.aiMode === "custom"
+      ? describeMonthlyUsage(
+          { budgetUsd: org.aiMonthlyBudgetUsd, tokens: org.aiMonthlyTokenLimit },
+          await getMonthUsage(org.id),
+        )
+      : null;
 
   let subOrgs: Awaited<ReturnType<typeof listSubOrganizations>> = [];
   let parentSellers: Awaited<ReturnType<typeof listParentSellers>> = [];
@@ -189,6 +200,7 @@ export default async function OrganizationSettingsPage({
             logoPath={resolveBrand(org).logoPath}
             brandDisplay={resolveBrand(org).display}
             brandLogoShape={resolveBrand(org).logoShape}
+            brandLogoScale={resolveBrand(org).logoScale}
           />
         </Card>
       )}
@@ -299,7 +311,18 @@ export default async function OrganizationSettingsPage({
 
       {tab === "integraciones" && (
         <>
-      {org.aiOwnKeyEnabled && (
+      {org.aiMode === "custom" && (
+        <Card className="mb-6">
+          <CardTitle className="mb-1">Inteligencia artificial</CardTitle>
+          <CardDescription className="mb-3">
+            Tu plan incluye IA con un límite mensual. Si lo alcanzas, la IA se detiene hasta el mes siguiente o hasta
+            que el administrador de la plataforma lo amplíe.
+          </CardDescription>
+          {aiUsageText && <p className="text-sm text-ink-muted">Este mes: {aiUsageText}</p>}
+        </Card>
+      )}
+
+      {org.aiMode === "own" && (
         <Card className="mb-6">
           <CardTitle className="mb-1">Clave de OpenAI</CardTitle>
           <CardDescription className="mb-4">

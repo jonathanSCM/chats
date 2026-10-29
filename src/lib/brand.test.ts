@@ -7,6 +7,8 @@ import {
   detectLogoType,
   effectiveDisplay,
   parseBrandDisplay,
+  clampLogoScale,
+  scaledLogoSize,
   parseLogoShape,
   isUsableBrandColor,
   resolveBrand,
@@ -32,6 +34,7 @@ describe("resolveBrand", () => {
       logoPath: "/api/brand-logo/o1?v=3",
       display: "both",
       logoShape: "square",
+      logoScale: 100,
     });
   });
 
@@ -45,6 +48,7 @@ describe("resolveBrand", () => {
       logoPath: null,
       display: "both",
       logoShape: "square",
+      logoScale: 100,
     });
   });
 
@@ -89,6 +93,29 @@ describe("color", () => {
   it("genera las variables CSS solo si hay color", () => {
     expect(accentStyle(null)).toBeUndefined();
     expect(accentStyle("#1d4ed8")?.["--accent"]).toBe("#1d4ed8");
+  });
+});
+
+describe("tamaño del logo", () => {
+  it("se acota entre 50% y 300% y un valor raro vuelve a 100%", () => {
+    expect(clampLogoScale(10)).toBe(50);
+    expect(clampLogoScale(999)).toBe(300);
+    expect(clampLogoScale("150")).toBe(150);
+    expect(clampLogoScale("abc")).toBe(100);
+    expect(clampLogoScale(null)).toBe(100);
+    expect(clampLogoScale(undefined)).toBe(100);
+  });
+
+  it("agranda el tamaño base pero no más allá del tope para que no desborde el menú", () => {
+    expect(scaledLogoSize(20, 100)).toBe(20);
+    expect(scaledLogoSize(20, 200)).toBe(40);
+    expect(scaledLogoSize(28, 300)).toBe(72);
+    expect(scaledLogoSize(20, 50)).toBe(10);
+  });
+
+  it("resolveBrand trae el tamaño elegido", () => {
+    expect(resolveBrand({ ...org, brandLogoScale: 220 }).logoScale).toBe(220);
+    expect(resolveBrand({ ...org, brandLogoScale: undefined }).logoScale).toBe(100);
   });
 });
 

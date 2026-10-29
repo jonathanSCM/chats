@@ -36,4 +36,13 @@ describe("correo de invitación con marca propia", () => {
     expect(html).not.toContain("<b>Financiera</b>");
     expect(html).toContain("&lt;b&gt;Financiera&lt;/b&gt;");
   });
+
+  it("un logo agrandado se ve más grande en el correo (con tope)", () => {
+    const big = inviteEmail({ ...base, brand: { ...brand, logoShape: "square", logoScale: 200 } }).html;
+    expect(big).toContain("height:72px");
+    const huge = inviteEmail({ ...base, brand: { ...brand, logoShape: "square", logoScale: 300 } }).html;
+    expect(huge).toContain("height:72px"); // tope
+    const round = inviteEmail({ ...base, brand: { ...brand, logoShape: "round", logoScale: 150 } }).html;
+    expect(round).toContain("width:54px");
+  });
 });

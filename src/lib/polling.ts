@@ -3,11 +3,14 @@
  * detiene mientras la pestaña está oculta. Con `setInterval` cada pestaña lanzaba una petición
  * nueva cada 2–3 s aunque la anterior siguiera sin responder: si el servidor tardaba más de ese
  * tiempo, las peticiones se acumulaban y la bandeja entera se volvía cada vez más lenta.
+ * Con la pestaña oculta sigue sondeando, pero más espaciado (`hiddenIntervalMs`), para que el
+ * sonido y los avisos de mensajes nuevos sigan funcionando en segundo plano.
  */
 export function startPolling(
   run: () => Promise<unknown> | void,
   intervalMs: number,
   env: {
+    hiddenIntervalMs?: number;
     isHidden?: () => boolean;
     onVisible?: (callback: () => void) => () => void;
   } = {},
@@ -28,12 +31,13 @@ export function startPolling(
   let running = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
+  const hiddenIntervalMs = env.hiddenIntervalMs ?? Math.max(intervalMs, 15_000);
+
   const schedule = () => {
-    if (!stopped) timer = setTimeout(tick, intervalMs);
+    if (!stopped) timer = setTimeout(tick, isHidden() ? hiddenIntervalMs : intervalMs);
   };
   const tick = async () => {
     if (stopped || running) return;
-    if (isHidden()) return schedule();
     running = true;
     try {
       await run();

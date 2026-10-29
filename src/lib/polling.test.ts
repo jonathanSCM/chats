@@ -23,17 +23,23 @@ describe("startPolling", () => {
     stop();
   });
 
-  it("no pide nada con la pestaña oculta y retoma al volver", async () => {
+  it("con la pestaña oculta sondea más espaciado y al volver pide de inmediato", async () => {
     let hidden = true;
     let visible!: () => void;
     const run = vi.fn(async () => {});
-    const stop = startPolling(run, 1000, { isHidden: () => hidden, onVisible: (cb) => ((visible = cb), () => {}) });
-    await vi.advanceTimersByTimeAsync(5000);
+    const stop = startPolling(run, 1000, {
+      hiddenIntervalMs: 10_000,
+      isHidden: () => hidden,
+      onVisible: (cb) => ((visible = cb), () => {}),
+    });
+    await vi.advanceTimersByTimeAsync(9000);
     expect(run).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(run).toHaveBeenCalledTimes(1); // sigue avisando de mensajes nuevos, pero cada 10 s
     hidden = false;
     visible();
     await vi.advanceTimersByTimeAsync(0);
-    expect(run).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledTimes(2);
     stop();
   });
 

@@ -57,6 +57,7 @@ import { firstUrl, URL_REGEX } from "@/lib/urls";
 import { usePushNotifications } from "@/lib/use-push-notifications";
 import { Button } from "@/components/ui/button";
 import { ConversationPanel } from "./_components/conversation-panel";
+import { startPolling } from "@/lib/polling";
 import { TemplatePickerModal } from "./_components/template-picker-modal";
 
 interface Vendor {
@@ -750,8 +751,7 @@ export function InboxClient({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch inicial + polling es intencional
     fetchConversations();
-    const interval = setInterval(fetchConversations, 3000);
-    return () => clearInterval(interval);
+    return startPolling(fetchConversations, 3000);
   }, [fetchConversations]);
 
   // Polling de los mensajes del chat abierto cada 2s.
@@ -765,8 +765,7 @@ export function InboxClient({
     setMessagesLoading(true);
     updateHasMoreHistory(false);
     fetchMessages(selectedId);
-    const interval = setInterval(() => fetchMessages(selectedId), 2000);
-    return () => clearInterval(interval);
+    return startPolling(() => fetchMessages(selectedId), 2000);
   }, [selectedId, fetchMessages]);
 
   useEffect(() => {

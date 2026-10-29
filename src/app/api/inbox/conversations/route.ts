@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@/generated/prisma/client";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 
@@ -50,10 +51,26 @@ export async function GET(request: Request) {
     include: {
       messages: { orderBy: { createdAt: "desc" }, take: 1 },
       assignedTo: { select: { id: true, name: true, email: true, color: true } },
-      reads: { where: { userId }, select: { lastReadAt: true } },
       bot: { select: { id: true, name: true, aiQualificationEnabled: true } },
     },
   });
+
+  // Mensajes sin leer de TODAS las conversaciones en una sola consulta. Antes era un count por
+  // conversación (cientos de consultas en cada poll de 3 s por cada pestaña abierta), que saturaba
+  // la conexión a la base y dejaba el resto de las peticiones esperando.
+  const unreadRows =
+    conversations.length === 0
+      ? []
+      : await prisma.$queryRaw<{ conversationId: string; unread: bigint }[]>(Prisma.sql`
+          SELECT m."conversationId", COUNT(*) AS unread
+            FROM "messages" m
+            LEFT JOIN "conversation_reads" r
+              ON r."conversationId" = m."conversationId" AND r."userId" = ${userId}
+           WHERE m."conversationId" IN (${Prisma.join(conversations.map((c) => c.id))})
+             AND m."role" = 'CUSTOMER'
+             AND m."createdAt" > COALESCE(r."lastReadAt", TIMESTAMP 'epoch')
+           GROUP BY m."conversationId"`);
+  const unreadByConversation = new Map(unreadRows.map((r) => [r.conversationId, Number(r.unread)]));
 
   return NextResponse.json(
     await Promise.all(
@@ -80,13 +97,7 @@ export async function GET(request: Request) {
               color: c.assignedTo.color,
             }
           : null,
-        unreadCount: await prisma.message.count({
-          where: {
-            conversationId: c.id,
-            role: "CUSTOMER",
-            createdAt: { gt: c.reads[0]?.lastReadAt ?? new Date(0) },
-          },
-        }),
+        unreadCount: unreadByConversation.get(c.id) ?? 0,
         lastMessage: c.messages[0]
           ? {
               content: c.messages[0].content,

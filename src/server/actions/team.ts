@@ -13,6 +13,7 @@ import { sendMail } from "@/server/services/mailer";
 import { inviteEmail } from "@/server/services/email-templates";
 import { removeMembership } from "@/server/services/organization-membership";
 import { seatBlockedMessage } from "@/server/services/org-limits";
+import { resolveBrand } from "@/lib/brand";
 import { audit } from "@/server/services/audit";
 import type { ActionState } from "./types";
 
@@ -66,7 +67,18 @@ export async function createInviteAction(
   if (parsed.data.email) {
     try {
       const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId } });
-      const { subject, text, html } = inviteEmail({ orgName: org.name, inviteUrl });
+      const brand = resolveBrand(org);
+      const { subject, text, html } = inviteEmail({
+        orgName: org.name,
+        inviteUrl,
+        brand: brand.custom
+          ? {
+              name: brand.name,
+              color: brand.color,
+              logoUrl: brand.logoPath ? `${process.env.NEXTAUTH_URL ?? ""}${brand.logoPath}` : null,
+            }
+          : undefined,
+      });
       await sendMail({ to: parsed.data.email, subject, text, html });
     } catch (error) {
       // No dejamos que un correo caído (dominio sin verificar en Resend,

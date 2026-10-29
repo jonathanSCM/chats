@@ -3,7 +3,7 @@
 // CSS moderno ni flexbox/grid de forma confiable.
 
 const BRAND_NAME = "CRM PROSHOP";
-const ACCENT = "#7c5cff";
+const DEFAULT_ACCENT = "#7c5cff";
 const INK = "#18181b";
 const INK_MUTED = "#71717a";
 const BORDER = "#e4e4e7";
@@ -13,27 +13,42 @@ function baseUrl(): string {
   return process.env.NEXTAUTH_URL ?? "";
 }
 
+/** Marca propia de la organización que manda el correo; sin esto, la de la plataforma. */
+export interface EmailBrand {
+  name: string | null;
+  logoUrl: string | null;
+  color: string | null;
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function layout({
   preheader,
   heading,
   bodyHtml,
   ctaLabel,
   ctaUrl,
+  brand,
 }: {
   preheader: string;
   heading: string;
   bodyHtml: string;
   ctaLabel?: string;
   ctaUrl?: string;
+  brand?: EmailBrand;
 }): string {
-  const logoUrl = `${baseUrl()}/logo-mark.png`;
+  const logoUrl = brand?.logoUrl ?? `${baseUrl()}/logo-mark.png`;
+  const BRAND = escapeHtml(brand?.name ?? BRAND_NAME);
+  const ACCENT = brand?.color ?? DEFAULT_ACCENT;
 
   return `<!DOCTYPE html>
 <html lang="es">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${BRAND_NAME}</title>
+    <title>${BRAND}</title>
   </head>
   <body style="margin:0; padding:0; background:${SURFACE}; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
     <div style="display:none; max-height:0; overflow:hidden; opacity:0;">${preheader}</div>
@@ -44,7 +59,7 @@ function layout({
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; background:#ffffff; border:1px solid ${BORDER}; border-radius:12px; overflow:hidden;">
             <tr>
               <td style="padding:28px 32px 0 32px;">
-                <img src="${logoUrl}" width="36" height="36" alt="${BRAND_NAME}" style="display:block; border-radius:8px;" />
+                <img src="${logoUrl}" width="36" height="36" alt="${BRAND}" style="display:block; border-radius:8px;" />
               </td>
             </tr>
             <tr>
@@ -73,7 +88,7 @@ function layout({
             <tr>
               <td style="padding:16px 32px; background:${SURFACE}; border-top:1px solid ${BORDER};">
                 <p style="margin:0; font-size:12px; line-height:18px; color:${INK_MUTED};">
-                  ${BRAND_NAME} es una solución tecnológica operada por Grafi.
+                  ${brand?.name ? `Enviado por ${BRAND}.` : `${BRAND} es una solución tecnológica operada por Grafi.`}
                 </p>
               </td>
             </tr>
@@ -102,19 +117,24 @@ export function passwordResetEmail({ resetUrl }: { resetUrl: string }) {
 export function inviteEmail({
   orgName,
   inviteUrl,
+  brand,
 }: {
   orgName: string;
   inviteUrl: string;
+  brand?: EmailBrand;
 }) {
+  const platform = brand?.name ?? BRAND_NAME;
+  const org = escapeHtml(orgName);
   return {
-    subject: `Te invitaron a unirte a ${orgName} en ${BRAND_NAME}`,
-    text: `Te invitaron a unirte a ${orgName} en ${BRAND_NAME}. Entra a este enlace para crear tu cuenta (vence en 7 días):\n\n${inviteUrl}`,
+    subject: `Te invitaron a unirte a ${orgName} en ${platform}`,
+    text: `Te invitaron a unirte a ${orgName} en ${platform}. Entra a este enlace para crear tu cuenta (vence en 7 días):\n\n${inviteUrl}`,
     html: layout({
-      preheader: `Te invitaron a unirte a ${orgName} en ${BRAND_NAME}.`,
-      heading: `Te invitaron a unirte a ${orgName}`,
-      bodyHtml: `<p style="margin:0;">Alguien de <strong>${orgName}</strong> te invitó a unirte a su equipo en ${BRAND_NAME}. El enlace vence en <strong>7 días</strong>.</p>`,
+      preheader: `Te invitaron a unirte a ${org} en ${escapeHtml(platform)}.`,
+      heading: `Te invitaron a unirte a ${org}`,
+      bodyHtml: `<p style="margin:0;">Alguien de <strong>${org}</strong> te invitó a unirte a su equipo en ${escapeHtml(platform)}. El enlace vence en <strong>7 días</strong>.</p>`,
       ctaLabel: "Crear mi cuenta",
       ctaUrl: inviteUrl,
+      brand,
     }),
   };
 }

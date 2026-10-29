@@ -1,3 +1,4 @@
+import { botCompanyName, resolveBrand } from "@/lib/brand";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { decrypt } from "@/lib/crypto";
@@ -110,6 +111,14 @@ const jsonSchema = {
   },
 } as const;
 
+/** El texto base habla de "ProShop": se adapta a la marca de la organización (sin marca propia queda igual). */
+export function systemFor(conversation: { brandCompany: string; brandAssistant: string | null }): string {
+  const greeting = conversation.brandAssistant
+    ? `Soy ${conversation.brandAssistant}, el asistente de ${conversation.brandCompany}.`
+    : `Soy el asistente de ${conversation.brandCompany}.`;
+  return SYSTEM.replace("Soy el asistente de ProShop.", greeting).replaceAll("ProShop", conversation.brandCompany);
+}
+
 const SYSTEM = `Eres el bot de WhatsApp que filtra los primeros mensajes de un lead antes de que lo atienda un vendedor.
 
 Reglas duras, siempre:
@@ -170,6 +179,9 @@ interface ConversationForBot {
   accessToken: string;
   aiQualificationEnabled: boolean;
   aiTestPhone: string | null;
+  /** Cómo se presenta el bot: nombre de la empresa y, si tiene, nombre propio del asistente. */
+  brandCompany: string;
+  brandAssistant: string | null;
   contact: { id: string; fullName: string | null; phone: string; jobTitle: string | null } | null;
 }
 
@@ -197,6 +209,8 @@ export async function loadConversation(conversationId: string): Promise<Conversa
     accessToken: conversation.bot.whatsappConnection.accessToken,
     aiQualificationEnabled: conversation.bot.aiQualificationEnabled,
     aiTestPhone: conversation.bot.aiTestPhone,
+    brandCompany: botCompanyName(resolveBrand(conversation.bot.organization)),
+    brandAssistant: resolveBrand(conversation.bot.organization).assistantName,
     contact: conversation.contact,
   };
 }
@@ -665,7 +679,7 @@ export async function runQualificationTurn(conversationId: string): Promise<void
     analysisType: "bot_calificacion",
     promptVersion: PROMPT_VERSION,
     model: MODELS.fast(),
-    system: SYSTEM,
+    system: systemFor(conversation),
     input,
     schemaName: "turno_calificacion",
     schema: jsonSchema,

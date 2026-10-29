@@ -4,6 +4,8 @@ import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { RenameOrgForm } from "./_components/rename-org-form";
+import { BrandForm } from "./_components/brand-form";
+import { resolveBrand } from "@/lib/brand";
 import { MembersList } from "./_components/members-list";
 import { InvitePanel } from "./_components/invite-panel";
 import { AiSettingsForm } from "./_components/ai-settings-form";
@@ -144,6 +146,22 @@ export default async function OrganizationSettingsPage({
         <CardTitle className="mb-4">Nombre</CardTitle>
         <RenameOrgForm currentName={org.name} />
       </Card>
+
+      {org.canCustomizeBrand && (
+        <Card className="mb-6">
+          <CardTitle className="mb-1">Marca</CardTitle>
+          <CardDescription className="mb-4">
+            Tu logo, nombre y color en el menú, los correos de invitación, el saludo del bot de WhatsApp y el
+            nombre del asistente en las reuniones.
+          </CardDescription>
+          <BrandForm
+            brandName={org.brandName ?? ""}
+            assistantName={org.assistantName ?? ""}
+            brandColor={org.brandColor ?? ""}
+            logoPath={resolveBrand(org).logoPath}
+          />
+        </Card>
+      )}
 
       <Card className="mb-6">
         <CardTitle className="mb-1">Asesor IA</CardTitle>

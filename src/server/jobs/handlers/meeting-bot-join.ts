@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { enqueueOrReschedule } from "../queue";
 import { extractMeetCode } from "@/server/services/meeting-bot";
+import { assistantDisplayName, resolveBrand } from "@/lib/brand";
 
 export const meetingBotJoinPayload = z.object({
   meetingId: z.string(),
@@ -37,7 +38,17 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
       id: true,
       meetingUrl: true,
       status: true,
-      organization: { select: { name: true } },
+      organization: {
+        select: {
+          id: true,
+          name: true,
+          canCustomizeBrand: true,
+          brandName: true,
+          brandColor: true,
+          assistantName: true,
+          brandLogoVersion: true,
+        },
+      },
     },
   });
   if (!meeting || !meeting.meetingUrl || meeting.status === "CANCELED") return;
@@ -53,7 +64,7 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
     body: JSON.stringify({
       platform: "google_meet",
       native_meeting_id: code,
-      bot_name: `Asistente de ${meeting.organization.name}`,
+      bot_name: assistantDisplayName(resolveBrand(meeting.organization), meeting.organization.name),
       language: "es",
     }),
   });

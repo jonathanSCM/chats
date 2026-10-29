@@ -27,6 +27,7 @@ import { ServerClock } from "@/components/layout/server-clock";
 import { OrgSwitcher } from "@/components/layout/org-switcher";
 import { getUserMemberships } from "@/server/services/organization-membership";
 import { isMarketingEnabled } from "@/lib/features";
+import { accentStyle, resolveBrand } from "@/lib/brand";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -46,6 +47,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const org = session?.user.organizationId
     ? await prisma.organization.findUnique({ where: { id: session.user.organizationId } })
     : null;
+  const brand = org ? resolveBrand(org) : null;
   const memberships = session?.user.id
     ? await getUserMemberships(session.user.id).then((m) =>
         m.map((mm) => ({ organizationId: mm.organizationId, organizationName: mm.organizationName })),
@@ -64,7 +66,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const navContent = (
     <>
       <Link href="/dashboard" className="nav-item mb-6 flex h-10 items-center px-2">
-        <Logo onDark />
+        <Logo onDark brandName={brand?.name} logoSrc={brand?.logoPath} />
       </Link>
 
       <nav className="flex flex-1 flex-col gap-0.5">
@@ -124,7 +126,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   );
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={accentStyle(brand?.color ?? null)}>
       {/* Sidebar fijo: solo escritorio. overflow-y-auto propio por si el
           menú alguna vez no entra en pantallas bajas. */}
       <aside className="app-sidebar hidden shrink-0 flex-col overflow-y-auto bg-sidebar px-3 py-5 md:flex">
@@ -137,7 +139,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <MobileNav>{navContent}</MobileNav>
           <SidebarToggle />
           <span className="md:hidden">
-            <Logo size="sm" />
+            <Logo size="sm" brandName={brand?.name} logoSrc={brand?.logoPath} />
           </span>
         </header>
 

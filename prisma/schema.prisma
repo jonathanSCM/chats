@@ -25,59 +25,65 @@ enum UserRole {
 }
 
 model Organization {
-  id                     String         @id @default(cuid())
+  id                     String                 @id @default(cuid())
   name                   String
-  slug                   String         @unique
-  suspended              Boolean        @default(false) // desactivada por el superadmin (ej. impago, abuso)
+  slug                   String                 @unique
+  suspended              Boolean                @default(false) // desactivada por el superadmin (ej. impago, abuso)
   // Jefe de Operaciones (API de integración, webhooks y tareas en la ficha): lo activa el
   // superadmin por organización. Apagado no borra nada: claves y webhook quedan guardados.
-  jefeEnabled            Boolean        @default(false)
+  jefeEnabled            Boolean                @default(false)
   // Plan del cliente (lo fija SOLO el superadmin en /admin): qué puede hacer esta organización.
   // null en un tope = sin límite. Todo apagado/vacío = comportamiento de siempre.
-  canHaveSubOrgs         Boolean        @default(false) // puede crear suborganizaciones
+  canHaveSubOrgs         Boolean                @default(false) // puede crear suborganizaciones
   maxSubOrgs             Int? // tope de suborganizaciones
   maxAdmins              Int? // tope de administradores (membresías OWNER)
   maxSellers             Int? // tope de vendedores (membresías MEMBER)
-  canCustomizeBrand      Boolean        @default(false) // puede cambiar logo, nombre, color y nombre del asistente
-  aiOwnKeyEnabled        Boolean        @default(false) // puede usar su propia clave de OpenAI
+  canCustomizeBrand      Boolean                @default(false) // puede cambiar logo, nombre, color y nombre del asistente
+  aiOwnKeyEnabled        Boolean                @default(false) // puede usar su propia clave de OpenAI
+  // Marca propia (solo se muestra si canCustomizeBrand): nombre, color de acento y nombre del asistente.
+  brandName              String?
+  brandColor             String? // #RRGGBB
+  assistantName          String?
+  brandLogoVersion       Int                    @default(0) // 0 = sin logo propio; sube en cada cambio (rompe la caché)
+  brandLogo              OrganizationBrandLogo?
   // Organización padre (suborganizaciones). null = organización de primer nivel.
   parentId               String?
-  parent                 Organization?  @relation("OrgHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
-  children               Organization[] @relation("OrgHierarchy")
+  parent                 Organization?          @relation("OrgHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children               Organization[]         @relation("OrgHierarchy")
   // Cuántos mensajes recientes de WhatsApp se le mandan al asesor IA por
   // análisis (ajustable por el dueño en /dashboard/organization). Más
   // mensajes = más contexto pero más costo por análisis.
-  aiMessageLimit         Int            @default(25)
+  aiMessageLimit         Int                    @default(25)
   // Calendario secundario de Google (no el "primary" de la cuenta
   // compartida de todo el bot) donde se crean las reuniones de ESTA
   // organización — separa a cada cliente de la plataforma para poder
   // compartir el calendario sin filtrar reuniones entre organizaciones.
   // Se crea recién la primera vez que hace falta (ver getOrCreateOrgCalendar).
   googleCalendarId       String?
-  googleCalendarShares   String[]       @default([]) // correos con los que está compartido (solo lectura)
+  googleCalendarShares   String[]               @default([]) // correos con los que está compartido (solo lectura)
   // Token opaco (no cifrado, mismo criterio que CRON_SECRET/BOT_SERVICE_SECRET
   // — un secreto de portador, no un dato personal) que la extensión de Chrome
   // de subtítulos pega en su config para autenticarse contra
   // api/extension/transcript. Se genera desde /dashboard/organization; null
   // hasta que alguien lo pide por primera vez.
-  meetExtensionToken     String?        @unique
+  meetExtensionToken     String?                @unique
   // Horario habilitado para que el bot de calificación ofrezca reuniones --
   // configurable desde /dashboard/organization. Reemplaza la variable de
   // entorno MEETING_SLOT_HOURS, que era una sola franja fija para todas las
   // organizaciones sin importar el negocio. Ver server/services/availability.ts.
-  timezone               String         @default("America/La_Paz")
-  bookingDays            Int[]          @default([1, 2, 3, 4, 5]) // 0=domingo ... 6=sábado
-  bookingStartHour       Int            @default(9)
-  bookingEndHour         Int            @default(18)
-  bookingDurationMinutes Int            @default(30)
-  bookingLeadHours       Int            @default(4) // anticipación mínima antes de poder ofrecer un horario
+  timezone               String                 @default("America/La_Paz")
+  bookingDays            Int[]                  @default([1, 2, 3, 4, 5]) // 0=domingo ... 6=sábado
+  bookingStartHour       Int                    @default(9)
+  bookingEndHour         Int                    @default(18)
+  bookingDurationMinutes Int                    @default(30)
+  bookingLeadHours       Int                    @default(4) // anticipación mínima antes de poder ofrecer un horario
   // Asignación automática de leads (F14): apagada por defecto. Reparte por turnos entre los
   // vendedores marcados como disponibles (OrganizationMembership.availableForLeads).
-  autoAssignEnabled      Boolean        @default(false)
+  autoAssignEnabled      Boolean                @default(false)
   // Tope de oportunidades abiertas por vendedor; null = sin tope.
   autoAssignMaxOpen      Int?
   // Minutos que un cliente puede esperar respuesta humana antes de avisar (y, al doble, reasignar).
-  autoAssignSlaMinutes   Int            @default(15)
+  autoAssignSlaMinutes   Int                    @default(15)
   // Último vendedor al que se le asignó: el próximo turno es el que sigue.
   autoAssignLastUserId   String?
   // Cuenta publicitaria de Meta (formato act_XXXXXXXXX) de donde se
@@ -91,15 +97,15 @@ model Organization {
   // Token del usuario que autorizó "Conectar con Facebook" (ads_read), cifrado
   // con encrypt(). Null con metaAdAccountId seteado = hay que reconectar
   // (venció o Meta lo invalidó).
-  metaAdsAccessToken     String?        @db.Text
+  metaAdsAccessToken     String?                @db.Text
   metaAdsTokenExpiresAt  DateTime?
   metaAdsConnectedAt     DateTime?
   // Última vez que syncMetaAdsIfDue() (api/cron/tick) encoló el sync de
   // gasto de esta organización -- evita re-encolar cada minuto; se
   // resincroniza cada ~20h. Null = nunca corrió.
   metaAdsLastSyncedAt    DateTime?
-  createdAt              DateTime       @default(now())
-  updatedAt              DateTime       @updatedAt
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
 
   users                  User[]
   bots                   Bot[]
@@ -1219,4 +1225,16 @@ model IdempotencyRecord {
   @@unique([organizationId, idempotencyKey])
   @@index([createdAt])
   @@map("idempotency_records")
+}
+
+/// Logo propio de una organización (solo si su plan permite cambiar la marca). Va en una tabla
+/// aparte para que las consultas normales de Organization no arrastren los bytes de la imagen.
+model OrganizationBrandLogo {
+  organizationId String       @id
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  data           Bytes
+  contentType    String
+  updatedAt      DateTime     @updatedAt
+
+  @@map("organization_brand_logos")
 }

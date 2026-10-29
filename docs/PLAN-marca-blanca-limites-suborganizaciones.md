@@ -1,124 +1,128 @@
-# Plan — Vender el CRM como servicio: marca propia, límite de usuarios y suborganizaciones
+# Plan — Vender el CRM como servicio: planes por organización, marca propia, suborganizaciones y API de IA propia
 
-Revisado en el código el 29 oct 2026. No se cambió código: este documento es la propuesta.
+Versión 2 (con las decisiones del dueño). Revisado contra el código; no se ha cambiado código todavía.
 
-## Qué ya existe (no hay que construirlo)
+## La idea en una frase
 
-- **Multi-organización real.** Cada dato cuelga de `Organization` (contactos, chats, bots,
-  reuniones, oportunidades…). Un usuario puede pertenecer a varias organizaciones
-  (`OrganizationMembership`) y ya hay un selector de organización
-  ([org-switcher.tsx](../src/components/layout/org-switcher.tsx)).
-- **Panel del superadmin** en `/admin` (organizaciones, usuarios, ajustes, logs) y activación de
-  funciones por organización (`jefeEnabled`, `suspended`).
-- **Invitaciones** por enlace con rol (`OrganizationInvite`).
-- **Asistente de reuniones y bots de WhatsApp por organización** (cada org tiene sus bots, su
-  calendario, su Meta Ads).
+El **superadmin** decide, organización por organización, qué puede hacer: tener suborganizaciones,
+cuántos administradores y vendedores puede tener, si puede cambiar su marca y si usa su propia
+clave de IA. La organización solo ve y usa lo que se le habilitó.
 
-## Qué falta
+## Panel del superadmin (por organización)
 
-| Pedido | Hoy | Falta |
+| Opción | Valores | Qué hace |
 |---|---|---|
-| Cambiar logo y nombre | Fijo en el código: "ProShop" en ~20 lugares (login, correos, instalación PWA, términos, asistente de reuniones, mensajes del bot) y logo en `/logo-mark.png` | Guardar marca por organización y usarla en esos lugares |
-| Nombre propio del asistente | El bot de reuniones se llama `Asistente de {nombre de la org}`; el bot de WhatsApp tiene su nombre/prompt | Campo "nombre del asistente" editable |
-| Limitar usuarios por organización | No hay ningún tope | Campo de límite + validación al crear/invitar/aceptar |
-| Suborganizaciones | No existe jerarquía | `parentId` en la organización + reglas de visibilidad |
+| Puede tener suborganizaciones | Sí / No | Habilita crear organizaciones hijas |
+| Máx. suborganizaciones | número (vacío = sin tope) | Solo si lo anterior es Sí |
+| Máx. administradores | número (vacío = sin tope) | Tope de usuarios OWNER |
+| Máx. vendedores | número (vacío = sin tope) | Tope de usuarios MEMBER |
+| Puede cambiar su marca | Sí / No | Habilita logo, nombre, color y nombre del asistente |
+| Usa su propia API de IA | Sí / No | Habilita el campo "Mi clave de OpenAI" en sus integraciones |
+| Dominio propio | — | **No por ahora** (se muestra "próximamente") |
+
+Todo vacío o en "No" = comportamiento actual. Lo que ya existe no cambia.
+
+## Qué ya existe en el código
+
+- Datos separados por organización; un usuario puede pertenecer a varias (`OrganizationMembership`)
+  y hay selector de organización.
+- Panel `/admin` (organizaciones, usuarios, ajustes) e invitaciones por enlace con rol.
+- **Toda la IA pasa por un solo archivo** ([ai/client.ts](../src/server/services/ai/client.ts)):
+  hoy usa `OPENAI_API_KEY` del entorno. Es lo que hace sencillo el punto de la API propia.
+- Ya existe cifrado de secretos (`encrypt`/`decrypt`, `APP_ENCRYPTION_KEY`), como en el token de Meta Ads.
 
 ---
 
-## 1. Marca propia por organización (white-label)
+## 1. Planes y límites (admins y vendedores)
 
-**Datos nuevos en `Organization`:** `brandName`, `logoUrl` (archivo subido), `brandColor`
-(acento), `assistantName`, `supportEmail`, opcional `customDomain`.
+- Campos en `Organization`: `maxAdmins Int?`, `maxSellers Int?` (null = sin tope).
+- Solo el superadmin los edita.
+- Se validan donde entra gente: crear/aceptar invitación, registro y alta directa
+  ([team.ts](../src/server/actions/team.ts), [admin.ts](../src/server/actions/admin.ts),
+  [signup.ts](../src/server/actions/signup.ts), `organization-membership.ts`).
+- Mensajes claros ("Tu plan permite 3 vendedores; tienes 3").
+- Si bajas el tope por debajo de lo actual, no se borra a nadie: solo se bloquean altas nuevas.
+- El administrador de la plataforma (SUPERADMIN) y las cuentas técnicas no cuentan.
 
-**Dónde se aplica, por orden de valor:**
-1. **Pantalla de inicio de sesión y barra lateral:** logo y nombre de la organización.
-   *Detalle técnico:* el login no sabe de qué organización es el visitante; se resuelve por
-   **subdominio o dominio propio** (`cliente.tuplataforma.com`) o por un enlace
-   `/login?org=slug`.
-2. **Correos** (invitaciones, recuperar contraseña): nombre y logo de la organización.
-3. **PWA / instalar app:** `manifest` dinámico por organización (nombre, ícono, color).
-4. **Asistente de reuniones y del bot:** `assistantName` en lugar de `Asistente de {org}`.
-5. **Términos y privacidad:** el nombre legal de la organización.
+## 2. Suborganizaciones
 
-**Quién lo edita:** el dueño de la organización desde `/dashboard/organization` (subir logo,
-nombre, color) y el superadmin desde `/admin`. Sin marca configurada se usa la de la plataforma.
+**Modelo:** `parentId` en `Organization` y la bandera `canHaveSubOrgs`. Un solo nivel
+(padre → hijas). Cada hija sigue siendo una organización completa y **aislada**.
 
-**Esfuerzo:** medio. La parte fácil (logo/nombre dentro de la app, asistente, correos) es de 1–2
-días. El **dominio propio por cliente** es lo que más pesa: DNS + certificado + reconocer el
-host en cada petición; conviene hacerlo después, en una segunda etapa.
+**Cómo funciona con tu idea de "qué vendedores usa cada hija":**
+- El administrador del padre crea una suborganización y **elige a cuáles de los vendedores del
+  padre** asigna a ella (los puede mover o quitar después).
+- Esos vendedores aparecen en la hija como miembros (mismo `OrganizationMembership`, rol vendedor),
+  y cambian entre padre e hijas con el selector que ya existe.
+- **Los límites son un fondo compartido:** los `maxAdmins`/`maxSellers` del padre se reparten entre
+  él y todas sus hijas. Un vendedor que está en el padre y en dos hijas **cuenta una sola vez**.
+  (Ej.: plan de 10 vendedores = 10 personas distintas en todo el grupo.)
+- La hija no ve a la padre ni a las hermanas. El padre **entra** a cada hija (no ve todo mezclado).
+- La hija hereda la marca del padre salvo que ella tenga la suya (si el padre lo permite).
+- No se comparte: chats, contactos, claves de WhatsApp/Meta. Cada hija conecta las suyas.
+- Solo un nivel por ahora (una hija no crea sub-hijas).
 
-## 2. Límite de usuarios por organización
+## 3. Marca propia
 
-**Datos:** `maxUsers Int?` en `Organization` (null = sin tope). Lo fija **solo el superadmin**
-(es parte del plan que vendes), no el dueño.
+- Campos: `brandName`, `logoUrl`, `brandColor`, `assistantName`. Solo editables si el superadmin
+  puso "Puede cambiar su marca = Sí".
+- Se aplica en: login/barra lateral (dentro de la app), correos, instalación de la app (PWA),
+  nombre del asistente de reuniones (hoy `Asistente de {org}`) y del bot, y términos/privacidad.
+- Hoy "ProShop" está fijo en ~20 lugares; se reemplaza por la marca de la organización con
+  la de la plataforma como respaldo.
+- **Sin dominio propio** por ahora: el login sigue siendo uno solo; la marca se ve al entrar.
+  (Si quieres una portada de login por cliente, se hace con `/login?org=slug` sin dominio nuevo.)
 
-**Dónde se valida** (todos los puntos que agregan gente):
-- Crear invitación y **aceptar** invitación ([team.ts](../src/server/actions/team.ts),
-  [admin.ts](../src/server/actions/admin.ts)).
-- Crear usuario directo y alta por registro ([signup.ts](../src/server/actions/signup.ts)).
-- Servicio central [organization-membership.ts](../src/server/services/organization-membership.ts).
+## 4. API de IA propia por organización
 
-**Cuenta como usuario:** miembros activos de la organización (con opción de no contar al
-administrador de la plataforma). Mensaje claro: "Tu plan permite 5 usuarios".
-Al **bajar** el tope por debajo de los usuarios actuales no se borra a nadie: solo se bloquean
-altas nuevas.
+**Qué pediste:** el superadmin marca "esta organización usa su propia API"; entonces el dueño de la
+organización padre ve en **Integraciones** un campo para guardar su clave. Si no tiene la opción,
+se usa la del entorno (`OPENAI_API_KEY`).
 
-**Opcionales a decidir:** límite también de bots de WhatsApp, de mensajes de IA al mes y de
-almacenamiento (misma mecánica, mismos campos).
-
-**Esfuerzo:** chico (medio día a 1 día).
-
-## 3. Suborganizaciones
-
-Es la más delicada porque toca **quién ve qué**. Propuesta mínima y segura:
-
-**Modelo:** `parentId` en `Organization` (un solo nivel de profundidad al principio: padre →
-hijas). Cada suborganización sigue siendo una organización completa y **aislada**: sus propios
-contactos, chats, bots, reuniones.
-
-**Reglas propuestas:**
-- Un **administrador de la organización padre** puede entrar a cualquiera de sus hijas (usando el
-  selector que ya existe) y crear nuevas.
-- Una hija **no ve** a la padre ni a las hermanas.
-- **Usuarios:** el tope de usuarios del padre es un **fondo compartido** entre él y sus hijas
-  (opción A) o cada hija tiene el suyo (opción B). Recomiendo A: es lo que se vende
-  ("plan de 20 usuarios para toda la empresa").
-- **Marca:** las hijas heredan la del padre salvo que configuren la suya.
-- **Reportes** (más adelante): vista consolidada para el padre (leads, ventas, gasto de anuncios
-  de todas sus hijas).
-- **Qué NO se comparte:** conversaciones, contactos y claves de WhatsApp/Meta. Cada hija conecta
-  las suyas.
-
-**Preguntas que cambian el diseño:**
-1. ¿Una persona del padre debe ver **todos** los chats de las hijas, o solo entrar a una y
-   cambiar de contexto? (Propongo lo segundo: más simple y sin mezclar datos.)
-2. ¿Las hijas pueden crear sus propias sub-hijas? (Propongo no: un nivel.)
-3. ¿Quién paga/factura: el padre por todo, o cada hija por separado?
-
-**Esfuerzo:** medio-grande (3–5 días), principalmente por las pruebas de aislamiento de datos.
+**Cómo se haría:**
+- `Organization.aiOwnKeyEnabled Boolean` (lo pone el superadmin) y `Organization.openaiApiKeyEnc Text?`
+  (la clave del cliente, **cifrada**, nunca visible después de guardarla: solo "…últimos 4").
+- Al guardar, se **valida** con una llamada de prueba a OpenAI antes de aceptarla.
+- `ai/client.ts` elige la clave por organización: si la tiene y está habilitada, usa la suya;
+  si no, la del entorno. Hay que crear un cliente por clave (con caché) y pasar el
+  `organizationId` a las funciones de IA (la mayoría ya lo recibe).
+- **Las hijas usan la clave del padre**, para que el padre pague todo su grupo.
+- Si la clave del cliente falla (sin saldo, revocada): se avisa al dueño y **no se hace caída
+  automática a la clave de la plataforma** (para no gastar tu saldo sin querer). Esto es una
+  decisión a confirmar.
+- El presupuesto diario de IA (`isWithinBudget`) sigue funcionando por organización.
+- Alcance a revisar: transcripción de audios y resumen de reuniones también usan OpenAI; deben
+  respetar la misma regla.
 
 ---
 
-## Orden de trabajo sugerido
+## Mi opinión
 
-1. **Límite de usuarios** (chico, desbloquea vender planes).
-2. **Marca propia dentro de la app** (logo, nombre, color, nombre del asistente, correos).
-3. **Suborganizaciones** con visibilidad mínima + fondo compartido de usuarios.
-4. **Dominio propio / subdominio por cliente** y PWA por organización.
-5. **Reportes consolidados** para la organización padre.
+Me parece un buen diseño: un solo panel de "interruptores" por cliente, sin tocar lo que ya anda.
+Tres cosas que sugiero:
+1. **Fondo compartido entre padre e hijas** para los límites (no uno por hija), contando personas
+   distintas. Es lo más fácil de vender y de entender.
+2. **Sin caída automática a tu clave** cuando falla la del cliente; así nunca pagas tú por error.
+3. **Empezar por límites + panel de superadmin**, porque desbloquea vender planes ya, y dejar
+   suborganizaciones para el final (es lo que más pruebas de aislamiento requiere).
 
-## Riesgos a tener presentes
+## Orden de trabajo
 
-- **Aislamiento entre clientes:** cada consulta debe filtrar por organización. Al agregar
-  jerarquía, hay que auditar que ningún filtro "se abra" por error a las hijas o al padre.
-- **Marca en lugares olvidados:** mensajes del bot, correos, notificaciones push y términos
-  todavía dicen "ProShop"; conviene una lista de verificación antes de entregarle a un cliente.
-- **Datos de ProShop actual:** la migración debe dejar `brandName`/`logoUrl` vacíos para que lo
-  existente siga viéndose igual.
+1. Panel de superadmin con las opciones + límites de admins/vendedores (chico, 1–2 días).
+2. Marca propia dentro de la app (1–2 días).
+3. API de IA propia por organización (1–2 días; es contenido por `ai/client.ts`).
+4. Suborganizaciones con asignación de vendedores y fondo compartido (3–5 días).
 
-## Decisiones tuyas
+## Riesgos
 
-1. ¿Subdominio por cliente desde el principio, o primero solo logo/nombre dentro de la app?
-2. Suborganizaciones: ¿fondo compartido de usuarios (A) o límite por hija (B)?
-3. ¿El padre solo "entra" a las hijas o ve todo consolidado?
-4. ¿Qué otros topes quieres en el plan: bots de WhatsApp, mensajes de IA, almacenamiento?
+- **Aislamiento:** cada consulta filtra por organización; al meter jerarquía hay que auditar que
+  ninguna se abra por error. Se acompaña con pruebas automáticas de "hija no ve datos del padre".
+- **Clave del cliente:** se guarda cifrada, no se imprime en logs ni se devuelve al navegador.
+- **Marca en lugares olvidados:** lista de verificación antes de entregar a un cliente.
+- **Migración:** todos los campos nuevos nacen apagados/vacíos; ProShop actual sigue igual.
+
+## Decisiones pendientes (solo estas)
+
+1. ¿Confirmas **sin caída automática** a la clave de la plataforma si falla la del cliente?
+2. ¿Los límites de admins/vendedores son **fondo compartido** del grupo (recomendado)?
+3. ¿Empiezo por el paso 1 (panel + límites)?

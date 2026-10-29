@@ -19,6 +19,8 @@ import { decrypt } from "@/lib/crypto";
 import { getPlatformSettings } from "@/server/services/platform-settings";
 import { isMarketingEnabled } from "@/lib/features";
 import { DangerZone } from "./_components/danger-zone";
+import { getSeatCounts } from "@/server/services/org-limits";
+import { formatSeatUsage } from "@/lib/org-limits";
 import { IntegrationApiPanel } from "./_components/integration-api-panel";
 import { INTEGRATION_EVENT_TYPES } from "@/server/integrations/events";
 
@@ -43,6 +45,7 @@ export default async function OrganizationSettingsPage({
   if (!session?.user.organizationId) redirect("/dashboard");
   if (session.user.role !== "OWNER") redirect("/dashboard");
 
+  const seatCounts = await getSeatCounts(session.user.organizationId);
   const [org, memberships, invites, bots, botMembers, pipelineStages, services] = await Promise.all([
     prisma.organization.findUniqueOrThrow({ where: { id: session.user.organizationId } }),
     // Vía OrganizationMembership, no User.organizationId directo: alguien
@@ -304,6 +307,12 @@ export default async function OrganizationSettingsPage({
         <CardDescription className="mb-4">
           Todos los que tienen acceso a tus bots y conversaciones.
         </CardDescription>
+        {(org.maxAdmins !== null || org.maxSellers !== null) && (
+          <p className="mb-3 rounded-control border border-border px-3 py-2 text-xs text-ink-muted">
+            Tu plan — administradores: {formatSeatUsage(seatCounts.admins, org.maxAdmins)} · vendedores:{" "}
+            {formatSeatUsage(seatCounts.sellers, org.maxSellers)}
+          </p>
+        )}
         <MembersList members={members} currentUserId={session.user.id} />
       </Card>
 

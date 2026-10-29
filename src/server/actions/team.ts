@@ -12,6 +12,7 @@ import { generateToken, hashToken } from "@/lib/tokens";
 import { sendMail } from "@/server/services/mailer";
 import { inviteEmail } from "@/server/services/email-templates";
 import { removeMembership } from "@/server/services/organization-membership";
+import { seatBlockedMessage } from "@/server/services/org-limits";
 import { audit } from "@/server/services/audit";
 import type { ActionState } from "./types";
 
@@ -43,6 +44,10 @@ export async function createInviteAction(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   }
+
+  // Plan: no se reparten más invitaciones que lugares quedan (cuentan las pendientes).
+  const blocked = await seatBlockedMessage(organizationId, parsed.data.role, { includePendingInvites: true });
+  if (blocked) return { error: blocked };
 
   const { token, tokenHash } = generateToken();
   await prisma.organizationInvite.create({
@@ -168,6 +173,11 @@ export async function changeMemberRoleAction(
     return { error: "Miembro no encontrado" };
   }
 
+  if (membership.role !== parsedRole.data) {
+    const blocked = await seatBlockedMessage(organizationId, parsedRole.data);
+    if (blocked) return { error: blocked };
+  }
+
   // El rol es por organización -- se actualiza la membresía de ESTA
   // organización, y además User.role si esta es la que tiene activa ahora
   // mismo (para que su sesión ya refleje el rol nuevo sin re-loguear).
@@ -245,6 +255,10 @@ export async function acceptInviteAction(
       };
     }
   }
+
+  // Pudo llenarse el plan después de mandar la invitación.
+  const blocked = await seatBlockedMessage(invite.organizationId, invite.role === "OWNER" ? "OWNER" : "MEMBER");
+  if (blocked) return { error: `No se pudo aceptar la invitación: ${blocked}` };
 
   const passwordHash = await bcrypt.hash(password, 12);
 
@@ -327,6 +341,9 @@ export async function acceptInviteWithCurrentSessionAction(token: string): Promi
   if (alreadyMember) {
     return { error: "Ya sos miembro de esta organización." };
   }
+
+  const blocked = await seatBlockedMessage(invite.organizationId, invite.role === "OWNER" ? "OWNER" : "MEMBER");
+  if (blocked) return { error: `No se pudo aceptar la invitación: ${blocked}` };
 
   await prisma.$transaction([
     prisma.organizationMembership.create({

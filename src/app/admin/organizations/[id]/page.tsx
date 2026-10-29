@@ -7,6 +7,8 @@ import { Table, Thead, Th, Td, Tr } from "@/components/ui/table";
 import { SuspendToggle } from "./_components/suspend-toggle";
 import { JefeToggle } from "./_components/jefe-toggle";
 import { DisconnectWhatsAppButton } from "./_components/disconnect-whatsapp-button";
+import { PlanForm } from "./_components/plan-form";
+import { getSeatCounts } from "@/server/services/org-limits";
 import type { BotStatus } from "@/generated/prisma/enums";
 
 const botStatusTone: Record<BotStatus, "accent" | "warning" | "neutral"> = {
@@ -38,6 +40,11 @@ export default async function AdminOrganizationDetailPage({
 
   if (!org) notFound();
 
+  const [seats, subOrgs] = await Promise.all([
+    getSeatCounts(org.id),
+    prisma.organization.count({ where: { parentId: org.id } }),
+  ]);
+
   return (
     <div className="max-w-3xl animate-fade-up">
       <div className="mb-8 flex items-start justify-between">
@@ -50,6 +57,25 @@ export default async function AdminOrganizationDetailPage({
           <SuspendToggle orgId={org.id} suspended={org.suspended} />
         </div>
       </div>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Plan de la organización</CardTitle>
+        <p className="mb-4 text-sm text-ink-muted">
+          Qué puede hacer este cliente y hasta cuánto. Solo tú lo ves y lo cambias.
+        </p>
+        <PlanForm
+          orgId={org.id}
+          plan={{
+            canHaveSubOrgs: org.canHaveSubOrgs,
+            maxSubOrgs: org.maxSubOrgs,
+            maxAdmins: org.maxAdmins,
+            maxSellers: org.maxSellers,
+            canCustomizeBrand: org.canCustomizeBrand,
+            aiOwnKeyEnabled: org.aiOwnKeyEnabled,
+          }}
+          usage={{ admins: seats.admins, sellers: seats.sellers, subOrgs }}
+        />
+      </Card>
 
       <Card className="mb-6">
         <div className="flex items-start justify-between gap-4">

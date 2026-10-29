@@ -5,6 +5,9 @@ import {
   botCompanyName,
   contrastWithWhite,
   detectLogoType,
+  effectiveDisplay,
+  parseBrandDisplay,
+  parseLogoShape,
   isUsableBrandColor,
   resolveBrand,
 } from "./brand";
@@ -27,12 +30,22 @@ describe("resolveBrand", () => {
       color: "#1d4ed8",
       assistantName: "Lía",
       logoPath: "/api/brand-logo/o1?v=3",
+      display: "both",
+      logoShape: "square",
     });
   });
 
   it("con el plan apagado ignora lo guardado, sin borrarlo", () => {
     const b = resolveBrand({ ...org, canCustomizeBrand: false });
-    expect(b).toEqual({ custom: false, name: null, color: null, assistantName: null, logoPath: null });
+    expect(b).toEqual({
+      custom: false,
+      name: null,
+      color: null,
+      assistantName: null,
+      logoPath: null,
+      display: "both",
+      logoShape: "square",
+    });
   });
 
   it("sin nada cargado no hay marca propia", () => {
@@ -76,6 +89,32 @@ describe("color", () => {
   it("genera las variables CSS solo si hay color", () => {
     expect(accentStyle(null)).toBeUndefined();
     expect(accentStyle("#1d4ed8")?.["--accent"]).toBe("#1d4ed8");
+  });
+});
+
+describe("qué mostrar y forma del logo", () => {
+  it("lee los valores guardados y cae a los de siempre si hay algo raro", () => {
+    expect(parseBrandDisplay("logo")).toBe("logo");
+    expect(parseBrandDisplay("otra-cosa")).toBe("both");
+    expect(parseLogoShape("round")).toBe("round");
+    expect(parseLogoShape(undefined)).toBe("square");
+  });
+
+  it("resolveBrand trae lo elegido; con el plan apagado vuelve a lo normal", () => {
+    const b = resolveBrand({ ...org, brandDisplay: "logo", brandLogoShape: "round" });
+    expect(b.display).toBe("logo");
+    expect(b.logoShape).toBe("round");
+    const off = resolveBrand({ ...org, canCustomizeBrand: false, brandDisplay: "logo", brandLogoShape: "round" });
+    expect(off.display).toBe("both");
+    expect(off.logoShape).toBe("square");
+  });
+
+  it("effectiveDisplay nunca deja el menú vacío", () => {
+    expect(effectiveDisplay({ display: "both", logoPath: "/x", name: "A" })).toEqual({ showLogo: true, showName: true });
+    expect(effectiveDisplay({ display: "logo", logoPath: "/x", name: "A" })).toEqual({ showLogo: true, showName: false });
+    expect(effectiveDisplay({ display: "name", logoPath: "/x", name: "A" })).toEqual({ showLogo: false, showName: true });
+    // "solo logo" sin logo cargado: se muestra el nombre
+    expect(effectiveDisplay({ display: "logo", logoPath: null, name: "A" })).toEqual({ showLogo: false, showName: true });
   });
 });
 

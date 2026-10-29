@@ -5,7 +5,14 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { audit } from "@/server/services/audit";
-import { MAX_LOGO_BYTES, detectLogoType, isHexColor, isUsableBrandColor } from "@/lib/brand";
+import {
+  MAX_LOGO_BYTES,
+  detectLogoType,
+  isHexColor,
+  isUsableBrandColor,
+  parseBrandDisplay,
+  parseLogoShape,
+} from "@/lib/brand";
 import type { ActionState } from "./types";
 
 const textSchema = z.object({
@@ -27,7 +34,15 @@ export async function updateBrandAction(_prevState: ActionState, formData: FormD
 
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { canCustomizeBrand: true, brandName: true, brandColor: true, assistantName: true, brandLogoVersion: true },
+    select: {
+      canCustomizeBrand: true,
+      brandName: true,
+      brandColor: true,
+      assistantName: true,
+      brandLogoVersion: true,
+      brandDisplay: true,
+      brandLogoShape: true,
+    },
   });
   if (!org) return { error: "Organización no encontrada." };
   if (!org.canCustomizeBrand) return { error: "Tu plan no incluye cambiar la marca." };
@@ -61,6 +76,8 @@ export async function updateBrandAction(_prevState: ActionState, formData: FormD
     newLogo = { data: bytes, contentType };
   }
 
+  const brandDisplay = parseBrandDisplay(formData.get("brandDisplay"));
+  const brandLogoShape = parseLogoShape(formData.get("brandLogoShape"));
   const nextVersion = newLogo ? org.brandLogoVersion + 1 : removeLogo ? 0 : org.brandLogoVersion;
 
   await prisma.$transaction(async (tx) => {
@@ -71,6 +88,8 @@ export async function updateBrandAction(_prevState: ActionState, formData: FormD
         assistantName: assistantName || null,
         brandColor: brandColor || null,
         brandLogoVersion: nextVersion,
+        brandDisplay,
+        brandLogoShape,
       },
     });
     if (newLogo) {
@@ -90,8 +109,14 @@ export async function updateBrandAction(_prevState: ActionState, formData: FormD
     action: "brand_updated",
     userId: session.user.id,
     organizationId,
-    before: { brandName: org.brandName, brandColor: org.brandColor, assistantName: org.assistantName },
-    after: { brandName: brandName || null, brandColor: brandColor || null, assistantName: assistantName || null, logoChanged: Boolean(newLogo), logoRemoved: removeLogo },
+    before: {
+      brandName: org.brandName,
+      brandColor: org.brandColor,
+      assistantName: org.assistantName,
+      brandDisplay: org.brandDisplay,
+      brandLogoShape: org.brandLogoShape,
+    },
+    after: { brandDisplay, brandLogoShape, brandName: brandName || null, brandColor: brandColor || null, assistantName: assistantName || null, logoChanged: Boolean(newLogo), logoRemoved: removeLogo },
   });
 
   revalidatePath("/", "layout");

@@ -79,6 +79,8 @@ export async function createInviteAction(
           ? {
               name: brand.name,
               color: brand.color,
+              display: brand.display,
+              logoShape: brand.logoShape,
               logoUrl: brand.logoPath ? `${process.env.NEXTAUTH_URL ?? ""}${brand.logoPath}` : null,
             }
           : undefined,

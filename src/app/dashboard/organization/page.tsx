@@ -187,6 +187,8 @@ export default async function OrganizationSettingsPage({
             assistantName={org.assistantName ?? ""}
             brandColor={org.brandColor ?? ""}
             logoPath={resolveBrand(org).logoPath}
+            brandDisplay={resolveBrand(org).display}
+            brandLogoShape={resolveBrand(org).logoShape}
           />
         </Card>
       )}

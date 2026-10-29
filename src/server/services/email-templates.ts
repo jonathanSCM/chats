@@ -18,6 +18,8 @@ export interface EmailBrand {
   name: string | null;
   logoUrl: string | null;
   color: string | null;
+  display?: "both" | "logo" | "name";
+  logoShape?: "square" | "round";
 }
 
 function escapeHtml(text: string): string {
@@ -40,6 +42,26 @@ function layout({
   brand?: EmailBrand;
 }): string {
   const logoUrl = brand?.logoUrl ?? `${baseUrl()}/logo-mark.png`;
+  // Cabecera: logo (respetando su proporción, o recortado en círculo) y/o nombre, según lo que eligió la organización.
+  const display = brand?.display ?? "both";
+  const hasOwnLogo = Boolean(brand?.logoUrl);
+  const showLogo = display !== "name" || !brand?.name;
+  const showName = Boolean(brand?.name) && (display !== "logo" || !hasOwnLogo);
+  const round = brand?.logoShape === "round";
+  const logoImg = showLogo
+    ? round && hasOwnLogo
+      ? `<img src="${logoUrl}" width="36" height="36" alt="" style="display:block; width:36px; height:36px; border-radius:50%; object-fit:cover;" />`
+      : hasOwnLogo
+        ? `<img src="${logoUrl}" height="36" alt="" style="display:block; height:36px; width:auto; max-width:126px; border-radius:8px; object-fit:contain;" />`
+        : `<img src="${logoUrl}" width="36" height="36" alt="${escapeHtml(brand?.name ?? BRAND_NAME)}" style="display:block; border-radius:8px;" />`
+    : "";
+  const nameText = showName
+    ? `<span style="font-size:16px; font-weight:600; color:${INK}; vertical-align:middle;">${escapeHtml(brand!.name!)}</span>`
+    : "";
+  const header =
+    logoImg && nameText
+      ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:10px;">${logoImg}</td><td>${nameText}</td></tr></table>`
+      : logoImg || nameText;
   const BRAND = escapeHtml(brand?.name ?? BRAND_NAME);
   const ACCENT = brand?.color ?? DEFAULT_ACCENT;
 
@@ -59,7 +81,7 @@ function layout({
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; background:#ffffff; border:1px solid ${BORDER}; border-radius:12px; overflow:hidden;">
             <tr>
               <td style="padding:28px 32px 0 32px;">
-                <img src="${logoUrl}" width="36" height="36" alt="${BRAND}" style="display:block; border-radius:8px;" />
+                ${header}
               </td>
             </tr>
             <tr>

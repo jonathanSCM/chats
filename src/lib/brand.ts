@@ -14,12 +14,26 @@ export const MAX_LOGO_BYTES = 400 * 1024;
 export const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
 export type LogoType = (typeof LOGO_TYPES)[number];
 
+export const BRAND_DISPLAYS = ["both", "logo", "name"] as const;
+export type BrandDisplay = (typeof BRAND_DISPLAYS)[number];
+export const LOGO_SHAPES = ["square", "round"] as const;
+export type LogoShape = (typeof LOGO_SHAPES)[number];
+
+export function parseBrandDisplay(value: unknown): BrandDisplay {
+  return BRAND_DISPLAYS.find((d) => d === value) ?? "both";
+}
+export function parseLogoShape(value: unknown): LogoShape {
+  return LOGO_SHAPES.find((s) => s === value) ?? "square";
+}
+
 export interface BrandSource {
   canCustomizeBrand: boolean;
   brandName: string | null;
   brandColor: string | null;
   assistantName: string | null;
   brandLogoVersion: number;
+  brandDisplay?: string | null;
+  brandLogoShape?: string | null;
 }
 
 export interface ResolvedBrand {
@@ -31,15 +45,29 @@ export interface ResolvedBrand {
   assistantName: string | null;
   /** Ruta pública del logo propio (con versión para romper la caché), o null. */
   logoPath: string | null;
+  /** Qué se muestra en el menú: logo y nombre, solo el logo o solo el nombre. */
+  display: BrandDisplay;
+  /** Forma del logo: cuadrado (se respeta su proporción) o redondo (se recorta en círculo). */
+  logoShape: LogoShape;
 }
 
 export function resolveBrand(org: BrandSource & { id: string }): ResolvedBrand {
-  if (!org.canCustomizeBrand) return { custom: false, name: null, color: null, assistantName: null, logoPath: null };
+  if (!org.canCustomizeBrand) {
+    return { custom: false, name: null, color: null, assistantName: null, logoPath: null, display: "both", logoShape: "square" };
+  }
   const logoPath = org.brandLogoVersion > 0 ? `/api/brand-logo/${org.id}?v=${org.brandLogoVersion}` : null;
   const name = org.brandName?.trim() || null;
   const color = org.brandColor && isUsableBrandColor(org.brandColor) ? org.brandColor : null;
   const assistantName = org.assistantName?.trim() || null;
-  return { custom: Boolean(name || color || assistantName || logoPath), name, color, assistantName, logoPath };
+  return {
+    custom: Boolean(name || color || assistantName || logoPath),
+    name,
+    color,
+    assistantName,
+    logoPath,
+    display: parseBrandDisplay(org.brandDisplay),
+    logoShape: parseLogoShape(org.brandLogoShape),
+  };
 }
 
 /** Campos de la organización padre que hacen falta para heredar su marca. */
@@ -50,6 +78,8 @@ export const BRAND_PARENT_SELECT = {
   brandColor: true,
   assistantName: true,
   brandLogoVersion: true,
+  brandDisplay: true,
+  brandLogoShape: true,
 } as const;
 
 /**
@@ -71,6 +101,20 @@ export function assistantDisplayName(brand: ResolvedBrand, fallbackOrgName: stri
 /** Cómo dice el bot de WhatsApp que se llama su empresa (para el saludo). */
 export function botCompanyName(brand: ResolvedBrand): string {
   return brand.name ?? PLATFORM_SHORT_NAME;
+}
+
+/** Qué mostrar en el menú. Sin logo cargado, "solo logo" no tiene sentido: se muestra el nombre. */
+export function effectiveDisplay(brand: Pick<ResolvedBrand, "display" | "logoPath" | "name">): {
+  showLogo: boolean;
+  showName: boolean;
+} {
+  const hasLogo = Boolean(brand.logoPath);
+  const wantsLogo = brand.display !== "name";
+  const wantsName = brand.display !== "logo";
+  const showLogo = hasLogo && wantsLogo;
+  // Nunca se deja el menú vacío: si no hay logo que mostrar, aparece el nombre aunque haya elegido "solo logo".
+  const showName = wantsName || !showLogo;
+  return { showLogo, showName };
 }
 
 // ── Color ──────────────────────────────────────────────────────────────────

@@ -36,7 +36,15 @@ function form(values: Record<string, string | File>): FormData {
   return f;
 }
 
-const ORG = { canCustomizeBrand: true, brandName: null, brandColor: null, assistantName: null, brandLogoVersion: 0 };
+const ORG = {
+  canCustomizeBrand: true,
+  brandName: null,
+  brandColor: null,
+  assistantName: null,
+  brandLogoVersion: 0,
+  brandDisplay: "both",
+  brandLogoShape: "square",
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -71,10 +79,24 @@ describe("updateBrandAction", () => {
     expect(r.error).toBeNull();
     expect(m.orgUpdate).toHaveBeenCalledWith({
       where: { id: "org1" },
-      data: { brandName: "Acme", assistantName: "Lía", brandColor: "#1d4ed8", brandLogoVersion: 0 },
+      data: {
+        brandName: "Acme",
+        assistantName: "Lía",
+        brandColor: "#1d4ed8",
+        brandLogoVersion: 0,
+        brandDisplay: "both",
+        brandLogoShape: "square",
+      },
     });
     await updateBrandAction({ error: null }, form({ brandName: "", assistantName: "", brandColor: "" }));
     expect(m.orgUpdate.mock.calls[1][0].data).toMatchObject({ brandName: null, assistantName: null, brandColor: null });
+  });
+
+  it("guarda qué mostrar y la forma del logo; un valor raro vuelve al de siempre", async () => {
+    await updateBrandAction({ error: null }, form({ brandDisplay: "logo", brandLogoShape: "round" }));
+    expect(m.orgUpdate.mock.calls[0][0].data).toMatchObject({ brandDisplay: "logo", brandLogoShape: "round" });
+    await updateBrandAction({ error: null }, form({ brandDisplay: "hackeado", brandLogoShape: "triangulo" }));
+    expect(m.orgUpdate.mock.calls[1][0].data).toMatchObject({ brandDisplay: "both", brandLogoShape: "square" });
   });
 
   it("rechaza colores mal escritos o demasiado claros", async () => {

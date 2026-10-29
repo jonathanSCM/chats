@@ -69,7 +69,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const navContent = (
     <>
       <Link href="/dashboard" className="nav-item mb-6 flex h-10 items-center px-2">
-        <Logo onDark brandName={brand?.name} logoSrc={brand?.logoPath} />
+        <Logo onDark brandName={brand?.name} logoSrc={brand?.logoPath} display={brand?.display} logoShape={brand?.logoShape} />
       </Link>
 
       <nav className="flex flex-1 flex-col gap-0.5">
@@ -142,7 +142,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <MobileNav>{navContent}</MobileNav>
           <SidebarToggle />
           <span className="md:hidden">
-            <Logo size="sm" brandName={brand?.name} logoSrc={brand?.logoPath} />
+            <Logo size="sm" brandName={brand?.name} logoSrc={brand?.logoPath} display={brand?.display} logoShape={brand?.logoShape} />
           </span>
         </header>
 

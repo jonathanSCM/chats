@@ -45,6 +45,8 @@ model Organization {
   brandColor             String? // #RRGGBB
   assistantName          String?
   brandLogoVersion       Int                    @default(0) // 0 = sin logo propio; sube en cada cambio (rompe la caché)
+  brandDisplay           String                 @default("both") // qué se ve en el menú: "both" (logo y nombre), "logo" o "name"
+  brandLogoShape         String                 @default("square") // "square" o "round"
   brandLogo              OrganizationBrandLogo?
   // Clave de OpenAI propia (solo si aiOwnKeyEnabled): cifrada, nunca se devuelve al navegador.
   openaiKeyEnc           String?                @db.Text

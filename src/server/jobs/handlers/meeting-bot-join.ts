@@ -3,6 +3,7 @@ import { prisma } from "@/server/db/client";
 import { enqueueOrReschedule } from "../queue";
 import { extractMeetCode } from "@/server/services/meeting-bot";
 import { assistantDisplayName, BRAND_PARENT_SELECT, resolveOrgBrand } from "@/lib/brand";
+import { decideConflict, parseSessionId, pickSession, type VexaSessionEntry } from "@/lib/vexa-session";
 
 export const meetingBotJoinPayload = z.object({
   meetingId: z.string(),
@@ -38,6 +39,8 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
       id: true,
       meetingUrl: true,
       status: true,
+      organizationId: true,
+      vexaSessionId: true,
       organization: {
         select: {
           id: true,
@@ -59,6 +62,7 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
     throw new Error("El link de la reunión no es un link de Google Meet válido.");
   }
 
+  const requestedAt = Date.now();
   const response = await fetch(`${config.url}/bots`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-API-Key": config.apiKey },
@@ -70,25 +74,63 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
     }),
   });
 
-  // 409 = Vexa ya tiene un bot en esa sala (el pedido anterior sí entró). No es un fallo: reintentar
-  // solo generaba errores en cadena, y al agotarse los reintentos la reunión quedaba marcada como
-  // FALLIDA con el bot dentro -- o volvía a pedirlo cuando el bot ya había salido.
-  const alreadyThere = response.status === 409;
-  if (!response.ok && !alreadyThere) {
+  const listSessions = async (): Promise<VexaSessionEntry[]> => {
+    const res = await fetch(`${config.url}/bots`, { headers: { "X-API-Key": config.apiKey } });
+    if (!res.ok) throw new Error(`El servicio del bot respondió ${res.status} al consultar sus sesiones.`);
+    return ((await res.json()) as { meetings?: VexaSessionEntry[] }).meetings ?? [];
+  };
+
+  let sessionId: number | null = null;
+
+  if (response.status === 409) {
+    // Vexa ya tiene un bot en esa sala. Solo se adopta esa sesión si es de ESTA organización (la propia reunión
+    // ya la tenía, u otra reunión de la misma organización la inició); si la inició otra organización no se toca,
+    // para no quedarse con una copia de lo que graba otra.
+    const sameOrg = await prisma.meeting.findMany({
+      where: { organizationId: meeting.organizationId, vexaSessionId: { not: null } },
+      select: { vexaSessionId: true },
+    });
+    const decision = decideConflict({
+      list: await listSessions(),
+      nativeId: code,
+      ownSessionId: meeting.vexaSessionId,
+      sameOrgSessionIds: new Set(sameOrg.map((m) => m.vexaSessionId as number)),
+    });
+    if (decision.action === "retry") {
+      throw new Error("El servicio del bot dice que ya hay un asistente en la sala, pero todavía no aparece su sesión.");
+    }
+    if (decision.action === "refuse") {
+      console.warn(`[meeting-bot] La sala ${code} ya tiene un asistente de otra organización; no se une (reunión ${meetingId}).`);
+      await prisma.meeting.update({ where: { id: meetingId }, data: { botStatus: "FAILED" } });
+      return;
+    }
+    sessionId = decision.sessionId;
+  } else if (!response.ok) {
     throw new Error(`El servicio del bot respondió ${response.status} al pedirle que se una.`);
+  } else {
+    sessionId = parseSessionId(await response.json().catch(() => null));
+    if (sessionId === null) {
+      // Versión de Vexa que no devuelve el id al crear: se busca la sesión recién creada para esta sala.
+      sessionId = pickSession(await listSessions(), { sessionId: null, nativeId: code, sinceMs: requestedAt - 60_000 })?.id ?? null;
+    }
   }
 
-  await prisma.meeting.updateMany({
-    where: alreadyThere
-      ? { id: meetingId, OR: [{ botStatus: null }, { botStatus: "PENDING" }] }
-      : { id: meetingId },
-    data: { botStatus: "JOINING" },
+  await prisma.meeting.update({
+    where: { id: meetingId },
+    data: {
+      vexaSessionId: sessionId,
+      // Al adoptar la sesión de otra reunión de la misma organización no se pisa un estado más avanzado.
+      ...(response.status === 409 ? {} : { botStatus: "JOINING" as const }),
+    },
   });
+  if (response.status === 409) {
+    await prisma.meeting.updateMany({ where: { id: meetingId, OR: [{ botStatus: null }, { botStatus: "PENDING" }] }, data: { botStatus: "JOINING" } });
+  }
 
   await enqueueOrReschedule({
     type: "vexa_bot_poll",
     uniqueKey: `vexa-poll-${meetingId}`,
-    payload: { meetingId, nativeMeetingId: code, startedAt: new Date().toISOString() },
+    payload: { meetingId, nativeMeetingId: code, startedAt: new Date().toISOString(), vexaSessionId: sessionId ?? undefined },
     runAfter: new Date(Date.now() + 15_000),
   });
 }

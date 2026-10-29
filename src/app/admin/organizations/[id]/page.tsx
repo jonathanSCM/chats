@@ -9,6 +9,8 @@ import { JefeToggle } from "./_components/jefe-toggle";
 import { DisconnectWhatsAppButton } from "./_components/disconnect-whatsapp-button";
 import { PlanForm } from "./_components/plan-form";
 import { AiForm } from "./_components/ai-form";
+import { ParentForm } from "./_components/parent-form";
+import { countParentUsersInOrg, listEligibleParents } from "@/server/services/org-hierarchy-admin";
 import { getMonthUsage } from "@/server/services/ai/client";
 import { checkMonthlyLimit, describeMonthlyUsage } from "@/lib/ai-limit";
 import { parseAiMode } from "@/lib/ai-key";
@@ -49,6 +51,10 @@ export default async function AdminOrganizationDetailPage({
   const [seats, subOrgs] = await Promise.all([
     getSeatCounts(org.id),
     prisma.organization.count({ where: { parentId: org.id } }),
+  ]);
+  const [eligibleParents, parentUsersInOrg] = await Promise.all([
+    listEligibleParents(org.id),
+    org.parent ? countParentUsersInOrg(org.id, org.parent.id) : Promise.resolve(0),
   ]);
   const aiMode = parseAiMode(org.aiMode);
   const aiLimits = { budgetUsd: org.aiMonthlyBudgetUsd, tokens: org.aiMonthlyTokenLimit };
@@ -92,6 +98,21 @@ export default async function AdminOrganizationDetailPage({
             canCustomizeBrand: org.canCustomizeBrand,
           }}
           usage={{ admins: seats.admins, sellers: seats.sellers, subOrgs }}
+        />
+      </Card>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Organización principal</CardTitle>
+        <p className="mb-4 text-sm text-ink-muted">
+          Convierte esta organización en suborganización de otra (o vuelve a hacerla independiente). Solo hay un nivel.
+        </p>
+        <ParentForm
+          orgId={org.id}
+          currentParentId={org.parent?.id ?? null}
+          currentParentName={org.parent?.name ?? null}
+          eligibleParents={eligibleParents}
+          hasChildren={org.children.length > 0}
+          parentUsersInOrg={parentUsersInOrg}
         />
       </Card>
 

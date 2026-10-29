@@ -11,6 +11,7 @@ import {
 import { getSeatCounts, getSeatPlan, seatBlockedMessage } from "@/server/services/org-limits";
 import { removeMembership } from "@/server/services/organization-membership";
 import { resolveOrgBrand } from "@/lib/brand";
+import { attachToParent, detachFromParent, listEligibleParents } from "@/server/services/org-hierarchy-admin";
 
 const tag = `suborg-${Date.now()}`;
 let failed = 0;
@@ -128,10 +129,58 @@ async function main() {
     check("no se puede borrar un padre que todavía tiene hijas", blocked);
     const listed = await listSubOrganizations(parent.id);
     check("el listado muestra las dos hijas", listed.length === 2);
+
+    console.log("8) El superadmin une y separa organizaciones");
+    const mkOrg = (name: string, extra: object = {}) => prisma.organization.create({ data: { name: `${name} ${tag}`, slug: `${name.toLowerCase()}-${tag}`, ...extra } });
+    const standalone = await mkOrg("Independiente");
+    const noPlan = await mkOrg("SinPlan");
+    const xOwner = await prisma.user.create({ data: { email: `xowner-${tag}@test.dev`, name: "xowner", passwordHash: "x", role: "OWNER", organizationId: standalone.id } });
+    await prisma.organizationMembership.create({ data: { userId: xOwner.id, organizationId: standalone.id, role: "OWNER" } });
+
+    const eligible = (await listEligibleParents(standalone.id)).map((o) => o.id);
+    check("los posibles padres son organizaciones principales con suborganizaciones habilitadas (no ella, ni sin plan, ni hijas)", eligible.includes(parent.id) && !eligible.includes(standalone.id) && !eligible.includes(noPlan.id) && !eligible.includes(a.id));
+    check("no puede ser hija de sí misma", !(await attachToParent({ orgId: parent.id, parentId: parent.id, byUserId: admin.id })).ok);
+    const toNoPlan = await attachToParent({ orgId: standalone.id, parentId: noPlan.id, byUserId: admin.id });
+    check("no se une a un padre que no tiene suborganizaciones en su plan", !toNoPlan.ok, toNoPlan.ok ? "" : toNoPlan.error);
+    const parentAsChild = await attachToParent({ orgId: parent.id, parentId: noPlan.id, byUserId: admin.id });
+    check("una organización con hijas no puede volverse hija", !parentAsChild.ok);
+    const toChild = await attachToParent({ orgId: standalone.id, parentId: a.id, byUserId: admin.id });
+    check("no se une a una hija (solo un nivel)", !toChild.ok, toChild.ok ? "" : toChild.error);
+
+    await prisma.organization.update({ where: { id: parent.id }, data: { maxSubOrgs: 5, maxAdmins: 2, maxSellers: 3 } });
+    await prisma.organization.update({ where: { id: standalone.id }, data: { canHaveSubOrgs: true, maxSubOrgs: 9 } });
+    const joined = await attachToParent({ orgId: standalone.id, parentId: parent.id, byUserId: admin.id });
+    check("se une a un padre con plan de suborganizaciones", joined.ok, joined.ok ? "" : joined.error);
+    const sa = await prisma.organization.findUniqueOrThrow({ where: { id: standalone.id } });
+    check("queda como hija y sin opciones de tener hijas", sa.parentId === parent.id && sa.canHaveSubOrgs === false && sa.maxSubOrgs === null);
+    check("los administradores del padre entran como administradores a la nueva hija", (await prisma.organizationMembership.count({ where: { organizationId: standalone.id, userId: admin.id, role: "OWNER" } })) === 1);
+    check("avisa que el grupo supera el tope de administradores del padre", joined.ok && joined.warnings.some((w) => /administradores/.test(w)), joined.ok ? joined.warnings.join(" | ") : "");
+    check("sus datos siguen siendo suyos: el padre no ve nada de ella", (await prisma.contact.count({ where: { organizationId: parent.id } })) === 0);
+    const again = await attachToParent({ orgId: standalone.id, parentId: parent.id, byUserId: admin.id });
+    check("unirla de nuevo al mismo padre se rechaza", !again.ok);
+
+    const blockedDetach = await detachFromParent({ orgId: standalone.id, removeParentUsers: true, byUserId: admin.id });
+    // Los únicos administradores de la hija son su dueño propio (xowner) y el admin del padre: quitar al del padre deja a xowner.
+    check("al desvincular quitando a los del padre, conserva a su administrador propio", blockedDetach.ok, blockedDetach.ok ? "" : blockedDetach.error);
+    check("el administrador del padre pierde el acceso; el propio lo conserva", (await prisma.organizationMembership.count({ where: { organizationId: standalone.id, userId: admin.id } })) === 0 && (await prisma.organizationMembership.count({ where: { organizationId: standalone.id, userId: xOwner.id } })) === 1);
+    check("vuelve a ser independiente", (await prisma.organization.findUniqueOrThrow({ where: { id: standalone.id } })).parentId === null);
+    check("desvincular una que ya es independiente se rechaza", !(await detachFromParent({ orgId: standalone.id, removeParentUsers: false, byUserId: admin.id })).ok);
+
+    // Sin casilla: los del padre conservan el acceso
+    await attachToParent({ orgId: standalone.id, parentId: parent.id, byUserId: admin.id });
+    await detachFromParent({ orgId: standalone.id, removeParentUsers: false, byUserId: admin.id });
+    check("sin la casilla, los del padre conservan el acceso", (await prisma.organizationMembership.count({ where: { organizationId: standalone.id, userId: admin.id } })) === 1);
+
+    // Si quitar a los del padre dejara la organización sin administradores, se rechaza y no se toca nada
+    await prisma.organizationMembership.deleteMany({ where: { organizationId: standalone.id, userId: xOwner.id } });
+    await attachToParent({ orgId: standalone.id, parentId: parent.id, byUserId: admin.id });
+    const orphan = await detachFromParent({ orgId: standalone.id, removeParentUsers: true, byUserId: admin.id });
+    check("no deja a la organización sin administradores", !orphan.ok && (await prisma.organization.findUniqueOrThrow({ where: { id: standalone.id } })).parentId === parent.id, orphan.ok ? "" : orphan.error);
   } finally {
     await prisma.auditLog.deleteMany({ where: { organizationId: { in: [parent.id] } } });
     await prisma.organization.deleteMany({ where: { parentId: parent.id } });
     await prisma.organization.deleteMany({ where: { id: parent.id } });
+    await prisma.organization.deleteMany({ where: { slug: { endsWith: `-${tag}` } } });
     await prisma.user.deleteMany({ where: { email: { endsWith: `-${tag}@test.dev` } } });
   }
   console.log(failed ? `\n${failed} comprobaciones fallaron` : "\nTodo bien");

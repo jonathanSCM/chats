@@ -59,7 +59,11 @@ marca propia permitida y modo de IA "clave propia de la organización".
    y, en Integraciones, "Este mes: USD 1.50 de USD 1.00". Con `ia-con-tope@demo.local` no hay aviso.
 9. **Tamaño del logo.** En Marca hay un deslizador de 50% a 300% y una vista previa "Así se verá en el
    menú" (usa el mismo componente del menú). Sube un logo chico y agrándalo.
-10. **Plan simple.** Entra como `cliente-simple@demo.local`: no tiene pestaña Suborganizaciones,
+10. **Unir y separar organizaciones (superadmin).** En el detalle de cualquier organización, tarjeta
+    **Organización principal**: elige una de la lista (solo aparecen las que tienen suborganizaciones
+    habilitadas) y guarda. Para separarla, elige "Ninguna": aparece la casilla para quitar el acceso de
+    las personas que venían del padre, con cuántas son.
+11. **Plan simple.** Entra como `cliente-simple@demo.local`: no tiene pestaña Suborganizaciones,
    tarjeta Marca ni Clave de OpenAI, y el tope de 1 vendedor se hace cumplir.
 
 ## Pruebas automáticas

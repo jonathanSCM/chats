@@ -1083,6 +1083,7 @@ model Meeting {
   googleCalendarOwner   User?             @relation("MeetingGoogleCalendarOwner", fields: [googleCalendarOwnerId], references: [id], onDelete: SetNull)
   status                MeetingStatus     @default(SCHEDULED)
   botStatus             MeetingBotStatus?
+  vexaSessionId         Int? // id interno de la sesión del bot en Vexa: se sigue la sesión, no el código de la sala
   botJoinedAt           DateTime? // cuándo el bot quedó admitido de verdad en la llamada
   botLeftAt             DateTime? // cuándo terminó de grabar y subió el audio
   transcript            String?           @db.Text // de subtítulos en vivo, con nombre de quién habló — separado de `notes`
@@ -1106,6 +1107,7 @@ model Meeting {
   attachments MeetingAttachment[]
 
   @@index([organizationId, scheduledAt])
+  @@index([vexaSessionId])
   @@map("meetings")
 }
 

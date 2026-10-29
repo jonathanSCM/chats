@@ -2,16 +2,19 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
 import { enqueue } from "../queue";
+import { NON_TERMINAL_STATUSES, pickSession, type VexaSessionEntry } from "@/lib/vexa-session";
 
 export const vexaBotPollPayload = z.object({
   meetingId: z.string(),
   nativeMeetingId: z.string(),
   startedAt: z.string(),
+  // Id de la sesión del bot en Vexa. Los jobs que ya estaban en cola antes de este cambio no lo traen:
+  // se buscan por el código de la sala y se les guarda el id apenas se encuentra la sesión.
+  vexaSessionId: z.number().int().optional(),
 });
 
-// Estados de Vexa mientras la reunión sigue en curso -- cualquier otro valor
+// Estados terminales: ver NON_TERMINAL_STATUSES en lib/vexa-session -- cualquier otro valor
 // se trata como terminal (la reunión ya se cortó, sea con éxito o con error).
-const NON_TERMINAL_STATUSES = new Set(["requested", "joining", "awaiting_admission", "active"]);
 
 // Si Vexa nunca llega a un estado terminal en este lapso, se da por perdido
 // en vez de seguir encolando para siempre (una reunión real no dura tanto).
@@ -23,12 +26,6 @@ function vexaConfig(): { url: string; apiKey: string } | null {
   const apiKey = process.env.VEXA_API_KEY;
   if (!url || !apiKey) return null;
   return { url, apiKey };
-}
-
-interface VexaBotEntry {
-  status: string;
-  failure_stage?: string | null;
-  updated_at?: string;
 }
 
 interface VexaRecording {
@@ -54,7 +51,7 @@ interface VexaTranscriptResponse {
  * cada `POLL_INTERVAL_MS` en vez de bloquear un worker esperando.
  */
 export async function handleVexaBotPoll(rawPayload: unknown): Promise<void> {
-  const { meetingId, nativeMeetingId, startedAt } = vexaBotPollPayload.parse(rawPayload);
+  const { meetingId, nativeMeetingId, startedAt, vexaSessionId: payloadSessionId } = vexaBotPollPayload.parse(rawPayload);
 
   const config = vexaConfig();
   if (!config) {
@@ -74,10 +71,25 @@ export async function handleVexaBotPoll(rawPayload: unknown): Promise<void> {
   if (!listResponse.ok) {
     throw new Error(`Vexa respondió ${listResponse.status} al consultar el estado del bot.`);
   }
-  const list = (await listResponse.json()) as { meetings?: Array<VexaBotEntry & { native_meeting_id: string; platform: string }> };
-  const entry = (list.meetings ?? [])
-    .filter((m) => m.platform === "google_meet" && m.native_meeting_id === nativeMeetingId)
-    .sort((a, b) => new Date(b.updated_at ?? 0).getTime() - new Date(a.updated_at ?? 0).getTime())[0];
+  const list = (await listResponse.json()) as { meetings?: VexaSessionEntry[] };
+
+  // Se sigue la SESIÓN del bot (por su id), no la sala: una sala reutilizada tiene varias sesiones y la más
+  // nueva no tiene por qué ser la de esta reunión.
+  const stored = payloadSessionId
+    ? null
+    : await prisma.meeting.findUnique({ where: { id: meetingId }, select: { vexaSessionId: true } });
+  let sessionId: number | null = payloadSessionId ?? stored?.vexaSessionId ?? null;
+  const entry = pickSession(list.meetings ?? [], {
+    sessionId,
+    nativeId: nativeMeetingId,
+    // Reuniones sin id guardado (iniciadas antes de este cambio): la sesión creada desde que se pidió el bot.
+    sinceMs: new Date(startedAt).getTime() - 5 * 60_000,
+  });
+  if (entry && sessionId === null) {
+    sessionId = entry.id;
+    await prisma.meeting.update({ where: { id: meetingId }, data: { vexaSessionId: entry.id } });
+  }
+  const sessionIdForJobs = sessionId ?? undefined;
 
   if (!entry) {
     // Todavía no aparece en la lista (puede tardar un instante en registrarse) — reintentar.
@@ -88,7 +100,7 @@ export async function handleVexaBotPoll(rawPayload: unknown): Promise<void> {
     // aparte en vez de reabrir la anterior.
     await enqueue({
       type: "vexa_bot_poll",
-      payload: { meetingId, nativeMeetingId, startedAt },
+      payload: { meetingId, nativeMeetingId, startedAt, vexaSessionId: sessionIdForJobs },
       runAfter: new Date(Date.now() + POLL_INTERVAL_MS),
     });
     return;
@@ -106,7 +118,7 @@ export async function handleVexaBotPoll(rawPayload: unknown): Promise<void> {
     }
     await enqueue({
       type: "vexa_bot_poll",
-      payload: { meetingId, nativeMeetingId, startedAt },
+      payload: { meetingId, nativeMeetingId, startedAt, vexaSessionId: sessionIdForJobs },
       runAfter: new Date(Date.now() + POLL_INTERVAL_MS),
     });
     return;
@@ -119,7 +131,12 @@ export async function handleVexaBotPoll(rawPayload: unknown): Promise<void> {
     data: { botStatus: "TRANSCRIBING", botLeftAt: new Date() },
   });
 
-  const transcriptResponse = await fetch(`${config.url}/transcripts/google_meet/${nativeMeetingId}`, {
+  // La transcripción y la grabación de ESTA sesión (por su id), no todo lo que haya pasado por la sala.
+  const transcriptUrl =
+    sessionId !== null
+      ? `${config.url}/transcripts/by-id/${sessionId}`
+      : `${config.url}/transcripts/google_meet/${nativeMeetingId}`;
+  const transcriptResponse = await fetch(transcriptUrl, {
     headers: { "X-API-Key": config.apiKey },
   });
   const transcriptData = transcriptResponse.ok ? ((await transcriptResponse.json()) as VexaTranscriptResponse) : null;

@@ -37,8 +37,9 @@ export default async function SeguimientoPage({
     servicio: initialService,
   } = await searchParams;
   const viewingArchived = archived === "1";
-  // Independiente de "archivado": oculta por defecto lo Ganado/Perdido/En
-  // pausa (siguen existiendo, solo no compiten visualmente con lo activo).
+  // Independiente de "archivado": oculta por defecto lo Perdido y En pausa
+  // (siguen existiendo, solo no compiten visualmente con lo activo). Lo
+  // Ganado se muestra siempre.
   const viewingAllStages = estado === "todos";
 
   const organizationId = session.user.organizationId;
@@ -46,9 +47,8 @@ export default async function SeguimientoPage({
 
   const stages = await getOrgStages(organizationId);
   const services = (await getOrgServices(organizationId)).map((s) => s.label);
-  // Fuera del flujo principal (antes HIDDEN_BY_DEFAULT_STAGES): las 3
-  // etapas con role no-null (ganado/perdido/nutrir).
-  const hiddenStageIds = stages.filter((s) => s.role !== null).map((s) => s.id);
+  // Ocultas por defecto: las etapas de perdido y en pausa (nutrir). Ganado no se oculta.
+  const hiddenStageIds = stages.filter((s) => s.role === "LOST" || s.role === "NURTURE").map((s) => s.id);
 
   // Todo el equipo ve la misma cartera — lo que carga el admin lo puede
   // tomar cualquier vendedor. La edición queda restringida en el servidor

@@ -171,7 +171,7 @@ interface Props {
   /** Solo true si el usuario actual conectó su propio Google Calendar en Mi Perfil -- el calendario compartido de la organización está fuera de servicio (token vencido). */
   canCreateGoogleMeet: boolean;
   viewingArchived: boolean;
-  /** `?estado=todos` — muestra también Ganado/Perdido/En pausa (ocultos por defecto). */
+  /** `?estado=todos` — muestra también Perdido y En pausa (ocultos por defecto; Ganado se ve siempre). */
   viewingAllStages: boolean;
   /** Si viene de `?open=<id>` (ej. desde el botón del inbox), abre ese cliente ni bien carga. */
   openId?: string;
@@ -462,7 +462,7 @@ export function TrackingTable({
         const d = r.nextActionAt?.slice(0, 10) ?? null;
         // "alta"/"vencidos"/"sin_accion" reflejan los KPIs de la cabecera,
         // que el servidor calcula solo sobre etapas abiertas — si acá no se
-        // filtra igual, con "Ver ganados/perdidos/pausados" activo el chip
+        // filtra igual, con "Ver perdidos/pausados" activo el chip
         // muestra más filas de las que decía la tarjeta.
         if (quickFilter === "alta" && (r.stage.role !== null || r.priority !== "ALTA")) return false;
         if (quickFilter === "sin_accion" && (r.stage.role !== null || hasCompleteNextAction(r)))
@@ -768,10 +768,10 @@ export function TrackingTable({
               <span className="text-border">·</span>
               <Link
                 href={viewingAllStages ? "/dashboard/seguimiento" : "/dashboard/seguimiento?estado=todos"}
-                title="Ganado, Perdido y En pausa/Nutrir quedan ocultos por defecto para no competir con lo activo"
+                title="Perdido y En pausa/Nutrir quedan ocultos por defecto para no competir con lo activo; Ganado se ve siempre"
                 className="flex items-center gap-1 whitespace-nowrap text-xs text-ink-muted hover:text-accent"
               >
-                <Eye size={13} /> {viewingAllStages ? "Ocultar cerrados/pausados" : "Ver ganados/perdidos/pausados"}
+                <Eye size={13} /> {viewingAllStages ? "Ocultar perdidos/pausados" : "Ver perdidos/pausados"}
               </Link>
             </>
           )}

@@ -22,7 +22,7 @@ export function PlanChangeNotice({ message }: { message: string }) {
 
   return (
     <Dialog open={open} onClose={dismiss} title="Tu plan cambió">
-      <div className="space-y-4 px-5 py-4">
+      <div className="space-y-4">
         <div className="space-y-1 text-sm text-ink">
           {message.split("\n").map((line, i) =>
             line.startsWith("•") ? (

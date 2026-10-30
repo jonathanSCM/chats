@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { createPlanAction, deletePlanAction, updatePlanAction } from "@/server/actions/admin-plans";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -15,7 +15,7 @@ export interface EditablePlan {
 }
 
 /** Formulario de un plan: sirve para crear uno nuevo (sin `plan`) o editar uno existente. */
-export function PlanEditor({ plan }: { plan?: EditablePlan }) {
+export function PlanEditor({ plan, onSaved }: { plan?: EditablePlan; onSaved?: () => void }) {
   const action = plan ? updatePlanAction.bind(null, plan.id) : createPlanAction;
   const [state, formAction, isPending] = useActionState(action, { error: null });
   const formRef = useRef<HTMLFormElement>(null);
@@ -25,6 +25,11 @@ export function PlanEditor({ plan }: { plan?: EditablePlan }) {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const v = plan?.values;
+  // Avisa a quien lo abrió (por ejemplo para cerrar la ventana) cuando el plan se guardó bien.
+  useEffect(() => {
+    if (state.message && !state.error) onSaved?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
   const orgCount = plan?.orgCount ?? 0;
   // Crear un plan nuevo vacía el formulario; editar uno conserva lo escrito.
   const [createdKey, setCreatedKey] = useState(0);

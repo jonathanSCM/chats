@@ -134,7 +134,7 @@ describe("handleVexaBotPoll (créditos por transcripción)", () => {
     transcript: null,
   });
 
-  it("al terminar bien cobra 5 créditos por minuto en la llamada", async () => {
+  it("al terminar bien registra los minutos de la llamada sin costo de créditos", async () => {
     m.meetingFind.mockResolvedValue(ended(60));
     vexa([entry({ id: 5, status: "completed" })]);
     await handleVexaBotPoll(payload({ vexaSessionId: 5 }));
@@ -142,7 +142,7 @@ describe("handleVexaBotPoll (créditos por transcripción)", () => {
     expect(m.charge).toHaveBeenCalledWith({
       organizationId: "org1",
       feature: "transcripcion",
-      credits: 300,
+      credits: 0,
       audioMinutes: 60,
       entityId: "mtg1",
     });

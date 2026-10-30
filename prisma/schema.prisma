@@ -73,6 +73,10 @@ model Organization {
   // Aviso emergente para el dueño cuando su plan cambió; lo borra al darlo por visto.
   planNoticeMessage      String?                @db.Text
   planNoticeAt           DateTime?
+  // Vigencia del plan: desde cuándo corre y hasta cuándo está activo. null = sin vencimiento (a medida).
+  // La bolsa mensual de créditos se renueva cada mes el mismo día que empezó el plan (planStartedAt).
+  planStartedAt          DateTime?
+  planEndsAt             DateTime?
   // Organización padre (suborganizaciones). null = organización de primer nivel.
   parentId               String?
   parent                 Organization?          @relation("OrgHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
@@ -146,6 +150,7 @@ model Organization {
   aiAnalyses             AiAnalysis[]
   aiCreditPacks          AiCreditPack[]
   aiCreditUsages         AiCreditUsage[]
+  creditRequests         CreditRequest[]
   metaAttributionTouches MetaAttributionTouch[]
   adSpendSnapshots       AdSpendSnapshot[]
   pipelineStages         PipelineStage[]
@@ -1239,6 +1244,27 @@ model AiCreditUsage {
 
   @@index([organizationId, createdAt])
   @@map("ai_credit_usages")
+}
+
+// Solicitud del dueño de una organización: más créditos de IA o renovar el plan. La atiende el superadmin
+// (el pago se hace por otro medio; aprobar carga los créditos o renueva el plan).
+model CreditRequest {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requestedById  String?
+  kind           String // "CREDITS" | "RENEWAL"
+  credits        Int? // cuántos créditos pide (solo CREDITS)
+  note           String?
+  status         String       @default("PENDING") // PENDING | APPROVED | REJECTED
+  resolvedAt     DateTime?
+  resolvedById   String?
+  resolvedNote   String?
+  createdAt      DateTime     @default(now())
+
+  @@index([status, createdAt])
+  @@index([organizationId, createdAt])
+  @@map("credit_requests")
 }
 
 // ─── Configuración de plataforma ─────────────────────────────────

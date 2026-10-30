@@ -1,5 +1,4 @@
 import {
-  CREDITS_PER_AUDIO_MINUTE,
   CREDITS_PER_USER,
   CREDIT_PACKS,
   CREDIT_USD,
@@ -8,7 +7,6 @@ import {
   PACK_VALID_DAYS,
   creditEquivalents,
   formatCredits,
-  formatDuration,
   suggestedMonthlyCredits,
 } from "@/lib/ai-credits";
 
@@ -20,7 +18,7 @@ export function CreditsEquivalence({ credits }: { credits: number }) {
     <p className="text-xs text-ink-faint">
       {formatCredits(credits)} créditos = US$ {e.usd.toFixed(2).replace(".", ",")} de presupuesto de IA. Eso alcanza para, por ejemplo,{" "}
       {formatCredits(e.botReplies)} respuestas del bot, o {formatCredits(e.analyses)} análisis de seguimiento, o{" "}
-      {formatDuration(e.audioMinutes)} de transcripción de reuniones (o una mezcla de todo).
+      {formatCredits(e.meetingSummaries)} resúmenes de reunión con IA (o una mezcla de todo).
     </p>
   );
 }
@@ -66,15 +64,13 @@ export function CreditsExplainer({ monthly }: { monthly?: number | null }) {
             {features.map((f) => (
               <li key={f.label} className="flex justify-between gap-3 border-b border-border/60 pb-1 last:border-0">
                 <span>{f.label}</span>
-                <span className="font-medium text-ink">
-                  {f.credits === CREDITS_PER_AUDIO_MINUTE && f.label.startsWith("Transcripción") ? `${f.credits} por minuto` : f.credits}
-                </span>
+                <span className="font-medium text-ink">{f.credits === 0 ? "gratis" : f.credits}</span>
               </li>
             ))}
           </ul>
           <p className="text-xs text-ink-faint">
-            Ejemplo: una reunión de 1 hora = {formatCredits(60 * CREDITS_PER_AUDIO_MINUTE)} créditos de transcripción. Cualquier función de IA
-            nueva sin precio definido cuesta 1 crédito.
+            La transcripción de reuniones no gasta créditos (corre en tu servidor); los minutos igual quedan registrados. Lo que sí gasta es el
+            resumen con IA de la reunión. Cualquier función de IA nueva sin precio definido cuesta 1 crédito.
           </p>
         </section>
 
@@ -88,8 +84,8 @@ export function CreditsExplainer({ monthly }: { monthly?: number | null }) {
             </li>
             <li>La bolsa mensual se renueva cada mes (calendario UTC) y lo que sobra <b className="text-ink">no se acumula</b>.</li>
             <li>
-              Solo gastan créditos las llamadas de IA que usan la <b className="text-ink">clave de la plataforma</b> y la transcripción de reuniones. Con
-              clave propia o personalizada de la organización no se cobran créditos.
+              Solo gastan créditos las llamadas de IA que usan la <b className="text-ink">clave de la plataforma</b>. Con clave propia o
+              personalizada de la organización no se cobran créditos.
             </li>
             <li>Una suborganización gasta de la bolsa de su organización principal.</li>
           </ul>
@@ -100,11 +96,12 @@ export function CreditsExplainer({ monthly }: { monthly?: number | null }) {
           <ul className="list-disc space-y-1 pl-5">
             <li>Al 80% y al 95% el dueño ve un aviso en su panel; al llegar a 0 el aviso es rojo.</li>
             <li>
-              El CRM sigue funcionando (contactos, pipeline, notas, tareas). Se detienen las funciones de IA manuales y el asistente de reuniones no entra.
+              El CRM sigue funcionando (contactos, pipeline, notas, tareas) y el asistente sigue grabando y transcribiendo. Se detienen las funciones
+              de IA (análisis, editor de conocimiento y resúmenes de reunión).
             </li>
             <li>
               El bot de WhatsApp tiene una reserva de emergencia de <b className="text-ink">{EMERGENCY_RESERVE} créditos</b> para no dejar a un cliente sin
-              respuesta de golpe.
+              respuesta de golpe. Cuando también se acaba, la conversación pasa a una persona del equipo con un aviso.
             </li>
           </ul>
         </section>

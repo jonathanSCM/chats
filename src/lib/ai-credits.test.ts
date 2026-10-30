@@ -26,16 +26,16 @@ describe("créditos por función", () => {
   it("usa la tabla del modelo comercial", () => {
     expect(creditsForFeature("bot_calificacion")).toBe(2);
     expect(creditsForFeature("seguimiento")).toBe(3);
-    expect(creditsForFeature("transcripcion")).toBe(5);
   });
   it("una función desconocida cuesta 1", () => {
     expect(creditsForFeature("nueva_cosa")).toBe(1);
   });
-  it("la transcripción cuesta 5 por minuto", () => {
-    expect(creditsForAudio(15)).toBe(75);
-    expect(creditsForAudio(60)).toBe(300);
-    expect(creditsForAudio(90)).toBe(450);
-    expect(creditsForAudio(-3)).toBe(0);
+  it("la transcripción no cuesta créditos y el resumen con IA sí", () => {
+    expect(creditsForAudio(15)).toBe(0);
+    expect(creditsForAudio(90)).toBe(0);
+    expect(creditsForFeature("transcripcion")).toBe(0);
+    expect(creditsForFeature("meeting_summary")).toBe(15);
+    expect(creditsForFeature("meeting_summary_live")).toBe(3);
   });
   it("redondea los minutos hacia arriba", () => {
     expect(billableMinutes(new Date(0), new Date(61_000))).toBe(2);
@@ -147,8 +147,8 @@ describe("equivalencias de créditos", () => {
     expect(e.usd).toBeCloseTo(8);
     expect(e.botReplies).toBe(4000);
     expect(e.analyses).toBe(2666);
-    expect(e.audioMinutes).toBe(1600);
-    expect(formatDuration(e.audioMinutes)).toBe("26 h 40 min");
+    expect(e.meetingSummaries).toBe(533);
+    expect(formatDuration(1600)).toBe("26 h 40 min");
     expect(formatDuration(45)).toBe("45 min");
     expect(formatDuration(120)).toBe("2 h");
   });

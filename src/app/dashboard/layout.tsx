@@ -29,7 +29,9 @@ import { getUserMemberships } from "@/server/services/organization-membership";
 import { isMarketingEnabled } from "@/lib/features";
 import { accentStyle, BRAND_PARENT_SELECT, resolveOrgBrand } from "@/lib/brand";
 import { getAiNotice } from "@/server/services/ai/notice";
-import { getOrgCredits } from "@/server/services/ai/credits";
+import { getOrgCredits, getPlanValidity } from "@/server/services/ai/credits";
+import { planStatusNotice } from "@/lib/plan-period";
+import { planDateLabel } from "@/components/plan-summary-card";
 import { creditNoticeText } from "@/lib/ai-credits";
 import { PlanChangeNotice } from "@/components/plan-change-notice";
 
@@ -61,6 +63,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // Aviso de créditos de IA al dueño: a partir del 80% de la bolsa, al 95% y cuando se acaban.
   const credits = org && session?.user.role === "OWNER" ? await getOrgCredits(org.id) : null;
   const creditNotice = credits && credits.level !== "ok" ? creditNoticeText(credits.level, credits.balance) : null;
+  // Aviso del vencimiento del plan al dueño: 7 días antes, durante la gracia y cuando ya venció.
+  const planValidity = org && session?.user.role === "OWNER" ? await getPlanValidity(org.id) : null;
+  const planNotice = planValidity?.endsAt ? planStatusNotice(planValidity.status, planDateLabel(planValidity.endsAt)) : null;
   const memberships = session?.user.id
     ? await getUserMemberships(session.user.id).then((m) =>
         m.map((mm) => ({ organizationId: mm.organizationId, organizationName: mm.organizationName })),
@@ -174,6 +179,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
         <main className="flex-1 overflow-y-auto bg-canvas px-4 py-5 md:px-6 md:py-6">
           {org?.planNoticeMessage && session?.user.role === "OWNER" && <PlanChangeNotice message={org.planNoticeMessage} />}
+          {planValidity && planNotice && (
+            <div
+              className={`mb-4 rounded-lg border px-4 py-3 text-sm text-ink ${
+                planValidity.status.state === "expired" ? "border-danger/40 bg-danger-dim" : "border-warning/40 bg-warning-dim"
+              }`}
+            >
+              <b className={planValidity.status.state === "expired" ? "text-danger" : "text-warning"}>
+                {planValidity.status.state === "expired" ? "Plan vencido." : planValidity.status.state === "grace" ? "Plan vencido, en gracia." : "Tu plan está por vencer."}
+              </b>{" "}
+              {planNotice}{" "}
+              <Link href="/dashboard/organization#plan" className="font-medium text-accent underline">
+                Ver mi plan
+              </Link>
+            </div>
+          )}
           {credits && creditNotice && (
             <div
               className={`mb-4 rounded-lg border px-4 py-3 text-sm text-ink ${

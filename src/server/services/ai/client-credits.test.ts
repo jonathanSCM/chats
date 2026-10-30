@@ -11,6 +11,7 @@ const m = vi.hoisted(() => ({
   settingUpdateMany: vi.fn(),
   responsesCreate: vi.fn(),
   assertCredits: vi.fn(),
+  assertPlan: vi.fn(),
   charge: vi.fn(),
 }));
 
@@ -29,11 +30,12 @@ vi.mock("openai", () => ({
 }));
 vi.mock("./credits", () => {
   class AiCreditsExhaustedError extends Error {}
-  return { AiCreditsExhaustedError, assertCreditsAvailable: m.assertCredits, chargeCredits: m.charge };
+  class PlanExpiredError extends Error {}
+  return { AiCreditsExhaustedError, PlanExpiredError, assertCreditsAvailable: m.assertCredits, assertPlanActive: m.assertPlan, chargeCredits: m.charge };
 });
 
 import { AiBudgetExceededError, AiCreditsError, runStructured } from "./client";
-import { AiCreditsExhaustedError } from "./credits";
+import { AiCreditsExhaustedError, PlanExpiredError } from "./credits";
 
 const options = {
   organizationId: "org1",
@@ -68,6 +70,7 @@ beforeEach(() => {
   m.orgFind.mockResolvedValue(platformOrg);
   m.responsesCreate.mockResolvedValue({ output_text: '{"ok":true}', usage: { input_tokens: 4000, output_tokens: 1000 } });
   m.assertCredits.mockResolvedValue(undefined);
+  m.assertPlan.mockResolvedValue(undefined);
   m.charge.mockResolvedValue(undefined);
 });
 
@@ -101,6 +104,15 @@ describe("runStructured y créditos de IA", () => {
     expect(error.message).toBe("Se acabaron los créditos");
     expect(m.responsesCreate).not.toHaveBeenCalled();
     expect(m.charge).not.toHaveBeenCalled();
+  });
+
+  it("con el plan vencido no llama a OpenAI, aunque la clave sea propia", async () => {
+    m.orgFind.mockResolvedValue({ ...platformOrg, aiMode: "own", openaiKeyEnc: "abc" });
+    m.assertPlan.mockRejectedValue(new PlanExpiredError("Tu plan venció"));
+    const error = await runStructured(options).catch((e) => e);
+    expect(error).toBeInstanceOf(AiCreditsError);
+    expect(error.message).toBe("Tu plan venció");
+    expect(m.responsesCreate).not.toHaveBeenCalled();
   });
 
   it("con clave propia no se cobran créditos", async () => {

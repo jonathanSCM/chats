@@ -645,6 +645,16 @@ async function escalate(conversation: ConversationForBot, motivo: string): Promi
 }
 
 /**
+ * La IA de la organización está detenida (sin créditos o plan vencido): en vez de dejar al cliente sin respuesta, la
+ * conversación pasa a una persona del equipo con un aviso. Como `escalate` pausa el bot, no se repite en cada mensaje.
+ */
+export async function escalateAiUnavailable(conversationId: string, reason: string): Promise<void> {
+  const conversation = await loadConversation(conversationId);
+  if (!conversation || conversation.botPaused) return;
+  await escalate(conversation, `La IA de la organización está detenida: ${reason}`);
+}
+
+/**
  * Corre un turno del bot de calificación para una conversación: genera la
  * siguiente respuesta (o decide escalar), la manda por WhatsApp, actualiza
  * la memoria, y crea la Opportunity en Seguimiento si el lead ya calificó.

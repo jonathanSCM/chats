@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { Building2, Layers, LogOut, ScrollText, Settings, Users } from "lucide-react";
+import { Building2, Inbox, Layers, LogOut, ScrollText, Settings, Users } from "lucide-react";
 import { auth } from "@/server/auth";
 import { logoutAction } from "@/server/actions/logout";
 import { NavLink } from "@/components/layout/nav-link";
 import { Logo } from "@/components/logo";
+import { countPendingRequests } from "@/server/services/credit-requests";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
+  const pendingRequests = await countPendingRequests();
 
   return (
     <div className="flex min-h-screen">
@@ -19,6 +21,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <nav className="flex flex-1 flex-col gap-0.5">
           <NavLink href="/admin" exact icon={<Building2 size={18} />}>Organizaciones</NavLink>
           <NavLink href="/admin/planes" icon={<Layers size={18} />}>Planes</NavLink>
+          <NavLink href="/admin/solicitudes" icon={<Inbox size={18} />}>
+            Solicitudes
+            {pendingRequests > 0 && (
+              <span className="ml-2 rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-semibold text-white">{pendingRequests}</span>
+            )}
+          </NavLink>
           <NavLink href="/admin/users" icon={<Users size={18} />}>Usuarios</NavLink>
           <NavLink href="/admin/logs" icon={<ScrollText size={18} />}>Registro</NavLink>
           <NavLink href="/admin/settings" icon={<Settings size={18} />}>Configuración</NavLink>

@@ -1,6 +1,6 @@
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
-import { isAiEnabledFor, AiBudgetExceededError } from "@/server/services/ai/client";
+import { isAiEnabledFor, AiBudgetExceededError, AiCreditsError } from "@/server/services/ai/client";
 import { renderMeetingSummaryPdf, type MeetingSummary } from "@/server/services/meeting-summary-pdf";
 import { ensureMeetingSummaryData } from "@/server/services/meeting-summary";
 
@@ -56,6 +56,7 @@ export async function requestMeetingSummaryPdf(
     });
     return { ok: true };
   } catch (error) {
+    if (error instanceof AiCreditsError) return { ok: false, error: error.message };
     if (error instanceof AiBudgetExceededError) {
       return { ok: false, error: "Se alcanzó el tope de gasto diario de IA. Probá de nuevo mañana." };
     }

@@ -4,7 +4,7 @@ import { decrypt } from "@/lib/crypto";
 import { chooseKey, classifyKeyError, parseAiMode, type AiMode } from "@/lib/ai-key";
 import { checkMonthlyLimit, monthStartUtc, type MonthlyLimits } from "@/lib/ai-limit";
 import { creditsForFeature } from "@/lib/ai-credits";
-import { AiCreditsExhaustedError, assertCreditsAvailable, chargeCredits } from "./credits";
+import { AiCreditsExhaustedError, PlanExpiredError, assertCreditsAvailable, assertPlanActive, chargeCredits } from "./credits";
 
 // Solo el cliente de la clave de la PLATAFORMA se reutiliza. Las claves de las organizaciones (propia o
 // personalizada) nunca se guardan en memoria entre llamadas: se crea un cliente descartable por pedido, así
@@ -252,7 +252,7 @@ export class AiMonthlyLimitError extends AiBudgetExceededError {
   }
 }
 
-/** Se acabaron los créditos de IA del plan de la organización (ver `credits.ts`). */
+/** Se acabaron los créditos de IA o venció el plan de la organización (ver `credits.ts`): la IA se omite, sin reintentos. */
 export class AiCreditsError extends AiBudgetExceededError {
   constructor(message: string) {
     super(message);
@@ -349,14 +349,14 @@ export async function runStructured<T>(options: RunOptions<T>): Promise<T> {
 
   // Plan con créditos: solo se cobran las llamadas que usan la clave de la plataforma (con clave propia o
   // personalizada el gasto no es de la plataforma). Si no quedan créditos se omite, sin reintentos.
+  // El plan vencido (pasada la gracia) detiene la IA en cualquier modo de clave.
   const usesCredits = key.mode === null;
-  if (usesCredits) {
-    try {
-      await assertCreditsAvailable(options.organizationId, options.analysisType);
-    } catch (error) {
-      if (error instanceof AiCreditsExhaustedError) throw new AiCreditsError(error.message);
-      throw error;
-    }
+  try {
+    await assertPlanActive(options.organizationId);
+    if (usesCredits) await assertCreditsAvailable(options.organizationId, options.analysisType);
+  } catch (error) {
+    if (error instanceof AiCreditsExhaustedError || error instanceof PlanExpiredError) throw new AiCreditsError(error.message);
+    throw error;
   }
 
   const startedAt = Date.now();

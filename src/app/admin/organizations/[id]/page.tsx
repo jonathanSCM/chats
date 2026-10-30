@@ -23,6 +23,9 @@ import { formatCredits } from "@/lib/ai-credits";
 import { getCreditUsageSummary, getOrgCredits, listCreditPacks } from "@/server/services/ai/credits";
 import { AiCreditsPanel } from "@/components/ai-credits-panel";
 import { CreditsExplainer } from "@/components/credits-explainer";
+import { PlanValidity } from "./_components/plan-validity";
+import { planDateLabel } from "@/components/plan-summary-card";
+import { PLAN_STATE_LABEL, planStatus } from "@/lib/plan-period";
 import { AddPackForm, CancelPackButton, CreditsPlanForm } from "./_components/credits-admin";
 import type { BotStatus } from "@/generated/prisma/enums";
 
@@ -102,6 +105,18 @@ export default async function AdminOrganizationDetailPage({
     credits && tab === "plan"
       ? await Promise.all([getCreditUsageSummary(org.id), listCreditPacks(org.id)])
       : [null, []];
+  const validity = planStatus(org.planEndsAt, new Date());
+  const pendingRequests = tab === "resumen" ? await prisma.creditRequest.count({ where: { organizationId: org.id, status: "PENDING" } }) : 0;
+  const validityDays =
+    org.planEndsAt && validity.daysLeft !== null
+      ? validity.daysLeft > 0
+        ? validity.daysLeft === 1
+          ? "queda 1 día"
+          : `quedan ${validity.daysLeft} días`
+        : validity.daysLeft === 0
+          ? "vence hoy"
+          : `venció hace ${Math.abs(validity.daysLeft)} día${Math.abs(validity.daysLeft) === 1 ? "" : "s"}`
+      : null;
   const connectedNumbers = org.bots.filter((b) => b.whatsappConnection?.verified).length;
 
   return (
@@ -148,6 +163,24 @@ export default async function AdminOrganizationDetailPage({
             <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
               <Fact label="Plan comercial">
                 {org.parent ? `Usa el de ${org.parent.name}` : org.planId ? (org.plan?.name ?? "—") : "A medida (sin plan)"}
+              </Fact>
+              <Fact label="Vigencia del plan">
+                {org.parent
+                  ? "La de la organización principal"
+                  : !org.planId
+                    ? "—"
+                    : org.planEndsAt
+                      ? `Hasta el ${planDateLabel(org.planEndsAt)} (${PLAN_STATE_LABEL[validity.state].toLowerCase()})`
+                      : "Sin fecha de vencimiento"}
+              </Fact>
+              <Fact label="Solicitudes pendientes">
+                {pendingRequests === 0 ? (
+                  "Ninguna"
+                ) : (
+                  <Link href="/admin/solicitudes" className="text-accent hover:underline">
+                    {pendingRequests} pendiente{pendingRequests === 1 ? "" : "s"}
+                  </Link>
+                )}
               </Fact>
               <Fact label="Estado">{org.suspended ? "Suspendida" : "Activa"}</Fact>
               <Fact label="Administradores">{formatSeatUsage(seats.admins, org.maxAdmins)}</Fact>
@@ -227,6 +260,19 @@ export default async function AdminOrganizationDetailPage({
               summary: describePlan(p.values).join(" · "),
             }))}
           />
+          {org.planId && (
+            <div className="mt-5">
+              <PlanValidity
+                orgId={org.id}
+                state={validity.state}
+                stateLabel={PLAN_STATE_LABEL[validity.state]}
+                startedAtLabel={org.planStartedAt ? planDateLabel(org.planStartedAt) : null}
+                endsAtLabel={org.planEndsAt ? planDateLabel(org.planEndsAt) : null}
+                endsAtInput={org.planEndsAt ? org.planEndsAt.toISOString().slice(0, 10) : ""}
+                daysText={validityDays}
+              />
+            </div>
+          )}
         </Card>
       )}
 

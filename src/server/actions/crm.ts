@@ -990,6 +990,8 @@ export async function regenerateMeetingSummaryAction(meetingId: string): Promise
     if (result.status === "too_short") return { error: "La transcripción es demasiado corta para resumir." };
     if (result.status === "not_found") return { error: "Reunión no encontrada" };
   } catch (error) {
+    // Sin créditos o plan vencido: el mensaje ya explica qué hacer (no es el tope diario).
+    if (error instanceof AiCreditsError) return { error: error.message };
     if (error instanceof AiBudgetExceededError) {
       return { error: "Se alcanzó el tope de gasto diario de IA. Probá de nuevo mañana." };
     }

@@ -16,8 +16,11 @@ export const PACK_VALID_DAYS = 90;
 /** Créditos de emergencia: pasado el 100%, el bot que contesta a los clientes sigue unos créditos más antes del corte total. */
 export const EMERGENCY_RESERVE = 300;
 
-/** Créditos por minuto de transcripción de una reunión. */
-export const CREDITS_PER_AUDIO_MINUTE = 5;
+/** Créditos por minuto de transcripción: ninguno. Transcribir corre en el servidor propio (no se paga por minuto a OpenAI); los minutos igual se registran. */
+export const CREDITS_PER_AUDIO_MINUTE = 0;
+
+/** Créditos de un resumen de reunión con IA (el PDF habla de 10 a 30 por el análisis posterior de una reunión). */
+export const MEETING_SUMMARY_CREDITS = 15;
 
 /** Paquetes que se venden (la recarga la carga el superadmin a mano). */
 export const CREDIT_PACKS = [
@@ -31,7 +34,9 @@ export const FEATURE_CREDITS: Record<string, { label: string; credits: number }>
   bot_calificacion: { label: "Respuesta y calificación del bot", credits: 2 },
   seguimiento: { label: "Análisis comercial de un seguimiento", credits: 3 },
   knowledge_editor: { label: "Editor de conocimiento", credits: 3 },
-  transcripcion: { label: "Transcripción de reunión", credits: CREDITS_PER_AUDIO_MINUTE },
+  meeting_summary: { label: "Resumen de reunión con IA", credits: MEETING_SUMMARY_CREDITS },
+  meeting_summary_live: { label: "Resumen en vivo de una reunión", credits: 3 },
+  transcripcion: { label: "Transcripción de reunión (gratis)", credits: CREDITS_PER_AUDIO_MINUTE },
 };
 
 /** Funciones automáticas (contestan a un cliente sin que nadie las pida): son las que usan la reserva de emergencia. */
@@ -194,7 +199,7 @@ export function creditEquivalents(credits: number) {
     usd: creditsToUsd(c),
     botReplies: Math.floor(c / creditsForFeature("bot_calificacion")),
     analyses: Math.floor(c / creditsForFeature("seguimiento")),
-    audioMinutes: Math.floor(c / CREDITS_PER_AUDIO_MINUTE),
+    meetingSummaries: Math.floor(c / MEETING_SUMMARY_CREDITS),
   };
 }
 

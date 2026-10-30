@@ -23,6 +23,8 @@ vi.mock("@/server/db/client", () => ({
 // Los créditos de IA tienen sus propias pruebas (client-credits.test.ts): acá no intervienen.
 vi.mock("./credits", () => ({
   AiCreditsExhaustedError: class extends Error {},
+  PlanExpiredError: class extends Error {},
+  assertPlanActive: vi.fn(async () => {}),
   assertCreditsAvailable: vi.fn(async () => {}),
   chargeCredits: vi.fn(async () => {}),
 }));

@@ -18,15 +18,17 @@ Modelo comercial de CRM ProShop (basado en "Modelo de créditos IA de CRM ProSho
 | Respuesta y calificación del bot (`bot_calificacion`) | 2 |
 | Análisis comercial de un seguimiento (`seguimiento`) | 3 |
 | Editor de conocimiento (`knowledge_editor`) | 3 |
-| Transcripción de reunión (`transcripcion`) | 5 por minuto en la llamada |
+| Resumen de reunión con IA (`meeting_summary`) | 15 |
+| Resumen en vivo de una reunión, `/bot resumen` (`meeting_summary_live`) | 3 |
+| Transcripción de reunión (`transcripcion`) | **gratis** (se registran los minutos) |
 | Cualquier función de IA nueva sin precio definido | 1 |
 
-La transcripción se cobra una sola vez por reunión, al terminar bien el asistente. Si la reunión falla no se cobra.
+La transcripción no gasta créditos: corre en el servidor propio (no se paga por minuto a OpenAI). Al terminar bien una reunión se anota el uso con sus minutos y 0 créditos, una sola vez por reunión, para tener el dato. Lo que sí gasta es el resumen con IA.
 
 ## Qué cobra y qué no
 
 - Las llamadas de IA que usan **la clave de la plataforma** gastan créditos. Con clave propia o personalizada de la organización **no** se cobran (el gasto no es de la plataforma).
-- La transcripción gasta créditos siempre que la organización tenga plan de créditos (Vexa corre en la infraestructura de la plataforma).
+- La transcripción y la grabación no gastan créditos (Vexa corre en la infraestructura de la plataforma).
 - El costo real de la API se guarda en cada consumo (`AiCreditUsage.costUsd`) y solo lo ve el superadmin, para ajustar los precios con datos reales.
 
 ## Qué pasa al agotarse
@@ -36,7 +38,7 @@ La transcripción se cobra una sola vez por reunión, al terminar bien el asiste
 | 80% | Aviso amarillo al dueño |
 | 95% | Segundo aviso, pide recarga |
 | 100% | Aviso rojo; se detienen las funciones de IA manuales; el asistente de reuniones no entra |
-| Pasado el 100% | El **bot de WhatsApp** y la transcripción siguen con una reserva de emergencia de **300 créditos** antes del corte total |
+| Pasado el 100% | El **bot de WhatsApp** sigue con una reserva de emergencia de **300 créditos**; al agotarse también, la conversación pasa a una persona del equipo con un aviso (el bot ya no queda callado) |
 
 El CRM nunca se detiene: contactos, pipeline, búsqueda, notas, tareas e historial siguen funcionando.
 
@@ -48,3 +50,15 @@ El CRM nunca se detiene: contactos, pipeline, búsqueda, notas, tareas e histori
 ## Tablas
 
 `ai_credit_packs` (recargas) y `ai_credit_usages` (cada consumo: organización, usuario, función, modelo, tokens, minutos de audio, costo real, créditos y de dónde salieron). Migración `20261031000000_ai_credits`, aditiva.
+
+## Qué se detiene sin créditos (y qué no)
+
+Se detiene: el análisis del asesor, el editor de conocimiento, los resúmenes de reunión con IA (y su PDF) y las respuestas del bot. Siguen: chats, contactos, pipeline, calendario, reuniones, grabación y transcripción del asistente, notas, tareas e historial. Los mensajes que ve el usuario dicen que faltan créditos o que el plan venció (no el viejo "tope diario"). Los resúmenes automáticos que quedaron sin hacer se retoman solos cuando hay créditos o se renueva el plan.
+
+## Período de la bolsa
+
+La bolsa se renueva **cada mes el mismo día que empezó el plan** (`planStartedAt`), no el 1 de cada mes. Una organización sin plan con fechas usa el mes calendario (UTC) de siempre.
+
+## Pedir más créditos
+
+El dueño tiene en su panel (General → Créditos de IA) el botón **Solicitar más créditos** (paquetes de 2.000 / 5.000 / 10.000 o una cantidad libre, con mensaje opcional). Le llega al superadmin en `/admin/solicitudes` (contador en el menú). Al **aprobar** —después de recibir el pago por otro medio— se carga un paquete de 90 días en la organización dueña de la bolsa. Tope: 3 solicitudes pendientes por organización.

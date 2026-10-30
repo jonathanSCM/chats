@@ -27,6 +27,10 @@ import { DangerZone } from "./_components/danger-zone";
 import { getSeatPlan } from "@/server/services/org-limits";
 import { getCreditUsageSummary, getOrgCredits, listCreditPacks } from "@/server/services/ai/credits";
 import { AiCreditsPanel } from "@/components/ai-credits-panel";
+import { PlanSummaryCard } from "@/components/plan-summary-card";
+import { getPlanOverview } from "@/server/services/plans";
+import { listRequests } from "@/server/services/credit-requests";
+import { RequestCreditsForm, RequestRenewalForm, type PendingRequestView } from "./_components/request-forms";
 import { SubOrgsPanel } from "./_components/suborgs-panel";
 import {
   ensureParentAdminsInChildren,
@@ -115,6 +119,19 @@ export default async function OrganizationSettingsPage({
   const [creditSummary, creditPacks] = credits
     ? await Promise.all([getCreditUsageSummary(credits.rootOrgId), listCreditPacks(credits.rootOrgId)])
     : [null, []];
+
+  // Plan y solicitudes (solo en la pestaña General, que es donde se muestran).
+  const planOverview = tab === "general" ? await getPlanOverview(org.id) : null;
+  const myRequests: PendingRequestView[] =
+    tab === "general"
+      ? (await listRequests({ organizationId: org.id, limit: 8 })).map((r) => ({
+          id: r.id,
+          kind: r.kind,
+          credits: r.credits,
+          createdAt: r.createdAt.toISOString(),
+          status: r.status,
+        }))
+      : [];
 
   let subOrgs: Awaited<ReturnType<typeof listSubOrganizations>> = [];
   let parentSellers: Awaited<ReturnType<typeof listParentSellers>> = [];
@@ -213,13 +230,31 @@ export default async function OrganizationSettingsPage({
         </Card>
       )}
 
+      {planOverview && (
+        <Card className="mb-6" id="plan">
+          <CardTitle className="mb-1">Mi plan</CardTitle>
+          <CardDescription className="mb-4">Qué plan tiene tu organización y hasta cuándo está activo.</CardDescription>
+          <PlanSummaryCard
+            planName={planOverview.planName}
+            state={planOverview.status.state}
+            daysLeft={planOverview.status.daysLeft}
+            endsAt={planOverview.endsAt}
+            startedAt={planOverview.startedAt}
+            includes={planOverview.includes}
+            creditsRenewAt={credits?.renewsAt ?? null}
+            fromParentName={planOverview.fromParentName}
+          >
+            <RequestRenewalForm requests={myRequests} highlight={["expiring", "grace", "expired"].includes(planOverview.status.state)} />
+          </PlanSummaryCard>
+        </Card>
+      )}
+
       {credits && creditSummary && (
         <Card className="mb-6" id="creditos">
           <CardTitle className="mb-1">Créditos de IA</CardTitle>
           <CardDescription className="mb-4">
-            La IA del CRM (bot de WhatsApp, asesor, transcripción de reuniones) gasta créditos de una bolsa compartida por
-            todo tu equipo. Si se acaban, el CRM sigue funcionando; solo se detienen las funciones de IA. Para recargar,
-            escríbenos.
+            La IA del CRM (bot de WhatsApp, asesor y resúmenes de reuniones) gasta créditos de una bolsa compartida por todo tu equipo. Si se acaban,
+            el CRM sigue funcionando; solo se detienen las funciones de IA. Puedes pedir más créditos aquí abajo.
           </CardDescription>
           <AiCreditsPanel
             credits={credits}
@@ -228,6 +263,9 @@ export default async function OrganizationSettingsPage({
             timeZone={org.timezone || "America/La_Paz"}
             fromParentName={parent?.name ?? null}
           />
+          <div className="mt-6">
+            <RequestCreditsForm requests={myRequests} />
+          </div>
         </Card>
       )}
 

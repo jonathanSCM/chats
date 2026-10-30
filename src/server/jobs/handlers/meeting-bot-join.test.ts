@@ -16,8 +16,10 @@ vi.mock("@/server/db/client", () => ({
   },
 }));
 vi.mock("../queue", () => ({ enqueueOrReschedule: m.enqueue }));
-vi.mock("@/server/services/ai/credits", () => ({ getOrgCredits: m.credits }));
-vi.mock("@/server/services/ai/credits", () => ({ getOrgCredits: m.credits }));
+vi.mock("@/server/services/ai/credits", () => {
+  class PlanExpiredError extends Error {}
+  return { PlanExpiredError, assertPlanActive: m.credits };
+});
 
 import { handleMeetingBotJoin } from "./meeting-bot-join";
 
@@ -60,7 +62,7 @@ beforeEach(() => {
   m.meetingUpdate.mockResolvedValue({});
   m.meetingUpdateMany.mockResolvedValue({ count: 1 });
   m.enqueue.mockResolvedValue(undefined);
-  m.credits.mockResolvedValue(null); // sin plan de créditos
+  m.credits.mockResolvedValue(undefined); // plan vigente
 });
 
 describe("handleMeetingBotJoin (identificador de sesión)", () => {
@@ -123,17 +125,18 @@ describe("handleMeetingBotJoin (identificador de sesión)", () => {
   });
 });
 
-describe("handleMeetingBotJoin (créditos de IA)", () => {
-  it("sin créditos disponibles el asistente no entra: se marca como fallida y no se llama a Vexa", async () => {
-    m.credits.mockResolvedValue({ balance: { available: 0 } });
+describe("handleMeetingBotJoin (vigencia del plan)", () => {
+  it("con el plan vencido el asistente no entra: se marca como fallida y no se llama a Vexa", async () => {
+    const { PlanExpiredError } = await import("@/server/services/ai/credits");
+    m.credits.mockRejectedValue(new PlanExpiredError("Tu plan venció"));
     await handleMeetingBotJoin({ meetingId: "mtg1" });
     expect(m.meetingUpdate).toHaveBeenCalledWith({ where: { id: "mtg1" }, data: { botStatus: "FAILED" } });
     expect(m.fetch).not.toHaveBeenCalled();
     expect(m.enqueue).not.toHaveBeenCalled();
   });
 
-  it("con créditos el flujo sigue igual", async () => {
-    m.credits.mockResolvedValue({ balance: { available: 50 } });
+  it("con el plan vigente el flujo sigue igual, aunque no queden créditos", async () => {
+    m.credits.mockResolvedValue(undefined);
     m.fetch.mockReturnValueOnce(json(201, { id: 7 }));
     await handleMeetingBotJoin({ meetingId: "mtg1" });
     expect(m.fetch).toHaveBeenCalled();

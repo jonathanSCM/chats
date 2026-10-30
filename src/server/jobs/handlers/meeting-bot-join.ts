@@ -4,7 +4,7 @@ import { enqueueOrReschedule } from "../queue";
 import { extractMeetCode } from "@/server/services/meeting-bot";
 import { assistantDisplayName, BRAND_PARENT_SELECT, resolveOrgBrand } from "@/lib/brand";
 import { decideConflict, parseSessionId, pickSession, type VexaSessionEntry } from "@/lib/vexa-session";
-import { getOrgCredits } from "@/server/services/ai/credits";
+import { PlanExpiredError, assertPlanActive } from "@/server/services/ai/credits";
 
 export const meetingBotJoinPayload = z.object({
   meetingId: z.string(),
@@ -58,10 +58,13 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
   });
   if (!meeting || !meeting.meetingUrl || meeting.status === "CANCELED") return;
 
-  // Sin créditos de IA el asistente no entra: grabar y transcribir gasta créditos. No se reintenta.
-  const credits = await getOrgCredits(meeting.organizationId);
-  if (credits && credits.balance.available <= 0) {
-    console.warn(`[meeting-bot] La organización ${meeting.organizationId} no tiene créditos de IA — el asistente no entra a ${meetingId}.`);
+  // Con el plan vencido (pasada la gracia) el asistente no entra. No se reintenta. Transcribir no gasta créditos, así que
+  // quedarse sin créditos no lo detiene (solo el resumen con IA).
+  try {
+    await assertPlanActive(meeting.organizationId);
+  } catch (error) {
+    if (!(error instanceof PlanExpiredError)) throw error;
+    console.warn(`[meeting-bot] El plan de la organización ${meeting.organizationId} venció — el asistente no entra a ${meetingId}.`);
     await prisma.meeting.update({ where: { id: meetingId }, data: { botStatus: "FAILED" } });
     return;
   }

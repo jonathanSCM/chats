@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { stopMeetingBot } from "@/server/services/meeting-bot";
 import { summarizeTranscriptNow } from "@/server/services/meeting-summary";
+import { AiCreditsError } from "@/server/services/ai/client";
 
 /**
  * Comandos escritos en el chat de la propia reunión de Google Meet (no
@@ -108,7 +109,12 @@ export async function POST(req: NextRequest) {
         transcript: transcriptText,
       });
       return withCors(NextResponse.json({ ok: true, reply: `Asistente (resumen hasta ahora): ${summary.resumen}` }));
-    } catch {
+    } catch (error) {
+      if (error instanceof AiCreditsError) {
+        return withCors(
+          NextResponse.json({ ok: true, reply: "Asistente: la IA de tu organización está detenida (sin créditos o plan vencido). Avisa al administrador." }),
+        );
+      }
       return withCors(NextResponse.json({ ok: true, reply: "Asistente: no pude generar el resumen ahora, probá de nuevo en un rato." }));
     }
   }

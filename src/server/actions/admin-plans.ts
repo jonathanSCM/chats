@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { requireSession, HttpError } from "@/server/auth/guards";
 import { audit } from "@/server/services/audit";
-import { assignPlanToOrg, planToValues, updatePlanAndPropagate } from "@/server/services/plans";
+import { assignPlanToOrg, planToValues, renewPlan, setPlanEnd, updatePlanAndPropagate } from "@/server/services/plans";
 import { CURRENCIES } from "@/lib/plans";
 import type { ActionState } from "./types";
 
@@ -156,4 +156,28 @@ export async function dismissPlanNoticeAction(): Promise<ActionState> {
   });
   revalidatePath("/", "layout");
   return { error: null };
+}
+
+/** Renueva el plan de una organización (suma meses al vencimiento) y le avisa al dueño. */
+export async function renewOrgPlanAction(orgId: string, months: number): Promise<ActionState> {
+  const session = await requireSuperadmin();
+  const result = await renewPlan(orgId, session.user.id, months);
+  if ("error" in result) return { error: result.error };
+  revalidatePath(`/admin/organizations/${orgId}`);
+  revalidateAll();
+  return { error: null, message: "Plan renovado." };
+}
+
+/** Fija a mano hasta cuándo está activo el plan (fecha tipo 2026-12-31). */
+export async function setOrgPlanEndAction(orgId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requireSuperadmin();
+  const raw = String(formData.get("endsAt") ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return { error: "Elige una fecha." };
+  // Vence al final de ese día en UTC (23:59:59), para que "hasta el 31" incluya el 31 completo.
+  const endsAt = new Date(`${raw}T23:59:59.000Z`);
+  const result = await setPlanEnd(orgId, endsAt, session.user.id);
+  if ("error" in result) return { error: result.error };
+  revalidatePath(`/admin/organizations/${orgId}`);
+  revalidateAll();
+  return { error: null, message: "Vencimiento guardado." };
 }

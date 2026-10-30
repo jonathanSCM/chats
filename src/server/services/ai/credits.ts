@@ -1,5 +1,5 @@
 import { prisma } from "@/server/db/client";
-import { monthStartUtc, nextMonthStartUtc } from "@/lib/ai-limit";
+import { creditPeriod, planStatus, planStatusNotice, type PlanStatus } from "@/lib/plan-period";
 import {
   AUTOMATIC_FEATURES,
   canSpend,
@@ -20,6 +20,14 @@ export class AiCreditsExhaustedError extends Error {
   }
 }
 
+/** El plan de la organización venció (y pasó la gracia): la IA y el asistente de reuniones se detienen. */
+export class PlanExpiredError extends Error {
+  constructor(message = "El plan de la organización venció") {
+    super(message);
+    this.name = "PlanExpiredError";
+  }
+}
+
 export interface OrgCredits {
   /** La organización dueña de la bolsa (la principal, si es una suborganización). */
   rootOrgId: string;
@@ -27,19 +35,51 @@ export interface OrgCredits {
   level: CreditLevel;
   /** Créditos gastados por encima del saldo este mes (uso de la reserva de emergencia). */
   overdraft: number;
+  /** Desde cuándo cuenta el consumo de este período de la bolsa mensual. */
+  periodStart: Date;
   /** Cuándo se renueva la bolsa mensual. */
   renewsAt: Date;
 }
 
 /** Una suborganización gasta de la bolsa de su organización principal. */
-async function resolveRoot(organizationId: string): Promise<{ rootOrgId: string; monthly: number | null } | null> {
+interface RootOrg {
+  rootOrgId: string;
+  monthly: number | null;
+  planStartedAt: Date | null;
+  planEndsAt: Date | null;
+}
+
+const ROOT_FIELDS = { id: true, aiCreditsMonthly: true, planStartedAt: true, planEndsAt: true } as const;
+
+async function resolveRoot(organizationId: string): Promise<RootOrg | null> {
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { id: true, aiCreditsMonthly: true, parent: { select: { id: true, aiCreditsMonthly: true } } },
+    select: { ...ROOT_FIELDS, parent: { select: ROOT_FIELDS } },
   });
   if (!org) return null;
   const root = org.parent ?? org;
-  return { rootOrgId: root.id, monthly: root.aiCreditsMonthly };
+  return {
+    rootOrgId: root.id,
+    monthly: root.aiCreditsMonthly,
+    planStartedAt: root.planStartedAt ?? null,
+    planEndsAt: root.planEndsAt ?? null,
+  };
+}
+
+/** Vigencia del plan de la organización (la de su organización principal si es una suborganización). */
+export async function getPlanValidity(organizationId: string, now = new Date()): Promise<{ rootOrgId: string; endsAt: Date | null; status: PlanStatus } | null> {
+  const root = await resolveRoot(organizationId);
+  if (!root) return null;
+  return { rootOrgId: root.rootOrgId, endsAt: root.planEndsAt, status: planStatus(root.planEndsAt, now) };
+}
+
+const dateLabel = (d: Date) => d.toLocaleDateString("es", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+
+/** Plan vencido más allá de la gracia: corta con PlanExpiredError. Sin fecha de vencimiento nunca corta. */
+export async function assertPlanActive(organizationId: string, now = new Date()): Promise<void> {
+  const validity = await getPlanValidity(organizationId, now);
+  if (!validity || !validity.status.aiBlocked || !validity.endsAt) return;
+  throw new PlanExpiredError(planStatusNotice(validity.status, dateLabel(validity.endsAt)) ?? undefined);
 }
 
 async function familyIds(rootOrgId: string): Promise<string[]> {
@@ -53,9 +93,10 @@ export async function getOrgCredits(organizationId: string, now = new Date()): P
   if (!root || root.monthly === null) return null;
 
   const ids = await familyIds(root.rootOrgId);
+  const period = creditPeriod(root.planStartedAt, now);
   const [usage, packs] = await Promise.all([
     prisma.aiCreditUsage.aggregate({
-      where: { organizationId: { in: ids }, createdAt: { gte: monthStartUtc(now) } },
+      where: { organizationId: { in: ids }, createdAt: { gte: period.start } },
       _sum: { credits: true, fromMonthly: true, fromPacks: true },
     }),
     prisma.aiCreditPack.findMany({
@@ -73,7 +114,8 @@ export async function getOrgCredits(organizationId: string, now = new Date()): P
     balance,
     level: creditLevel(balance),
     overdraft: Math.max(0, total - fromMonthly - fromPacks),
-    renewsAt: nextMonthStartUtc(now),
+    periodStart: period.start,
+    renewsAt: period.end,
   };
 }
 
@@ -100,16 +142,18 @@ export interface ChargeInput {
 
 /** Descuenta créditos (primero lo mensual, después los paquetes que vencen antes) y deja el registro. */
 export async function chargeCredits(input: ChargeInput, now = new Date()): Promise<void> {
-  if (input.credits <= 0) return;
+  // Sin créditos que descontar no hay nada que anotar, salvo los minutos de audio (la transcripción no cuesta, pero se registra).
+  if (input.credits <= 0 && !(input.audioMinutes && input.audioMinutes > 0)) return;
   const root = await resolveRoot(input.organizationId);
   if (!root || root.monthly === null) return;
   const monthly = root.monthly;
   const ids = await familyIds(root.rootOrgId);
+  const periodStart = creditPeriod(root.planStartedAt, now).start;
 
   await prisma.$transaction(async (tx) => {
     const [used, packs] = await Promise.all([
       tx.aiCreditUsage.aggregate({
-        where: { organizationId: { in: ids }, createdAt: { gte: monthStartUtc(now) } },
+        where: { organizationId: { in: ids }, createdAt: { gte: periodStart } },
         _sum: { fromMonthly: true },
       }),
       tx.aiCreditPack.findMany({
@@ -192,7 +236,8 @@ export interface CreditUsageSummary {
 /** Resumen del consumo del mes: por función, por usuario y las últimas operaciones (con el costo real de la API). */
 export async function getCreditUsageSummary(rootOrgId: string, now = new Date(), recentLimit = 25): Promise<CreditUsageSummary> {
   const ids = await familyIds(rootOrgId);
-  const where = { organizationId: { in: ids }, createdAt: { gte: monthStartUtc(now) } };
+  const anchor = (await prisma.organization.findUnique({ where: { id: rootOrgId }, select: { planStartedAt: true } }))?.planStartedAt ?? null;
+  const where = { organizationId: { in: ids }, createdAt: { gte: creditPeriod(anchor, now).start } };
   const [byFeature, byUser, recent, cost] = await Promise.all([
     prisma.aiCreditUsage.groupBy({ by: ["feature"], where, _sum: { credits: true }, _count: { _all: true } }),
     prisma.aiCreditUsage.groupBy({ by: ["userId"], where, _sum: { credits: true } }),

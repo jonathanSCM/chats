@@ -164,11 +164,14 @@ export async function updateMeetEvent({
   eventId,
   scheduledAt,
   durationMinutes,
+  summary,
 }: {
   calendarId: string;
   eventId: string;
   scheduledAt: Date;
   durationMinutes: number;
+  /** Título nuevo del evento; sin esto no se toca. */
+  summary?: string;
 }): Promise<void> {
   const calendar = getCalendarClient();
   const endAt = new Date(scheduledAt.getTime() + durationMinutes * 60_000);
@@ -178,6 +181,7 @@ export async function updateMeetEvent({
     eventId,
     sendUpdates: "all",
     requestBody: {
+      ...(summary ? { summary } : {}),
       start: { dateTime: scheduledAt.toISOString() },
       end: { dateTime: endAt.toISOString() },
     },

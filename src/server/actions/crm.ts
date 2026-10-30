@@ -23,6 +23,7 @@ import { createUserMeetEvent, hasGoogleCalendarConnected } from "@/server/servic
 import { scheduleMeetingBotJoin, cancelMeetingBotJoin, stopMeetingBot } from "@/server/services/meeting-bot";
 import { requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
 import { generateMeetingSummary } from "@/server/services/meeting-summary";
+import { meetingTitleForClient } from "@/lib/meeting-title";
 import { meetingSummarySchema } from "@/lib/meeting-summary";
 import { buildProposals, type ApplyKey } from "@/lib/meeting-apply";
 import { AiBudgetExceededError } from "@/server/services/ai/client";
@@ -495,7 +496,12 @@ export async function createMeetingAction(
   let googleEventId: string | null = null;
   let googleCalendarOwnerId: string | null = null;
   const botEnabled = parsed.data.botEnabled ?? true;
-  const summary = `Reunión con ${opportunity.contact.fullName || opportunity.contact.phone} — ${opportunity.title}`;
+  // Lo que ve el cliente en la invitación: solo el título escrito (o "Reunión con {nombre}"), nunca el contexto interno.
+  const summary = meetingTitleForClient({
+    title: parsed.data.title,
+    contactName: opportunity.contact.fullName,
+    phone: opportunity.contact.phone,
+  });
 
   // Mismo criterio que adhoc-meetings.ts: si quien crea la reunión conectó
   // su Google Calendar personal, TODA reunión que cree se refleja ahí --
@@ -543,9 +549,7 @@ export async function createMeetingAction(
     data: {
       organizationId,
       opportunityId: parsed.data.opportunityId,
-      title:
-        parsed.data.title?.trim() ||
-        `Reunión con ${opportunity.contact.fullName || opportunity.contact.phone}`,
+      title: summary,
       scheduledAt,
       durationMinutes,
       meetingUrl,
@@ -717,6 +721,8 @@ export async function updateMeetingAction(meetingId: string, formData: FormData)
           eventId: meeting.googleEventId,
           scheduledAt,
           durationMinutes: parsed.data.durationMinutes,
+          // Si cambió el título, la invitación del cliente también lo muestra nuevo.
+          summary: parsed.data.title?.trim() && parsed.data.title.trim() !== meeting.title ? parsed.data.title.trim() : undefined,
         });
       } catch (error) {
         return { error: error instanceof Error ? error.message : "No se pudo actualizar el evento en Google Calendar." };

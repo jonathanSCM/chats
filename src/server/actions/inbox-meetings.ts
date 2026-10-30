@@ -1,6 +1,7 @@
 "use server";
 
 import { normalizeMeetUrl } from "@/lib/meet-code";
+import { meetingTitleForClient } from "@/lib/meeting-title";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
@@ -104,7 +105,7 @@ export async function createMeetingFromConversationAction(
   let googleEventId: string | null = null;
   let googleCalendarOwnerId: string | null = null;
   const botEnabled = parsed.data.botEnabled ?? true;
-  const title = parsed.data.title?.trim() || `Reunión con ${contact.fullName || contact.phone}`;
+  const title = meetingTitleForClient({ title: parsed.data.title, contactName: contact.fullName, phone: contact.phone });
 
   // Mismo criterio que crm.ts/adhoc-meetings.ts: si quien crea la reunión
   // conectó su Google Calendar personal, se refleja ahí sin importar si

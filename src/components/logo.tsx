@@ -39,7 +39,8 @@ export function BrandLogoImage({
       alt=""
       width={size}
       height={size}
-      className={cn("shrink-0 rounded-full object-cover", className)}
+      data-shape="round"
+      className={cn("brand-logo-img shrink-0 rounded-full object-cover", className)}
       style={{ width: size, height: size }}
     />
   ) : (
@@ -48,7 +49,8 @@ export function BrandLogoImage({
       src={src}
       alt=""
       height={size}
-      className={cn("shrink-0 rounded-md object-contain", className)}
+      data-shape="square"
+      className={cn("brand-logo-img shrink-0 rounded-md object-contain", className)}
       style={{ height: size, width: "auto", maxWidth: size * 3.5 }}
     />
   );

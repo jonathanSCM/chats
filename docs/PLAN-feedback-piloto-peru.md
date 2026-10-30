@@ -7,17 +7,17 @@ Estado según lo que revisé en el código y en los logs de producción. "Hecho"
 
 | # | Tema | Estado hoy | Siguiente paso | Esfuerzo |
 |---|---|---|---|---|
-| 2.1 | "Necesidad / Contexto" en el título que ve el cliente | **Causa encontrada** | Título real, separado del contexto | Chico |
+| 2.1 | "Necesidad / Contexto" en el título que ve el cliente | **Hecho** | Redeploy | — |
 | 2.2 | Bot no entra por enlace de Meet | **Hecho** (commits `8e2f7be`, `c31ff17`) | Redeploy | — |
 | 2.3 | Bot se sale de la llamada | **Causa encontrada y regla puesta en Vexa** | Vigilar 1–2 reuniones | — |
 | 1.1 | Guardado falla al primer intento | **Mitigado** (`1bd652a`, `f0012b4`) | Redeploy y medir | — |
-| 4.1 | Ficha no accesible desde el celular | **Causa probable** | Menú "⋯" con los botones de la cabecera | Chico |
-| 4.2 | Teléfono visible / llamar | Falta | Mostrar número con enlace `tel:` | Muy chico |
+| 4.1 | Ficha no accesible desde el celular | **Hecho** (menú "⋯") | Redeploy y probar en un celular real | — |
+| 4.2 | Teléfono visible / llamar | **Hecho** | Redeploy | — |
 | 3.2 | Salientes del celular no aparecen hasta la respuesta | **Por diagnosticar** | Un ejemplo concreto de Mariana | Medio |
 | 3.3 | Archivar sincronizado con WhatsApp Business | **Probable límite de Meta** | Confirmar en la doc de Meta | Por ver |
 | 2.4 | Pestaña única de reuniones | Propuesta | Ver detalle abajo | Medio |
 | 2.5 | Calendario/categoría "ProShop" en Google | Propuesta | Ver detalle abajo | Chico–medio |
-| 3.4 | Guardar contacto CRM ↔ teléfono | **Parcialmente imposible** | Alternativas abajo | Por ver |
+| 3.4 | Guardar contacto CRM ↔ teléfono | **Hecho el .vcf** (el sentido inverso ya llega por Coexistence) | Redeploy | — |
 | 3.1 | Contactos con username | **Hecho** (`0541948`) | Redeploy (ya en prod desde el 28) | — |
 
 ---

@@ -18,7 +18,10 @@ import {
   Copy,
   Pencil,
   Ban,
+  Phone,
+  Download,
 } from "lucide-react";
+import { formatPhoneDisplay, phoneHref } from "@/lib/phone";
 import {
   addConversationNoteAction,
   deleteConversationAction,
@@ -640,6 +643,64 @@ function AddToTrackingForm({
   );
 }
 
+/** Teléfono del contacto: se ve, se llama con un toque, se copia y se guarda en la agenda del celular (.vcf). */
+function PhoneActions({ contactId, phone }: { contactId: string; phone: string }) {
+  const href = phoneHref(phone);
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(formatPhoneDisplay(phone));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // sin permiso del portapapeles: no pasa nada, el número se ve igual
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <p className="flex items-center gap-1.5 text-sm font-medium text-ink">
+        <Phone size={13} className="shrink-0 text-ink-faint" />
+        {href ? (
+          <a href={href} className="text-accent hover:underline" title="Llamar">
+            {formatPhoneDisplay(phone)}
+          </a>
+        ) : (
+          <span className="text-xs font-normal text-ink-faint">{formatPhoneDisplay(phone)}</span>
+        )}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {href && (
+          <a
+            href={href}
+            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
+          >
+            <Phone size={11} /> Llamar
+          </a>
+        )}
+        {href && (
+          <button
+            type="button"
+            onClick={copy}
+            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
+          >
+            <Copy size={11} /> {copied ? "Copiado" : "Copiar"}
+          </button>
+        )}
+        <a
+          href={`/api/contacts/${contactId}/vcard`}
+          download
+          title="Descarga la ficha como tarjeta de contacto: el celular ofrece guardarla en la agenda"
+          className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
+        >
+          <Download size={11} /> Guardar en el teléfono
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function ContactForm({
   contact,
   onSaved,
@@ -681,7 +742,7 @@ function ContactForm({
   return (
     <form action={formAction} className="space-y-2 border-t border-border pt-4">
       <Label>Contacto</Label>
-      <p className=" text-xs text-ink-faint">{contact.phone}</p>
+      <PhoneActions contactId={contact.id} phone={contact.phone} />
 
       <Input
         name="fullName"
@@ -838,7 +899,7 @@ function MeetingsPanel({
           <Input
             type="text"
             name="title"
-            placeholder="Nombre de la reunión (opcional)"
+            placeholder="Título de la reunión (lo ve el cliente)"
             className="py-1.5 text-xs"
           />
           <div className="flex gap-2">

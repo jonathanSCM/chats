@@ -110,7 +110,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           href="/dashboard/perfil"
           className="nav-item mb-2 block rounded-lg px-2 py-2 transition-colors hover:bg-[var(--sidebar-hover)]"
         >
-          <p className="flex items-center gap-2 truncate text-sm font-medium text-white">
+          <p className="nav-profile-row flex items-center gap-2 truncate text-sm font-medium text-white">
             <UserCircle size={18} className="shrink-0 text-[var(--sidebar-ink)]" />
             <span className="nav-label truncate">{session?.user.email}</span>
           </p>

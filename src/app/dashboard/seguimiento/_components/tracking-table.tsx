@@ -2192,7 +2192,7 @@ function MeetingsSection({
           <Input
             type="text"
             name="title"
-            placeholder="Nombre de la reunión (opcional — se arma uno solo si lo dejás vacío)"
+            placeholder="Título de la reunión (lo ve el cliente). Vacío = «Reunión con …»"
             className="py-1.5 text-xs"
           />
           <div className="flex gap-2">

@@ -288,6 +288,26 @@ textarea {
   padding-right: 0;
 }
 
+/* Contraído, el logo propio no puede pasar del ancho del menú (un logo ancho se cortaba): se achica
+   conservando su proporción; el redondo queda como un círculo chico. */
+:root[data-sidebar="closed"] .app-sidebar .brand-logo-img {
+  max-width: 44px !important;
+  max-height: 44px !important;
+}
+:root[data-sidebar="closed"] .app-sidebar .brand-logo-img[data-shape="square"] {
+  width: auto !important;
+  height: auto !important;
+}
+:root[data-sidebar="closed"] .app-sidebar .brand-logo-img[data-shape="round"] {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+/* La fila del perfil es un bloque con el ícono adentro: contraída, el ícono se centra como los demás. */
+:root[data-sidebar="closed"] .app-sidebar .nav-profile-row {
+  justify-content: center;
+}
+
 /* 768–1023 px: el menú queda contraído (solo íconos) para dejar espacio al contenido (guía §9). */
 @media (min-width: 768px) and (max-width: 1023px) {
   .app-sidebar,
@@ -304,6 +324,23 @@ textarea {
     justify-content: center;
     padding-left: 0;
     padding-right: 0;
+  }
+
+  .app-sidebar .brand-logo-img {
+    max-width: 44px !important;
+    max-height: 44px !important;
+  }
+  .app-sidebar .brand-logo-img[data-shape="square"] {
+    width: auto !important;
+    height: auto !important;
+  }
+  .app-sidebar .brand-logo-img[data-shape="round"] {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .app-sidebar .nav-profile-row {
+    justify-content: center;
   }
 }
 

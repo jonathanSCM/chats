@@ -33,6 +33,7 @@ import {
   Pause,
   FlaskConical,
   CalendarClock,
+  MoreVertical,
 } from "lucide-react";
 import {
   sendInboxMessageAction,
@@ -58,6 +59,7 @@ import { usePushNotifications } from "@/lib/use-push-notifications";
 import { Button } from "@/components/ui/button";
 import { ConversationPanel } from "./_components/conversation-panel";
 import { startPolling } from "@/lib/polling";
+import { formatPhoneDisplay, phoneHref } from "@/lib/phone";
 import { TemplatePickerModal } from "./_components/template-picker-modal";
 
 interface Vendor {
@@ -139,6 +141,36 @@ interface Message {
   staffReaction: string | null;
   linkPreview: { title: string; description: string | null; imageUrl: string | null } | null;
   replyTo: { id: string; content: string; role: Message["role"]; mediaType: MediaType | null } | null;
+}
+
+/** Fila del menú "⋯" de la cabecera del chat en pantallas chicas. */
+function MenuRow({
+  icon,
+  label,
+  onClick,
+  disabled,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  tone?: "accent" | "danger";
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-surface-2/60 disabled:opacity-50 ${
+        tone === "danger" ? "text-danger" : tone === "accent" ? "text-accent" : "text-ink"
+      }`}
+    >
+      <span className="shrink-0">{icon}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+    </button>
+  );
 }
 
 function StatusTicks({ status }: { status: Message["status"] }) {
@@ -539,6 +571,8 @@ export function InboxClient({
   const [chatSearchIndex, setChatSearchIndex] = useState(0);
 
   const [panelOpen, setPanelOpen] = useState(false);
+  // Menú "⋯" con las acciones del chat en pantallas chicas (donde los botones no entran en la cabecera).
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState<string | null>(null);
   const confirmDeleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1428,7 +1462,15 @@ export function InboxClient({
                   )}
                 </p>
                 {customerName && (
-                  <p className="truncate text-xs text-ink-faint">{customerPhone}</p>
+                  <p className="truncate text-xs text-ink-faint">
+                    {phoneHref(customerPhone) ? (
+                      <a href={phoneHref(customerPhone) ?? undefined} className="hover:text-accent hover:underline" title="Llamar">
+                        {formatPhoneDisplay(customerPhone)}
+                      </a>
+                    ) : (
+                      formatPhoneDisplay(customerPhone)
+                    )}
+                  </p>
                 )}
                 {conversationFromAd && adReferralData?.headline && (
                   <p className="flex items-center gap-1.5 truncate text-xs text-accent">
@@ -1521,6 +1563,8 @@ export function InboxClient({
                   {assignedTo.id === currentUserId ? "Tú" : assignedTo.name}
                 </span>
               )}
+              {/* En escritorio, los botones de siempre; en pantallas chicas van dentro del menú "⋯" de más abajo. */}
+              <div className="hidden shrink-0 items-center md:flex">
               <button
                 type="button"
                 onClick={sendScheduleOffer}
@@ -1600,6 +1644,102 @@ export function InboxClient({
               >
                 <PanelRight size={18} />
               </button>
+              </div>
+
+              <div className="relative flex shrink-0 items-center md:hidden">
+                <button
+                  type="button"
+                  onClick={() => setPanelOpen((v) => !v)}
+                  aria-label="Ficha del contacto"
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface ${
+                    panelOpen ? "text-accent" : "text-ink-muted"
+                  }`}
+                >
+                  <PanelRight size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen((v) => !v)}
+                  aria-label="Más acciones"
+                  aria-haspopup="menu"
+                  aria-expanded={mobileMenuOpen}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface"
+                >
+                  <MoreVertical size={18} />
+                </button>
+                {mobileMenuOpen && (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Cerrar el menú"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="fixed inset-0 z-30 cursor-default"
+                    />
+                    <div
+                      role="menu"
+                      className="absolute right-0 top-full z-40 mt-1 w-64 overflow-hidden rounded-md border border-border bg-surface py-1 shadow-lg"
+                    >
+                      <MenuRow
+                        icon={<PanelRight size={16} />}
+                        label="Ficha del contacto"
+                        onClick={() => {
+                          setPanelOpen(true);
+                          setMobileMenuOpen(false);
+                        }}
+                      />
+                      <MenuRow
+                        icon={<CalendarClock size={16} />}
+                        label="Ofrecer horarios de reunión"
+                        disabled={scheduleOfferSending}
+                        onClick={() => {
+                          sendScheduleOffer();
+                          setMobileMenuOpen(false);
+                        }}
+                      />
+                      <MenuRow
+                        icon={<Search size={16} />}
+                        label="Buscar en la conversación"
+                        onClick={() => {
+                          setChatSearchOpen(true);
+                          setMobileMenuOpen(false);
+                        }}
+                      />
+                      <MenuRow
+                        icon={conversationMuted ? <BellOff size={16} /> : <Bell size={16} />}
+                        label={conversationMuted ? "Reactivar notificaciones" : "Silenciar"}
+                        tone={conversationMuted ? "accent" : undefined}
+                        onClick={() => {
+                          toggleMute();
+                          setMobileMenuOpen(false);
+                        }}
+                      />
+                      <MenuRow
+                        icon={conversationBlocked ? <ShieldCheck size={16} /> : <Ban size={16} />}
+                        label={conversationBlocked ? "Desbloquear" : confirmBlock ? "¿Seguro? Toca de nuevo" : "Bloquear"}
+                        tone={conversationBlocked || confirmBlock ? "danger" : undefined}
+                        onClick={() => {
+                          // Bloquear pide confirmar con un segundo toque: el menú sigue abierto hasta entonces.
+                          const done = conversationBlocked || confirmBlock;
+                          toggleBlock();
+                          if (done) setMobileMenuOpen(false);
+                        }}
+                      />
+                      <MenuRow
+                        icon={conversationStatus === "CLOSED" ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                        label={
+                          conversationStatus === "CLOSED" ? "Desarchivar" : confirmArchive ? "¿Seguro? Toca de nuevo" : "Archivar"
+                        }
+                        tone={conversationStatus === "CLOSED" ? "accent" : confirmArchive ? "danger" : undefined}
+                        onClick={() => {
+                          const done = conversationStatus === "CLOSED" || confirmArchive;
+                          toggleArchive();
+                          if (done) setMobileMenuOpen(false);
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             {chatSearchOpen && (

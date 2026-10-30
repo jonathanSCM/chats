@@ -63,6 +63,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
                   status: true,
                   meetingUrl: true,
                   botEnabled: true,
+                  context: true,
                 },
                 orderBy: { scheduledAt: "desc" },
               },
@@ -211,6 +212,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
               status: m.status,
               meetingUrl: m.meetingUrl,
               botEnabled: m.botEnabled,
+              context: m.context ?? "",
             })),
           })),
         }

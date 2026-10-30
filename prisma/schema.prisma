@@ -1104,6 +1104,9 @@ model Meeting {
   transcript            String?           @db.Text // de subtítulos en vivo, con nombre de quién habló — separado de `notes`
   audioTranscript       String?           @db.Text // whisper.cpp local sobre el audio completo, sin nombres — complementa transcript cuando los subtítulos tienen huecos o fallaron
   notes                 String?           @db.Text // texto cargado a mano por el vendedor, nunca lo pisa el bot
+  // Contexto de la reunión: lo escribe una persona ("esta reunión es para ver tal cosa"). Es INTERNO: no va al título, a la
+  // invitación ni a los invitados, y no es el resumen de la IA ni la transcripción.
+  context               String?           @db.Text
   aiSummary             String?           @db.Text
   // Resumen estructurado (resumen, puntos, decisiones, próximos pasos e información comercial) y cuándo se generó -- ver services/meeting-summary.ts.
   aiSummaryData         Json?

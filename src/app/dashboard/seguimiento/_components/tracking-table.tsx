@@ -47,6 +47,7 @@ import {
   stopMeetingBotAction,
   generateMeetingSummaryPdfAction,
   updateMeetingAction,
+  updateMeetingContextAction,
   renameMeetingAction,
   cancelMeetingAction,
 } from "@/server/actions/crm";
@@ -120,6 +121,8 @@ export interface Row {
     botLeftAt: string | null;
     botEnabled: boolean;
     notes: string;
+    /** Contexto interno escrito por una persona; no se envía al cliente. */
+    context: string;
     hasTranscript: boolean;
     aiSummary: string;
     aiSummaryData: unknown;
@@ -2241,6 +2244,13 @@ function MeetingsSection({
             className="py-1.5 text-xs"
           />
           <textarea
+            name="context"
+            rows={3}
+            maxLength={5000}
+            placeholder="Contexto de la reunión (interno, no lo ve el cliente): para qué es, qué quieres ver o aclarar…"
+            className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-xs leading-relaxed text-ink outline-none focus:border-accent-dim"
+          />
+          <textarea
             name="notes"
             rows={5}
             placeholder="Pega acá la transcripción o el resumen de la reunión…"
@@ -2288,6 +2298,7 @@ function MeetingsSection({
                     })}{" "}
                     · {m.status}
                   </p>
+                  {m.context && <p className="line-clamp-1 text-xs italic text-ink-faint">{m.context}</p>}
                 </div>
 
                 <div className="flex shrink-0 flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
@@ -2526,6 +2537,22 @@ function MeetingsSection({
                 </p>
               </PanelSection>
             )}
+
+            <PanelSection label="Contexto de la reunión" delay={140}>
+              <p className="mb-1.5 text-xs text-ink-faint">Interno: lo escribes tú y no lo ve el cliente.</p>
+              {editable ? (
+                <EditableText
+                  value={m.context}
+                  disabled={disabled}
+                  placeholder="Para qué es esta reunión, qué quieres ver o aclarar…"
+                  onSave={(v) => startTransition(async () => { await updateMeetingContextAction(m.id, v); })}
+                />
+              ) : m.context ? (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">{m.context}</p>
+              ) : (
+                <p className="text-xs text-ink-faint">Sin contexto.</p>
+              )}
+            </PanelSection>
 
             <PanelSection label="Notas" delay={160}>
               {editable ? (

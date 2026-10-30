@@ -25,6 +25,8 @@ const createMeetingFromConversationSchema = z.object({
   withGoogleMeet: z.coerce.boolean().optional(),
   guestEmails: z.string().max(2000).optional(),
   botEnabled: z.coerce.boolean().optional(),
+  // Contexto interno de la reunión (no lo ve el cliente).
+  context: z.string().max(5_000, "El contexto admite hasta 5.000 caracteres.").optional(),
 });
 
 /**
@@ -47,6 +49,7 @@ export async function createMeetingFromConversationAction(
     withGoogleMeet: formData.get("withGoogleMeet") || undefined,
     guestEmails: formData.get("guestEmails") || undefined,
     botEnabled: formData.has("botEnabled") ? "true" : "false",
+    context: formData.get("context") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -164,6 +167,7 @@ export async function createMeetingFromConversationAction(
       googleCalendarOwnerId,
       guestEmails: guestEmailsResult.emails,
       botEnabled,
+      context: parsed.data.context?.trim() || null,
       status: "SCHEDULED",
     },
   });

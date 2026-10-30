@@ -38,6 +38,7 @@ interface Row extends ListMeeting {
   opportunityId: string | null;
   opportunityTitle: string | null;
   assignedTo: { id: string; name: string; color: string | null } | null;
+  context: string | null;
 }
 
 export default async function TodasLasReunionesPage({
@@ -68,6 +69,7 @@ export default async function TodasLasReunionesPage({
         status: true,
         botStatus: true,
         meetingUrl: true,
+        context: true,
         opportunityId: true,
         opportunity: {
           select: {
@@ -100,6 +102,7 @@ export default async function TodasLasReunionesPage({
       meetingUrl: m.meetingUrl,
       opportunityId: m.opportunityId,
       opportunityTitle: m.opportunity?.title ?? null,
+      context: m.context,
       clientKey: contact?.id ?? null,
       clientName,
       assignedTo: m.opportunity?.assignedTo
@@ -258,6 +261,11 @@ export default async function TodasLasReunionesPage({
                               </span>
                             )}
                           </p>
+                          {m.context && (
+                            <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-xs italic text-ink-faint" title="Contexto interno: no lo ve el cliente">
+                              {m.context}
+                            </p>
+                          )}
                           {filters.vista === "dia" && m.clientName && m.opportunityTitle && (
                             <p className="mt-1 truncate text-xs text-ink-faint">
                               {m.clientName} · {m.opportunityTitle}

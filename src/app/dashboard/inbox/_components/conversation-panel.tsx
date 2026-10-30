@@ -86,6 +86,8 @@ interface PanelData {
         status: string;
         meetingUrl: string | null;
         botEnabled: boolean;
+        /** Contexto interno de la reunión; no lo ve el cliente. */
+        context: string;
       }[];
     }[];
   } | null;
@@ -947,6 +949,13 @@ function MeetingsPanel({
             placeholder="Pegá el link de la reunión (Meet, Zoom, etc.)"
             className="py-1.5 text-xs"
           />
+          <textarea
+            name="context"
+            rows={3}
+            maxLength={5000}
+            placeholder="Contexto de la reunión (interno, no lo ve el cliente): para qué es, qué quieres ver o aclarar…"
+            className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-xs leading-relaxed text-ink outline-none focus:border-accent-dim"
+          />
           {state.error && <p className="text-xs text-danger">{state.error}</p>}
           <SlowActionNotice show={createSlow} />
           <div className="flex gap-2">
@@ -967,6 +976,11 @@ function MeetingsPanel({
           {meetings.map((m) => (
             <div key={m.id} className="rounded-md border border-border bg-surface px-2.5 py-2">
               {m.title && <p className="truncate text-xs font-medium text-ink">{m.title}</p>}
+              {m.context && (
+                <p className="mt-0.5 whitespace-pre-wrap text-xs italic text-ink-faint" title="Contexto interno: no lo ve el cliente">
+                  {m.context}
+                </p>
+              )}
               <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
                 <span className="">
                   {new Date(m.scheduledAt).toLocaleString("es", {
@@ -1061,6 +1075,14 @@ function MeetingsPanel({
                     <input type="checkbox" name="botEnabled" className="h-3.5 w-3.5" defaultChecked={m.botEnabled} />
                     Que el bot se una a esta reunión
                   </label>
+                  <textarea
+                    name="context"
+                    rows={3}
+                    maxLength={5000}
+                    defaultValue={m.context}
+                    placeholder="Contexto de la reunión (interno, no lo ve el cliente): para qué es, qué quieres ver o aclarar…"
+                    className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-xs leading-relaxed text-ink outline-none focus:border-accent-dim"
+                  />
                   {editError?.id === m.id && <p className="text-xs text-danger">{editError.message}</p>}
                   <div className="flex gap-2">
                     <Button type="submit" size="sm" className="text-xs" disabled={editPending}>

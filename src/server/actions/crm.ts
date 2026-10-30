@@ -431,6 +431,10 @@ const meetingNotesField = z
   .string()
   .max(MEETING_NOTES_MAX, `Máximo ${MEETING_NOTES_MAX.toLocaleString("es")} caracteres.`);
 
+// Contexto interno de la reunión: unas líneas de "para qué es esta reunión". Nunca sale hacia el cliente.
+const MEETING_CONTEXT_MAX = 5_000;
+const meetingContextField = z.string().max(MEETING_CONTEXT_MAX, `Máximo ${MEETING_CONTEXT_MAX.toLocaleString("es")} caracteres.`);
+
 const createMeetingSchema = z.object({
   opportunityId: z.string().min(1),
   title: z.string().max(160).optional(),
@@ -441,6 +445,7 @@ const createMeetingSchema = z.object({
   guestEmails: z.string().max(2000).optional(),
   botEnabled: z.coerce.boolean().optional(),
   notes: meetingNotesField.optional(), // transcripción o resumen de la reunión
+  context: meetingContextField.optional(), // contexto interno (no lo ve el cliente)
 });
 
 export async function createMeetingAction(
@@ -459,6 +464,7 @@ export async function createMeetingAction(
     guestEmails: formData.get("guestEmails") || undefined,
     botEnabled: formData.has("botEnabled") ? "true" : "false",
     notes: formData.get("notes") || undefined,
+    context: formData.get("context") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -558,6 +564,7 @@ export async function createMeetingAction(
       guestEmails: guestEmailsResult.emails,
       botEnabled,
       notes: parsed.data.notes || null,
+      context: parsed.data.context?.trim() || null,
       status: parsed.data.notes ? "DONE" : "SCHEDULED",
     },
   });
@@ -573,6 +580,32 @@ export async function createMeetingAction(
 const updateMeetingNotesSchema = z.object({
   notes: meetingNotesField,
 });
+
+/** Edita el contexto interno de una reunión (lo escribe una persona; no cambia el estado de la reunión ni sale al cliente). */
+export async function updateMeetingContextAction(meetingId: string, context: string): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    include: { opportunity: { select: { assignedToId: true } } },
+  });
+  if (!meeting || meeting.organizationId !== organizationId) {
+    return { error: "Reunión no encontrada" };
+  }
+  if (meeting.opportunity && !canEditOpportunity(meeting.opportunity, userId, isAdmin)) {
+    return { error: "Este cliente está asignado a otro vendedor." };
+  }
+
+  const parsed = meetingContextField.safeParse(context);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+
+  await prisma.meeting.update({ where: { id: meetingId }, data: { context: parsed.data.trim() || null } });
+  revalidatePath(PATH);
+  revalidatePath("/dashboard/inbox");
+  return { error: null };
+}
 
 /** Carga o edita la transcripción/resumen de una reunión ya registrada. */
 export async function updateMeetingNotesAction(
@@ -671,6 +704,7 @@ const updateMeetingSchema = z.object({
   durationMinutes: z.coerce.number().int().positive().max(600),
   meetingUrl: z.string().max(500).optional(),
   botEnabled: z.coerce.boolean().optional(),
+  context: meetingContextField.optional(),
 });
 
 /**
@@ -700,6 +734,8 @@ export async function updateMeetingAction(meetingId: string, formData: FormData)
     durationMinutes: formData.get("durationMinutes"),
     meetingUrl: formData.get("meetingUrl") || undefined,
     botEnabled: formData.has("botEnabled") ? formData.get("botEnabled") : undefined,
+    // Solo si el formulario trae el campo: los demás formularios de edición no deben borrar el contexto.
+    context: formData.has("context") ? String(formData.get("context")) : undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -738,6 +774,7 @@ export async function updateMeetingAction(meetingId: string, formData: FormData)
       durationMinutes: parsed.data.durationMinutes,
       meetingUrl,
       botEnabled,
+      ...(parsed.data.context !== undefined ? { context: parsed.data.context.trim() || null } : {}),
     },
   });
 

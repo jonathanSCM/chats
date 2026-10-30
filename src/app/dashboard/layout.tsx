@@ -31,6 +31,7 @@ import { accentStyle, BRAND_PARENT_SELECT, resolveOrgBrand } from "@/lib/brand";
 import { getAiNotice } from "@/server/services/ai/notice";
 import { getOrgCredits } from "@/server/services/ai/credits";
 import { creditNoticeText } from "@/lib/ai-credits";
+import { PlanChangeNotice } from "@/components/plan-change-notice";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -172,6 +173,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </header>
 
         <main className="flex-1 overflow-y-auto bg-canvas px-4 py-5 md:px-6 md:py-6">
+          {org?.planNoticeMessage && session?.user.role === "OWNER" && <PlanChangeNotice message={org.planNoticeMessage} />}
           {credits && creditNotice && (
             <div
               className={`mb-4 rounded-lg border px-4 py-3 text-sm text-ink ${

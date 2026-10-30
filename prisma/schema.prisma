@@ -66,6 +66,13 @@ model Organization {
   // Créditos de IA incluidos en el plan por mes (1 crédito = US$0,001). null = esta organización no usa créditos (sin cambios).
   // Las suborganizaciones comparten la bolsa de su organización padre.
   aiCreditsMonthly       Int?
+  // Plan comercial asignado (/admin/planes). Editar el plan cambia a todas las organizaciones que lo tienen.
+  // null = a medida (los valores se fijan a mano en la ficha de la organización).
+  planId                 String?
+  plan                   Plan?                  @relation(fields: [planId], references: [id], onDelete: SetNull)
+  // Aviso emergente para el dueño cuando su plan cambió; lo borra al darlo por visto.
+  planNoticeMessage      String?                @db.Text
+  planNoticeAt           DateTime?
   // Organización padre (suborganizaciones). null = organización de primer nivel.
   parentId               String?
   parent                 Organization?          @relation("OrgHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
@@ -150,6 +157,7 @@ model Organization {
   idempotencyRecords  IdempotencyRecord[]
 
   @@index([parentId])
+  @@index([planId])
   @@map("organizations")
 }
 
@@ -1162,6 +1170,27 @@ model AiAnalysis {
   @@index([organizationId, createdAt])
   @@index([entityType, entityId])
   @@map("ai_analyses")
+}
+
+// ─── Planes comerciales ─────────────────────────────────────────
+//
+// Plantilla de lo que incluye un plan (usuarios, créditos de IA, suborganizaciones, marca) y su precio mensual.
+// El precio solo se anota (no se cobra desde acá: todavía no hay pasarela de pago).
+model Plan {
+  id                String         @id @default(cuid())
+  name              String         @unique
+  priceSoles        Decimal?       @db.Decimal(10, 2) // precio mensual en soles; null = sin precio anotado
+  maxAdmins         Int?
+  maxSellers        Int?
+  canHaveSubOrgs    Boolean        @default(false)
+  maxSubOrgs        Int?
+  canCustomizeBrand Boolean        @default(false)
+  aiCreditsMonthly  Int? // créditos de IA por mes; null = sin bolsa de créditos
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  organizations     Organization[]
+
+  @@map("plans")
 }
 
 // ─── Créditos de IA ─────────────────────────────────────────────

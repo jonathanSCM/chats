@@ -9,6 +9,9 @@ import { JefeToggle } from "./_components/jefe-toggle";
 import { DisconnectWhatsAppButton } from "./_components/disconnect-whatsapp-button";
 import { PlanForm } from "./_components/plan-form";
 import { AiForm } from "./_components/ai-form";
+import { PlanAssignForm } from "./_components/plan-assign-form";
+import { listPlans, planToValues } from "@/server/services/plans";
+import { changedKeys, describePlan, formatPriceSoles } from "@/lib/plans";
 import { ParentForm } from "./_components/parent-form";
 import { countParentUsersInOrg, listEligibleParents } from "@/server/services/org-hierarchy-admin";
 import { getMonthUsage } from "@/server/services/ai/client";
@@ -60,6 +63,9 @@ export default async function AdminOrganizationDetailPage({
     org.parent ? countParentUsersInOrg(org.id, org.parent.id) : Promise.resolve(0),
   ]);
   const aiMode = parseAiMode(org.aiMode);
+  const plans = org.parent ? [] : await listPlans();
+  const currentPlan = plans.find((p) => p.id === org.planId) ?? null;
+  const planIsCustom = currentPlan ? changedKeys(currentPlan.values, planToValues(org)).length > 0 : false;
   const aiLimits = { budgetUsd: org.aiMonthlyBudgetUsd, tokens: org.aiMonthlyTokenLimit };
   const aiUsage = aiMode === "custom" ? await getMonthUsage(org.id) : null;
   const aiStatus = aiUsage ? checkMonthlyLimit(aiLimits, aiUsage) : null;
@@ -89,10 +95,36 @@ export default async function AdminOrganizationDetailPage({
         </div>
       </div>
 
+      {!org.parent && (
+        <Card className="mb-6">
+          <CardTitle className="mb-1">Plan comercial</CardTitle>
+          <p className="mb-4 text-sm text-ink-muted">
+            Elige uno de tus planes (se crean en{" "}
+            <Link href="/admin/planes" className="text-accent hover:underline">
+              Planes
+            </Link>
+            ). Aplicarlo le pone a esta organización lo que incluye el plan. Si luego editas el plan, el cambio le llega solo y al
+            dueño le sale un aviso.
+          </p>
+          <PlanAssignForm
+            orgId={org.id}
+            currentPlanId={org.planId}
+            isCustom={planIsCustom}
+            plans={plans.map((p) => ({
+              id: p.id,
+              name: p.name,
+              priceLabel: formatPriceSoles(p.priceSoles),
+              summary: describePlan(p.values).join(" · "),
+            }))}
+          />
+        </Card>
+      )}
+
       <Card className="mb-6">
         <CardTitle className="mb-1">Plan de la organización</CardTitle>
         <p className="mb-4 text-sm text-ink-muted">
           Qué puede hacer este cliente y hasta cuánto. Solo tú lo ves y lo cambias.
+          {currentPlan ? ` Tiene el plan ${currentPlan.name}: si editas ese plan, estos valores se sobrescriben.` : ""}
         </p>
         <PlanForm
           orgId={org.id}

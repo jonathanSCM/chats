@@ -14,18 +14,21 @@ import { X } from "lucide-react";
 export function SidePanel({
   header,
   accent,
+  stacked = false,
   onClose,
   children,
 }: {
   header: React.ReactNode;
   accent?: string;
+  /** Panel que se abre encima de otro panel lateral (ej. la reunión dentro de la ficha): queda por encima aunque se monte a la vez. */
+  stacked?: boolean;
   onClose: () => void;
   children: React.ReactNode;
 }) {
   // Se monta en el <body> por la misma razón que DetailPanel: un ancestro
   // con transform recortaría el panel al alto del contenido.
   return createPortal(
-    <div data-portal className="fixed inset-0 z-[100] flex justify-end">
+    <div data-portal className={`fixed inset-0 ${stacked ? "z-[110]" : "z-[100]"} flex justify-end`}>
       <button
         type="button"
         aria-label="Cerrar"

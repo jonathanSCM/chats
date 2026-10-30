@@ -1178,11 +1178,12 @@ model AiAnalysis {
 // ─── Planes comerciales ─────────────────────────────────────────
 //
 // Plantilla de lo que incluye un plan (usuarios, créditos de IA, suborganizaciones, marca) y su precio mensual.
-// El precio solo se anota (no se cobra desde acá: todavía no hay pasarela de pago).
+// El precio solo se anota (no se cobra desde acá: todavía no hay pasarela de pago) y se elige en qué moneda está.
 model Plan {
   id                String         @id @default(cuid())
   name              String         @unique
-  priceSoles        Decimal?       @db.Decimal(10, 2) // precio mensual en soles; null = sin precio anotado
+  price             Decimal?       @db.Decimal(10, 2) // precio mensual en la moneda del plan; null = sin precio anotado
+  currency          String         @default("PEN") // PEN, USD, BOB o EUR (ver lib/plans.ts)
   maxAdmins         Int?
   maxSellers        Int?
   canHaveSubOrgs    Boolean        @default(false)

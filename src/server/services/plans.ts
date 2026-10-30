@@ -14,7 +14,8 @@ const ORG_PLAN_FIELDS = {
 
 export interface PlanInput {
   name: string;
-  priceSoles: number | null;
+  price: number | null;
+  currency: string;
   values: PlanValues;
 }
 
@@ -41,7 +42,7 @@ export async function updatePlanAndPropagate(
   await prisma.$transaction(async (tx) => {
     await tx.plan.update({
       where: { id: planId },
-      data: { name: input.name, priceSoles: input.priceSoles, ...values },
+      data: { name: input.name, price: input.price, currency: input.currency, ...values },
     });
     for (const org of orgs) {
       const message = planChangeNotice({ planName: input.name, before: planToValues(org), after: values });
@@ -122,20 +123,22 @@ export async function assignPlanToOrg(orgId: string, planId: string | null, acto
 export interface PlanSummary {
   id: string;
   name: string;
-  priceSoles: number | null;
+  price: number | null;
+  currency: string;
   values: PlanValues;
   organizations: { id: string; name: string; suspended: boolean }[];
 }
 
 export async function listPlans(): Promise<PlanSummary[]> {
   const plans = await prisma.plan.findMany({
-    orderBy: [{ priceSoles: { sort: "asc", nulls: "last" } }, { name: "asc" }],
+    orderBy: [{ price: { sort: "asc", nulls: "last" } }, { name: "asc" }],
     include: { organizations: { select: { id: true, name: true, suspended: true }, orderBy: { name: "asc" } } },
   });
   return plans.map((p) => ({
     id: p.id,
     name: p.name,
-    priceSoles: p.priceSoles === null ? null : Number(p.priceSoles),
+    price: p.price === null ? null : Number(p.price),
+    currency: p.currency,
     values: planToValues(p),
     organizations: p.organizations,
   }));

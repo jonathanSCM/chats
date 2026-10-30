@@ -15,6 +15,8 @@ export default async function SeguimientoPage({
   searchParams: Promise<{
     archived?: string;
     open?: string;
+    /** Con `open`: abre además el detalle de esta reunión dentro de la ficha. */
+    reunion?: string;
     estado?: string;
     stage?: string;
     quick?: string;
@@ -29,6 +31,7 @@ export default async function SeguimientoPage({
   const {
     archived,
     open: openId,
+    reunion: openMeetingId,
     estado,
     stage: initialStage,
     quick: initialQuickFilter,
@@ -228,6 +231,7 @@ export default async function SeguimientoPage({
         viewingArchived={viewingArchived}
         viewingAllStages={viewingAllStages}
         openId={openId}
+        openMeetingId={openMeetingId}
         initialStage={initialStage}
         initialQuickFilter={initialQuickFilter}
         initialAssignee={initialAssignee}

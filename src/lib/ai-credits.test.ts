@@ -139,3 +139,17 @@ describe("formato", () => {
     expect(formatCredits(1234567.4)).toBe("1.234.567");
   });
 });
+
+describe("equivalencias de créditos", () => {
+  it("8.000 créditos son US$ 8 de presupuesto", async () => {
+    const { creditEquivalents, formatDuration } = await import("./ai-credits");
+    const e = creditEquivalents(8000);
+    expect(e.usd).toBeCloseTo(8);
+    expect(e.botReplies).toBe(4000);
+    expect(e.analyses).toBe(2666);
+    expect(e.audioMinutes).toBe(1600);
+    expect(formatDuration(e.audioMinutes)).toBe("26 h 40 min");
+    expect(formatDuration(45)).toBe("45 min");
+    expect(formatDuration(120)).toBe("2 h");
+  });
+});

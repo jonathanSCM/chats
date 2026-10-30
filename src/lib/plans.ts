@@ -122,9 +122,40 @@ export function planChangeNotice(args: {
   return `${head}${list}${now}`;
 }
 
-/** Precio mensual anotado, "S/ 249" o "S/ 249,50". */
-export function formatPriceSoles(price: number | null): string {
+/** Monedas en las que se puede anotar el precio de un plan. */
+export const CURRENCIES = [
+  { code: "PEN", symbol: "S/", label: "Soles (S/)" },
+  { code: "USD", symbol: "US$", label: "Dólares (US$)" },
+  { code: "BOB", symbol: "Bs", label: "Bolivianos (Bs)" },
+  { code: "EUR", symbol: "€", label: "Euros (€)" },
+] as const;
+
+export type CurrencyCode = (typeof CURRENCIES)[number]["code"];
+
+export const DEFAULT_CURRENCY: CurrencyCode = "PEN";
+
+/** Una moneda desconocida cae en soles, la de siempre. */
+export function parseCurrency(value: unknown): CurrencyCode {
+  return CURRENCIES.find((c) => c.code === value)?.code ?? DEFAULT_CURRENCY;
+}
+
+export function currencySymbol(currency: string): string {
+  return CURRENCIES.find((c) => c.code === currency)?.symbol ?? currency;
+}
+
+/** Precio mensual anotado: "S/ 249", "US$ 249,50" o "Sin precio". */
+export function formatPrice(price: number | null, currency: string): string {
   if (price === null) return "Sin precio";
-  const text = Number.isInteger(price) ? String(price) : price.toFixed(2).replace(".", ",");
-  return `S/ ${text}`;
+  const amount = Number.isInteger(price) ? String(price) : price.toFixed(2).replace(".", ",");
+  return `${currencySymbol(currency)} ${amount}`;
+}
+
+/** Suma el precio de cada plan por sus clientes, separado por moneda (no se mezclan soles con dólares). */
+export function sumByCurrency(items: { price: number | null; currency: string; clients: number }[]): { currency: string; total: number }[] {
+  const totals = new Map<string, number>();
+  for (const i of items) {
+    if (i.price === null || i.clients <= 0) continue;
+    totals.set(i.currency, (totals.get(i.currency) ?? 0) + i.price * i.clients);
+  }
+  return [...totals.entries()].map(([currency, total]) => ({ currency, total }));
 }

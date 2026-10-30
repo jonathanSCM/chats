@@ -3,7 +3,9 @@ import {
   changedKeys,
   describeChanges,
   describePlan,
-  formatPriceSoles,
+  formatPrice,
+  parseCurrency,
+  sumByCurrency,
   normalizePlanValues,
   planChangeNotice,
   type PlanValues,
@@ -69,10 +71,33 @@ describe("aviso de cambio de plan", () => {
   });
 });
 
-describe("precio", () => {
-  it("formatea en soles", () => {
-    expect(formatPriceSoles(249)).toBe("S/ 249");
-    expect(formatPriceSoles(249.5)).toBe("S/ 249,50");
-    expect(formatPriceSoles(null)).toBe("Sin precio");
+describe("precio y moneda", () => {
+  it("formatea según la moneda", () => {
+    expect(formatPrice(249, "PEN")).toBe("S/ 249");
+    expect(formatPrice(249.5, "PEN")).toBe("S/ 249,50");
+    expect(formatPrice(59, "USD")).toBe("US$ 59");
+    expect(formatPrice(300, "BOB")).toBe("Bs 300");
+    expect(formatPrice(50, "EUR")).toBe("€ 50");
+    expect(formatPrice(null, "PEN")).toBe("Sin precio");
+  });
+
+  it("una moneda desconocida cae en soles", () => {
+    expect(parseCurrency("USD")).toBe("USD");
+    expect(parseCurrency("XYZ")).toBe("PEN");
+    expect(parseCurrency(undefined)).toBe("PEN");
+  });
+
+  it("suma por cliente y por moneda, sin mezclar", () => {
+    const totals = sumByCurrency([
+      { price: 249, currency: "PEN", clients: 2 },
+      { price: 59, currency: "USD", clients: 3 },
+      { price: 100, currency: "PEN", clients: 1 },
+      { price: null, currency: "PEN", clients: 5 },
+      { price: 80, currency: "EUR", clients: 0 },
+    ]);
+    expect(totals).toEqual([
+      { currency: "PEN", total: 598 },
+      { currency: "USD", total: 177 },
+    ]);
   });
 });

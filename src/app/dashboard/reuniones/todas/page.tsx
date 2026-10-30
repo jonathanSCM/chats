@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CalendarDays, ExternalLink, Link2, Users, Video } from "lucide-react";
+import { CalendarDays, ExternalLink, FileText, Link2, Users, Video } from "lucide-react";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { Card } from "@/components/ui/card";
@@ -227,7 +227,6 @@ export default async function TodasLasReunionesPage({
                 {(g.rows as Row[]).map((m) => {
                   const bot = m.botStatus ? BOT_STATUS_CONFIG[m.botStatus] : null;
                   const BotIcon = bot?.icon;
-                  const openHref = m.opportunityId ? `/dashboard/seguimiento?open=${m.opportunityId}` : `/dashboard/reuniones?open=${m.id}`;
                   return (
                     <li key={m.id} className="rounded-lg border border-border bg-surface p-3">
                       <div className="flex items-start gap-3">
@@ -274,9 +273,32 @@ export default async function TodasLasReunionesPage({
                         </div>
 
                         <div className="flex shrink-0 flex-col items-end gap-1.5 text-xs">
-                          <Link href={openHref} className="inline-flex items-center gap-1 text-accent hover:underline">
-                            <ExternalLink size={12} /> Abrir
-                          </Link>
+                          {m.opportunityId ? (
+                            <>
+                              <Link
+                                href={`/dashboard/seguimiento?open=${m.opportunityId}&reunion=${m.id}`}
+                                className="inline-flex items-center gap-1 text-accent hover:underline"
+                                title="Abre la ficha de la reunión (transcripción, resumen, contexto y notas)"
+                              >
+                                <FileText size={12} /> Abrir ficha
+                              </Link>
+                              <Link
+                                href={`/dashboard/seguimiento?open=${m.opportunityId}`}
+                                className="inline-flex items-center gap-1 text-ink-muted hover:text-ink"
+                                title="Abre al cliente en Seguimiento"
+                              >
+                                <ExternalLink size={12} /> Ver en seguimiento
+                              </Link>
+                            </>
+                          ) : (
+                            <Link
+                              href={`/dashboard/reuniones?open=${m.id}`}
+                              className="inline-flex items-center gap-1 text-accent hover:underline"
+                              title="Abre la ficha de la reunión interna"
+                            >
+                              <FileText size={12} /> Abrir ficha
+                            </Link>
+                          )}
                           {m.meetingUrl && (
                             <a
                               href={m.meetingUrl}

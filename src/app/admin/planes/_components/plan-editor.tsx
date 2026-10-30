@@ -3,13 +3,15 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { createPlanAction, deletePlanAction, updatePlanAction } from "@/server/actions/admin-plans";
 import { Button } from "@/components/ui/button";
-import { Input, Label } from "@/components/ui/input";
-import type { PlanValues } from "@/lib/plans";
+import { Input, Label, Select } from "@/components/ui/input";
+import { CURRENCIES, currencySymbol, type PlanValues } from "@/lib/plans";
+import { CreditsEquivalence } from "@/components/credits-explainer";
 
 export interface EditablePlan {
   id: string;
   name: string;
-  priceSoles: number | null;
+  price: number | null;
+  currency: string;
   values: PlanValues;
   orgCount: number;
 }
@@ -25,6 +27,8 @@ export function PlanEditor({ plan, onSaved }: { plan?: EditablePlan; onSaved?: (
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const v = plan?.values;
+  const [currency, setCurrency] = useState(plan?.currency ?? "PEN");
+  const [creditsText, setCreditsText] = useState(String(v?.aiCreditsMonthly ?? ""));
   // Avisa a quien lo abrió (por ejemplo para cerrar la ventana) cuando el plan se guardó bien.
   useEffect(() => {
     if (state.message && !state.error) onSaved?.();
@@ -45,27 +49,39 @@ export function PlanEditor({ plan, onSaved }: { plan?: EditablePlan; onSaved?: (
       ref={formRef}
       action={formAction}
       className="space-y-4"
-      key={plan ? `${plan.id}-${JSON.stringify(plan.values)}-${plan.name}-${plan.priceSoles}` : `new-${createdKey}`}
+      key={plan ? `${plan.id}-${JSON.stringify(plan.values)}-${plan.name}-${plan.price}-${plan.currency}` : `new-${createdKey}`}
       onSubmit={() => setConfirming(false)}
     >
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor={`name-${plan?.id ?? "new"}`}>Nombre del plan</Label>
-          <Input id={`name-${plan?.id ?? "new"}`} name="name" defaultValue={plan?.name ?? ""} placeholder="Ej. GLA" maxLength={60} required />
-        </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`name-${plan?.id ?? "new"}`}>Nombre del plan</Label>
+        <Input id={`name-${plan?.id ?? "new"}`} name="name" defaultValue={plan?.name ?? ""} placeholder="Ej. GLA" maxLength={60} required />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor={`price-${plan?.id ?? "new"}`}>Precio mensual (S/)</Label>
+          <Label htmlFor={`price-${plan?.id ?? "new"}`}>Precio mensual ({currencySymbol(currency)})</Label>
           <Input
             id={`price-${plan?.id ?? "new"}`}
-            name="priceSoles"
+            name="price"
             type="number"
             min={0}
             step="0.01"
-            defaultValue={plan?.priceSoles ?? ""}
+            defaultValue={plan?.price ?? ""}
             placeholder="Sin precio"
           />
         </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`currency-${plan?.id ?? "new"}`}>Moneda del precio</Label>
+          <Select id={`currency-${plan?.id ?? "new"}`} name="currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+            {CURRENCIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.label}
+              </option>
+            ))}
+          </Select>
+        </div>
       </div>
+      <p className="-mt-2 text-xs text-ink-faint">El precio solo se anota (no se cobra desde acá) y se muestra en la moneda que elijas.</p>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-1.5">
@@ -84,10 +100,12 @@ export function PlanEditor({ plan, onSaved }: { plan?: EditablePlan; onSaved?: (
             type="number"
             min={0}
             defaultValue={v?.aiCreditsMonthly ?? ""}
+            onChange={(e) => setCreditsText(e.target.value)}
             placeholder="Sin bolsa"
           />
         </div>
       </div>
+      <CreditsEquivalence credits={Number(creditsText.replace(/[\s.]/g, ""))} />
 
       <div className="space-y-2">
         <label className="flex items-center gap-2 text-sm text-ink">

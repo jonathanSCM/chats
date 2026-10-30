@@ -6,6 +6,7 @@ import { prisma } from "@/server/db/client";
 import { requireSession, HttpError } from "@/server/auth/guards";
 import { audit } from "@/server/services/audit";
 import { assignPlanToOrg, planToValues, updatePlanAndPropagate } from "@/server/services/plans";
+import { CURRENCIES } from "@/lib/plans";
 import type { ActionState } from "./types";
 
 async function requireSuperadmin() {
@@ -30,7 +31,8 @@ const price = z.preprocess(
 
 const planSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre al plan").max(60, "El nombre es demasiado largo"),
-  priceSoles: price,
+  price,
+  currency: z.enum(CURRENCIES.map((c) => c.code) as [string, ...string[]], { message: "Elige una moneda válida" }),
   maxAdmins: limit(100_000),
   maxSellers: limit(100_000),
   canHaveSubOrgs: z.boolean(),
@@ -42,7 +44,8 @@ const planSchema = z.object({
 function parsePlan(formData: FormData) {
   const parsed = planSchema.safeParse({
     name: formData.get("name"),
-    priceSoles: formData.get("priceSoles"),
+    price: formData.get("price"),
+    currency: formData.get("currency") || "PEN",
     maxAdmins: formData.get("maxAdmins"),
     maxSellers: formData.get("maxSellers"),
     canHaveSubOrgs: formData.get("canHaveSubOrgs") === "on",
@@ -51,8 +54,8 @@ function parsePlan(formData: FormData) {
     aiCreditsMonthly: formData.get("aiCreditsMonthly"),
   });
   if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
-  const { name, priceSoles, ...values } = parsed.data;
-  return { ok: true as const, name, priceSoles, values: planToValues(values) };
+  const { name, price, currency, ...values } = parsed.data;
+  return { ok: true as const, name, price, currency, values: planToValues(values) };
 }
 
 function revalidateAll() {
@@ -69,13 +72,13 @@ export async function createPlanAction(_prev: ActionState, formData: FormData): 
   if (await prisma.plan.findUnique({ where: { name: parsed.name }, select: { id: true } })) {
     return { error: "Ya existe un plan con ese nombre." };
   }
-  const plan = await prisma.plan.create({ data: { name: parsed.name, priceSoles: parsed.priceSoles, ...parsed.values } });
+  const plan = await prisma.plan.create({ data: { name: parsed.name, price: parsed.price, currency: parsed.currency, ...parsed.values } });
   await audit({
     entityType: "Plan",
     entityId: plan.id,
     action: "plan_created",
     userId: session.user.id,
-    after: { name: parsed.name, priceSoles: parsed.priceSoles, ...parsed.values },
+    after: { name: parsed.name, price: parsed.price, currency: parsed.currency, ...parsed.values },
   });
   revalidateAll();
   return { error: null, message: `Plan "${parsed.name}" creado.` };
@@ -98,7 +101,7 @@ export async function updatePlanAction(planId: string, _prev: ActionState, formD
     entityId: planId,
     action: "plan_updated",
     userId: session.user.id,
-    after: { name: parsed.name, priceSoles: parsed.priceSoles, ...parsed.values, ...result },
+    after: { name: parsed.name, price: parsed.price, currency: parsed.currency, ...parsed.values, ...result },
   });
   revalidateAll();
   const alcance =

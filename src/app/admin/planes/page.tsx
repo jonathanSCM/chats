@@ -1,7 +1,8 @@
 import { Check } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { describePlan, formatPriceSoles } from "@/lib/plans";
+import { describePlan, formatPrice, sumByCurrency } from "@/lib/plans";
+import { CreditsExplainer } from "@/components/credits-explainer";
 import { listPlans } from "@/server/services/plans";
 import { CreatePlanButton, EditPlanButton } from "./_components/plan-dialogs";
 
@@ -9,7 +10,9 @@ export default async function AdminPlansPage() {
   const plans = await listPlans();
 
   // Facturación mensual anotada: precio de cada plan × organizaciones activas (las suspendidas no cuentan).
-  const monthly = plans.reduce((sum, p) => sum + (p.priceSoles ?? 0) * p.organizations.filter((o) => !o.suspended).length, 0);
+  const monthly = sumByCurrency(
+    plans.map((p) => ({ price: p.price, currency: p.currency, clients: p.organizations.filter((o) => !o.suspended).length })),
+  );
   const clients = plans.reduce((sum, p) => sum + p.organizations.length, 0);
 
   return (
@@ -25,6 +28,10 @@ export default async function AdminPlansPage() {
         <CreatePlanButton />
       </div>
 
+      <div className="mb-6">
+        <CreditsExplainer />
+      </div>
+
       {plans.length > 0 && (
         <div className="mb-6 grid gap-3 sm:grid-cols-3">
           <Card className="p-4">
@@ -37,7 +44,9 @@ export default async function AdminPlansPage() {
           </Card>
           <Card className="p-4">
             <p className="text-xs text-ink-faint">Facturación mensual anotada</p>
-            <p className="text-xl font-semibold text-ink">{formatPriceSoles(monthly)}</p>
+            <p className="text-xl font-semibold text-ink">
+              {monthly.length === 0 ? formatPrice(0, "PEN") : monthly.map((m) => formatPrice(m.total, m.currency)).join(" + ")}
+            </p>
           </Card>
         </div>
       )}
@@ -65,8 +74,8 @@ export default async function AdminPlansPage() {
                 </div>
 
                 <p className="mb-4">
-                  <span className="text-3xl font-semibold text-ink">{formatPriceSoles(p.priceSoles)}</span>
-                  {p.priceSoles !== null && <span className="text-sm text-ink-muted"> /mes</span>}
+                  <span className="text-3xl font-semibold text-ink">{formatPrice(p.price, p.currency)}</span>
+                  {p.price !== null && <span className="text-sm text-ink-muted"> /mes</span>}
                 </p>
 
                 <ul className="mb-4 flex-1 space-y-1.5 text-sm text-ink-muted">
@@ -90,7 +99,7 @@ export default async function AdminPlansPage() {
                 )}
 
                 <EditPlanButton
-                  plan={{ id: p.id, name: p.name, priceSoles: p.priceSoles, values: p.values, orgCount: p.organizations.length }}
+                  plan={{ id: p.id, name: p.name, price: p.price, currency: p.currency, values: p.values, orgCount: p.organizations.length }}
                   includes={includes}
                   clients={p.organizations}
                 />

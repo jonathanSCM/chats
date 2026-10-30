@@ -178,6 +178,8 @@ interface Props {
   viewingAllStages: boolean;
   /** Si viene de `?open=<id>` (ej. desde el botón del inbox), abre ese cliente ni bien carga. */
   openId?: string;
+  /** Reunión cuyo detalle se abre sola dentro de la ficha abierta por `openId`. */
+  openMeetingId?: string;
   /** Click-through desde el Dashboard: preseleccionan filtros al cargar (id de PipelineStage). */
   initialStage?: string;
   initialQuickFilter?: string;
@@ -283,6 +285,7 @@ export function TrackingTable({
   viewingArchived,
   viewingAllStages,
   openId,
+  openMeetingId,
   initialStage,
   initialQuickFilter,
   initialAssignee,
@@ -943,6 +946,7 @@ export function TrackingTable({
           members={members}
           editable={canEdit(detail, currentUserId, isAdmin)}
           canCreateGoogleMeet={canCreateGoogleMeet}
+          initialMeetingId={detail.id === openId ? openMeetingId : undefined}
           onClose={closeDetail}
         />
       )}
@@ -1601,9 +1605,11 @@ function DetailPanel({
   members,
   editable,
   canCreateGoogleMeet,
+  initialMeetingId,
   onClose,
 }: {
   row: Row;
+  initialMeetingId?: string;
   currentUserId: string;
   isAdmin: boolean;
   members: Member[];
@@ -1833,6 +1839,7 @@ function DetailPanel({
             editable={editable}
             disabled={locked}
             canCreateGoogleMeet={canCreateGoogleMeet}
+            initialMeetingId={initialMeetingId}
           />
 
           <div className="rounded-lg border border-accent-dim/40 bg-accent/5 p-3">
@@ -2074,7 +2081,9 @@ function MeetingsSection({
   editable,
   disabled,
   canCreateGoogleMeet,
+  initialMeetingId,
 }: {
+  initialMeetingId?: string;
   opportunityId: string;
   meetings: Row["meetings"];
   editable: boolean;
@@ -2168,7 +2177,9 @@ function MeetingsSection({
     });
   }
 
-  const [detailMeetingId, setDetailMeetingId] = useState<string | null>(null);
+  const [detailMeetingId, setDetailMeetingId] = useState<string | null>(
+    initialMeetingId && meetings.some((m) => m.id === initialMeetingId) ? initialMeetingId : null,
+  );
 
   return (
     <div className="rounded-lg border border-border bg-surface-2/40 p-3">
@@ -2338,6 +2349,7 @@ function MeetingsSection({
         const pdfAttachment = m.attachments.find((a) => a.mimeType === "application/pdf");
         return (
           <SidePanel
+            stacked
             onClose={() => setDetailMeetingId(null)}
             accent={panelAccent(m.botStatus)}
             header={

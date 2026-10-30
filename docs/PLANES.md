@@ -1,10 +1,10 @@
 # Planes comerciales
 
-Pantalla `/admin/planes` (solo superadmin). Un plan es una plantilla de lo que incluye y cuánto cuesta al mes. El precio **solo se anota** (alimenta "Facturación mensual anotada"); el cobro se hace por otro medio hasta que haya pasarela de pago.
+Pantalla `/admin/planes` (solo superadmin). Un plan es una plantilla de lo que incluye y cuánto cuesta al mes. El precio **solo se anota** (alimenta "Facturación mensual anotada"); el cobro se hace por otro medio hasta que haya pasarela de pago. Cada plan tiene su **moneda** (soles, dólares, bolivianos o euros): la facturación anotada se suma por moneda, sin mezclarlas.
 
 ## Qué fija un plan
 
-Máximo de administradores y vendedores, suborganizaciones (sí/no y tope), marca propia, y créditos de IA por mes (ver `CREDITOS-IA.md`). Vacío = sin tope. No fija la clave de IA ni lo que la organización ya configuró (marca, etc.).
+Máximo de administradores y vendedores, suborganizaciones (sí/no y tope), marca propia, y créditos de IA por mes (ver `CREDITOS-IA.md`). Al escribir los créditos el formulario muestra cuánto es (en dólares de presupuesto, respuestas del bot, análisis y horas de transcripción), y arriba de la lista hay una explicación de cómo se calculan. Vacío = sin tope. No fija la clave de IA ni lo que la organización ya configuró (marca, etc.).
 
 ## Cómo se usa
 
@@ -27,4 +27,4 @@ Solo se puede si ninguna organización lo tiene; si no, primero hay que pasarlas
 
 ## Datos
 
-Tabla `plans`; `organizations.planId`, `planNoticeMessage`, `planNoticeAt`. Migración `20261031010000_plans`, aditiva: sin plan, todo queda igual. Cada cambio queda en el registro de auditoría (`plan_created`, `plan_updated`, `plan_propagated`, `plan_assigned`, `plan_unassigned`, `plan_deleted`).
+Tabla `plans` (`price` + `currency`, migración `20261031030000_plan_currency`); `organizations.planId`, `planNoticeMessage`, `planNoticeAt`. Migración `20261031010000_plans`, aditiva: sin plan, todo queda igual. Cada cambio queda en el registro de auditoría (`plan_created`, `plan_updated`, `plan_propagated`, `plan_assigned`, `plan_unassigned`, `plan_deleted`).

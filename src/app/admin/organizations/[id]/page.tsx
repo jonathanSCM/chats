@@ -11,7 +11,7 @@ import { PlanForm } from "./_components/plan-form";
 import { AiForm } from "./_components/ai-form";
 import { PlanAssignForm } from "./_components/plan-assign-form";
 import { listPlans, planToValues } from "@/server/services/plans";
-import { changedKeys, describePlan, formatPriceSoles } from "@/lib/plans";
+import { changedKeys, describePlan, formatPrice } from "@/lib/plans";
 import { ParentForm } from "./_components/parent-form";
 import { countParentUsersInOrg, listEligibleParents } from "@/server/services/org-hierarchy-admin";
 import { getMonthUsage } from "@/server/services/ai/client";
@@ -22,6 +22,7 @@ import { formatSeatUsage } from "@/lib/org-limits";
 import { formatCredits } from "@/lib/ai-credits";
 import { getCreditUsageSummary, getOrgCredits, listCreditPacks } from "@/server/services/ai/credits";
 import { AiCreditsPanel } from "@/components/ai-credits-panel";
+import { CreditsExplainer } from "@/components/credits-explainer";
 import { AddPackForm, CancelPackButton, CreditsPlanForm } from "./_components/credits-admin";
 import type { BotStatus } from "@/generated/prisma/enums";
 
@@ -222,7 +223,7 @@ export default async function AdminOrganizationDetailPage({
             plans={plans.map((p) => ({
               id: p.id,
               name: p.name,
-              priceLabel: formatPriceSoles(p.priceSoles),
+              priceLabel: formatPrice(p.price, p.currency),
               summary: describePlan(p.values).join(" · "),
             }))}
           />
@@ -265,6 +266,7 @@ export default async function AdminOrganizationDetailPage({
           </p>
         ) : (
           <div className="space-y-6">
+            <CreditsExplainer monthly={org.aiCreditsMonthly} />
             <CreditsPlanForm orgId={org.id} monthly={org.aiCreditsMonthly} users={seats.admins + seats.sellers} />
             {credits && creditSummary && (
               <>

@@ -186,3 +186,23 @@ export function creditNoticeText(level: CreditLevel, balance: CreditBalance): st
   }
   return `Has usado el ${pct}% de tus créditos de IA de este mes. Quedan ${formatCredits(balance.available)}.`;
 }
+
+/** Cuánto alcanza una cantidad de créditos si se gastara toda en una sola cosa (para entender cuánto es). */
+export function creditEquivalents(credits: number) {
+  const c = Math.max(0, credits);
+  return {
+    usd: creditsToUsd(c),
+    botReplies: Math.floor(c / creditsForFeature("bot_calificacion")),
+    analyses: Math.floor(c / creditsForFeature("seguimiento")),
+    audioMinutes: Math.floor(c / CREDITS_PER_AUDIO_MINUTE),
+  };
+}
+
+/** 90 → "1 h 30 min"; 45 → "45 min"; 120 → "2 h". */
+export function formatDuration(minutes: number): string {
+  const m = Math.max(0, Math.floor(minutes));
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  if (h === 0) return `${rest} min`;
+  return rest === 0 ? `${h} h` : `${h} h ${rest} min`;
+}

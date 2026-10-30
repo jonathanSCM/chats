@@ -64,14 +64,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   m.orgs = [org("a"), org("b")];
   m.plans = {
-    gla: { id: "gla", name: "GLA", priceSoles: 249, ...values },
-    pro: { id: "pro", name: "Pro", priceSoles: 499, ...values, maxSellers: 10, aiCreditsMonthly: 20000 },
+    gla: { id: "gla", name: "GLA", price: 249, currency: "PEN", ...values },
+    pro: { id: "pro", name: "Pro", price: 499, currency: "PEN", ...values, maxSellers: 10, aiCreditsMonthly: 20000 },
   };
 });
 
 describe("updatePlanAndPropagate", () => {
   it("aplica el cambio a todas las organizaciones del plan y les deja un aviso", async () => {
-    const r = await updatePlanAndPropagate("gla", { name: "GLA", priceSoles: 249, values: { ...values, aiCreditsMonthly: 10000 } }, "admin1");
+    const r = await updatePlanAndPropagate("gla", { name: "GLA", price: 249, currency: "PEN", values: { ...values, aiCreditsMonthly: 10000 } }, "admin1");
     expect(r).toEqual({ orgsUpdated: 2, orgsNotified: 2 });
     for (const o of m.orgs) {
       expect(o.aiCreditsMonthly).toBe(10000);
@@ -82,27 +82,27 @@ describe("updatePlanAndPropagate", () => {
 
   it("a la organización a la que no le cambia nada no se le avisa", async () => {
     m.orgs = [org("a"), org("b", { aiCreditsMonthly: 10000 })];
-    const r = await updatePlanAndPropagate("gla", { name: "GLA", priceSoles: 249, values: { ...values, aiCreditsMonthly: 10000 } }, "admin1");
+    const r = await updatePlanAndPropagate("gla", { name: "GLA", price: 249, currency: "PEN", values: { ...values, aiCreditsMonthly: 10000 } }, "admin1");
     expect(r).toEqual({ orgsUpdated: 2, orgsNotified: 1 });
     expect(m.orgs[0].planNoticeMessage).toBeTruthy();
     expect(m.orgs[1].planNoticeMessage).toBeUndefined();
   });
 
   it("solo cambiar nombre o precio no avisa a nadie", async () => {
-    const r = await updatePlanAndPropagate("gla", { name: "GLA Plus", priceSoles: 299, values }, "admin1");
+    const r = await updatePlanAndPropagate("gla", { name: "GLA Plus", price: 299, currency: "USD", values }, "admin1");
     expect(r.orgsNotified).toBe(0);
-    expect(m.plans.gla).toMatchObject({ name: "GLA Plus", priceSoles: 299 });
+    expect(m.plans.gla).toMatchObject({ name: "GLA Plus", price: 299, currency: "USD" });
   });
 
   it("no toca organizaciones de otros planes", async () => {
     m.orgs = [org("a"), org("c", { planId: "pro", plan: { name: "Pro" }, aiCreditsMonthly: 20000, maxSellers: 10 })];
-    await updatePlanAndPropagate("gla", { name: "GLA", priceSoles: 249, values: { ...values, maxSellers: 6 } }, "admin1");
+    await updatePlanAndPropagate("gla", { name: "GLA", price: 249, currency: "PEN", values: { ...values, maxSellers: 6 } }, "admin1");
     expect(m.orgs[0].maxSellers).toBe(6);
     expect(m.orgs[1].maxSellers).toBe(10);
   });
 
   it("sin suborganizaciones el tope se guarda vacío", async () => {
-    await updatePlanAndPropagate("gla", { name: "GLA", priceSoles: 249, values: { ...values, canHaveSubOrgs: false, maxSubOrgs: 5 } }, "admin1");
+    await updatePlanAndPropagate("gla", { name: "GLA", price: 249, currency: "PEN", values: { ...values, canHaveSubOrgs: false, maxSubOrgs: 5 } }, "admin1");
     expect(m.orgs[0].maxSubOrgs).toBeNull();
   });
 });

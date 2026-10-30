@@ -15,6 +15,9 @@ import { getMonthUsage } from "@/server/services/ai/client";
 import { checkMonthlyLimit, describeMonthlyUsage } from "@/lib/ai-limit";
 import { parseAiMode } from "@/lib/ai-key";
 import { getSeatCounts } from "@/server/services/org-limits";
+import { getCreditUsageSummary, getOrgCredits, listCreditPacks } from "@/server/services/ai/credits";
+import { AiCreditsPanel } from "@/components/ai-credits-panel";
+import { AddPackForm, CancelPackButton, CreditsPlanForm } from "./_components/credits-admin";
 import type { BotStatus } from "@/generated/prisma/enums";
 
 const botStatusTone: Record<BotStatus, "accent" | "warning" | "neutral"> = {
@@ -60,6 +63,9 @@ export default async function AdminOrganizationDetailPage({
   const aiLimits = { budgetUsd: org.aiMonthlyBudgetUsd, tokens: org.aiMonthlyTokenLimit };
   const aiUsage = aiMode === "custom" ? await getMonthUsage(org.id) : null;
   const aiStatus = aiUsage ? checkMonthlyLimit(aiLimits, aiUsage) : null;
+  // Créditos de IA: la bolsa es de la organización principal; una suborganización solo apunta a ella.
+  const credits = org.parent ? null : await getOrgCredits(org.id);
+  const [creditSummary, creditPacks] = credits ? await Promise.all([getCreditUsageSummary(org.id), listCreditPacks(org.id)]) : [null, []];
 
   return (
     <div className="max-w-3xl animate-fade-up">
@@ -131,6 +137,46 @@ export default async function AdminOrganizationDetailPage({
           usageText={aiUsage ? describeMonthlyUsage(aiLimits, aiUsage) : null}
           limitReachedMessage={aiStatus && !aiStatus.ok ? aiStatus.message : null}
         />
+      </Card>
+
+      <Card className="mb-6">
+        <CardTitle className="mb-1">Créditos de IA</CardTitle>
+        <p className="mb-4 text-sm text-ink-muted">
+          Bolsa mensual de créditos (1 crédito = US$ 0,001 de presupuesto de IA) compartida por todos los usuarios, más
+          recargas que duran 90 días. Se cobran las funciones de IA que usan la clave de la plataforma y la transcripción
+          de reuniones. Sin créditos por mes definidos, la organización no usa esta bolsa.
+        </p>
+        {org.parent ? (
+          <p className="text-sm text-ink-muted">
+            Es una suborganización: gasta de la bolsa de{" "}
+            <Link href={`/admin/organizations/${org.parent.id}`} className="text-accent hover:underline">
+              {org.parent.name}
+            </Link>
+            .
+          </p>
+        ) : (
+          <div className="space-y-6">
+            <CreditsPlanForm orgId={org.id} monthly={org.aiCreditsMonthly} users={seats.admins + seats.sellers} />
+            {credits && creditSummary && (
+              <>
+                <hr className="border-border" />
+                <AiCreditsPanel
+                  credits={credits}
+                  summary={creditSummary}
+                  packs={creditPacks}
+                  timeZone={org.timezone || "America/La_Paz"}
+                  showRealCost
+                  packAction={(p) => <CancelPackButton packId={p.id} />}
+                />
+                <hr className="border-border" />
+                <div>
+                  <h4 className="mb-2 text-sm font-medium text-ink">Recarga manual</h4>
+                  <AddPackForm orgId={org.id} />
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </Card>
 
       {org.children.length > 0 && (

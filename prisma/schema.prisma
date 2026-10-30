@@ -63,6 +63,9 @@ model Organization {
   customKeyLast4         String?
   aiMonthlyBudgetUsd     Float? // tope de gasto por mes en USD (modo custom); null = sin tope
   aiMonthlyTokenLimit    Int? // tope de tokens por mes (modo custom); null = sin tope
+  // Créditos de IA incluidos en el plan por mes (1 crédito = US$0,001). null = esta organización no usa créditos (sin cambios).
+  // Las suborganizaciones comparten la bolsa de su organización padre.
+  aiCreditsMonthly       Int?
   // Organización padre (suborganizaciones). null = organización de primer nivel.
   parentId               String?
   parent                 Organization?          @relation("OrgHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
@@ -134,6 +137,8 @@ model Organization {
   activities             Activity[]
   meetings               Meeting[]
   aiAnalyses             AiAnalysis[]
+  aiCreditPacks          AiCreditPack[]
+  aiCreditUsages         AiCreditUsage[]
   metaAttributionTouches MetaAttributionTouch[]
   adSpendSnapshots       AdSpendSnapshot[]
   pipelineStages         PipelineStage[]
@@ -1157,6 +1162,50 @@ model AiAnalysis {
   @@index([organizationId, createdAt])
   @@index([entityType, entityId])
   @@map("ai_analyses")
+}
+
+// ─── Créditos de IA ─────────────────────────────────────────────
+//
+// Modelo comercial: cada organización tiene una bolsa mensual de créditos (Organization.aiCreditsMonthly,
+// se renueva cada mes y NO se acumula) más paquetes comprados que duran 90 días. Se gasta primero lo mensual.
+// 1 crédito = hasta US$0,001 de presupuesto de IA: es una unidad comercial, no el costo exacto.
+
+// Paquete de créditos adicionales (recarga manual del superadmin).
+model AiCreditPack {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  credits        Int // créditos con los que se creó
+  remaining      Int // créditos que quedan
+  expiresAt      DateTime
+  note           String?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, expiresAt])
+  @@map("ai_credit_packs")
+}
+
+// Cada consumo de créditos: quién, cuándo, en qué función, con qué modelo y cuánto costó de verdad.
+model AiCreditUsage {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String? // null = proceso automático (bot, transcripción)
+  feature        String // "bot_calificacion", "seguimiento", "transcripcion"…
+  model          String?
+  inputTokens    Int          @default(0)
+  outputTokens   Int          @default(0)
+  audioMinutes   Int          @default(0)
+  costUsd        Decimal      @default(0) @db.Decimal(10, 6) // costo real estimado de la API (0 si no se mide)
+  credits        Int // créditos descontados en total
+  fromMonthly    Int // cuántos salieron de la bolsa mensual
+  fromPacks      Int // cuántos de paquetes comprados
+  entityId       String?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@map("ai_credit_usages")
 }
 
 // ─── Configuración de plataforma ─────────────────────────────────

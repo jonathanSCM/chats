@@ -7,13 +7,20 @@ const m = vi.hoisted(() => ({
   enqueue: vi.fn(),
   saveMedia: vi.fn(),
   fetch: vi.fn(),
+  charge: vi.fn(),
+  usageFind: vi.fn(),
 }));
 
 vi.mock("@/server/db/client", () => ({
-  prisma: { meeting: { findUnique: m.meetingFind, update: m.meetingUpdate }, meetingAttachment: { create: m.attachmentCreate } },
+  prisma: {
+    meeting: { findUnique: m.meetingFind, update: m.meetingUpdate },
+    meetingAttachment: { create: m.attachmentCreate },
+    aiCreditUsage: { findFirst: m.usageFind },
+  },
 }));
 vi.mock("../queue", () => ({ enqueue: m.enqueue }));
 vi.mock("@/lib/media-storage", () => ({ saveMediaFile: m.saveMedia }));
+vi.mock("@/server/services/ai/credits", () => ({ chargeCredits: m.charge }));
 
 import { handleVexaBotPoll } from "./vexa-bot-poll";
 
@@ -56,6 +63,8 @@ beforeEach(() => {
   m.attachmentCreate.mockResolvedValue({});
   m.enqueue.mockResolvedValue(undefined);
   m.saveMedia.mockResolvedValue("/media/x.txt");
+  m.charge.mockResolvedValue(undefined);
+  m.usageFind.mockResolvedValue(null);
 });
 
 describe("handleVexaBotPoll (por sesión, no por sala)", () => {
@@ -113,5 +122,54 @@ describe("handleVexaBotPoll (por sesión, no por sala)", () => {
       where: { id: "mtg1" },
       data: expect.objectContaining({ botStatus: "RECORDING" }),
     });
+  });
+});
+
+describe("handleVexaBotPoll (créditos por transcripción)", () => {
+  const ended = (minutes: number) => ({
+    organizationId: "org1",
+    botJoinedAt: new Date(Date.now() - minutes * 60_000),
+    botLeftAt: new Date(),
+    vexaSessionId: 5,
+    transcript: null,
+  });
+
+  it("al terminar bien cobra 5 créditos por minuto en la llamada", async () => {
+    m.meetingFind.mockResolvedValue(ended(60));
+    vexa([entry({ id: 5, status: "completed" })]);
+    await handleVexaBotPoll(payload({ vexaSessionId: 5 }));
+    expect(m.charge).toHaveBeenCalledTimes(1);
+    expect(m.charge).toHaveBeenCalledWith({
+      organizationId: "org1",
+      feature: "transcripcion",
+      credits: 300,
+      audioMinutes: 60,
+      entityId: "mtg1",
+    });
+  });
+
+  it("no cobra dos veces la misma reunión", async () => {
+    m.meetingFind.mockResolvedValue(ended(30));
+    m.usageFind.mockResolvedValue({ id: "u1" });
+    vexa([entry({ id: 5, status: "completed" })]);
+    await handleVexaBotPoll(payload({ vexaSessionId: 5 }));
+    expect(m.charge).not.toHaveBeenCalled();
+  });
+
+  it("no cobra si la reunión falló", async () => {
+    m.meetingFind.mockResolvedValue(ended(30));
+    vexa([entry({ id: 5, status: "failed" })]);
+    await handleVexaBotPoll(payload({ vexaSessionId: 5 }));
+    expect(m.charge).not.toHaveBeenCalled();
+  });
+
+  it("si el cobro falla la reunión igual queda guardada", async () => {
+    m.meetingFind.mockResolvedValue(ended(10));
+    m.charge.mockRejectedValue(new Error("db caída"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vexa([entry({ id: 5, status: "completed" })]);
+    await expect(handleVexaBotPoll(payload({ vexaSessionId: 5 }))).resolves.toBeUndefined();
+    expect(m.meetingUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ botStatus: "DONE" }) }));
+    spy.mockRestore();
   });
 });

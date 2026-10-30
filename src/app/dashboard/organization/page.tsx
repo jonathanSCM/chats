@@ -25,6 +25,8 @@ import { getPlatformSettings } from "@/server/services/platform-settings";
 import { isMarketingEnabled } from "@/lib/features";
 import { DangerZone } from "./_components/danger-zone";
 import { getSeatPlan } from "@/server/services/org-limits";
+import { getCreditUsageSummary, getOrgCredits, listCreditPacks } from "@/server/services/ai/credits";
+import { AiCreditsPanel } from "@/components/ai-credits-panel";
 import { SubOrgsPanel } from "./_components/suborgs-panel";
 import {
   ensureParentAdminsInChildren,
@@ -107,6 +109,12 @@ export default async function OrganizationSettingsPage({
           await getMonthUsage(org.id),
         )
       : null;
+
+  // Créditos de IA (solo si el plan los incluye). Una suborganización ve la bolsa de su organización principal.
+  const credits = tab === "general" ? await getOrgCredits(org.id) : null;
+  const [creditSummary, creditPacks] = credits
+    ? await Promise.all([getCreditUsageSummary(credits.rootOrgId), listCreditPacks(credits.rootOrgId)])
+    : [null, []];
 
   let subOrgs: Awaited<ReturnType<typeof listSubOrganizations>> = [];
   let parentSellers: Awaited<ReturnType<typeof listParentSellers>> = [];
@@ -201,6 +209,24 @@ export default async function OrganizationSettingsPage({
             brandDisplay={resolveBrand(org).display}
             brandLogoShape={resolveBrand(org).logoShape}
             brandLogoScale={resolveBrand(org).logoScale}
+          />
+        </Card>
+      )}
+
+      {credits && creditSummary && (
+        <Card className="mb-6" id="creditos">
+          <CardTitle className="mb-1">Créditos de IA</CardTitle>
+          <CardDescription className="mb-4">
+            La IA del CRM (bot de WhatsApp, asesor, transcripción de reuniones) gasta créditos de una bolsa compartida por
+            todo tu equipo. Si se acaban, el CRM sigue funcionando; solo se detienen las funciones de IA. Para recargar,
+            escríbenos.
+          </CardDescription>
+          <AiCreditsPanel
+            credits={credits}
+            summary={creditSummary}
+            packs={creditPacks}
+            timeZone={org.timezone || "America/La_Paz"}
+            fromParentName={parent?.name ?? null}
           />
         </Card>
       )}

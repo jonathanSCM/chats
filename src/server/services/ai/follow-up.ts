@@ -345,7 +345,7 @@ ${conversationText}`;
  * de IA. No toca lo que escribió la persona (estado, necesidad, última
  * actualización): la IA propone, el vendedor decide (manual §28).
  */
-export async function analyzeFollowUp(opportunityId: string): Promise<FollowUpResult> {
+export async function analyzeFollowUp(opportunityId: string, userId?: string | null): Promise<FollowUpResult> {
   const opportunity = await prisma.opportunity.findUnique({
     where: { id: opportunityId },
     include: {
@@ -362,6 +362,7 @@ export async function analyzeFollowUp(opportunityId: string): Promise<FollowUpRe
     entityType: "Opportunity",
     entityId: opportunityId,
     analysisType: "seguimiento",
+    userId,
     promptVersion: PROMPT_VERSION,
     model: MODELS.analysis(),
     system: SYSTEM,

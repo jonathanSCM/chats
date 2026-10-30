@@ -7,6 +7,7 @@ const m = vi.hoisted(() => ({
   meetingUpdateMany: vi.fn(),
   enqueue: vi.fn(),
   fetch: vi.fn(),
+  credits: vi.fn(),
 }));
 
 vi.mock("@/server/db/client", () => ({
@@ -15,6 +16,8 @@ vi.mock("@/server/db/client", () => ({
   },
 }));
 vi.mock("../queue", () => ({ enqueueOrReschedule: m.enqueue }));
+vi.mock("@/server/services/ai/credits", () => ({ getOrgCredits: m.credits }));
+vi.mock("@/server/services/ai/credits", () => ({ getOrgCredits: m.credits }));
 
 import { handleMeetingBotJoin } from "./meeting-bot-join";
 
@@ -57,6 +60,7 @@ beforeEach(() => {
   m.meetingUpdate.mockResolvedValue({});
   m.meetingUpdateMany.mockResolvedValue({ count: 1 });
   m.enqueue.mockResolvedValue(undefined);
+  m.credits.mockResolvedValue(null); // sin plan de créditos
 });
 
 describe("handleMeetingBotJoin (identificador de sesión)", () => {
@@ -116,5 +120,22 @@ describe("handleMeetingBotJoin (identificador de sesión)", () => {
     vexa({ post: json(409, {}), list: [{ id: 90, platform: "google_meet", native_meeting_id: "abc-defg-hij", status: "joining", created_at: new Date().toISOString() }] });
     await handleMeetingBotJoin({ meetingId: "mtg1" });
     expect(m.enqueue.mock.calls[0][0].payload.vexaSessionId).toBe(90);
+  });
+});
+
+describe("handleMeetingBotJoin (créditos de IA)", () => {
+  it("sin créditos disponibles el asistente no entra: se marca como fallida y no se llama a Vexa", async () => {
+    m.credits.mockResolvedValue({ balance: { available: 0 } });
+    await handleMeetingBotJoin({ meetingId: "mtg1" });
+    expect(m.meetingUpdate).toHaveBeenCalledWith({ where: { id: "mtg1" }, data: { botStatus: "FAILED" } });
+    expect(m.fetch).not.toHaveBeenCalled();
+    expect(m.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("con créditos el flujo sigue igual", async () => {
+    m.credits.mockResolvedValue({ balance: { available: 50 } });
+    m.fetch.mockReturnValueOnce(json(201, { id: 7 }));
+    await handleMeetingBotJoin({ meetingId: "mtg1" });
+    expect(m.fetch).toHaveBeenCalled();
   });
 });

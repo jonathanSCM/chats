@@ -3,6 +3,8 @@ import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
 import { enqueue } from "../queue";
 import { NON_TERMINAL_STATUSES, pickSession, type VexaSessionEntry } from "@/lib/vexa-session";
+import { billableMinutes, creditsForAudio } from "@/lib/ai-credits";
+import { chargeCredits } from "@/server/services/ai/credits";
 
 export const vexaBotPollPayload = z.object({
   meetingId: z.string(),
@@ -220,6 +222,39 @@ export async function handleVexaBotPoll(rawPayload: unknown): Promise<void> {
     where: { id: meetingId },
     data: { botStatus: failed ? "FAILED" : "DONE", audioTranscript: transcript },
   });
+
+  if (!failed) await chargeTranscription(meetingId);
+}
+
+/**
+ * Cobra la transcripción de la reunión a la bolsa de créditos de IA (5 créditos por minuto en la llamada).
+ * Solo si la organización usa créditos; y una sola vez por reunión, aunque el job se repita.
+ */
+async function chargeTranscription(meetingId: string): Promise<void> {
+  try {
+    const meeting = await prisma.meeting.findUnique({
+      where: { id: meetingId },
+      select: { organizationId: true, botJoinedAt: true, botLeftAt: true },
+    });
+    if (!meeting?.botJoinedAt || !meeting.botLeftAt) return;
+    const minutes = billableMinutes(meeting.botJoinedAt, meeting.botLeftAt);
+    if (minutes <= 0) return;
+    const already = await prisma.aiCreditUsage.findFirst({
+      where: { organizationId: meeting.organizationId, feature: "transcripcion", entityId: meetingId },
+      select: { id: true },
+    });
+    if (already) return;
+    await chargeCredits({
+      organizationId: meeting.organizationId,
+      feature: "transcripcion",
+      credits: creditsForAudio(minutes),
+      audioMinutes: minutes,
+      entityId: meetingId,
+    });
+  } catch (error) {
+    // La reunión ya quedó guardada: un fallo al anotar los créditos no debe volver a correr todo el job.
+    console.error(`[vexa-bot-poll] No se pudieron cobrar los créditos de la reunión ${meetingId}:`, error);
+  }
 }
 
 // Frases que Whisper "inventa" con frecuencia documentada cuando le llega un

@@ -3,6 +3,8 @@ import { prisma } from "@/server/db/client";
 import { decrypt } from "@/lib/crypto";
 import { chooseKey, classifyKeyError, parseAiMode, type AiMode } from "@/lib/ai-key";
 import { checkMonthlyLimit, monthStartUtc, type MonthlyLimits } from "@/lib/ai-limit";
+import { creditsForFeature } from "@/lib/ai-credits";
+import { AiCreditsExhaustedError, assertCreditsAvailable, chargeCredits } from "./credits";
 
 // Solo el cliente de la clave de la PLATAFORMA se reutiliza. Las claves de las organizaciones (propia o
 // personalizada) nunca se guardan en memoria entre llamadas: se crea un cliente descartable por pedido, así
@@ -250,6 +252,14 @@ export class AiMonthlyLimitError extends AiBudgetExceededError {
   }
 }
 
+/** Se acabaron los créditos de IA del plan de la organización (ver `credits.ts`). */
+export class AiCreditsError extends AiBudgetExceededError {
+  constructor(message: string) {
+    super(message);
+    this.name = "AiCreditsError";
+  }
+}
+
 /**
  * Distingue "sin créditos" de cualquier otro fallo (red, esquema inválido,
  * rate limit pasajero) -- solo lo primero amerita un aviso en /admin,
@@ -308,6 +318,8 @@ export interface RunOptions<T> {
   schemaName: string;
   schema: Record<string, unknown>;
   parse: (raw: unknown) => T;
+  /** Quién lo pidió (para el registro de créditos); vacío = proceso automático. */
+  userId?: string | null;
 }
 
 /**
@@ -333,6 +345,18 @@ export async function runStructured<T>(options: RunOptions<T>): Promise<T> {
   if (key.mode === "custom" && key.limits && key.ownerOrgId) {
     const status = checkMonthlyLimit(key.limits, await getMonthUsage(key.ownerOrgId));
     if (!status.ok) throw new AiMonthlyLimitError(status.message);
+  }
+
+  // Plan con créditos: solo se cobran las llamadas que usan la clave de la plataforma (con clave propia o
+  // personalizada el gasto no es de la plataforma). Si no quedan créditos se omite, sin reintentos.
+  const usesCredits = key.mode === null;
+  if (usesCredits) {
+    try {
+      await assertCreditsAvailable(options.organizationId, options.analysisType);
+    } catch (error) {
+      if (error instanceof AiCreditsExhaustedError) throw new AiCreditsError(error.message);
+      throw error;
+    }
   }
 
   const startedAt = Date.now();
@@ -384,6 +408,25 @@ export async function runStructured<T>(options: RunOptions<T>): Promise<T> {
           durationMs: Date.now() - startedAt,
         },
       });
+
+      if (usesCredits) {
+        try {
+          await chargeCredits({
+            organizationId: options.organizationId,
+            userId: options.userId ?? null,
+            feature: options.analysisType,
+            credits: creditsForFeature(options.analysisType),
+            model: options.model,
+            inputTokens,
+            outputTokens,
+            costUsd: estimateCost(inputTokens, outputTokens, cachedTokens),
+            entityId: options.entityId,
+          });
+        } catch (chargeError) {
+          // El análisis ya se hizo y se guardó: un fallo al anotar los créditos no debe perderlo.
+          console.error("[ai] No se pudieron descontar los créditos:", chargeError);
+        }
+      }
 
       if (key.ownerOrgId === null) {
         await updateQuotaAlert(null);

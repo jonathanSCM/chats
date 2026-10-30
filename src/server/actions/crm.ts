@@ -9,7 +9,7 @@ import { audit } from "@/server/services/audit";
 import { ALL_LOSS_REASONS, type LossReason } from "@/lib/pipeline";
 import { getOrgStages, defaultEntryStage, type PipelineStage } from "@/server/services/pipeline";
 import { analyzeFollowUp } from "@/server/services/ai/follow-up";
-import { getAiKeySource, isAiEnabledFor, isWithinBudget, spentToday, type AiKeySource } from "@/server/services/ai/client";
+import { AiCreditsError, getAiKeySource, isAiEnabledFor, isWithinBudget, spentToday, type AiKeySource } from "@/server/services/ai/client";
 import { saveMediaFile, deleteMediaFile } from "@/lib/media-storage";
 import { parseGuestEmails } from "@/lib/guest-emails";
 import {
@@ -1132,8 +1132,9 @@ export async function analyzeOpportunityAction(
   }
 
   try {
-    await analyzeFollowUp(opportunityId);
+    await analyzeFollowUp(opportunityId, userId);
   } catch (error) {
+    if (error instanceof AiCreditsError) return { error: error.message };
     console.error("[crm] Falló el análisis:", error);
     return { error: "No se pudo analizar. Intenta de nuevo en un momento." };
   }

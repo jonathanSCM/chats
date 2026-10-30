@@ -6,7 +6,7 @@ import { PDFParse } from "pdf-parse";
 import { prisma } from "@/server/db/client";
 import { requireSession } from "@/server/auth/guards";
 import { audit } from "@/server/services/audit";
-import { AiBudgetExceededError, isAiEnabledFor } from "@/server/services/ai/client";
+import { AiBudgetExceededError, AiCreditsError, isAiEnabledFor } from "@/server/services/ai/client";
 import { proposeKnowledgeChanges, type ChatTurn } from "@/server/services/ai/knowledge-editor";
 import {
   MAX_CHANGES,
@@ -239,6 +239,7 @@ export async function proposeKnowledgeChangesAction(
       items,
     });
   } catch (error) {
+    if (error instanceof AiCreditsError) return { ...empty, error: error.message };
     if (error instanceof AiBudgetExceededError) {
       return { ...empty, error: "Se alcanzó el tope de gasto diario de IA. Probá de nuevo mañana." };
     }

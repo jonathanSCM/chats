@@ -29,6 +29,8 @@ import { getUserMemberships } from "@/server/services/organization-membership";
 import { isMarketingEnabled } from "@/lib/features";
 import { accentStyle, BRAND_PARENT_SELECT, resolveOrgBrand } from "@/lib/brand";
 import { getAiNotice } from "@/server/services/ai/notice";
+import { getOrgCredits } from "@/server/services/ai/credits";
+import { creditNoticeText } from "@/lib/ai-credits";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -55,6 +57,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // Solo el dueño ve el aviso de IA detenida, y solo se consulta si la organización no usa la clave de la plataforma.
   const aiNotice =
     org && session?.user.role === "OWNER" && (org.aiMode !== "platform" || org.parentId) ? await getAiNotice(org.id) : null;
+  // Aviso de créditos de IA al dueño: a partir del 80% de la bolsa, al 95% y cuando se acaban.
+  const credits = org && session?.user.role === "OWNER" ? await getOrgCredits(org.id) : null;
+  const creditNotice = credits && credits.level !== "ok" ? creditNoticeText(credits.level, credits.balance) : null;
   const memberships = session?.user.id
     ? await getUserMemberships(session.user.id).then((m) =>
         m.map((mm) => ({ organizationId: mm.organizationId, organizationName: mm.organizationName })),
@@ -167,6 +172,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </header>
 
         <main className="flex-1 overflow-y-auto bg-canvas px-4 py-5 md:px-6 md:py-6">
+          {credits && creditNotice && (
+            <div
+              className={`mb-4 rounded-lg border px-4 py-3 text-sm text-ink ${
+                credits.level === "exhausted" ? "border-danger/40 bg-danger-dim" : "border-warning/40 bg-warning-dim"
+              }`}
+            >
+              <b className={credits.level === "exhausted" ? "text-danger" : "text-warning"}>
+                {credits.level === "exhausted" ? "Sin créditos de IA." : "Créditos de IA."}
+              </b>{" "}
+              {creditNotice}{" "}
+              <Link href="/dashboard/organization#creditos" className="font-medium text-accent underline">
+                Ver mis créditos
+              </Link>
+            </div>
+          )}
           {aiNotice && (
             <div className="mb-4 rounded-lg border border-danger/40 bg-danger-dim px-4 py-3 text-sm text-ink">
               <b className="text-danger">La IA de tu organización está detenida.</b> {aiNotice.message}{" "}

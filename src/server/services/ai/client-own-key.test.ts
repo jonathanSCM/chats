@@ -20,6 +20,12 @@ vi.mock("@/server/db/client", () => ({
     platformSetting: { upsert: m.settingUpsert, updateMany: m.settingUpdateMany },
   },
 }));
+// Los créditos de IA tienen sus propias pruebas (client-credits.test.ts): acá no intervienen.
+vi.mock("./credits", () => ({
+  AiCreditsExhaustedError: class extends Error {},
+  assertCreditsAvailable: vi.fn(async () => {}),
+  chargeCredits: vi.fn(async () => {}),
+}));
 vi.mock("@/lib/crypto", () => ({ decrypt: (enc: string) => `sk-own-${enc}` }));
 vi.mock("openai", () => ({
   default: class FakeOpenAI {

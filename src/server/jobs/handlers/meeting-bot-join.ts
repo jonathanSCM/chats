@@ -4,6 +4,7 @@ import { enqueueOrReschedule } from "../queue";
 import { extractMeetCode } from "@/server/services/meeting-bot";
 import { assistantDisplayName, BRAND_PARENT_SELECT, resolveOrgBrand } from "@/lib/brand";
 import { decideConflict, parseSessionId, pickSession, type VexaSessionEntry } from "@/lib/vexa-session";
+import { getOrgCredits } from "@/server/services/ai/credits";
 
 export const meetingBotJoinPayload = z.object({
   meetingId: z.string(),
@@ -56,6 +57,14 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
     },
   });
   if (!meeting || !meeting.meetingUrl || meeting.status === "CANCELED") return;
+
+  // Sin créditos de IA el asistente no entra: grabar y transcribir gasta créditos. No se reintenta.
+  const credits = await getOrgCredits(meeting.organizationId);
+  if (credits && credits.balance.available <= 0) {
+    console.warn(`[meeting-bot] La organización ${meeting.organizationId} no tiene créditos de IA — el asistente no entra a ${meetingId}.`);
+    await prisma.meeting.update({ where: { id: meetingId }, data: { botStatus: "FAILED" } });
+    return;
+  }
 
   const code = extractMeetCode(meeting.meetingUrl);
   if (!code) {

@@ -101,6 +101,7 @@ export async function proposeKnowledgeChanges(options: {
     entityType: "KnowledgeBase",
     entityId: options.userId,
     analysisType: "knowledge_editor",
+    userId: options.userId,
     promptVersion: KNOWLEDGE_EDITOR_VERSION,
     model: MODELS.analysis(),
     system: SYSTEM,

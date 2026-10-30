@@ -205,7 +205,7 @@ export function ConversationPanel({
 
   if (!data) {
     return (
-      <aside className="w-full shrink-0 border-l border-border bg-surface/60 p-4 lg:w-80">
+      <aside className="w-full shrink-0 border-l border-border bg-surface p-4 lg:w-80">
         <p className="text-sm text-ink-faint">Cargando ficha…</p>
       </aside>
     );
@@ -214,8 +214,8 @@ export function ConversationPanel({
   const openOpportunities = data.contact?.opportunities.filter((o) => o.open) ?? [];
 
   return (
-    <aside className="flex w-full shrink-0 flex-col overflow-y-auto border-l border-border bg-surface/60 lg:w-80">
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface/90 px-4 py-3 backdrop-blur">
+    <aside className="flex w-full shrink-0 flex-col overflow-y-auto border-l border-border bg-surface lg:w-80">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface px-4 py-3">
         <h2 className="font-display text-sm font-semibold text-ink">Ficha</h2>
         <button
           type="button"

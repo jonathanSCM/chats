@@ -16,7 +16,7 @@ import {
   Bell,
   Loader2,
   AlertTriangle,
-  PanelRight,
+  User,
   Archive,
   ArchiveRestore,
   Ban,
@@ -1642,21 +1642,11 @@ export function InboxClient({
                   panelOpen ? "text-accent" : "text-ink-muted"
                 }`}
               >
-                <PanelRight size={18} />
+                <MoreVertical size={18} />
               </button>
               </div>
 
               <div className="relative flex shrink-0 items-center md:hidden">
-                <button
-                  type="button"
-                  onClick={() => setPanelOpen((v) => !v)}
-                  aria-label="Ficha del contacto"
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface ${
-                    panelOpen ? "text-accent" : "text-ink-muted"
-                  }`}
-                >
-                  <PanelRight size={18} />
-                </button>
                 <button
                   type="button"
                   onClick={() => setMobileMenuOpen((v) => !v)}
@@ -1680,7 +1670,7 @@ export function InboxClient({
                       className="absolute right-0 top-full z-40 mt-1 w-64 overflow-hidden rounded-md border border-border bg-surface py-1 shadow-lg"
                     >
                       <MenuRow
-                        icon={<PanelRight size={16} />}
+                        icon={<User size={16} />}
                         label="Ficha del contacto"
                         onClick={() => {
                           setPanelOpen(true);
@@ -2177,7 +2167,7 @@ export function InboxClient({
       {/* Ficha del contacto. En pantallas chicas ocupa todo el ancho para
           no espachurrar el chat; en escritorio va como tercera columna. */}
       {selectedId && panelOpen && (
-        <div className="absolute inset-0 z-20 flex lg:static lg:z-auto lg:w-80 lg:shrink-0">
+        <div className="absolute inset-0 z-20 flex bg-surface lg:static lg:z-auto lg:w-80 lg:shrink-0">
           <ConversationPanel
             key={selectedId}
             conversationId={selectedId}

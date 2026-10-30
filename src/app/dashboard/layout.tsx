@@ -91,7 +91,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <NavLink href="/dashboard/marketing" icon={<Megaphone size={18} />}>Marketing</NavLink>
         )}
         <NavLink href="/dashboard/calendario" icon={<CalendarDays size={18} />}>Calendario</NavLink>
-        <NavLink href="/dashboard/reuniones" icon={<Video size={18} />}>Reuniones</NavLink>
+        <NavLink href="/dashboard/reuniones/todas" matchPrefix="/dashboard/reuniones" icon={<Video size={18} />}>
+          Reuniones
+        </NavLink>
         <NavLink href="/dashboard/whatsapp" icon={<Smartphone size={18} />}>Conexión WhatsApp</NavLink>
         {session?.user.role === "OWNER" && (
           <>

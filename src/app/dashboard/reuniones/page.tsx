@@ -3,6 +3,7 @@ import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
 import { AdhocMeetingsClient } from "./_components/adhoc-meetings-client";
+import { ReunionesTabs } from "./_components/reuniones-tabs";
 
 export default async function ReunionesPage({
   searchParams,
@@ -69,6 +70,8 @@ export default async function ReunionesPage({
         Reuniones internas que no pasan por Seguimiento — con empleados, dirección, o cualquier
         reunión de emergencia que necesite grabarse.
       </p>
+
+      <ReunionesTabs active="internas" />
 
       <AdhocMeetingsClient meetings={rows} openId={open ?? null} canCreateGoogleMeet={canCreateGoogleMeet} />
     </div>

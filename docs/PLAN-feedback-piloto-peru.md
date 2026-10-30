@@ -15,7 +15,7 @@ Estado según lo que revisé en el código y en los logs de producción. "Hecho"
 | 4.2 | Teléfono visible / llamar | **Hecho** | Redeploy | — |
 | 3.2 | Salientes del celular no aparecen hasta la respuesta | **Por diagnosticar** | Un ejemplo concreto de Mariana | Medio |
 | 3.3 | Archivar sincronizado con WhatsApp Business | **Probable límite de Meta** | Confirmar en la doc de Meta | Por ver |
-| 2.4 | Pestaña única de reuniones | Propuesta | Ver detalle abajo | Medio |
+| 2.4 | Pestaña única de reuniones | Hecho | Ver detalle abajo | Medio |
 | 2.5 | Calendario/categoría "ProShop" en Google | Propuesta | Ver detalle abajo | Chico–medio |
 | 3.4 | Guardar contacto CRM ↔ teléfono | **Hecho el .vcf** (el sentido inverso ya llega por Coexistence) | Redeploy | — |
 | 3.1 | Contactos con username | **Hecho** (`0541948`) | Redeploy (ya en prod desde el 28) | — |

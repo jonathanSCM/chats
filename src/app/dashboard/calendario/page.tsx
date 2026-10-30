@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { CalendarMonth } from "./_components/calendar-month";
+import { ReunionesTabs } from "@/app/dashboard/reuniones/_components/reuniones-tabs";
 
 // Lunes como primer día — igual que el calendario de la mayoría acá.
 function startOfWeekMonday(d: Date): Date {
@@ -94,9 +95,10 @@ export default async function CalendarioPage({
   return (
     <div className="animate-fade-up">
       <h1 className="mb-1 text-2xl font-bold">Calendario</h1>
-      <p className="mb-6 text-sm text-ink-muted">
+      <p className="mb-4 text-sm text-ink-muted">
         Las reuniones agendadas en Seguimiento, todas juntas en un solo lugar.
       </p>
+      <ReunionesTabs active="calendario" />
 
       <CalendarMonth
         rows={rows}

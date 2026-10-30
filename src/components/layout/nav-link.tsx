@@ -12,16 +12,19 @@ import { cn } from "@/lib/utils";
 export function NavLink({
   href,
   exact,
+  matchPrefix,
   icon,
   children,
 }: {
   href: string;
   exact?: boolean;
+  /** Prefijo que también marca el enlace como activo (cuando la pantalla de inicio de la sección vive bajo otra ruta). */
+  matchPrefix?: string;
   icon: ReactNode;
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const active = exact ? pathname === href : pathname.startsWith(href);
+  const active = exact ? pathname === href : pathname.startsWith(matchPrefix ?? href);
 
   return (
     <Link

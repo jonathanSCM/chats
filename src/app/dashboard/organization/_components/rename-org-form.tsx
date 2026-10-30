@@ -11,7 +11,8 @@ export function RenameOrgForm({ currentName }: { currentName: string }) {
   });
 
   return (
-    <form action={formAction} className="flex items-end gap-3">
+    // Con `key` el formulario se rearma con lo guardado (si no, React deja el valor viejo hasta recargar).
+    <form action={formAction} className="flex items-end gap-3" key={currentName}>
       <div className="flex-1 space-y-1.5">
         <Label htmlFor="name">Nombre de la organización</Label>
         <Input id="name" name="name" defaultValue={currentName} required />

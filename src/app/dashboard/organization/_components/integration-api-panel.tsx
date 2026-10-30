@@ -208,7 +208,12 @@ function WebhookSection({
         </p>
       </div>
 
-      <form action={formAction} className="space-y-3">
+      {/* `key`: al guardar, el formulario se rearma con lo guardado (si no, React deja el valor viejo hasta recargar). */}
+      <form
+        action={formAction}
+        className="space-y-3"
+        key={`${webhook?.url ?? ""}|${webhook?.enabled ?? ""}|${webhook?.events.join(",") ?? ""}`}
+      >
         <div className="space-y-1.5">
           <Label htmlFor="wh-url">URL de destino</Label>
           <Input

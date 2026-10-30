@@ -44,9 +44,12 @@ export function BookingSettingsForm({
   currentLeadHours: number;
 }) {
   const [state, formAction, isPending] = useActionState(updateBookingSettingsAction, { error: null });
+  // Al guardar, React vacía los campos sin controlar de un <form action>: sin esto la pantalla volvía al valor
+  // anterior hasta recargar (el dato sí se guardaba). Con `key`, el formulario se vuelve a armar con lo guardado.
+  const formKey = [currentTimezone, currentDays.join(","), currentStartHour, currentEndHour, currentDurationMinutes, currentLeadHours].join("|");
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-4" key={formKey}>
       <div className="space-y-1.5">
         <Label>Días que atendés</Label>
         <div className="flex flex-wrap gap-3">

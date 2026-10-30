@@ -11,7 +11,8 @@ export function AiSettingsForm({ currentLimit }: { currentLimit: number }) {
   });
 
   return (
-    <form action={formAction} className="flex items-end gap-3">
+    // Con `key` el formulario se rearma con lo guardado (si no, React deja el valor viejo hasta recargar).
+    <form action={formAction} className="flex items-end gap-3" key={currentLimit}>
       <div className="flex-1 space-y-1.5">
         <Label htmlFor="aiMessageLimit">Mensajes recientes que analiza el asesor IA</Label>
         <Input

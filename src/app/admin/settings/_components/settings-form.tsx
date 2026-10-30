@@ -31,7 +31,8 @@ export function SettingsForm({
   }
 
   return (
-    <form action={formAction} className="space-y-4">
+    // Con `key` el formulario se rearma con lo guardado (si no, React deja el valor viejo hasta recargar).
+    <form action={formAction} className="space-y-4" key={[whatsappAppId, whatsappConfigId, whatsappVerifyToken, metaAdsConfigId, hasAppSecret].join("|")}>
       <div className="space-y-1.5">
         <Label htmlFor="whatsappAppId">App ID</Label>
         <Input

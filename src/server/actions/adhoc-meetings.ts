@@ -395,6 +395,37 @@ export async function renameAdhocMeetingAction(meetingId: string, title: string)
   return { error: null };
 }
 
+/**
+ * Marca (o desmarca) una reunión como "del equipo". El Jefe de Operaciones solo lee las del equipo para sacar
+ * tareas; las demás (clientes, pruebas, personales) no le llegan.
+ */
+export async function setMeetingTeamAction(meetingId: string, isTeam: boolean): Promise<ActionState> {
+  const { organizationId, userId } = await requireOrg();
+
+  const meeting = await prisma.meeting.findUnique({
+    where: { id: meetingId },
+    select: { organizationId: true, opportunityId: true, isTeam: true },
+  });
+  if (!meeting || meeting.organizationId !== organizationId || meeting.opportunityId !== null) {
+    return { error: "Reunión no encontrada" };
+  }
+  if (meeting.isTeam === isTeam) return { error: null };
+
+  // updatedAt cambia solo: así el Jefe la ve en su próxima lectura aunque la reunión sea vieja.
+  await prisma.meeting.update({ where: { id: meetingId }, data: { isTeam } });
+  await audit({
+    entityType: "Meeting",
+    entityId: meetingId,
+    action: isTeam ? "mark_team" : "unmark_team",
+    userId,
+    organizationId,
+    before: { isTeam: meeting.isTeam },
+    after: { isTeam },
+  });
+  revalidatePath(PATH);
+  return { error: null };
+}
+
 /** Cancela la reunión (no la borra) — si tiene evento de Calendar, lo cancela y avisa a los invitados. */
 export async function cancelAdhocMeetingAction(meetingId: string): Promise<ActionState> {
   const { organizationId } = await requireOrg();

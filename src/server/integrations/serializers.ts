@@ -84,11 +84,13 @@ export function serializeMeeting(m: {
   aiSummaryData: unknown;
   aiSummaryAt: Date | null;
   guestEmails: string[];
+  isTeam?: boolean;
   updatedAt: Date;
 }) {
   return {
     id: m.id,
     title: m.title?.trim() || "Reunión",
+    isTeam: m.isTeam ?? false,
     scheduledAt: m.scheduledAt.toISOString(),
     durationMinutes: m.durationMinutes,
     status: m.status,

@@ -504,6 +504,7 @@ components:
         durationMinutes: { type: [integer, "null"] }
         status: { type: string, enum: [SCHEDULED, CONFIRMED, DONE, CANCELED, NO_SHOW] }
         opportunityId: { type: [string, "null"] }
+        isTeam: { type: boolean, description: "Reunion marcada como del equipo en el CRM (la unica que lee el Jefe de Operaciones). Filtro: `?team=true`." }
         transcript: { type: [string, "null"], description: "Subtitulos en vivo con nombre de quien hablo." }
         audioTranscript: { type: [string, "null"], description: "Whisper sobre el audio (sin nombres)." }
         notes: { type: [string, "null"] }

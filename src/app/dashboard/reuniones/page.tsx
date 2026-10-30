@@ -14,6 +14,12 @@ export default async function ReunionesPage({
   if (!session?.user.organizationId) redirect("/dashboard");
 
   const { open } = await searchParams;
+  // "Reuniones del equipo" solo tiene sentido si la organización tiene habilitado el Jefe de Operaciones.
+  const org = await prisma.organization.findUnique({
+    where: { id: session.user.organizationId },
+    select: { jefeEnabled: true },
+  });
+  const jefeEnabled = org?.jefeEnabled ?? false;
   const canCreateGoogleMeet = await hasGoogleCalendarConnected(session.user.id);
 
   const meetings = await prisma.meeting.findMany({
@@ -30,6 +36,7 @@ export default async function ReunionesPage({
       botJoinedAt: true,
       botLeftAt: true,
       botEnabled: true,
+      isTeam: true,
       notes: true,
       transcript: true,
       audioTranscript: true,
@@ -54,6 +61,7 @@ export default async function ReunionesPage({
     botJoinedAt: m.botJoinedAt?.toISOString() ?? null,
     botLeftAt: m.botLeftAt?.toISOString() ?? null,
     botEnabled: m.botEnabled,
+    isTeam: m.isTeam,
     notes: m.notes ?? "",
     transcript: m.transcript ?? "",
     audioTranscript: m.audioTranscript ?? "",
@@ -66,14 +74,25 @@ export default async function ReunionesPage({
   return (
     <div className="animate-fade-up">
       <h1 className="mb-1 text-2xl font-bold">Reuniones</h1>
-      <p className="mb-6 text-sm text-ink-muted">
+      <p className="mb-4 text-sm text-ink-muted">
         Reuniones internas que no pasan por Seguimiento — con empleados, dirección, o cualquier
         reunión de emergencia que necesite grabarse.
+        {jefeEnabled && (
+          <>
+            {" "}
+            Marca las que sean <b>del equipo</b>: el Jefe de Operaciones solo lee esas para sacar tareas.
+          </>
+        )}
       </p>
 
       <ReunionesTabs active="internas" />
 
-      <AdhocMeetingsClient meetings={rows} openId={open ?? null} canCreateGoogleMeet={canCreateGoogleMeet} />
+      <AdhocMeetingsClient
+        meetings={rows}
+        openId={open ?? null}
+        canCreateGoogleMeet={canCreateGoogleMeet}
+        jefeEnabled={jefeEnabled}
+      />
     </div>
   );
 }

@@ -166,12 +166,28 @@ describe("emitSettledMeetingTranscripts", () => {
   });
 });
 
+describe("reuniones que no son del equipo", () => {
+  it("no emiten resumen listo (el Jefe solo lee las del equipo)", async () => {
+    db.emit.mockClear();
+    db.meetingFind.mockResolvedValueOnce({ id: "m2", organizationId: "orgA", isTeam: false, aiSummary: "x", aiSummaryData: null, aiSummaryAt: new Date() });
+    await emitMeetingSummaryReady("m2");
+    expect(db.emit).not.toHaveBeenCalled();
+  });
+  it("la lectura de transcripciones filtra por isTeam", async () => {
+    db.meetingFindMany.mockClear();
+    db.meetingFindMany.mockResolvedValueOnce([]);
+    await emitSettledMeetingTranscripts(new Date("2026-10-26T15:00:00Z"));
+    expect(db.meetingFindMany.mock.calls[0][0].where).toMatchObject({ isTeam: true });
+  });
+});
+
 describe("emitMeetingSummaryReady", () => {
   it("emite con el aiSummaryAt como versión del eventId", async () => {
     const at = new Date("2026-10-15T16:00:00Z");
     db.meetingFind.mockResolvedValueOnce({
       id: "m1",
       organizationId: "orgA",
+      isTeam: true,
       aiSummary: "Resumen",
       aiSummaryData: { resumen: "x" },
       aiSummaryAt: at,

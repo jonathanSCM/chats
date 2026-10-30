@@ -18,6 +18,7 @@ import {
   linkMeetingToOpportunityAction,
   createClientAndLinkMeetingAction,
   type ClientSearchResult,
+  setMeetingTeamAction,
 } from "@/server/actions/adhoc-meetings";
 import { scheduledAtToUtcHidden, utcIsoToLocalInputValue } from "@/lib/datetime-local";
 import { BOT_STATUS_CONFIG } from "@/lib/meeting-bot-status";
@@ -39,6 +40,7 @@ export interface AdhocMeetingRow {
   botJoinedAt: string | null;
   botLeftAt: string | null;
   botEnabled: boolean;
+  isTeam: boolean;
   notes: string;
   transcript: string;
   audioTranscript: string;
@@ -187,9 +189,12 @@ export function AdhocMeetingsClient({
   meetings,
   openId,
   canCreateGoogleMeet,
+  jefeEnabled,
 }: {
   meetings: AdhocMeetingRow[];
   openId?: string | null;
+  /** Solo con el Jefe de Operaciones habilitado se muestra todo lo de "Reuniones del equipo". */
+  jefeEnabled: boolean;
   /** Solo true si ESTE usuario conectó su propio Google Calendar en Mi Perfil -- el calendario compartido de la organización está fuera de servicio (token vencido), así que sin esto no hay forma de que "Crear con Google Meet" funcione. */
   canCreateGoogleMeet: boolean;
 }) {
@@ -263,6 +268,18 @@ export function AdhocMeetingsClient({
       setEditPending(false);
       if (result.error) setEditError({ id, message: result.error });
       else setEditingId(null);
+    });
+  }
+
+  // Reunión del equipo: la ve el Jefe de Operaciones. Se actualiza al instante y se revierte si falla.
+  const [teamOverride, setTeamOverride] = useState<Record<string, boolean>>({});
+  const [teamFilter, setTeamFilter] = useState<"all" | "team" | "other">("all");
+  const isTeamOf = (m: AdhocMeetingRow) => teamOverride[m.id] ?? m.isTeam;
+  function handleTeam(id: string, value: boolean) {
+    setTeamOverride((o) => ({ ...o, [id]: value }));
+    startTransition(async () => {
+      const result = await setMeetingTeamAction(id, value);
+      if (result.error) setTeamOverride((o) => ({ ...o, [id]: !value }));
     });
   }
 
@@ -389,6 +406,30 @@ export function AdhocMeetingsClient({
         </Card>
       )}
 
+      {jefeEnabled && meetings.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-[13px]">
+          {(
+            [
+              ["all", `Todas (${meetings.length})`],
+              ["team", `Del equipo (${meetings.filter((m) => isTeamOf(m)).length})`],
+              ["other", `Sin marcar (${meetings.filter((m) => !isTeamOf(m)).length})`],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setTeamFilter(k)}
+              className={`cursor-pointer rounded-full border px-3 py-1 font-medium transition-colors ${
+                teamFilter === k ? "border-accent/40 bg-accent/10 text-accent" : "border-border text-ink-muted hover:bg-surface-2"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          <span className="text-xs text-ink-faint">El Jefe de Operaciones solo lee las marcadas «Del equipo».</span>
+        </div>
+      )}
+
       {meetings.length === 0 ? (
         <Card className="text-sm text-ink-muted">
           Todavía no hay reuniones internas. Se usan para juntadas de emergencia con el equipo, la
@@ -396,7 +437,7 @@ export function AdhocMeetingsClient({
         </Card>
       ) : (
         <div className="space-y-2">
-          {meetings.map((m) => {
+          {meetings.filter((m) => !jefeEnabled || teamFilter === "all" || (teamFilter === "team") === isTeamOf(m)).map((m) => {
             const botConfig = m.botStatus ? BOT_STATUS_CONFIG[m.botStatus] : null;
             const BotIcon = botConfig?.icon;
             const live = m.botStatus === "JOINING" || m.botStatus === "RECORDING";
@@ -421,6 +462,17 @@ export function AdhocMeetingsClient({
                 </div>
 
                 <div className="flex shrink-0 flex-col items-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  {jefeEnabled && (
+                  <label
+                    title="El Jefe de Operaciones solo lee las reuniones marcadas como del equipo para sacar tareas."
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                      isTeamOf(m) ? "border-accent/40 bg-accent/10 text-accent" : "border-border text-ink-muted hover:bg-surface-2"
+                    }`}
+                  >
+                    <input type="checkbox" className="h-3.5 w-3.5" checked={isTeamOf(m)} onChange={(e) => handleTeam(m.id, e.target.checked)} />
+                    Del equipo
+                  </label>
+                  )}
                   <div className="flex flex-wrap items-center justify-end gap-1.5">
                     <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-muted">
                       {STATUS_LABEL[m.status] ?? m.status}
@@ -494,6 +546,18 @@ export function AdhocMeetingsClient({
                 )}
               </div>
             </PanelSection>
+
+            {jefeEnabled && (
+            <PanelSection label="Equipo" delay={15}>
+              <label className="flex cursor-pointer items-start gap-2 text-sm text-ink">
+                <input type="checkbox" className="mt-0.5 h-4 w-4" checked={isTeamOf(m)} onChange={(e) => handleTeam(m.id, e.target.checked)} />
+                <span>
+                  <b>Reunión del equipo.</b>{" "}
+                  <span className="text-ink-muted">El Jefe de Operaciones la lee para sacar las tareas y compromisos del equipo. Si no la marcas, no la ve.</span>
+                </span>
+              </label>
+            </PanelSection>
+            )}
 
             <PanelSection label="Cliente" delay={20}>
               <LinkClientSection meetingId={m.id} disabled={isPending} />

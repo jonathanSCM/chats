@@ -129,6 +129,8 @@ describe("serializadores: lista blanca, sin secretos", () => {
     });
     expect(m.title).toBe("Reunión");
     expect(m.attendees).toEqual(["a@x.com"]);
+    expect(m.isTeam).toBe(false); // sin marcar: no es del equipo
+    expect(serializeMeeting({ id: "m", title: "x", scheduledAt: now, durationMinutes: 30, status: "DONE", opportunityId: null, transcript: null, audioTranscript: null, notes: null, aiSummary: null, aiSummaryData: null, aiSummaryAt: null, guestEmails: [], isTeam: true, updatedAt: now }).isTeam).toBe(true);
     expect(
       serializeMessage({ id: "g", conversationId: "c", role: "STAFF", content: "  ", mediaType: "IMAGE", isVoiceNote: false, fileName: null, createdAt: now }).text,
     ).toBeNull();

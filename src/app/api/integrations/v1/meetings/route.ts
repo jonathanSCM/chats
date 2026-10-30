@@ -12,10 +12,13 @@ export const GET = integrationRoute("read", async (ctx, req) => {
   const limit = parseLimit(q.get("limit"));
   const since = parseDate(q.get("since"), "since");
   const cursor = decodeCursor(q.get("cursor"));
+  // ?team=true: solo las reuniones marcadas como del equipo (lo que lee el Jefe de Operaciones).
+  const onlyTeam = q.get("team") === "true";
 
   const rows = await prisma.meeting.findMany({
     where: {
       organizationId: ctx.organizationId,
+      ...(onlyTeam ? { isTeam: true } : {}),
       ...(since ? { updatedAt: { gt: since } } : {}),
       ...keysetAfter("updatedAt", cursor),
     },
@@ -33,6 +36,7 @@ export const GET = integrationRoute("read", async (ctx, req) => {
       aiSummaryData: true,
       aiSummaryAt: true,
       guestEmails: true,
+      isTeam: true,
       updatedAt: true,
     },
     orderBy: [{ updatedAt: "asc" }, { id: "asc" }],

@@ -108,6 +108,7 @@ export async function emitSettledMeetingTranscripts(now = new Date()): Promise<n
     where: {
       updatedAt: { gt: since, lt: settledBefore },
       scheduledAt: { lt: settledBefore },
+      isTeam: true,
       OR: [{ transcript: { not: null } }, { audioTranscript: { not: null } }],
       organization: { jefeEnabled: true, integrationWebhooks: { some: { enabled: true } } },
     },
@@ -187,9 +188,9 @@ export async function emitMeetingSummaryReady(meetingId: string): Promise<void> 
   try {
     const m = await prisma.meeting.findUnique({
       where: { id: meetingId },
-      select: { id: true, organizationId: true, aiSummary: true, aiSummaryData: true, aiSummaryAt: true },
+      select: { id: true, organizationId: true, isTeam: true, aiSummary: true, aiSummaryData: true, aiSummaryAt: true },
     });
-    if (!m?.aiSummaryAt) return;
+    if (!m?.aiSummaryAt || !m.isTeam) return;
     await emitIntegrationEvent({
       eventId: eventIds.summaryReady(m.id, m.aiSummaryAt),
       type: "meeting.summary_ready",

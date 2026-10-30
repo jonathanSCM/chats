@@ -1067,6 +1067,8 @@ model Meeting {
   opportunityId         String?
   opportunity           Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   title                 String? // solo se usa cuando opportunityId es null (reunión suelta/ad-hoc)
+  // Reunión del equipo (interna): es la única que el Jefe de Operaciones lee para sacar tareas. Se marca a mano en Reuniones.
+  isTeam                Boolean           @default(false)
   scheduledAt           DateTime
   durationMinutes       Int               @default(30)
   meetingUrl            String?
@@ -1107,6 +1109,7 @@ model Meeting {
   attachments MeetingAttachment[]
 
   @@index([organizationId, scheduledAt])
+  @@index([organizationId, isTeam, updatedAt])
   @@index([vexaSessionId])
   @@map("meetings")
 }

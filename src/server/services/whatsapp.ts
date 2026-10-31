@@ -599,6 +599,8 @@ export interface ParsedEcho {
   phoneNumberId: string;
   to: string; // número del cliente
   messageId: string;
+  /** Segundos Unix en que el mensaje se mandó desde el celular (según Meta). */
+  timestamp: string;
   text: string | null;
   media: {
     type: InboundMediaType;
@@ -629,6 +631,7 @@ export function parseMessageEchoes(payload: unknown): ParsedEcho[] {
             phoneNumberId: phone_number_id,
             to: echo.to,
             messageId: echo.id,
+            timestamp: echo.timestamp,
             text: echo.text.body,
             media: null,
           });
@@ -642,6 +645,7 @@ export function parseMessageEchoes(payload: unknown): ParsedEcho[] {
               phoneNumberId: phone_number_id,
               to: echo.to,
               messageId: echo.id,
+              timestamp: echo.timestamp,
               text: mediaObj.caption ?? null,
               media: {
                 type: mediaType,

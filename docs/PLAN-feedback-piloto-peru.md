@@ -13,10 +13,10 @@ Estado según lo que revisé en el código y en los logs de producción. "Hecho"
 | 1.1 | Guardado falla al primer intento | **Mitigado** (`1bd652a`, `f0012b4`) | Redeploy y medir | — |
 | 4.1 | Ficha no accesible desde el celular | **Hecho** (menú "⋯") | Redeploy y probar en un celular real | — |
 | 4.2 | Teléfono visible / llamar | **Hecho** | Redeploy | — |
-| 3.2 | Salientes del celular no aparecen hasta la respuesta | **Por diagnosticar** | Un ejemplo concreto de Mariana | Medio |
-| 3.3 | Archivar sincronizado con WhatsApp Business | **Probable límite de Meta** | Confirmar en la doc de Meta | Por ver |
+| 3.2 | Salientes del celular no aparecen hasta la respuesta | **En observación**: los ecos sí se guardan (194 en 14 días); ahora se guarda la hora real de envío y el log dice cuánto tardó cada eco | Redeploy y probar con un chat concreto | Medio |
+| 3.3 | Archivar sincronizado con WhatsApp Business | **No se hace por ahora** (Meta no lo permite); archivar, bloquear y silenciar son solo del CRM | — | — |
 | 2.4 | Pestaña única de reuniones | Hecho | Ver detalle abajo | Medio |
-| 2.5 | Calendario/categoría "ProShop" en Google | Propuesta | Ver detalle abajo | Chico–medio |
+| 2.5 | Calendario/categoría "ProShop" en Google | **Hecho**: color propio (Pavo real) y marca interna en los eventos nuevos | Redeploy | — |
 | 3.4 | Guardar contacto CRM ↔ teléfono | **Hecho el .vcf** (el sentido inverso ya llega por Coexistence) | Redeploy | — |
 | 3.1 | Contactos con username | **Hecho** (`0541948`) | Redeploy (ya en prod desde el 28) | — |
 

@@ -530,6 +530,13 @@ export async function handlePhoneAppEcho(echo: ParsedEcho): Promise<void> {
 
   const conversationId = await findOrCreateConversation(connection.bot.id, echo.to);
 
+  // La hora real de envío manda: si Meta entrega el eco tarde, el mensaje queda en su lugar de la
+  // conversación y no después de lo que el cliente haya contestado mientras tanto.
+  const sentAtMs = Number(echo.timestamp) * 1000;
+  const now = Date.now();
+  const sentAt = Number.isFinite(sentAtMs) && sentAtMs > 0 && sentAtMs <= now ? new Date(sentAtMs) : new Date(now);
+  const lagSeconds = Math.round((now - sentAt.getTime()) / 1000);
+
   let messageId: string;
   try {
     const created = await prisma.message.create({
@@ -543,6 +550,7 @@ export async function handlePhoneAppEcho(echo: ParsedEcho): Promise<void> {
         fileName: echo.media?.fileName ?? null,
         externalId: echo.messageId,
         viaPhoneApp: true,
+        createdAt: sentAt,
       },
       select: { id: true },
     });
@@ -571,7 +579,7 @@ export async function handlePhoneAppEcho(echo: ParsedEcho): Promise<void> {
     data: { lastMessageAt: new Date(), botPaused: true },
   });
   await maybeActivateFreeEntryPoint(conversationId);
-  console.log(`[webhook] eco ${echo.messageId} guardado en la conversación ${conversationId} (a ${echo.to})`);
+  console.log(`[webhook] eco ${echo.messageId} guardado en la conversación ${conversationId} (a ${echo.to}), llegó ${lagSeconds}s después de enviarse`);
 }
 
 // ─── Coexistence: import del historial previo a conectar ───────────────

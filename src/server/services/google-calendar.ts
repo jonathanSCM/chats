@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { google, type calendar_v3 } from "googleapis";
 import { prisma } from "@/server/db/client";
+import { proshopEventStyle } from "@/lib/google-event-style";
 
 /**
  * Una sola cuenta de Google (GOOGLE_BOT_REFRESH_TOKEN), compartida por toda
@@ -109,6 +110,7 @@ export async function createMeetEvent({
     sendUpdates: attendeeEmails?.length ? "all" : "none",
     requestBody: {
       summary,
+      ...proshopEventStyle(),
       start: { dateTime: scheduledAt.toISOString() },
       end: { dateTime: endAt.toISOString() },
       conferenceData: {
@@ -148,6 +150,7 @@ export async function createCalendarEvent({
     calendarId,
     requestBody: {
       summary,
+      ...proshopEventStyle(),
       start: { dateTime: scheduledAt.toISOString() },
       end: { dateTime: endAt.toISOString() },
     },

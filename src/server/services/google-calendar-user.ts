@@ -1,6 +1,7 @@
 import { randomUUID, randomBytes } from "node:crypto";
 import { google, type calendar_v3 } from "googleapis";
 import { prisma } from "@/server/db/client";
+import { proshopEventStyle } from "@/lib/google-event-style";
 
 /**
  * Calendario de Google *personal* de cada usuario (a diferencia de
@@ -177,6 +178,7 @@ export async function createUserMeetEvent({
     sendUpdates: attendeeEmails?.length ? "all" : "none",
     requestBody: {
       summary,
+      ...proshopEventStyle(),
       start: { dateTime: scheduledAt.toISOString() },
       end: { dateTime: endAt.toISOString() },
       location: existingMeetingUrl ?? undefined,

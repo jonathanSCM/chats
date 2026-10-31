@@ -514,13 +514,19 @@ export async function handlePhoneAppEcho(echo: ParsedEcho): Promise<void> {
     where: { externalId: echo.messageId },
     select: { id: true },
   });
-  if (alreadyProcessed) return;
+  if (alreadyProcessed) {
+    console.log(`[webhook] eco ${echo.messageId} ya estaba guardado`);
+    return;
+  }
 
   const connection = await prisma.whatsAppConnection.findUnique({
     where: { phoneNumberId: echo.phoneNumberId },
     include: { bot: true },
   });
-  if (!connection) return;
+  if (!connection) {
+    console.warn(`[webhook] eco ${echo.messageId} descartado: ningún número conectado con phone_number_id ${echo.phoneNumberId}`);
+    return;
+  }
 
   const conversationId = await findOrCreateConversation(connection.bot.id, echo.to);
 
@@ -565,6 +571,7 @@ export async function handlePhoneAppEcho(echo: ParsedEcho): Promise<void> {
     data: { lastMessageAt: new Date(), botPaused: true },
   });
   await maybeActivateFreeEntryPoint(conversationId);
+  console.log(`[webhook] eco ${echo.messageId} guardado en la conversación ${conversationId} (a ${echo.to})`);
 }
 
 // ─── Coexistence: import del historial previo a conectar ───────────────

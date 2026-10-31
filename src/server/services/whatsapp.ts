@@ -619,7 +619,10 @@ export function parseMessageEchoes(payload: unknown): ParsedEcho[] {
       const { phone_number_id } = change.value.metadata;
       for (const rawEcho of change.value.message_echoes ?? []) {
         const to = rawEcho.to?.trim() || rawEcho.to_user_id?.trim();
-        if (!to) continue;
+        if (!to) {
+          console.warn(`[webhook] eco ${rawEcho.id} descartado: no trae destinatario (to / to_user_id)`);
+          continue;
+        }
         const echo = { ...rawEcho, to };
         if (echo.type === "text" && echo.text?.body) {
           results.push({
@@ -647,8 +650,12 @@ export function parseMessageEchoes(payload: unknown): ParsedEcho[] {
                 fileName: mediaObj.filename,
               },
             });
+            continue;
           }
         }
+        // Sin esto un eco de un tipo que no guardamos (sticker, ubicación, contacto, plantilla...) se
+        // perdía sin dejar rastro y el chat parecía desactualizado.
+        console.warn(`[webhook] eco ${echo.id} descartado: tipo "${echo.type}" no soportado`);
       }
     }
   }

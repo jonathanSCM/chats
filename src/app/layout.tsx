@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, IBM_Plex_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { StaleActionReload } from "@/components/stale-action-reload";
 import { PwaPrompts } from "@/components/pwa-prompts";
 import { LEGACY_BROWSER_NOTICE_SCRIPT } from "@/lib/legacy-browser-notice";
@@ -8,16 +8,23 @@ import "./globals.css";
 
 // Inter es la única tipografía de la interfaz (guía de rediseño). La monoespaciada
 // queda solo para identificadores técnicos (`font-code`).
-const sans = Inter({
+// Las fuentes viven en el repo (src/app/fonts, licencia OFL) y no se bajan de Google al construir: antes, si Google
+// Fonts fallaba o tardaba durante el build en el servidor, el despliegue entero se caía (Turbopack: "next/font/google
+// queries have exactly one entry"). Subconjunto latino: cubre español completo.
+const sans = localFont({
+  src: "./fonts/inter-latin-wght-normal.woff2", // variable: sirve todos los pesos 100-900
   variable: "--font-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: "100 900",
+  display: "swap",
 });
 
-const code = IBM_Plex_Mono({
+const code = localFont({
+  src: [
+    { path: "./fonts/ibm-plex-mono-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/ibm-plex-mono-latin-500-normal.woff2", weight: "500", style: "normal" },
+  ],
   variable: "--font-code",
-  subsets: ["latin"],
-  weight: ["400", "500"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {

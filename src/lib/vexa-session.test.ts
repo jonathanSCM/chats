@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideConflict, parseSessionId, pickSession, type VexaSessionEntry } from "./vexa-session";
+import { MAX_JOIN_RETRIES, decideConflict, describeJoinFailure, parseSessionId, pickSession, shouldRetryJoin, type VexaSessionEntry } from "./vexa-session";
 
 const entry = (over: Partial<VexaSessionEntry>): VexaSessionEntry => ({
   id: 1,
@@ -90,5 +90,39 @@ describe("decideConflict (Vexa dijo que ya hay un bot en la sala)", () => {
     const older = entry({ id: 70, status: "joining", created_at: "2026-10-29T20:00:00Z" });
     const r = decideConflict({ list: [older, active], nativeId: "abc-defg-hij", ownSessionId: null, sameOrgSessionIds: new Set([70, 90]) });
     expect(r).toEqual({ action: "adopt", sessionId: 90 });
+  });
+});
+
+const failed = (reason: string): Pick<VexaSessionEntry, "data" | "failure_stage"> => ({
+  failure_stage: "joining",
+  data: { join_evidence: { reason } },
+});
+
+describe("describeJoinFailure", () => {
+  it("explica en palabras de una persona por qué no entró", () => {
+    expect(describeJoinFailure(failed("awaiting_admission_timeout"))).toMatch(/Nadie admitió/);
+    expect(describeJoinFailure(failed("awaiting_admission_rejected"))).toMatch(/rechazó/);
+    expect(describeJoinFailure(failed("never_reached_lobby"))).toMatch(/Meet no dejó/);
+    expect(describeJoinFailure({ failure_stage: "joining", data: null })).toMatch(/no pudo entrar/);
+  });
+});
+
+describe("shouldRetryJoin", () => {
+  const base = { attempt: 0, scheduledInAdvance: true, meetingEnded: false };
+
+  it("reintenta cuando Meet no mostró la sala", () => {
+    expect(shouldRetryJoin({ ...base, entry: failed("never_reached_lobby"), scheduledInAdvance: false })).toBe(true);
+  });
+
+  it("reintenta una espera sin admisión solo si la reunión estaba agendada con tiempo", () => {
+    expect(shouldRetryJoin({ ...base, entry: failed("awaiting_admission_timeout") })).toBe(true);
+    expect(shouldRetryJoin({ ...base, entry: failed("awaiting_admission_timeout"), scheduledInAdvance: false })).toBe(false);
+  });
+
+  it("no reintenta tras un rechazo, una cancelación, una reunión terminada o con el tope alcanzado", () => {
+    expect(shouldRetryJoin({ ...base, entry: failed("awaiting_admission_rejected") })).toBe(false);
+    expect(shouldRetryJoin({ ...base, entry: failed("stopped_while_joining") })).toBe(false);
+    expect(shouldRetryJoin({ ...base, entry: failed("never_reached_lobby"), meetingEnded: true })).toBe(false);
+    expect(shouldRetryJoin({ ...base, entry: failed("never_reached_lobby"), attempt: MAX_JOIN_RETRIES })).toBe(false);
   });
 });

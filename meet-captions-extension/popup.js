@@ -34,7 +34,8 @@ micBtn.addEventListener("click", () => {
   chrome.tabs.create({ url: chrome.runtime.getURL("permissions.html") });
 });
 
-const MEETING_URL_RE = /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}/i;
+// Meet usa tanto /abc-defg-hij como /meet/abc-defg-hij.
+const MEETING_URL_RE = /^https:\/\/meet\.google\.com\/(?:meet\/)?([a-z]{3}-[a-z]{4}-[a-z]{3})/i;
 const CRM_BASE = "https://chats.proshop.lat";
 
 // Ya no se pega ningún token a mano: se abre el CRM (reusa la sesión ya
@@ -92,7 +93,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       meetingText.textContent = "No se pudo conectar con la reunión — recargá la pestaña de Meet e intentá de nuevo.";
       return;
     }
-    const meetingUrl = tab.url.match(MEETING_URL_RE)[0];
+    const meetingUrl = `https://meet.google.com/${tab.url.match(MEETING_URL_RE)[1].toLowerCase()}`;
 
     if (response.recording) {
       meetingText.innerHTML = '<span class="dot"></span>Grabando esta reunión (' + response.lines + " líneas).";

@@ -5,6 +5,7 @@
 /** Franja de color arriba del panel: grabando/falló en rojo, el resto el verde de acento. */
 export function panelAccent(botStatus: string | null): string {
   if (botStatus === "RECORDING" || botStatus === "FAILED") return "var(--danger)";
+  if (botStatus === "WAITING_ADMISSION") return "var(--warning)";
   return "var(--accent)";
 }
 

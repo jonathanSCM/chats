@@ -11,6 +11,12 @@ export const BOT_STATUS_CONFIG: Record<
 > = {
   PENDING: { label: "Se va a unir", icon: Clock, className: "bg-surface-2 text-ink-muted", canStop: true },
   JOINING: { label: "Entrando…", icon: Loader2, className: "bg-accent-dim/20 text-accent", canStop: true },
+  WAITING_ADMISSION: {
+    label: "Esperando que lo admitan",
+    icon: Clock,
+    className: "bg-warning-dim text-warning",
+    canStop: true,
+  },
   RECORDING: { label: "Grabando", icon: Video, className: "bg-danger/15 text-danger", canStop: true },
   TRANSCRIBING: {
     label: "Transcribiendo…",

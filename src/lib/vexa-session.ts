@@ -16,6 +16,49 @@ export interface VexaSessionEntry {
   updated_at?: string | null;
   failure_stage?: string | null;
   completion_reason?: string | null;
+  /** Detalle que guarda Vexa de la sesión; `join_evidence.reason` dice por qué no se pudo entrar. */
+  data?: { join_evidence?: { reason?: string | null } | null } | null;
+}
+
+/** Motivo técnico del fallo al entrar (`awaiting_admission_timeout`, `never_reached_lobby`…), si Vexa lo informó. */
+export function joinFailureCode(entry: Pick<VexaSessionEntry, "data" | "failure_stage">): string | null {
+  return entry.data?.join_evidence?.reason ?? null;
+}
+
+/** El motivo del fallo en palabras de una persona, para mostrarlo en el CRM. */
+export function describeJoinFailure(entry: Pick<VexaSessionEntry, "data" | "failure_stage" | "completion_reason">): string {
+  switch (joinFailureCode(entry)) {
+    case "awaiting_admission_timeout":
+      return "Nadie admitió al asistente en la sala de espera (esperó 15 minutos). Quien organiza la reunión tiene que aceptarlo cuando aparezca el aviso de Meet.";
+    case "awaiting_admission_rejected":
+      return "Quien organiza la reunión rechazó al asistente.";
+    case "never_reached_lobby":
+      return "Meet no dejó que el asistente llegara a la sala (el link no abrió una reunión activa, o Meet lo bloqueó).";
+    case "stopped_while_joining":
+      return "Se canceló antes de que el asistente llegara a entrar.";
+    default:
+      return "El asistente no pudo entrar a la reunión.";
+  }
+}
+
+export const MAX_JOIN_RETRIES = 2;
+
+/**
+ * ¿Vale la pena pedir el asistente de nuevo? Solo si el fallo suele ser pasajero:
+ *  - `never_reached_lobby`: Meet no mostró la sala (a veces se arregla al segundo intento).
+ *  - `awaiting_admission_timeout` en una reunión agendada que todavía no terminó: el anfitrión suele llegar tarde.
+ * Nunca después de un rechazo ni de una cancelación a mano, y con tope de reintentos.
+ */
+export function shouldRetryJoin(params: {
+  entry: Pick<VexaSessionEntry, "data" | "failure_stage">;
+  attempt: number;
+  scheduledInAdvance: boolean;
+  meetingEnded: boolean;
+}): boolean {
+  if (params.attempt >= MAX_JOIN_RETRIES || params.meetingEnded) return false;
+  const code = joinFailureCode(params.entry);
+  if (code === "never_reached_lobby") return true;
+  return code === "awaiting_admission_timeout" && params.scheduledInAdvance;
 }
 
 /** El id de la sesión que devuelve Vexa al crear el bot (según la versión viene como `id` o dentro de `meeting`). */

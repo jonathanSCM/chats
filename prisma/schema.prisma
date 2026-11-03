@@ -1071,6 +1071,7 @@ enum MeetingStatus {
 enum MeetingBotStatus {
   PENDING
   JOINING
+  WAITING_ADMISSION // el asistente ya golpeó la puerta y espera que el anfitrión lo admita en la sala de espera
   RECORDING
   RECORDED // legado: reuniones grabadas antes de que whisper.cpp transcribiera siempre solo — ya no se usa para reuniones nuevas
   TRANSCRIBING // el bot ya salió de la reunión y está corriendo whisper.cpp sobre el audio (puede tardar unos minutos)
@@ -1106,6 +1107,7 @@ model Meeting {
   vexaSessionId         Int? // id interno de la sesión del bot en Vexa: se sigue la sesión, no el código de la sala
   botJoinedAt           DateTime? // cuándo el bot quedó admitido de verdad en la llamada
   botLeftAt             DateTime? // cuándo terminó de grabar y subió el audio
+  botFailureReason      String? // por qué falló el asistente, en palabras de una persona (solo si botStatus = FAILED)
   transcript            String?           @db.Text // de subtítulos en vivo, con nombre de quién habló — separado de `notes`
   audioTranscript       String?           @db.Text // whisper.cpp local sobre el audio completo, sin nombres — complementa transcript cuando los subtítulos tienen huecos o fallaron
   notes                 String?           @db.Text // texto cargado a mano por el vendedor, nunca lo pisa el bot

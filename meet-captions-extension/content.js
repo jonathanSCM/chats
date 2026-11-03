@@ -10,14 +10,17 @@
 (function () {
   "use strict";
 
-  const MEETING_CODE_RE = /^\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/i;
+  // Meet usa tanto /abc-defg-hij como /meet/abc-defg-hij (el que sale al abrir el link desde Calendar o Gmail).
+  const MEETING_CODE_RE = /^\/(?:meet\/)?([a-z]{3}-[a-z]{4}-[a-z]{3})\/?$/i;
   const POLL_MS = 2000;
   const END_CHECK_TICKS = 10; // cada 10 polls (~20s) se fija si la reunión terminó
   const API_PATH = "/api/extension/transcript";
 
-  if (!MEETING_CODE_RE.test(window.location.pathname)) return;
+  const codeMatch = MEETING_CODE_RE.exec(window.location.pathname);
+  if (!codeMatch) return;
 
-  const meetingUrl = `https://meet.google.com${window.location.pathname}`;
+  // Siempre el link canónico, así la misma reunión cae en la misma fila del CRM sin importar cómo se abrió.
+  const meetingUrl = `https://meet.google.com/${codeMatch[1].toLowerCase()}`;
 
   let started = false;
   let ticks = 0;

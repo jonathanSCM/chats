@@ -35,6 +35,7 @@ export function OPTIONS(): NextResponse {
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "todavía no entró",
   JOINING: "entrando ahora",
+  WAITING_ADMISSION: "esperando que lo admitan en la sala de espera",
   RECORDING: "grabando",
   TRANSCRIBING: "salió, transcribiendo el audio",
   DONE: "terminó, transcripción lista",

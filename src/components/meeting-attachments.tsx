@@ -114,6 +114,12 @@ export function MeetingAttachments({
                   </button>
                 )}
               </div>
+              {a.mimeType.startsWith("image/") && (
+                <a href={a.url} target="_blank" rel="noopener noreferrer" className="block w-fit">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- captura del asistente servida desde nuestro propio almacenamiento */}
+                  <img src={a.url} alt={a.fileName} loading="lazy" className="max-h-32 rounded-md border border-border/60" />
+                </a>
+              )}
               {a.mimeType.startsWith("audio/") && (
                 // eslint-disable-next-line jsx-a11y/media-has-caption -- grabación de reunión, no hay pista de subtítulos que adjuntar acá
                 <audio controls preload="none" src={a.url} className="h-8 w-full max-w-sm" />

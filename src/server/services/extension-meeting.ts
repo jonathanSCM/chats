@@ -1,4 +1,5 @@
 import { prisma } from "@/server/db/client";
+import { extractMeetCode, normalizeMeetUrl } from "@/lib/meet-code";
 
 /**
  * Encuentra o crea la reunión que le corresponde a un link de Meet que
@@ -16,10 +17,18 @@ export async function resolveExtensionMeeting(params: {
   // null si por alguna razón no se pudo identificar.
   recordedById?: string | null;
 }): Promise<{ id: string; transcript: string | null; audioTranscript: string | null }> {
-  const { organizationId, meetingUrl, recordedById = null } = params;
+  const { organizationId, recordedById = null } = params;
+  // El mismo link llega escrito de varias formas (meet.google.com/abc-defg-hij, /meet/abc-defg-hij, con parámetros):
+  // se busca por el código de la sala y las reuniones nuevas se guardan con el link canónico.
+  const code = extractMeetCode(params.meetingUrl);
+  const meetingUrl = normalizeMeetUrl(params.meetingUrl) ?? params.meetingUrl;
 
   const existing = await prisma.meeting.findFirst({
-    where: { organizationId, meetingUrl, status: { not: "CANCELED" } },
+    where: {
+      organizationId,
+      meetingUrl: code ? { contains: code, mode: "insensitive" } : meetingUrl,
+      status: { not: "CANCELED" },
+    },
     orderBy: { scheduledAt: "desc" },
     select: { id: true, transcript: true, audioTranscript: true, recordedById: true },
   });

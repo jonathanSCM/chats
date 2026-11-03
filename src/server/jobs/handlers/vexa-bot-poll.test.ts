@@ -4,6 +4,9 @@ const m = vi.hoisted(() => ({
   meetingFind: vi.fn(),
   meetingUpdate: vi.fn(),
   attachmentCreate: vi.fn(),
+  attachmentFind: vi.fn(),
+  meetingUpdateMany: vi.fn(),
+  reschedule: vi.fn(),
   enqueue: vi.fn(),
   saveMedia: vi.fn(),
   fetch: vi.fn(),
@@ -13,12 +16,12 @@ const m = vi.hoisted(() => ({
 
 vi.mock("@/server/db/client", () => ({
   prisma: {
-    meeting: { findUnique: m.meetingFind, update: m.meetingUpdate },
-    meetingAttachment: { create: m.attachmentCreate },
+    meeting: { findUnique: m.meetingFind, update: m.meetingUpdate, updateMany: m.meetingUpdateMany },
+    meetingAttachment: { create: m.attachmentCreate, findFirst: m.attachmentFind },
     aiCreditUsage: { findFirst: m.usageFind },
   },
 }));
-vi.mock("../queue", () => ({ enqueue: m.enqueue }));
+vi.mock("../queue", () => ({ enqueue: m.enqueue, enqueueOrReschedule: m.reschedule }));
 vi.mock("@/lib/media-storage", () => ({ saveMediaFile: m.saveMedia }));
 vi.mock("@/server/services/ai/credits", () => ({ chargeCredits: m.charge }));
 
@@ -61,6 +64,9 @@ beforeEach(() => {
   m.meetingFind.mockResolvedValue({ botJoinedAt: new Date(), vexaSessionId: null, transcript: null });
   m.meetingUpdate.mockResolvedValue({});
   m.attachmentCreate.mockResolvedValue({});
+  m.attachmentFind.mockResolvedValue(null);
+  m.meetingUpdateMany.mockResolvedValue({ count: 1 });
+  m.reschedule.mockResolvedValue(undefined);
   m.enqueue.mockResolvedValue(undefined);
   m.saveMedia.mockResolvedValue("/media/x.txt");
   m.charge.mockResolvedValue(undefined);
@@ -173,3 +179,65 @@ describe("handleVexaBotPoll (créditos por transcripción)", () => {
     spy.mockRestore();
   });
 });
+
+describe("handleVexaBotPoll (entrada fallida y sala de espera)", () => {
+  const failedEntry = (reason: string, over: Record<string, unknown> = {}) =>
+    entry({ id: 7, status: "failed", failure_stage: "joining", data: { join_evidence: { reason } }, ...over });
+  const meetingRow = (over: Record<string, unknown> = {}) => ({
+    status: "CONFIRMED",
+    botStatus: "JOINING",
+    createdAt: new Date(Date.now() - 30 * 60_000),
+    scheduledAt: new Date(Date.now() - 20 * 60_000),
+    durationMinutes: 60,
+    meetingUrl: "https://meet.google.com/abc-defg-hij",
+    ...over,
+  });
+
+  it("marca 'esperando que lo admitan' mientras el asistente está en la sala de espera", async () => {
+    vexa([entry({ id: 7, status: "awaiting_admission" })]);
+    await handleVexaBotPoll(payload({ vexaSessionId: 7 }));
+    expect(m.meetingUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { botStatus: "WAITING_ADMISSION" } }),
+    );
+    expect(m.enqueue).toHaveBeenCalledTimes(1); // sigue mirando
+  });
+
+  it("si Meet no mostró la sala, vuelve a pedir el asistente y no lo da por fallido", async () => {
+    m.meetingFind.mockResolvedValue(meetingRow());
+    vexa([failedEntry("never_reached_lobby")]);
+    await handleVexaBotPoll(payload({ vexaSessionId: 7 }));
+    expect(m.reschedule).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "meeting_bot_join", payload: { meetingId: "mtg1", attempt: 1 } }),
+    );
+    expect(m.meetingUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: { botStatus: "PENDING" } }));
+  });
+
+  it("tras agotar los reintentos queda FAILED con el motivo a la vista", async () => {
+    m.meetingFind.mockResolvedValue(meetingRow());
+    vexa([failedEntry("never_reached_lobby")]);
+    await handleVexaBotPoll(payload({ vexaSessionId: 7, joinAttempt: 2 }));
+    expect(m.reschedule).not.toHaveBeenCalled();
+    expect(m.meetingUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ botStatus: "FAILED", botFailureReason: expect.stringMatching(/Meet no dejó/) }) }),
+    );
+  });
+
+  it("si nadie lo admitió en una reunión 'en vivo', no insiste", async () => {
+    m.meetingFind.mockResolvedValue(meetingRow({ createdAt: new Date(), scheduledAt: new Date() }));
+    vexa([failedEntry("awaiting_admission_timeout", { failure_stage: "awaiting_admission" })]);
+    await handleVexaBotPoll(payload({ vexaSessionId: 7 }));
+    expect(m.reschedule).not.toHaveBeenCalled();
+    expect(m.meetingUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ botFailureReason: expect.stringMatching(/Nadie admitió/) }) }),
+    );
+  });
+
+  it("no duplica la transcripción si el trabajo se repite", async () => {
+    m.attachmentFind.mockResolvedValue({ id: "a1" });
+    m.meetingFind.mockResolvedValue({ botJoinedAt: new Date(), vexaSessionId: null, transcript: "hola" });
+    vexa([entry({ id: 5, status: "completed" })], { segments: [{ speaker: "A", text: "hola" }], recordings: [] });
+    await handleVexaBotPoll(payload({ vexaSessionId: 5 }));
+    expect(m.attachmentCreate).not.toHaveBeenCalled();
+  });
+});
+

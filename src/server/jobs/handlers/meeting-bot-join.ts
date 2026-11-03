@@ -8,6 +8,8 @@ import { PlanExpiredError, assertPlanActive } from "@/server/services/ai/credits
 
 export const meetingBotJoinPayload = z.object({
   meetingId: z.string(),
+  // Cuántas veces se volvió a pedir el asistente tras un fallo pasajero al entrar (ver shouldRetryJoin).
+  attempt: z.number().int().min(0).optional(),
 });
 
 function vexaConfig(): { url: string; apiKey: string } | null {
@@ -26,7 +28,7 @@ function vexaConfig(): { url: string; apiKey: string } | null {
  * el bot casero, que no aplica acá).
  */
 export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
-  const { meetingId } = meetingBotJoinPayload.parse(rawPayload);
+  const { meetingId, attempt = 0 } = meetingBotJoinPayload.parse(rawPayload);
 
   const config = vexaConfig();
   if (!config) {
@@ -132,7 +134,7 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
     data: {
       vexaSessionId: sessionId,
       // Al adoptar la sesión de otra reunión de la misma organización no se pisa un estado más avanzado.
-      ...(response.status === 409 ? {} : { botStatus: "JOINING" as const }),
+      ...(response.status === 409 ? {} : { botStatus: "JOINING" as const, botFailureReason: null }),
     },
   });
   if (response.status === 409) {
@@ -142,7 +144,7 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
   await enqueueOrReschedule({
     type: "vexa_bot_poll",
     uniqueKey: `vexa-poll-${meetingId}`,
-    payload: { meetingId, nativeMeetingId: code, startedAt: new Date().toISOString(), vexaSessionId: sessionId ?? undefined },
+    payload: { meetingId, nativeMeetingId: code, startedAt: new Date().toISOString(), vexaSessionId: sessionId ?? undefined, joinAttempt: attempt },
     runAfter: new Date(Date.now() + 15_000),
   });
 }

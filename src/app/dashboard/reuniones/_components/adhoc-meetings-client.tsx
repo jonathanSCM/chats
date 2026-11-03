@@ -37,6 +37,7 @@ export interface AdhocMeetingRow {
   meetingUrl: string | null;
   status: string;
   botStatus: string | null;
+  botFailureReason: string | null;
   botJoinedAt: string | null;
   botLeftAt: string | null;
   botEnabled: boolean;
@@ -440,7 +441,7 @@ export function AdhocMeetingsClient({
           {meetings.filter((m) => !jefeEnabled || teamFilter === "all" || (teamFilter === "team") === isTeamOf(m)).map((m) => {
             const botConfig = m.botStatus ? BOT_STATUS_CONFIG[m.botStatus] : null;
             const BotIcon = botConfig?.icon;
-            const live = m.botStatus === "JOINING" || m.botStatus === "RECORDING";
+            const live = m.botStatus === "JOINING" || m.botStatus === "WAITING_ADMISSION" || m.botStatus === "RECORDING";
             return (
               <Card
                 key={m.id}
@@ -537,7 +538,7 @@ export function AdhocMeetingsClient({
                 </span>
                 {botConfig && BotIcon && (
                   <span
-                    data-active={m.botStatus === "JOINING" || m.botStatus === "RECORDING" || m.botStatus === "TRANSCRIBING"}
+                    data-active={m.botStatus === "JOINING" || m.botStatus === "WAITING_ADMISSION" || m.botStatus === "RECORDING" || m.botStatus === "TRANSCRIBING"}
                     className={`corner-brackets flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ${botConfig.className}`}
                   >
                     <BotIcon size={10} className={m.botStatus === "JOINING" || m.botStatus === "TRANSCRIBING" ? "animate-spin" : ""} />
@@ -545,6 +546,14 @@ export function AdhocMeetingsClient({
                   </span>
                 )}
               </div>
+            {m.botStatus === "WAITING_ADMISSION" && (
+              <p className="mt-2 rounded-lg bg-warning-dim px-3 py-2 text-xs text-ink">
+                El asistente está en la sala de espera de Meet. Quien organiza la reunión tiene que aceptarlo desde la ventana de Meet.
+              </p>
+            )}
+            {m.botStatus === "FAILED" && m.botFailureReason && (
+              <p className="mt-2 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{m.botFailureReason}</p>
+            )}
             </PanelSection>
 
             {jefeEnabled && (

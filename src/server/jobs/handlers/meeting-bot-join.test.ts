@@ -69,7 +69,7 @@ describe("handleMeetingBotJoin (identificador de sesión)", () => {
   it("guarda el id de la sesión que devuelve Vexa y lo pasa al seguimiento", async () => {
     vexa({ post: json(201, { id: 82, status: "requested" }) });
     await handleMeetingBotJoin({ meetingId: "mtg1" });
-    expect(m.meetingUpdate).toHaveBeenCalledWith({ where: { id: "mtg1" }, data: { vexaSessionId: 82, botStatus: "JOINING" } });
+    expect(m.meetingUpdate).toHaveBeenCalledWith({ where: { id: "mtg1" }, data: { vexaSessionId: 82, botStatus: "JOINING", botFailureReason: null } });
     expect(m.enqueue.mock.calls[0][0].payload).toMatchObject({ meetingId: "mtg1", nativeMeetingId: "abc-defg-hij", vexaSessionId: 82 });
   });
 

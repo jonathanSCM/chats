@@ -32,6 +32,10 @@ import { getPlanOverview } from "@/server/services/plans";
 import { listRequests } from "@/server/services/credit-requests";
 import { RequestCreditsForm, RequestRenewalForm, type PendingRequestView } from "./_components/request-forms";
 import { SubOrgsPanel } from "./_components/suborgs-panel";
+import { SettingRow } from "./_components/setting-row";
+import { Fold } from "./_components/fold";
+import { formatCredits } from "@/lib/ai-credits";
+import { PLAN_STATE_LABEL } from "@/lib/plan-period";
 import {
   ensureParentAdminsInChildren,
   listParentSellers,
@@ -43,6 +47,7 @@ import { INTEGRATION_EVENT_TYPES } from "@/server/integrations/events";
 
 const TABS = [
   { key: "general", label: "General" },
+  { key: "plan", label: "Plan y créditos" },
   { key: "equipo", label: "Equipo" },
   { key: "ventas", label: "Ventas" },
   { key: "integraciones", label: "Integraciones" },
@@ -50,6 +55,17 @@ const TABS = [
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
+
+const DAY_LABELS: Record<number, string> = { 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb", 0: "Dom" };
+
+/** "Lun a vie" cuando son los cinco días hábiles seguidos; si no, la lista. */
+function bookingDaysLabel(days: number[]): string {
+  const ordered = [1, 2, 3, 4, 5, 6, 0].filter((d) => days.includes(d));
+  if (ordered.length === 0) return "Sin días";
+  if (ordered.length === 5 && ordered.every((d, i) => d === i + 1)) return "Lun a vie";
+  if (ordered.length === 7) return "Todos los días";
+  return ordered.map((d) => DAY_LABELS[d]).join(", ");
+}
 
 export default async function OrganizationSettingsPage({
   searchParams,
@@ -100,8 +116,12 @@ export default async function OrganizationSettingsPage({
   ]);
 
   // La pestaña de suborganizaciones solo existe para una organización principal con esa opción en su plan.
+  const [credits, planOverview] = await Promise.all([getOrgCredits(org.id), getPlanOverview(org.id)]);
   const showSubOrgs = org.canHaveSubOrgs && !org.parentId;
-  const visibleTabs = TABS.filter((t) => t.key !== "suborganizaciones" || showSubOrgs);
+  const showPlanTab = Boolean(credits || planOverview);
+  const visibleTabs = TABS.filter(
+    (t) => (t.key !== "suborganizaciones" || showSubOrgs) && (t.key !== "plan" || showPlanTab),
+  );
   const tab: TabKey = visibleTabs.some((t) => t.key === seccion) ? (seccion as TabKey) : "general";
   const parent = org.parentId ? await prisma.organization.findUnique({ where: { id: org.parentId }, select: { name: true } }) : null;
 
@@ -114,16 +134,14 @@ export default async function OrganizationSettingsPage({
         )
       : null;
 
-  // Créditos de IA (solo si el plan los incluye). Una suborganización ve la bolsa de su organización principal.
-  const credits = tab === "general" ? await getOrgCredits(org.id) : null;
-  const [creditSummary, creditPacks] = credits
-    ? await Promise.all([getCreditUsageSummary(credits.rootOrgId), listCreditPacks(credits.rootOrgId)])
-    : [null, []];
-
-  // Plan y solicitudes (solo en la pestaña General, que es donde se muestran).
-  const planOverview = tab === "general" ? await getPlanOverview(org.id) : null;
+  // Detalle de créditos y solicitudes: solo en la pestaña "Plan y créditos", que es donde se muestran.
+  // Una suborganización ve la bolsa de su organización principal.
+  const [creditSummary, creditPacks] =
+    tab === "plan" && credits
+      ? await Promise.all([getCreditUsageSummary(credits.rootOrgId), listCreditPacks(credits.rootOrgId)])
+      : [null, []];
   const myRequests: PendingRequestView[] =
-    tab === "general"
+    tab === "plan"
       ? (await listRequests({ organizationId: org.id, limit: 8 })).map((r) => ({
           id: r.id,
           kind: r.kind,
@@ -132,6 +150,12 @@ export default async function OrganizationSettingsPage({
           status: r.status,
         }))
       : [];
+  const summaryDate = new Intl.DateTimeFormat("es", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: org.timezone || "America/La_Paz",
+  });
 
   let subOrgs: Awaited<ReturnType<typeof listSubOrganizations>> = [];
   let parentSellers: Awaited<ReturnType<typeof listParentSellers>> = [];
@@ -178,7 +202,7 @@ export default async function OrganizationSettingsPage({
   return (
     <div className="max-w-2xl animate-fade-up">
       <h1 className="mb-1 text-2xl font-bold">Organización</h1>
-      <p className="mb-6 text-sm text-ink-muted">Datos, equipo, ventas e integraciones.</p>
+      <p className="mb-6 text-sm text-ink-muted">Datos, plan, equipo, ventas e integraciones.</p>
 
       {parent && (
         <p className="mb-6 rounded-control border border-border px-3 py-2 text-sm text-ink-muted">
@@ -206,155 +230,202 @@ export default async function OrganizationSettingsPage({
 
       {tab === "general" && (
         <>
-      <Card className="mb-6">
-        <CardTitle className="mb-4">Nombre</CardTitle>
-        <RenameOrgForm currentName={org.name} />
-      </Card>
+          {(planOverview || credits) && (
+            <Card className="mb-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-ink-faint">Tu plan</p>
+                  <p className="text-sm text-ink">
+                    <b>{planOverview?.planName ?? "A medida"}</b>
+                    {planOverview?.endsAt && (
+                      <span className="text-ink-muted">
+                        {" "}
+                        · {PLAN_STATE_LABEL[planOverview.status.state].toLowerCase()}, hasta el {summaryDate.format(planOverview.endsAt)}
+                      </span>
+                    )}
+                    {credits && (
+                      <span className="text-ink-muted"> · {formatCredits(credits.balance.available)} créditos de IA disponibles</span>
+                    )}
+                  </p>
+                </div>
+                <Link href="/dashboard/organization?seccion=plan" className="text-sm font-medium text-accent hover:underline">
+                  Ver plan y créditos
+                </Link>
+              </div>
+              {credits && (
+                <div
+                  className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2"
+                  role="progressbar"
+                  aria-valuenow={Math.floor(credits.balance.percentUsed)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <div
+                    className={`h-full rounded-full ${credits.level === "exhausted" ? "bg-danger" : credits.level === "ok" ? "bg-accent" : "bg-warning"}`}
+                    style={{ width: `${Math.max(credits.balance.percentUsed, credits.balance.percentUsed > 0 ? 2 : 0)}%` }}
+                  />
+                </div>
+              )}
+            </Card>
+          )}
 
-      {org.canCustomizeBrand && (
-        <Card className="mb-6">
-          <CardTitle className="mb-1">Marca</CardTitle>
-          <CardDescription className="mb-4">
-            Tu logo, nombre y color en el menú, los correos de invitación, el saludo del bot de WhatsApp y el
-            nombre del asistente en las reuniones.
-          </CardDescription>
-          <BrandForm
-            brandName={org.brandName ?? ""}
-            assistantName={org.assistantName ?? ""}
-            brandColor={org.brandColor ?? ""}
-            logoPath={resolveBrand(org).logoPath}
-            brandDisplay={resolveBrand(org).display}
-            brandLogoShape={resolveBrand(org).logoShape}
-            brandLogoScale={resolveBrand(org).logoScale}
-          />
-        </Card>
+          <Card className="mb-6 divide-y divide-border">
+            <SettingRow title="Nombre" summary={org.name} description="Cómo se llama tu organización dentro del CRM.">
+              <RenameOrgForm currentName={org.name} />
+            </SettingRow>
+
+            {org.canCustomizeBrand && (
+              <SettingRow
+                title="Marca"
+                summary={
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="inline-block size-3 rounded-full border border-border"
+                      style={{ background: org.brandColor ?? "var(--accent)" }}
+                    />
+                    {org.brandName || org.name}
+                    {org.assistantName ? ` · asistente “${org.assistantName}”` : ""}
+                  </span>
+                }
+                description="Tu logo, nombre y color en el menú, los correos de invitación, el saludo del bot de WhatsApp y el nombre del asistente en las reuniones."
+              >
+                <BrandForm
+                  brandName={org.brandName ?? ""}
+                  assistantName={org.assistantName ?? ""}
+                  brandColor={org.brandColor ?? ""}
+                  logoPath={resolveBrand(org).logoPath}
+                  brandDisplay={resolveBrand(org).display}
+                  brandLogoShape={resolveBrand(org).logoShape}
+                  brandLogoScale={resolveBrand(org).logoScale}
+                />
+              </SettingRow>
+            )}
+
+            <SettingRow
+              title="Asesor IA"
+              summary={`Analiza los últimos ${org.aiMessageLimit} mensajes de cada chat`}
+              description="Cuánto contexto de la conversación recibe el asesor al analizar un cliente."
+            >
+              <AiSettingsForm currentLimit={org.aiMessageLimit} />
+            </SettingRow>
+          </Card>
+
+          <Fold title="Zona de peligro" description="Exportar tus datos o eliminar la organización por completo." danger>
+            <DangerZone orgName={org.name} />
+          </Fold>
+        </>
       )}
 
-      {planOverview && (
-        <Card className="mb-6" id="plan">
-          <CardTitle className="mb-1">Mi plan</CardTitle>
-          <CardDescription className="mb-4">Qué plan tiene tu organización y hasta cuándo está activo.</CardDescription>
-          <PlanSummaryCard
-            planName={planOverview.planName}
-            state={planOverview.status.state}
-            daysLeft={planOverview.status.daysLeft}
-            endsAt={planOverview.endsAt}
-            startedAt={planOverview.startedAt}
-            includes={planOverview.includes}
-            creditsRenewAt={credits?.renewsAt ?? null}
-            fromParentName={planOverview.fromParentName}
-          >
-            <RequestRenewalForm requests={myRequests} highlight={["expiring", "grace", "expired"].includes(planOverview.status.state)} />
-          </PlanSummaryCard>
-        </Card>
-      )}
+      {tab === "plan" && (
+        <>
+          {planOverview && (
+            <Card className="mb-6" id="plan">
+              <CardTitle className="mb-1">Mi plan</CardTitle>
+              <CardDescription className="mb-4">Qué plan tiene tu organización y hasta cuándo está activo.</CardDescription>
+              <PlanSummaryCard
+                planName={planOverview.planName}
+                state={planOverview.status.state}
+                daysLeft={planOverview.status.daysLeft}
+                endsAt={planOverview.endsAt}
+                startedAt={planOverview.startedAt}
+                includes={planOverview.includes}
+                creditsRenewAt={credits?.renewsAt ?? null}
+                fromParentName={planOverview.fromParentName}
+              >
+                <RequestRenewalForm requests={myRequests} highlight={["expiring", "grace", "expired"].includes(planOverview.status.state)} />
+              </PlanSummaryCard>
+            </Card>
+          )}
 
-      {credits && creditSummary && (
-        <Card className="mb-6" id="creditos">
-          <CardTitle className="mb-1">Créditos de IA</CardTitle>
-          <CardDescription className="mb-4">
-            La IA del CRM (bot de WhatsApp, asesor y resúmenes de reuniones) gasta créditos de una bolsa compartida por todo tu equipo. Si se acaban,
-            el CRM sigue funcionando; solo se detienen las funciones de IA. Puedes pedir más créditos aquí abajo.
-          </CardDescription>
-          <AiCreditsPanel
-            credits={credits}
-            summary={creditSummary}
-            packs={creditPacks}
-            timeZone={org.timezone || "America/La_Paz"}
-            fromParentName={parent?.name ?? null}
-          />
-          <div className="mt-6">
-            <RequestCreditsForm requests={myRequests} />
-          </div>
-        </Card>
-      )}
-
-      <Card className="mb-6">
-        <CardTitle className="mb-1">Asesor IA</CardTitle>
-        <CardDescription className="mb-4">
-          Cuánto contexto de la conversación recibe el asesor al analizar un cliente.
-        </CardDescription>
-        <AiSettingsForm currentLimit={org.aiMessageLimit} />
-      </Card>
-
-      <Card className="border-danger/30">
-        <CardTitle className="mb-1 text-danger">Zona de peligro</CardTitle>
-        <CardDescription className="mb-4">
-          Exportar tus datos o eliminar la organización por completo.
-        </CardDescription>
-        <DangerZone orgName={org.name} />
-      </Card>
+          {credits && creditSummary && (
+            <Card className="mb-6" id="creditos">
+              <CardTitle className="mb-1">Créditos de IA</CardTitle>
+              <CardDescription className="mb-4">
+                La IA del CRM (bot de WhatsApp, asesor y resúmenes de reuniones) gasta créditos de una bolsa compartida por todo tu equipo. Si se acaban,
+                el CRM sigue funcionando; solo se detienen las funciones de IA. Puedes pedir más créditos aquí abajo.
+              </CardDescription>
+              <AiCreditsPanel
+                credits={credits}
+                summary={creditSummary}
+                packs={creditPacks}
+                timeZone={org.timezone || "America/La_Paz"}
+                fromParentName={parent?.name ?? null}
+              />
+              <div className="mt-6">
+                <RequestCreditsForm requests={myRequests} />
+              </div>
+            </Card>
+          )}
         </>
       )}
 
       {tab === "ventas" && (
         <>
+          <Card className="mb-6 divide-y divide-border">
+            <SettingRow
+              title="Horario de citas"
+              summary={`${bookingDaysLabel(org.bookingDays)} · ${org.bookingStartHour}:00 a ${org.bookingEndHour}:00 · ${org.bookingDurationMinutes} min`}
+              description="Cuándo puede el bot de calificación ofrecer una reunión por WhatsApp."
+            >
+              <BookingSettingsForm
+                currentTimezone={org.timezone}
+                currentDays={org.bookingDays}
+                currentStartHour={org.bookingStartHour}
+                currentEndHour={org.bookingEndHour}
+                currentDurationMinutes={org.bookingDurationMinutes}
+                currentLeadHours={org.bookingLeadHours}
+              />
+            </SettingRow>
 
-      <Card className="mb-6">
-        <CardTitle className="mb-1">Horario de citas</CardTitle>
-        <CardDescription className="mb-4">
-          Cuándo puede el bot de calificación ofrecer una reunión por WhatsApp.
-        </CardDescription>
-        <BookingSettingsForm
-          currentTimezone={org.timezone}
-          currentDays={org.bookingDays}
-          currentStartHour={org.bookingStartHour}
-          currentEndHour={org.bookingEndHour}
-          currentDurationMinutes={org.bookingDurationMinutes}
-          currentLeadHours={org.bookingLeadHours}
-        />
-      </Card>
+            {LEAD_AUTO_ASSIGN_AVAILABLE && (
+              <SettingRow
+                title="Asignación automática de leads"
+                summary={org.autoAssignEnabled ? `Activada · avisa a los ${org.autoAssignSlaMinutes} min sin respuesta` : "Desactivada"}
+                description="Reparte los leads nuevos por turnos entre tu equipo y avisa cuando un cliente se queda esperando respuesta."
+              >
+                <AutoAssignSettings
+                  enabled={org.autoAssignEnabled}
+                  slaMinutes={org.autoAssignSlaMinutes}
+                  maxOpen={org.autoAssignMaxOpen}
+                  members={members.map((m) => ({
+                    id: m.id,
+                    name: m.name,
+                    email: m.email,
+                    role: m.role,
+                    availableForLeads: m.availableForLeads,
+                  }))}
+                />
+              </SettingRow>
+            )}
+          </Card>
 
-      {LEAD_AUTO_ASSIGN_AVAILABLE && (
-        <Card className="mb-6">
-          <CardTitle className="mb-1">Asignación automática de leads</CardTitle>
-          <CardDescription className="mb-4">
-            Reparte los leads nuevos por turnos entre tu equipo y avisa cuando un cliente se queda esperando
-            respuesta.
-          </CardDescription>
-          <AutoAssignSettings
-            enabled={org.autoAssignEnabled}
-            slaMinutes={org.autoAssignSlaMinutes}
-            maxOpen={org.autoAssignMaxOpen}
-            members={members.map((m) => ({
-              id: m.id,
-              name: m.name,
-              email: m.email,
-              role: m.role,
-              availableForLeads: m.availableForLeads,
-            }))}
-          />
-        </Card>
-      )}
+          <Card className="mb-6">
+            <CardTitle className="mb-1">Pipeline comercial</CardTitle>
+            <CardDescription className="mb-4">
+              Las etapas por las que pasa una oportunidad. Ganado, Perdido y En pausa / Nutrir son del
+              sistema (se pueden renombrar, no borrar) — el resto lo definís vos: nombre, color, orden,
+              agregar o quitar.
+            </CardDescription>
+            <PipelineStagesList
+              stages={pipelineStages.map((s) => ({
+                id: s.id,
+                label: s.label,
+                color: s.color,
+                role: s.role,
+                isDefaultEntry: s.isDefaultEntry,
+                opportunityCount: s._count.opportunities,
+              }))}
+            />
+          </Card>
 
-      <Card className="mb-6">
-        <CardTitle className="mb-1">Pipeline comercial</CardTitle>
-        <CardDescription className="mb-4">
-          Las etapas por las que pasa una oportunidad. Ganado, Perdido y En pausa / Nutrir son del
-          sistema (se pueden renombrar, no borrar) — el resto lo definís vos: nombre, color, orden,
-          agregar o quitar.
-        </CardDescription>
-        <PipelineStagesList
-          stages={pipelineStages.map((s) => ({
-            id: s.id,
-            label: s.label,
-            color: s.color,
-            role: s.role,
-            isDefaultEntry: s.isDefaultEntry,
-            opportunityCount: s._count.opportunities,
-          }))}
-        />
-      </Card>
-
-      <Card className="mb-6">
-        <CardTitle className="mb-1">Servicios</CardTitle>
-        <CardDescription className="mb-4">
-          Las opciones de &quot;servicio de interés&quot; al cargar una oportunidad — nombre, orden, agregar o
-          quitar. Borrar una no afecta a los clientes que ya tenían ese servicio cargado.
-        </CardDescription>
-        <ServicesList services={services} />
-      </Card>
-
+          <Card className="mb-6">
+            <CardTitle className="mb-1">Servicios</CardTitle>
+            <CardDescription className="mb-4">
+              Las opciones de &quot;servicio de interés&quot; al cargar una oportunidad — nombre, orden, agregar o
+              quitar. Borrar una no afecta a los clientes que ya tenían ese servicio cargado.
+            </CardDescription>
+            <ServicesList services={services} />
+          </Card>
         </>
       )}
 
@@ -374,135 +445,156 @@ export default async function OrganizationSettingsPage({
       )}
 
       {tab === "integraciones" && (
-        <>
-      {org.aiMode === "custom" && (
-        <Card className="mb-6">
-          <CardTitle className="mb-1">Inteligencia artificial</CardTitle>
-          <CardDescription className="mb-3">
-            Tu plan incluye IA con un límite mensual. Si lo alcanzas, la IA se detiene hasta el mes siguiente o hasta
-            que el administrador de la plataforma lo amplíe.
-          </CardDescription>
-          {aiUsageText && <p className="text-sm text-ink-muted">Este mes: {aiUsageText}</p>}
-        </Card>
-      )}
+        <Card className="mb-6 divide-y divide-border">
+          {org.aiMode === "custom" && (
+            <SettingRow
+              title="Inteligencia artificial"
+              actionLabel="Ver"
+              summary={aiUsageText ? `Este mes: ${aiUsageText}` : "Con límite mensual"}
+              description="Tu plan incluye IA con un límite mensual. Si lo alcanzas, la IA se detiene hasta el mes siguiente o hasta que el administrador de la plataforma lo amplíe."
+            >
+              {aiUsageText && <p className="text-sm text-ink-muted">Este mes: {aiUsageText}</p>}
+            </SettingRow>
+          )}
 
-      {org.aiMode === "own" && (
-        <Card className="mb-6">
-          <CardTitle className="mb-1">Clave de OpenAI</CardTitle>
-          <CardDescription className="mb-4">
-            El bot de WhatsApp, el asesor y los resúmenes de reuniones pueden funcionar con tu propia cuenta de
-            OpenAI en vez de la de la plataforma.
-          </CardDescription>
-          <OpenAiKeyForm last4={org.openaiKeyLast4} alertMessage={org.aiKeyAlertMessage} />
-        </Card>
-      )}
-      {isMarketingEnabled() && (
-        <Card className="mb-6">
-          <CardTitle className="mb-1">Meta Ads</CardTitle>
-          <CardDescription className="mb-4">
-            Conectá tu cuenta publicitaria con Facebook (solo lectura) para ver el gasto junto a tus
-            ventas en Marketing — se sincroniza sola cada ~20h.
-          </CardDescription>
-          <MetaAdsConnect
-            accountId={org.metaAdAccountId}
-            accountName={org.metaAdAccountName}
-            connected={Boolean(org.metaAdsAccessToken)}
-            needsReconnect={!org.metaAdsAccessToken && Boolean(org.metaAdAccountId)}
-            pendingAccounts={pendingAdAccounts}
-            lastSyncedAt={org.metaAdsLastSyncedAt?.toISOString() ?? null}
-          />
-        </Card>
-      )}
+          {org.aiMode === "own" && (
+            <SettingRow
+              title="Clave de OpenAI"
+              actionLabel="Configurar"
+              summary={
+                org.aiKeyAlertMessage ? (
+                  <span className="text-danger">Hay un problema con la clave</span>
+                ) : org.openaiKeyLast4 ? (
+                  `Clave terminada en ${org.openaiKeyLast4}`
+                ) : (
+                  "Sin clave cargada"
+                )
+              }
+              defaultOpen={Boolean(org.aiKeyAlertMessage)}
+              description="El bot de WhatsApp, el asesor y los resúmenes de reuniones pueden funcionar con tu propia cuenta de OpenAI en vez de la de la plataforma."
+            >
+              <OpenAiKeyForm last4={org.openaiKeyLast4} alertMessage={org.aiKeyAlertMessage} />
+            </SettingRow>
+          )}
 
-      <Card className="mb-6">
-        <CardTitle className="mb-1">Extensión de subtítulos para Meet</CardTitle>
-        <CardDescription className="mb-4">
-          Extensión de Chrome que lee los subtítulos en vivo de Google Meet desde el navegador de
-          quien esté en la reunión — no hace falta que un bot pida entrar ni que nadie lo admita.
-          Función aparte del bot grabador: el bot sigue disponible para cuando sí se necesita audio.
-          Cada vendedor se identifica solo, con su propia sesión del CRM — no hace falta generar ni
-          pegar ningún token: instalá la extensión, tocá su ícono y elegí &quot;Iniciar sesión&quot;.
-        </CardDescription>
-      </Card>
+          {isMarketingEnabled() && (
+            <SettingRow
+              title="Meta Ads"
+              actionLabel={org.metaAdsAccessToken ? "Administrar" : "Conectar"}
+              summary={
+                org.metaAdsAccessToken
+                  ? `Conectada${org.metaAdAccountName ? ` · ${org.metaAdAccountName}` : ""}`
+                  : org.metaAdAccountId
+                    ? "Hay que volver a conectarla"
+                    : "No conectada"
+              }
+              defaultOpen={pendingAdAccounts.length > 0}
+              description="Conecta tu cuenta publicitaria con Facebook (solo lectura) para ver el gasto junto a tus ventas en Marketing — se sincroniza sola cada ~20h."
+            >
+              <MetaAdsConnect
+                accountId={org.metaAdAccountId}
+                accountName={org.metaAdAccountName}
+                connected={Boolean(org.metaAdsAccessToken)}
+                needsReconnect={!org.metaAdsAccessToken && Boolean(org.metaAdAccountId)}
+                pendingAccounts={pendingAdAccounts}
+                lastSyncedAt={org.metaAdsLastSyncedAt?.toISOString() ?? null}
+              />
+            </SettingRow>
+          )}
 
-      {/* Solo si el superadmin habilitó el Jefe de Operaciones para esta organización. */}
-      {org.jefeEnabled && (
-      <Card className="mb-6">
-        <CardTitle className="mb-1">API para integraciones</CardTitle>
-        <CardDescription className="mb-4">
-          Claves de API y avisos automáticos (webhook) para conectar otros sistemas, como el Jefe de Operaciones.
-        </CardDescription>
-        <IntegrationApiPanel
-          keys={integrationKeys.map((k) => ({
-            id: k.id,
-            name: k.name,
-            prefix: k.prefix,
-            scopes: k.scopes,
-            lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
-            revokedAt: k.revokedAt?.toISOString() ?? null,
-          }))}
-          webhook={
-            integrationWebhook
-              ? {
-                  url: integrationWebhook.url,
-                  events: integrationWebhook.events,
-                  enabled: integrationWebhook.enabled,
-                  lastSuccessAt: integrationWebhook.lastSuccessAt?.toISOString() ?? null,
-                  lastFailureAt: integrationWebhook.lastFailureAt?.toISOString() ?? null,
-                  lastError: integrationWebhook.lastError,
+          <SettingRow
+            title="Extensión de subtítulos para Meet"
+            actionLabel="Ver cómo se usa"
+            summary="Extensión de Chrome para leer los subtítulos en vivo"
+          >
+            <p className="text-sm text-ink-muted">
+              Extensión de Chrome que lee los subtítulos en vivo de Google Meet desde el navegador de quien esté en la
+              reunión — no hace falta que un bot pida entrar ni que nadie lo admita. Función aparte del bot grabador: el
+              bot sigue disponible para cuando sí se necesita audio.
+            </p>
+            <p className="text-sm text-ink-muted">
+              Cada vendedor se identifica solo, con su propia sesión del CRM — no hace falta generar ni pegar ningún token:
+              instala la extensión, toca su ícono y elige &quot;Iniciar sesión&quot;.
+            </p>
+          </SettingRow>
+
+          {/* Solo si el superadmin habilitó el Jefe de Operaciones para esta organización. */}
+          {org.jefeEnabled && (
+            <SettingRow
+              title="API para integraciones"
+              actionLabel="Configurar"
+              summary={`${integrationKeys.filter((k) => !k.revokedAt).length} claves activas · aviso automático ${integrationWebhook?.enabled ? "activo" : "sin configurar"}`}
+              description="Claves de API y avisos automáticos (webhook) para conectar otros sistemas, como el Jefe de Operaciones."
+            >
+              <IntegrationApiPanel
+                keys={integrationKeys.map((k) => ({
+                  id: k.id,
+                  name: k.name,
+                  prefix: k.prefix,
+                  scopes: k.scopes,
+                  lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
+                  revokedAt: k.revokedAt?.toISOString() ?? null,
+                }))}
+                webhook={
+                  integrationWebhook
+                    ? {
+                        url: integrationWebhook.url,
+                        events: integrationWebhook.events,
+                        enabled: integrationWebhook.enabled,
+                        lastSuccessAt: integrationWebhook.lastSuccessAt?.toISOString() ?? null,
+                        lastFailureAt: integrationWebhook.lastFailureAt?.toISOString() ?? null,
+                        lastError: integrationWebhook.lastError,
+                      }
+                    : null
                 }
-              : null
-          }
-          availableEvents={[...INTEGRATION_EVENT_TYPES]}
-        />
-      </Card>
-      )}
-        </>
+                availableEvents={[...INTEGRATION_EVENT_TYPES]}
+              />
+            </SettingRow>
+          )}
+        </Card>
       )}
 
       {tab === "equipo" && (
         <>
-      <Card className="mb-6">
-        <CardTitle className="mb-1">Equipo</CardTitle>
-        <CardDescription className="mb-4">
-          Todos los que tienen acceso a tus bots y conversaciones.
-        </CardDescription>
-        {(seatPlan.limits.maxAdmins !== null || seatPlan.limits.maxSellers !== null) && (
-          <p className="mb-3 rounded-control border border-border px-3 py-2 text-xs text-ink-muted">
-            Tu plan{seatPlan.isGroup ? " (compartido con tus suborganizaciones)" : ""} — administradores:{" "}
-            {formatSeatUsage(seatPlan.counts.admins, seatPlan.limits.maxAdmins)} · vendedores:{" "}
-            {formatSeatUsage(seatPlan.counts.sellers, seatPlan.limits.maxSellers)}
-          </p>
-        )}
-        <MembersList members={members} currentUserId={session.user.id} />
-      </Card>
+          <Card className="mb-6">
+            <CardTitle className="mb-1">Equipo</CardTitle>
+            <CardDescription className="mb-4">
+              Todos los que tienen acceso a tus bots y conversaciones.
+            </CardDescription>
+            {(seatPlan.limits.maxAdmins !== null || seatPlan.limits.maxSellers !== null) && (
+              <p className="mb-3 rounded-control border border-border px-3 py-2 text-xs text-ink-muted">
+                Tu plan{seatPlan.isGroup ? " (compartido con tus suborganizaciones)" : ""} — administradores:{" "}
+                {formatSeatUsage(seatPlan.counts.admins, seatPlan.limits.maxAdmins)} · vendedores:{" "}
+                {formatSeatUsage(seatPlan.counts.sellers, seatPlan.limits.maxSellers)}
+              </p>
+            )}
+            <MembersList members={members} currentUserId={session.user.id} />
+          </Card>
 
-      <Card className="mb-6">
-        <CardTitle className="mb-1">Accesos por cuenta de WhatsApp</CardTitle>
-        <CardDescription className="mb-4">
-          Marca a qué cuentas puede entrar cada vendedor — sin marcar, no ve esos chats.
-        </CardDescription>
-        <BotAccessMatrix
-          bots={bots}
-          members={vendedores.map((v) => ({ id: v.id, name: v.name ?? "", email: v.email, color: v.color }))}
-          initialAccess={new Set(botMembers.map((bm) => `${bm.botId}:${bm.userId}`))}
-        />
-      </Card>
+          <Card className="mb-6">
+            <SettingRow
+              title="Invitar a alguien"
+              actionLabel="Invitar"
+              summary={invites.length > 0 ? `${invites.length} ${invites.length === 1 ? "invitación pendiente" : "invitaciones pendientes"}` : "Genera un enlace y compártelo"}
+              description="Genera un enlace y compártelo — quien lo abra se une como miembro."
+            >
+              <InvitePanel
+                invites={invites.map((i) => ({
+                  id: i.id,
+                  email: i.email,
+                  expiresAt: i.expiresAt.toISOString(),
+                }))}
+              />
+            </SettingRow>
+          </Card>
 
-      <Card className="mb-6">
-        <CardTitle className="mb-1">Invitar a alguien</CardTitle>
-        <CardDescription className="mb-4">
-          Genera un enlace y compártelo — quien lo abra se une como miembro.
-        </CardDescription>
-        <InvitePanel
-          invites={invites.map((i) => ({
-            id: i.id,
-            email: i.email,
-            expiresAt: i.expiresAt.toISOString(),
-          }))}
-        />
-      </Card>
-
+          <Fold title="Accesos por cuenta de WhatsApp" description="Marca a qué cuentas puede entrar cada vendedor — sin marcar, no ve esos chats.">
+            <BotAccessMatrix
+              bots={bots}
+              members={vendedores.map((v) => ({ id: v.id, name: v.name ?? "", email: v.email, color: v.color }))}
+              initialAccess={new Set(botMembers.map((bm) => `${bm.botId}:${bm.userId}`))}
+            />
+          </Fold>
         </>
       )}
     </div>

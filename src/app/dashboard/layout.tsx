@@ -189,7 +189,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 {planValidity.status.state === "expired" ? "Plan vencido." : planValidity.status.state === "grace" ? "Plan vencido, en gracia." : "Tu plan está por vencer."}
               </b>{" "}
               {planNotice}{" "}
-              <Link href="/dashboard/organization#plan" className="font-medium text-accent underline">
+              <Link href="/dashboard/organization?seccion=plan#plan" className="font-medium text-accent underline">
                 Ver mi plan
               </Link>
             </div>
@@ -204,7 +204,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 {credits.level === "exhausted" ? "Sin créditos de IA." : "Créditos de IA."}
               </b>{" "}
               {creditNotice}{" "}
-              <Link href="/dashboard/organization#creditos" className="font-medium text-accent underline">
+              <Link href="/dashboard/organization?seccion=plan#creditos" className="font-medium text-accent underline">
                 Ver mis créditos
               </Link>
             </div>

@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import { KnowledgeManager } from "./_components/knowledge-manager";
-import { KnowledgeAiEditor, type AiEditEntry } from "./_components/knowledge-ai-editor";
+import type { AiEditEntry } from "./_components/knowledge-ai-editor";
+import { AiEditorLauncher } from "./_components/ai-editor-launcher";
 
 export default async function KnowledgePage() {
   const session = await auth();
@@ -64,9 +65,8 @@ export default async function KnowledgePage() {
         precios, alcances, exclusiones y políticas. Si algo no está aquí, la IA no lo sabe.
       </p>
 
-      <KnowledgeAiEditor history={aiHistory} />
-
       <KnowledgeManager
+        toolbar={<AiEditorLauncher history={aiHistory} />}
         items={items.map((item) => ({
           id: item.id,
           category: item.category,

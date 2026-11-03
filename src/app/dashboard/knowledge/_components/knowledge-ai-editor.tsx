@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, Send, History, Undo2, Check } from "lucide-react";
+import { Send, History, Undo2, Check } from "lucide-react";
 import {
   proposeKnowledgeChangesAction,
   applyKnowledgeChangesAction,
@@ -10,7 +10,6 @@ import {
   type KnowledgeProposalResult,
 } from "@/server/actions/knowledge";
 import { diffLines, type ProposedChange } from "@/lib/knowledge-editor";
-import { Card, CardTitle } from "@/components/ui/card";
 
 export interface AiEditEntry {
   id: string;
@@ -167,12 +166,9 @@ export function KnowledgeAiEditor({ history }: { history: AiEditEntry[] }) {
   }
 
   return (
-    <Card className="mb-6 border-accent-dim/40">
-      <div className="mb-3 flex items-center justify-between">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Sparkles size={15} className="text-accent" /> Editar con IA
-        </CardTitle>
-        {history.length > 0 && (
+    <div>
+      {history.length > 0 && (
+        <div className="mb-3 flex justify-end">
           <button
             type="button"
             onClick={() => setShowHistory((v) => !v)}
@@ -180,13 +176,8 @@ export function KnowledgeAiEditor({ history }: { history: AiEditEntry[] }) {
           >
             <History size={12} /> Cambios hechos con IA ({history.length})
           </button>
-        )}
-      </div>
-
-      <p className="mb-3 text-xs text-ink-muted">
-        Pedí el cambio como se lo dirías a un colega. La IA propone la edición, la ves marcada y vos la aprobás:
-        nada se aplica solo, y todo se puede revertir.
-      </p>
+        </div>
+      )}
 
       {turns.length === 0 && (
         <div className="mb-3 flex flex-wrap gap-2">
@@ -356,6 +347,6 @@ export function KnowledgeAiEditor({ history }: { history: AiEditEntry[] }) {
           ))}
         </ul>
       )}
-    </Card>
+    </div>
   );
 }

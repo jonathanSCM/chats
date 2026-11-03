@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, X, Eye, EyeOff, FileUp } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, EyeOff, FileUp, Search } from "lucide-react";
 import {
   createKnowledgeItemAction,
   updateKnowledgeItemAction,
@@ -9,6 +9,8 @@ import {
   deleteKnowledgeItemAction,
   extractPdfTextAction,
 } from "@/server/actions/knowledge";
+import type { ReactNode } from "react";
+import { SidePanel } from "@/components/side-panel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
@@ -60,35 +62,76 @@ interface Item {
   updatedBy: string | null;
 }
 
-export function KnowledgeManager({ items }: { items: Item[] }) {
+export function KnowledgeManager({ items, toolbar }: { items: Item[]; toolbar?: ReactNode }) {
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Category | "ALL">("ALL");
 
   // Estables para que el efecto de cierre del formulario no se redispare.
   const closeCreate = useCallback(() => setCreating(false), []);
   const closeEdit = useCallback(() => setEditingId(null), []);
 
-  const grouped = items.reduce<Record<string, Item[]>>((acc, item) => {
-    (acc[item.category] ??= []).push(item);
+  const counts = items.reduce<Partial<Record<Category, number>>>((acc, item) => {
+    acc[item.category] = (acc[item.category] ?? 0) + 1;
     return acc;
   }, {});
 
+  const needle = query.trim().toLowerCase();
+  const visible = items.filter(
+    (item) =>
+      (filter === "ALL" || item.category === filter) &&
+      (!needle || item.title.toLowerCase().includes(needle) || item.content.toLowerCase().includes(needle)),
+  );
+  const grouped = visible.reduce<Record<string, Item[]>>((acc, item) => {
+    (acc[item.category] ??= []).push(item);
+    return acc;
+  }, {});
+  const editing = items.find((i) => i.id === editingId) ?? null;
+  const filtering = needle !== "" || filter !== "ALL";
+
   return (
     <div className="space-y-6">
-      {creating ? (
-        <Card>
-          <ItemForm onDone={closeCreate} />
-        </Card>
-      ) : (
+      <div className="flex flex-wrap items-center gap-2">
         <Button type="button" onClick={() => setCreating(true)}>
           <Plus size={16} /> Agregar entrada
         </Button>
+        {toolbar}
+      </div>
+
+      {items.length > 0 && (
+        <div className="space-y-3">
+          <div className="relative">
+            <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar por título o contenido…"
+              aria-label="Buscar en la base de conocimiento"
+              className="pl-9"
+            />
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <FilterChip active={filter === "ALL"} onClick={() => setFilter("ALL")} label={`Todas (${items.length})`} />
+            {(Object.keys(categoryLabel) as Category[])
+              .filter((c) => counts[c])
+              .map((c) => (
+                <FilterChip key={c} active={filter === c} onClick={() => setFilter(c)} label={`${categoryLabel[c]} (${counts[c]})`} />
+              ))}
+          </div>
+        </div>
       )}
 
-      {items.length === 0 && !creating && (
+      {items.length === 0 && (
         <Card className="text-sm text-ink-muted">
           Todavía no hay nada cargado. Empieza por tus servicios y por lo que necesitas
           averiguar antes de cotizar.
+        </Card>
+      )}
+
+      {items.length > 0 && visible.length === 0 && (
+        <Card className="text-sm text-ink-muted">
+          Ninguna entrada coincide{filtering ? " con la búsqueda o el filtro" : ""}.
         </Card>
       )}
 
@@ -98,23 +141,39 @@ export function KnowledgeManager({ items }: { items: Item[] }) {
             {categoryLabel[category as Category]}
           </h2>
           <div className="space-y-2">
-            {categoryItems.map((item) =>
-              editingId === item.id ? (
-                <Card key={item.id}>
-                  <ItemForm item={item} onDone={closeEdit} />
-                </Card>
-              ) : (
-                <ItemRow
-                  key={item.id}
-                  item={item}
-                  onEdit={() => setEditingId(item.id)}
-                />
-              ),
-            )}
+            {categoryItems.map((item) => (
+              <ItemRow key={item.id} item={item} onEdit={() => setEditingId(item.id)} />
+            ))}
           </div>
         </section>
       ))}
+
+      {creating && (
+        <SidePanel onClose={closeCreate} header={<h2 className="font-display text-lg font-semibold text-ink">Nueva entrada</h2>}>
+          <ItemForm onDone={closeCreate} />
+        </SidePanel>
+      )}
+      {editing && (
+        <SidePanel onClose={closeEdit} header={<h2 className="font-display text-lg font-semibold text-ink">Editar entrada</h2>}>
+          <ItemForm item={editing} onDone={closeEdit} />
+        </SidePanel>
+      )}
     </div>
+  );
+}
+
+function FilterChip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`cursor-pointer rounded-full border px-3 py-1 text-xs transition-colors ${
+        active ? "border-accent bg-accent-dim/20 text-accent" : "border-border text-ink-muted hover:border-border-strong hover:text-ink"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -225,19 +284,6 @@ function ItemForm({ item, onDone }: { item?: Item; onDone: () => void }) {
 
   return (
     <form action={formAction} className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <p className="font-display text-sm font-semibold text-ink">
-          {item ? "Editar entrada" : "Nueva entrada"}
-        </p>
-        <button
-          type="button"
-          onClick={onDone}
-          className="cursor-pointer text-ink-faint hover:text-ink"
-        >
-          <X size={16} />
-        </button>
-      </div>
-
       <div className="space-y-1.5">
         <Label htmlFor="category">Tipo</Label>
         <Select

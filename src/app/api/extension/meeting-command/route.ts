@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { stopMeetingBot } from "@/server/services/meeting-bot";
+import { resolveExtensionOrganizationId } from "@/server/services/extension-meeting";
+import { extractMeetCode } from "@/lib/meet-code";
 import { summarizeTranscriptNow } from "@/server/services/meeting-summary";
 import { AiCreditsError } from "@/server/services/ai/client";
 
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { meetExtensionToken: token },
-    select: { organizationId: true },
+    select: { organizationId: true, email: true },
   });
   if (!user?.organizationId) {
     return withCors(new NextResponse("Unauthorized", { status: 401 }));
@@ -74,8 +76,15 @@ export async function POST(req: NextRequest) {
   // A diferencia de resolveExtensionMeeting (api/extension/transcript), acá
   // NO se crea una reunión si no existe -- un comando sin una reunión de bot
   // real detrás no tiene nada que ejecutar.
+  const organizationId = await resolveExtensionOrganizationId({ organizationId: user.organizationId, email: user.email }, meetingUrl);
+  const code = extractMeetCode(meetingUrl);
   const meeting = await prisma.meeting.findFirst({
-    where: { organizationId: user.organizationId, meetingUrl, status: { not: "CANCELED" }, botStatus: { not: null } },
+    where: {
+      organizationId,
+      meetingUrl: code ? { contains: code, mode: "insensitive" } : meetingUrl,
+      status: { not: "CANCELED" },
+      botStatus: { not: null },
+    },
     orderBy: { scheduledAt: "desc" },
     select: { id: true, botStatus: true, transcript: true, audioTranscript: true },
   });
@@ -105,7 +114,7 @@ export async function POST(req: NextRequest) {
     }
     try {
       const summary = await summarizeTranscriptNow({
-        organizationId: user.organizationId,
+        organizationId,
         meetingId: meeting.id,
         transcript: transcriptText,
       });

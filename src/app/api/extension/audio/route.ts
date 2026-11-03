@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
-import { resolveExtensionMeeting } from "@/server/services/extension-meeting";
+import { resolveExtensionMeeting, resolveExtensionOrganizationId } from "@/server/services/extension-meeting";
 import { transcribeAudioViaBotService } from "@/server/services/meeting-bot";
 
 /**
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { meetExtensionToken: token },
-    select: { id: true, organizationId: true },
+    select: { id: true, organizationId: true, email: true },
   });
   if (!user?.organizationId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   }
 
   const resolved = await resolveExtensionMeeting({
-    organizationId: user.organizationId,
+    organizationId: await resolveExtensionOrganizationId({ organizationId: user.organizationId, email: user.email }, meetingUrl),
     meetingUrl,
     recordedById: user.id,
   });

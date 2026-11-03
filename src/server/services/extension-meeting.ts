@@ -1,6 +1,34 @@
 import { prisma } from "@/server/db/client";
 import { extractMeetCode, normalizeMeetUrl } from "@/lib/meet-code";
 
+/** La cuenta interna con la que el parche del asistente (Vexa) habla con el CRM: sirve a todas las organizaciones. */
+const PLATFORM_BOT_EMAIL_SUFFIX = "@internal.proshop.lat";
+
+export function isPlatformBotEmail(email: string): boolean {
+  return email.endsWith(PLATFORM_BOT_EMAIL_SUFFIX);
+}
+
+/**
+ * Organización a la que pertenece lo que manda este token para esta reunión. Una persona (extensión de Chrome) trabaja
+ * en SU organización. El asistente es uno solo para todas: su token es de una cuenta interna de ProShop, así que la
+ * organización es la de la reunión con asistente que tiene ese link; sin ella, mandaba subtítulos, audio, comandos y
+ * cobros de reuniones de otras organizaciones a ProShop.
+ */
+export async function resolveExtensionOrganizationId(
+  user: { organizationId: string; email: string },
+  meetingUrl: string,
+): Promise<string> {
+  if (!isPlatformBotEmail(user.email)) return user.organizationId;
+  const code = extractMeetCode(meetingUrl);
+  if (!code) return user.organizationId;
+  const meeting = await prisma.meeting.findFirst({
+    where: { meetingUrl: { contains: code, mode: "insensitive" }, botStatus: { not: null }, status: { not: "CANCELED" } },
+    orderBy: { createdAt: "desc" },
+    select: { organizationId: true },
+  });
+  return meeting?.organizationId ?? user.organizationId;
+}
+
 /**
  * Encuentra o crea la reunión que le corresponde a un link de Meet que
  * mandó la extensión de subtítulos (texto o audio) -- compartido entre

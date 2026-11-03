@@ -5,6 +5,7 @@ import { saveMediaFile } from "@/lib/media-storage";
 import { extractMeetCode } from "@/lib/meet-code";
 import { classifyShotPage, shotFileName, SHOT_REASONS } from "@/lib/bot-shot";
 import { stopMeetingBot } from "@/server/services/meeting-bot";
+import { isPlatformBotEmail } from "@/server/services/extension-meeting";
 
 /**
  * Captura de pantalla del asistente mientras entra a Meet (la manda vexa-patches/apply-shots.js desde el bot).
@@ -18,7 +19,6 @@ import { stopMeetingBot } from "@/server/services/meeting-bot";
  */
 const MAX_IMAGE_BYTES = 1_500_000;
 const LIVE_STATUSES = ["PENDING", "JOINING", "WAITING_ADMISSION"] as const;
-const PLATFORM_BOT_EMAIL_SUFFIX = "@internal.proshop.lat";
 
 const bodySchema = z.object({
   sessionId: z.number().int().positive().nullable().optional(),
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   const user = await prisma.user.findUnique({ where: { meetExtensionToken: token }, select: { organizationId: true, email: true } });
   if (!user?.organizationId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   // La cuenta interna del asistente sirve a todas las organizaciones; cualquier otra, solo a la suya.
-  const orgScope = user.email.endsWith(PLATFORM_BOT_EMAIL_SUFFIX) ? {} : { organizationId: user.organizationId };
+  const orgScope = isPlatformBotEmail(user.email) ? {} : { organizationId: user.organizationId };
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });

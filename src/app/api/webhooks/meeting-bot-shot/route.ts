@@ -9,13 +9,16 @@ import { stopMeetingBot } from "@/server/services/meeting-bot";
 /**
  * Captura de pantalla del asistente mientras entra a Meet (la manda vexa-patches/apply-shots.js desde el bot).
  * Se guarda como adjunto de la reunión, que la limpieza diaria borra a los 7 días. Auth: el mismo token personal
- * de la extensión que ya usa el parche de subtítulos.
+ * de la extensión que ya usa el parche de subtítulos. Ese token es de una cuenta interna de la plataforma (el asistente
+ * es uno solo para todas las organizaciones), así que con ella la reunión se busca en TODAS las organizaciones; un
+ * token de una persona común solo ve las de su propia organización.
  *
  * Si la captura muestra que Meet mandó al asistente a otra página (la de inicio de Google, o un pedido de iniciar
  * sesión), no tiene sentido seguir esperando 15 minutos: se anota el motivo y se saca al asistente.
  */
 const MAX_IMAGE_BYTES = 1_500_000;
 const LIVE_STATUSES = ["PENDING", "JOINING", "WAITING_ADMISSION"] as const;
+const PLATFORM_BOT_EMAIL_SUFFIX = "@internal.proshop.lat";
 
 const bodySchema = z.object({
   sessionId: z.number().int().positive().nullable().optional(),
@@ -30,9 +33,10 @@ export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const user = await prisma.user.findUnique({ where: { meetExtensionToken: token }, select: { organizationId: true } });
+  const user = await prisma.user.findUnique({ where: { meetExtensionToken: token }, select: { organizationId: true, email: true } });
   if (!user?.organizationId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const organizationId = user.organizationId;
+  // La cuenta interna del asistente sirve a todas las organizaciones; cualquier otra, solo a la suya.
+  const orgScope = user.email.endsWith(PLATFORM_BOT_EMAIL_SUFFIX) ? {} : { organizationId: user.organizationId };
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
@@ -45,11 +49,11 @@ export async function POST(req: NextRequest) {
   // La sesión de Vexa; o, si el CRM todavía no la guardó (la captura llega a los pocos segundos de pedir el
   // asistente), la reunión de esta organización que está entrando a esa sala.
   const select = { id: true, botStatus: true } as const;
-  let meeting = sessionId ? await prisma.meeting.findFirst({ where: { organizationId, vexaSessionId: sessionId }, select }) : null;
+  let meeting = sessionId ? await prisma.meeting.findFirst({ where: { ...orgScope, vexaSessionId: sessionId }, select }) : null;
   if (!meeting && nativeMeetingId) {
     const code = extractMeetCode(nativeMeetingId) ?? nativeMeetingId;
     meeting = await prisma.meeting.findFirst({
-      where: { organizationId, meetingUrl: { contains: code, mode: "insensitive" }, botStatus: { in: [...LIVE_STATUSES] } },
+      where: { ...orgScope, meetingUrl: { contains: code, mode: "insensitive" }, botStatus: { in: [...LIVE_STATUSES] } },
       orderBy: { createdAt: "desc" },
       select,
     });

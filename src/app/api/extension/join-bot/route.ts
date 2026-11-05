@@ -17,6 +17,8 @@ const bodySchema = z.object({
   meetingUrl: z.string().min(1).max(500),
   // Organización elegida en el panel de la extensión; sin ella, la del link ya agendado o la activa del CRM.
   organizationId: z.string().optional(),
+  // Nombre de la reunión (opcional): se guarda en vez de "Reunión Extensión".
+  title: z.string().max(300).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -56,6 +58,7 @@ export async function POST(req: NextRequest) {
     organizationId: org.organizationId,
     meetingUrl: parsed.data.meetingUrl,
     recordedById: user.id,
+    title: parsed.data.title,
   });
 
   await scheduleMeetingBotJoinNow(resolved.id);

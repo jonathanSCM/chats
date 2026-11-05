@@ -175,6 +175,8 @@
   // Organización de esta reunión: se fija al tocar "Grabar" (aunque después se cambie la elegida en el popup o la activa del
   // CRM, lo que se grabó acá sigue yendo a la misma). Sin elegir (cuenta de una sola organización) va null.
   let lockedOrgId;
+  // Nombre de la reunión (opcional), fijado al tocar «Grabar».
+  let lockedTitle = null;
 
   function getStoredAuth() {
     return new Promise((resolve) => {
@@ -304,7 +306,7 @@
         const res = await fetch(base + API_PATH, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ meetingUrl, transcript, ...(orgId ? { organizationId: orgId } : {}) }),
+          body: JSON.stringify({ meetingUrl, transcript, ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}) }),
         });
         console.log(`[proshop-captions] Transcripción enviada (${reason}):`, res.status);
       } catch (error) {
@@ -368,7 +370,7 @@
       if (!token) return;
       const orgId = lockedOrgId !== undefined ? lockedOrgId : storedOrgId || null;
       const base = (apiBase || "https://chats.proshop.lat").replace(/\/$/, "");
-      const blob = new Blob([JSON.stringify({ meetingUrl, transcript, token, ...(orgId ? { organizationId: orgId } : {}) })], {
+      const blob = new Blob([JSON.stringify({ meetingUrl, transcript, token, ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}) })], {
         type: "application/json",
       });
       navigator.sendBeacon(base + API_PATH, blob);
@@ -395,6 +397,7 @@
     }
     if (message?.type === "START_RECORDING") {
       if (lockedOrgId === undefined) lockedOrgId = message.organizationId || null;
+      if (!lockedTitle) lockedTitle = message.title || null;
       void start().then(() => sendResponse({ ok: true }));
       return true; // respuesta async
     }

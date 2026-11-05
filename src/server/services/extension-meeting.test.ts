@@ -9,7 +9,7 @@ vi.mock("@/server/db/client", () => ({
   },
 }));
 
-import { isPlatformBotEmail, resolveExtensionMeeting, resolveExtensionOrg, resolveExtensionOrganizationId } from "./extension-meeting";
+import { cleanMeetingTitle, isPlatformBotEmail, resolveExtensionMeeting, resolveExtensionOrg, resolveExtensionOrganizationId } from "./extension-meeting";
 
 const bot = { organizationId: "org-proshop", email: "meet-captions@internal.proshop.lat" };
 const person = { organizationId: "org-proshop", email: "vendedora@ejemplo.com" };
@@ -113,6 +113,43 @@ describe("resolveExtensionOrg (persona con varias organizaciones)", () => {
     const bot = { id: "bot", organizationId: "org-proshop", email: "meet-captions@internal.proshop.lat" };
     await expect(resolveExtensionOrg({ user: bot, meetingUrl: url, vexaSessionId: 5, requestedOrganizationId: "org-otra" })).resolves.toEqual({ ok: true, organizationId: "org-peru" });
     expect(m.memberFind).not.toHaveBeenCalled();
+  });
+});
+
+describe("nombre de la reunión", () => {
+  const base = { organizationId: "org-a", meetingUrl: "https://meet.google.com/abc-defg-hij" };
+
+  it("limpia espacios y recorta; vacío = sin nombre", () => {
+    expect(cleanMeetingTitle("  Demo   con  Ana \n")).toBe("Demo con Ana");
+    expect(cleanMeetingTitle("   ")).toBeNull();
+    expect(cleanMeetingTitle(null)).toBeNull();
+    expect(cleanMeetingTitle("x".repeat(300))).toHaveLength(160);
+  });
+
+  it("una reunión nueva se guarda con el nombre que le puso la persona", async () => {
+    m.findFirst.mockResolvedValue(null);
+    m.create.mockResolvedValue({ id: "nueva", transcript: null, audioTranscript: null });
+    await resolveExtensionMeeting({ ...base, title: "Demo con Ana" });
+    expect(m.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ title: "Demo con Ana" }) }));
+  });
+
+  it("sin nombre sigue llamándose «Reunión Extensión»", async () => {
+    m.findFirst.mockResolvedValue(null);
+    m.create.mockResolvedValue({ id: "nueva", transcript: null, audioTranscript: null });
+    await resolveExtensionMeeting({ ...base, title: "  " });
+    expect(m.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ title: "Reunión Extensión" }) }));
+  });
+
+  it("una reunión que tenía nombre automático lo cambia por el nuevo", async () => {
+    m.findFirst.mockResolvedValue({ id: "e1", title: "Reunión en vivo", transcript: null, audioTranscript: null, recordedById: "u1" });
+    await resolveExtensionMeeting({ ...base, title: "Demo con Ana" });
+    expect(m.update).toHaveBeenCalledWith({ where: { id: "e1" }, data: { title: "Demo con Ana" } });
+  });
+
+  it("una reunión agendada o ya renombrada conserva su nombre", async () => {
+    m.findFirst.mockResolvedValue({ id: "e2", title: "Reunión con Liliana", transcript: null, audioTranscript: null, recordedById: "u1" });
+    await resolveExtensionMeeting({ ...base, title: "Otro nombre" });
+    expect(m.update).not.toHaveBeenCalled();
   });
 });
 

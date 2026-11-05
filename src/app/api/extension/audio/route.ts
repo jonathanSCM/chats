@@ -21,6 +21,15 @@ import { transcribeAudioViaBotService } from "@/server/services/meeting-bot";
  * dashboard/extension-authorize) -- antes era un token único por
  * organización.
  */
+function safeDecode(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
   const meetingUrl = req.headers.get("x-meeting-url");
@@ -54,6 +63,8 @@ export async function POST(req: NextRequest) {
     organizationId: org.organizationId,
     meetingUrl,
     recordedById: user.id,
+    // El nombre viaja codificado (encabezado HTTP): encodeURIComponent en la extensión.
+    title: safeDecode(req.headers.get("x-meeting-title")),
   });
 
   const audioUrl = await saveMediaFile(buffer, mimeType);

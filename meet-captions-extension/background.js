@@ -39,6 +39,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           streamId,
           meetingUrl: message.meetingUrl,
           organizationId: message.organizationId || null,
+          title: message.title || null,
         });
         if (started?.ok === false) {
           sendResponse({ ok: false, error: started.error });

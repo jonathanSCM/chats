@@ -39,6 +39,15 @@ export async function resolveExtensionOrganizationId(
   return meeting?.organizationId ?? user.organizationId;
 }
 
+/** Nombres que el CRM pone solo cuando nadie le dio uno: son los únicos que un nombre nuevo puede reemplazar. */
+const PLACEHOLDER_TITLES = ["Reunión Extensión", "Reunión en vivo"];
+
+/** El nombre que la persona escribió en el panel de la extensión: sin espacios de más, máximo 160 caracteres; vacío = ninguno. */
+export function cleanMeetingTitle(raw: string | null | undefined): string | null {
+  const title = raw?.replace(/\s+/g, " ").trim().slice(0, 160);
+  return title ? title : null;
+}
+
 export type ExtensionOrgResult = { ok: true; organizationId: string } | { ok: false; error: string };
 
 /**
@@ -123,8 +132,13 @@ export async function resolveExtensionMeeting(params: {
   recordedById?: string | null;
   // Id de la sesión del asistente en Vexa: identifica la reunión exacta (ver resolveExtensionOrganizationId).
   vexaSessionId?: number | null;
+  // Nombre que la persona le puso a la reunión en el panel de la extensión. Si la reunión se crea acá, se guarda con ese
+  // nombre; si ya existía con un nombre automático ("Reunión Extensión", "Reunión en vivo") se lo cambia. Una reunión ya
+  // agendada o renombrada conserva el suyo.
+  title?: string | null;
 }): Promise<{ id: string; transcript: string | null; audioTranscript: string | null }> {
   const { organizationId, recordedById = null, vexaSessionId = null } = params;
+  const title = cleanMeetingTitle(params.title);
 
   if (vexaSessionId) {
     const bySession = await prisma.meeting.findFirst({
@@ -147,9 +161,12 @@ export async function resolveExtensionMeeting(params: {
       status: { not: "CANCELED" },
     },
     orderBy: { scheduledAt: "desc" },
-    select: { id: true, transcript: true, audioTranscript: true, recordedById: true },
+    select: { id: true, title: true, transcript: true, audioTranscript: true, recordedById: true },
   });
   if (existing) {
+    if (title && existing.title !== title && PLACEHOLDER_TITLES.includes(existing.title ?? "")) {
+      await prisma.meeting.update({ where: { id: existing.id }, data: { title } });
+    }
     // No se pisa si ya había alguien -- se completa solo si todavía no se
     // sabía quién la estaba grabando.
     if (!existing.recordedById && recordedById) {
@@ -162,7 +179,7 @@ export async function resolveExtensionMeeting(params: {
     data: {
       organizationId,
       opportunityId: null,
-      title: "Reunión Extensión",
+      title: title ?? "Reunión Extensión",
       scheduledAt: new Date(),
       durationMinutes: 30,
       meetingUrl,

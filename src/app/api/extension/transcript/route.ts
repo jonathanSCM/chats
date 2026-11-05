@@ -31,6 +31,8 @@ const bodySchema = z.object({
   vexaSessionId: z.number().int().positive().nullable().optional(),
   // Organización elegida en el panel de la extensión (fijada al empezar a grabar).
   organizationId: z.string().optional(),
+  // Nombre de la reunión escrito en el panel (opcional).
+  title: z.string().max(300).optional(),
 });
 
 // El content script de la extensión corre pegado al origen de la propia
@@ -60,7 +62,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return withCors(new NextResponse("Datos inválidos", { status: 400 }));
   }
-  const { meetingUrl, transcript, final, vexaSessionId, organizationId: requestedOrganizationId } = parsed.data;
+  const { meetingUrl, transcript, final, vexaSessionId, organizationId: requestedOrganizationId, title } = parsed.data;
 
   const token =
     req.headers.get("authorization")?.replace("Bearer ", "").trim() || parsed.data.token;
@@ -89,6 +91,7 @@ export async function POST(req: NextRequest) {
     meetingUrl,
     recordedById: user.id,
     vexaSessionId,
+    title,
   });
 
   // No se pisa una transcripción que ya tenga contenido (por ej. si el bot

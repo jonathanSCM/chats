@@ -11,6 +11,7 @@ let mediaRecorder = null;
 let chunks = [];
 let meetingUrl = null;
 let organizationId = null;
+let meetingTitle = null;
 let micStream = null;
 let tabStream = null;
 
@@ -40,7 +41,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // Antes esto era "dispara y olvida" -- background.js nunca sabía si la
     // grabación había arrancado de verdad, así que el popup siempre mostraba
     // "Audio activado" aunque tabCapture hubiera fallado en silencio.
-    startRecording(message.streamId, message.meetingUrl, message.organizationId)
+    startRecording(message.streamId, message.meetingUrl, message.organizationId, message.title)
       .then(() => sendResponse({ ok: true }))
       .catch((error) => sendResponse({ ok: false, error: String(error) }));
     return true; // respuesta async
@@ -57,11 +58,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-async function startRecording(streamId, url, orgId) {
+async function startRecording(streamId, url, orgId, title) {
   if (mediaRecorder && mediaRecorder.state !== "inactive") return; // ya está grabando
 
   meetingUrl = url;
   organizationId = orgId || null;
+  meetingTitle = title || null;
   chunks = [];
 
   // Antes, si esto tiraba error (streamId vencido, otra captura ya activa
@@ -159,6 +161,8 @@ async function stopRecording() {
         Authorization: `Bearer ${token}`,
         "X-Meeting-Url": meetingUrl || "",
         ...(organizationId ? { "X-Organization-Id": organizationId } : {}),
+        // Los encabezados HTTP no admiten tildes ni emojis: va codificado y el servidor lo decodifica.
+        ...(meetingTitle ? { "X-Meeting-Title": encodeURIComponent(meetingTitle) } : {}),
         "Content-Type": "audio/webm",
       },
       body: blob,

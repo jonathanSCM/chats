@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ProShop CRM — Subtítulos de Meet
 // @namespace    https://chats.proshop.lat
-// @version      1.2.0
+// @version      1.3.0
 // @description  Lee los subtítulos de Google Meet y los manda al CRM, o avisa al asistente para que entre solo. Se conecta con tu sesión del CRM (sin pegar tokens). Sin audio: eso solo lo hace la extensión de Chrome.
 // @match        https://meet.google.com/*
 // @match        https://chats.proshop.lat/dashboard/extension-authorize*
@@ -30,6 +30,9 @@
   // organización donde la reunión ya está agendada, o la activa del CRM.
   const getOrgId = () => GM_getValue("orgId", "") || null;
   const withOrg = (orgId) => (orgId ? { organizationId: orgId } : {});
+  // Nombre de la reunión (opcional): lo escrito se recuerda por reunión; vacío = el CRM usa su nombre automático.
+  const titleKey = () => `titleDraft:${session ? session.code : ""}`;
+  const getTitle = () => (GM_getValue(titleKey(), "") || "").replace(/\s+/g, " ").trim() || null;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // ── Estilos y constructor de elementos (sin innerHTML)
@@ -109,6 +112,7 @@
       meetingUrl: `https://meet.google.com/${code}`,
       started: false,
       orgId: null, // se fija al tocar «Grabar»: lo que se grabó acá sigue yendo a esa organización
+      title: null, // nombre de la reunión, fijado al tocar «Grabar»
       sent: false,
       ticks: 0,
       endSignals: 0,
@@ -226,7 +230,7 @@
     }
     session.sent = true;
     const s = session;
-    request("POST", API.transcript, { meetingUrl: s.meetingUrl, transcript, ...withOrg(s.orgId) }, (status) => {
+    request("POST", API.transcript, { meetingUrl: s.meetingUrl, transcript, ...withOrg(s.orgId), ...(s.title ? { title: s.title } : {}) }, (status) => {
       console.log(`[ProShop] Transcripción enviada (${reason}):`, status);
       if (status === 0 || status >= 500) s.sent = false; // se reintenta en el próximo aviso de fin
       if (status === 401) GM_deleteValue("token");
@@ -262,6 +266,7 @@
     if (!session || session.started) return;
     session.started = true;
     session.orgId = getOrgId();
+    session.title = getTitle();
     ensureBadge();
     await sleep(500);
     await enableCaptions();
@@ -310,6 +315,14 @@
     });
     account.append(accountText, connectBtn, logoutBtn);
     panelEl.appendChild(account);
+
+    const titleBox = el("div", "margin-bottom:10px;");
+    titleBox.appendChild(el("label", "display:block;font-size:11px;color:#667781;margin-bottom:4px;", "Nombre de la reunión (opcional)"));
+    const titleInput = el("input", "width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid #e9edef;border-radius:6px;font:inherit;", null, { type: "text", maxlength: "160", placeholder: "Ej.: Demo con Ana - Financiera" });
+    titleInput.value = GM_getValue(titleKey(), "") || "";
+    titleInput.addEventListener("input", () => GM_setValue(titleKey(), titleInput.value));
+    titleBox.appendChild(titleInput);
+    panelEl.appendChild(titleBox);
 
     const orgBox = el("div", "margin-bottom:10px;display:none;");
     orgBox.appendChild(el("label", "display:block;font-size:11px;color:#667781;margin-bottom:4px;", "Organización de esta reunión"));
@@ -382,7 +395,7 @@
         return;
       }
       joinBtn.disabled = true;
-      request("POST", API.join, { meetingUrl: session.meetingUrl, ...withOrg(getOrgId()) }, (statusCode) => {
+      request("POST", API.join, { meetingUrl: session.meetingUrl, ...withOrg(getOrgId()), ...(getTitle() ? { title: getTitle() } : {}) }, (statusCode) => {
         if (statusCode === 401) GM_deleteValue("token");
         if (!statusCode || statusCode >= 400) {
           joinBtn.disabled = false;
@@ -494,7 +507,7 @@
     if (!session || !session.started || session.sent) return;
     const transcript = currentTranscript().trim();
     if (transcript.length < 40 || !getToken()) return;
-    navigator.sendBeacon(CRM_BASE + API.transcript, new Blob([JSON.stringify({ meetingUrl: session.meetingUrl, transcript, token: getToken(), ...withOrg(session.orgId) })], { type: "application/json" }));
+    navigator.sendBeacon(CRM_BASE + API.transcript, new Blob([JSON.stringify({ meetingUrl: session.meetingUrl, transcript, token: getToken(), ...withOrg(session.orgId), ...(session.title ? { title: session.title } : {}) })], { type: "application/json" }));
   });
 
   // Si el token cambia (se conectó desde la otra pestaña), el panel abierto se actualiza solo.

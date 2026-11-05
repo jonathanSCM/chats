@@ -9,6 +9,8 @@ const meetingText = document.getElementById("meetingText");
 const meetingStatus = document.getElementById("meetingStatus");
 const recordBtn = document.getElementById("recordBtn");
 const joinAssistantBtn = document.getElementById("joinAssistantBtn");
+const titleBox = document.getElementById("titleBox");
+const titleInput = document.getElementById("titleInput");
 const orgBox = document.getElementById("orgBox");
 const orgSelect = document.getElementById("orgSelect");
 const orgOnly = document.getElementById("orgOnly");
@@ -141,6 +143,15 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     }
     const meetingUrl = `https://meet.google.com/${tab.url.match(MEETING_URL_RE)[1].toLowerCase()}`;
 
+    // Nombre de la reunión: se guarda lo escrito por reunión, porque el popup se cierra solo al perder el foco.
+    const draftKey = `titleDraft:${meetingUrl}`;
+    titleBox.style.display = "block";
+    chrome.storage.local.get([draftKey], (stored) => {
+      if (stored[draftKey]) titleInput.value = stored[draftKey];
+    });
+    titleInput.addEventListener("input", () => chrome.storage.local.set({ [draftKey]: titleInput.value }));
+    const meetingTitle = () => titleInput.value.replace(/\s+/g, " ").trim() || null;
+
     if (response.recording) {
       meetingText.innerHTML = '<span class="dot"></span>Grabando esta reunión (' + response.lines + " líneas).";
       recordBtn.style.display = "none";
@@ -151,7 +162,8 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
         recordBtn.disabled = true;
 
         const organizationId = orgBox.style.display === "none" ? null : orgSelect.value;
-        chrome.tabs.sendMessage(tab.id, { type: "START_RECORDING", organizationId }, () => {
+        const title = meetingTitle();
+        chrome.tabs.sendMessage(tab.id, { type: "START_RECORDING", organizationId, title }, () => {
           meetingText.innerHTML = '<span class="dot"></span>Grabando esta reunión.';
           recordBtn.style.display = "none";
           meetingStatus.textContent = "Subtítulos activados.";
@@ -161,7 +173,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
         // Audio real para whisper.cpp, además de los subtítulos -- best
         // effort: si tabCapture falla por lo que sea, los subtítulos de
         // arriba siguen andando igual, no se cae toda la grabación por esto.
-        chrome.runtime.sendMessage({ type: "START_AUDIO_CAPTURE", tabId: tab.id, meetingUrl, organizationId }, (response) => {
+        chrome.runtime.sendMessage({ type: "START_AUDIO_CAPTURE", tabId: tab.id, meetingUrl, organizationId, title }, (response) => {
           if (chrome.runtime.lastError || !response?.ok) {
             meetingStatus.textContent += " Audio: no se pudo activar (sigue grabando solo subtítulos).";
             return;
@@ -187,7 +199,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
         fetch(`${base}/api/extension/join-bot`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ meetingUrl, organizationId: orgBox.style.display === "none" ? undefined : orgSelect.value }),
+          body: JSON.stringify({ meetingUrl, organizationId: orgBox.style.display === "none" ? undefined : orgSelect.value, title: meetingTitle() ?? undefined }),
         })
           .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
           .then(({ ok, data }) => {

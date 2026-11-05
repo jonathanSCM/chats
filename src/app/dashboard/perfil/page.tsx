@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
@@ -5,80 +6,54 @@ import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { NameForm } from "./_components/name-form";
 import { PasswordForm } from "./_components/password-form";
 import { ColorPicker } from "./_components/color-picker";
-import { GoogleCalendarCard } from "./_components/google-calendar-card";
-import { InstallAppCard } from "./_components/install-app-card";
+import { getT } from "@/lib/i18n/server";
 
-export default async function ProfilePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ calendarConnected?: string; calendarError?: string }>;
-}) {
+export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
-
-  const { calendarConnected, calendarError } = await searchParams;
+  const t = await getT();
 
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: session.user.id },
     select: { id: true, name: true, email: true, color: true },
   });
 
-  const calendarAccount = await prisma.googleCalendarAccount.findUnique({
-    where: { userId: session.user.id },
-    select: { googleEmail: true },
-  });
-
-  const calendarNotice = calendarConnected
-    ? { type: "ok" as const, text: "Google Calendar conectado — tus próximas reuniones se van a crear ahí." }
-    : calendarError
-      ? { type: "error" as const, text: `No se pudo conectar: ${calendarError}` }
-      : null;
-
   return (
     <div className="mx-auto max-w-xl">
-      <h1 className="mb-1 font-display text-xl font-semibold text-ink">Mi perfil</h1>
+      <h1 className="mb-1 font-display text-xl font-semibold text-ink">{t("Mi perfil")}</h1>
       <p className="mb-6 text-sm text-ink-muted">{user.email}</p>
 
       <Card className="mb-6">
-        <CardTitle className="mb-1">Nombre</CardTitle>
+        <CardTitle className="mb-1">{t("Nombre")}</CardTitle>
         <CardDescription className="mb-4">
-          Cómo te ven tus compañeros en el CRM (chats asignados, notas, reuniones).
+          {t("Cómo te ven tus compañeros en el CRM (chats asignados, notas, reuniones).")}
         </CardDescription>
         <NameForm currentName={user.name ?? ""} />
       </Card>
 
       <Card className="mb-6">
-        <CardTitle className="mb-1">Color</CardTitle>
+        <CardTitle className="mb-1">{t("Color")}</CardTitle>
         <CardDescription className="mb-4">
-          Te identifica de un vistazo en la bandeja y en Seguimiento.
+          {t("Te identifica de un vistazo en la bandeja y en Seguimiento.")}
         </CardDescription>
         <ColorPicker userId={user.id} currentColor={user.color} />
       </Card>
 
       <Card className="mb-6">
-        <CardTitle className="mb-1">Google Calendar</CardTitle>
+        <CardTitle className="mb-1">{t("Contraseña")}</CardTitle>
         <CardDescription className="mb-4">
-          Conectá tu cuenta para que las reuniones que crees se agenden directo en tu calendario
-          (con sincronización en las dos direcciones: lo que edites acá o en Google se refleja del otro lado).
-        </CardDescription>
-        <GoogleCalendarCard connectedEmail={calendarAccount?.googleEmail ?? null} notice={calendarNotice} />
-      </Card>
-
-      <Card className="mb-6">
-        <CardTitle className="mb-1">Contraseña</CardTitle>
-        <CardDescription className="mb-4">
-          Pedimos la actual para confirmar que sos vos, aunque ya tengas sesión iniciada.
+          {t("Pedimos la actual para confirmar que sos vos, aunque ya tengas sesión iniciada.")}
         </CardDescription>
         <PasswordForm />
       </Card>
 
-      <Card className="mb-6">
-        <CardTitle className="mb-1">Instalar en mi dispositivo</CardTitle>
-        <CardDescription className="mb-4">
-          Acceso directo en tu pantalla de inicio, pantalla completa y avisos de mensajes nuevos.
-        </CardDescription>
-        <InstallAppCard />
-      </Card>
+      <p className="text-sm text-ink-muted">
+        {t("El idioma, Google Calendar y la instalación en tu dispositivo están en")}{" "}
+        <Link href="/dashboard/ajustes" className="font-medium text-accent underline">
+          {t("Ajustes")}
+        </Link>
+        .
+      </p>
     </div>
   );
 }

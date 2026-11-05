@@ -10,6 +10,7 @@ import {
   subscribeInstall,
 } from "@/lib/pwa-install-store";
 import { isInAppBrowser, isIOSDevice, isIOSSafari } from "@/lib/pwa";
+import { useT } from "@/lib/i18n/client";
 
 interface Device {
   standalone: boolean;
@@ -24,6 +25,7 @@ interface Device {
  * disponible acá por si la persona lo descartó o no lo vio.
  */
 export function InstallAppCard() {
+  const t = useT();
   const install = useSyncExternalStore(subscribeInstall, getInstallSnapshot, () => SERVER_INSTALL_SNAPSHOT);
   const [device, setDevice] = useState<Device | null>(null);
   const [busy, setBusy] = useState(false);
@@ -56,7 +58,7 @@ export function InstallAppCard() {
     return (
       <p className="flex items-center gap-2 text-sm text-ink">
         <CheckCircle2 size={16} className="shrink-0 text-accent" />
-        Ya estás usando la app instalada en este dispositivo.
+        {t("Ya estás usando la app instalada en este dispositivo.")}
       </p>
     );
   }
@@ -65,16 +67,15 @@ export function InstallAppCard() {
     return (
       <div className="space-y-2 text-sm text-ink-muted">
         <p>
-          Tu teléfono usa <b className="text-ink">Android {install.legacyAndroid}</b>. En ese Android, la app
-          instalada desde Chrome se cierra al abrirla: es una limitación de Chrome, no de ProShop, por eso
-          no te ofrecemos instalarla.
+          {t("Tu teléfono usa")} <b className="text-ink">Android {install.legacyAndroid}</b>.{" "}
+          {t("En ese Android, la app instalada desde Chrome se cierra al abrirla: es una limitación de Chrome, no de ProShop, por eso no te ofrecemos instalarla.")}
         </p>
         <p>
-          Para tener un acceso directo en la pantalla de inicio: en Chrome toca los tres puntos →{" "}
-          <b className="text-ink">Agregar a pantalla de inicio</b> y, si te da a elegir, escoge{" "}
-          <b className="text-ink">Crear acceso directo</b> (no «Instalar»). Se abrirá en Chrome.
+          {t("Para tener un acceso directo en la pantalla de inicio: en Chrome toca los tres puntos →")}{" "}
+          <b className="text-ink">{t("Agregar a pantalla de inicio")}</b> {t("y, si te da a elegir, escoge")}{" "}
+          <b className="text-ink">{t("Crear acceso directo")}</b> {t("(no «Instalar»). Se abrirá en Chrome.")}
         </p>
-        <p>Si ya instalaste la app y se cierra, mantén presionado su ícono y desinstálala.</p>
+        <p>{t("Si ya instalaste la app y se cierra, mantén presionado su ícono y desinstálala.")}</p>
       </div>
     );
   }
@@ -83,7 +84,7 @@ export function InstallAppCard() {
     return (
       <Button onClick={handleInstall} disabled={busy}>
         <Download size={16} />
-        {busy ? "Abriendo…" : "Instalar en mi dispositivo"}
+        {busy ? t("Abriendo…") : t("Instalar en mi dispositivo")}
       </Button>
     );
   }
@@ -91,8 +92,8 @@ export function InstallAppCard() {
   if (device.inApp) {
     return (
       <p className="text-sm text-ink-muted">
-        Estás dentro de otra app (WhatsApp, Instagram…) y desde ahí no se puede instalar. Toca los tres puntos y
-        elige <b className="text-ink">Abrir en el navegador</b> (Chrome o Safari); luego vuelve a esta pantalla.
+        {t("Estás dentro de otra app (WhatsApp, Instagram…) y desde ahí no se puede instalar. Toca los tres puntos y elige")}{" "}
+        <b className="text-ink">{t("Abrir en el navegador")}</b> {t("(Chrome o Safari); luego vuelve a esta pantalla.")}
       </p>
     );
   }
@@ -101,14 +102,16 @@ export function InstallAppCard() {
     return (
       <div className="space-y-2 text-sm text-ink-muted">
         <p>
-          En iPhone o iPad: toca <Share size={14} className="inline align-text-bottom" />{" "}
-          <b className="text-ink">Compartir</b> (o el menú <b className="text-ink">⋯</b>) →{" "}
-          <b className="text-ink">Agregar a pantalla de inicio</b>. Si no lo ves, toca <b className="text-ink">Ver más</b>.
+          {t("En iPhone o iPad: toca")} <Share size={14} className="inline align-text-bottom" />{" "}
+          <b className="text-ink">{t("Compartir")}</b> {t("(o el menú")} <b className="text-ink">⋯</b>) →{" "}
+          <b className="text-ink">{t("Agregar a pantalla de inicio")}</b>. {t("Si no lo ves, toca")}{" "}
+          <b className="text-ink">{t("Ver más")}</b>.
         </p>
         <p>
-          Deja activado <b className="text-ink">Abrir como app web</b> y toca <b className="text-ink">Agregar</b>: así se
-          abre en pantalla completa y puede recibir avisos de mensajes nuevos.
-          {!device.iosSafari && " Si tu navegador no muestra esa opción, ábrelo en Safari."}
+          {t("Deja activado")} <b className="text-ink">{t("Abrir como app web")}</b> {t("y toca")}{" "}
+          <b className="text-ink">{t("Agregar")}</b>:{" "}
+          {t("así se abre en pantalla completa y puede recibir avisos de mensajes nuevos.")}
+          {!device.iosSafari && ` ${t("Si tu navegador no muestra esa opción, ábrelo en Safari.")}`}
         </p>
       </div>
     );
@@ -117,14 +120,13 @@ export function InstallAppCard() {
   return (
     <div className="space-y-2 text-sm text-ink-muted">
       <p>
-        Tu navegador no ofrece la instalación con un botón en este momento. Abre el menú del
-        navegador (los tres puntos) y elige <b className="text-ink">Instalar aplicación</b> o{" "}
-        <b className="text-ink">Agregar a pantalla de inicio</b>.
+        {t("Tu navegador no ofrece la instalación con un botón en este momento. Abre el menú del navegador (los tres puntos) y elige")}{" "}
+        <b className="text-ink">{t("Instalar aplicación")}</b> {t("o")}{" "}
+        <b className="text-ink">{t("Agregar a pantalla de inicio")}</b>.
       </p>
       {device.oldBrowser && (
         <p className="text-warning">
-          Tu navegador es antiguo: actualiza Chrome y «Android System WebView» desde Play Store
-          (versión 111 o mayor).
+          {t("Tu navegador es antiguo: actualiza Chrome y «Android System WebView» desde Play Store (versión 111 o mayor).")}
         </p>
       )}
     </div>

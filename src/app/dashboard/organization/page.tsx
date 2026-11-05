@@ -44,6 +44,7 @@ import {
 import { formatSeatUsage } from "@/lib/org-limits";
 import { IntegrationApiPanel } from "./_components/integration-api-panel";
 import { INTEGRATION_EVENT_TYPES } from "@/server/integrations/events";
+import { getT } from "@/lib/i18n/server";
 
 const TABS = [
   { key: "general", label: "General" },
@@ -75,6 +76,7 @@ export default async function OrganizationSettingsPage({
   const { seccion } = await searchParams;
 
   const session = await auth();
+  const tr = await getT();
   if (!session?.user.organizationId) redirect("/dashboard");
   if (session.user.role !== "OWNER") redirect("/dashboard");
 
@@ -201,8 +203,8 @@ export default async function OrganizationSettingsPage({
 
   return (
     <div className="max-w-2xl animate-fade-up">
-      <h1 className="mb-1 text-2xl font-bold">Organización</h1>
-      <p className="mb-6 text-sm text-ink-muted">Datos, plan, equipo, ventas e integraciones.</p>
+      <h1 className="mb-1 text-2xl font-bold">{tr("Organización")}</h1>
+      <p className="mb-6 text-sm text-ink-muted">{tr("Datos, plan, equipo, ventas e integraciones.")}</p>
 
       {parent && (
         <p className="mb-6 rounded-control border border-border px-3 py-2 text-sm text-ink-muted">
@@ -223,7 +225,7 @@ export default async function OrganizationSettingsPage({
                 : "border-transparent text-ink-muted hover:text-ink"
             }`}
           >
-            {t.label}
+            {tr(t.label)}
           </Link>
         ))}
       </nav>
@@ -448,30 +450,30 @@ export default async function OrganizationSettingsPage({
         <Card className="mb-6 divide-y divide-border">
           {org.aiMode === "custom" && (
             <SettingRow
-              title="Inteligencia artificial"
-              actionLabel="Ver"
-              summary={aiUsageText ? `Este mes: ${aiUsageText}` : "Con límite mensual"}
-              description="Tu plan incluye IA con un límite mensual. Si lo alcanzas, la IA se detiene hasta el mes siguiente o hasta que el administrador de la plataforma lo amplíe."
+              title={tr("Inteligencia artificial")}
+              actionLabel={tr("Ver")}
+              summary={aiUsageText ? tr("Este mes: {usage}", { usage: aiUsageText }) : tr("Con límite mensual")}
+              description={tr("Tu plan incluye IA con un límite mensual. Si lo alcanzas, la IA se detiene hasta el mes siguiente o hasta que el administrador de la plataforma lo amplíe.")}
             >
-              {aiUsageText && <p className="text-sm text-ink-muted">Este mes: {aiUsageText}</p>}
+              {aiUsageText && <p className="text-sm text-ink-muted">{tr("Este mes: {usage}", { usage: aiUsageText })}</p>}
             </SettingRow>
           )}
 
           {org.aiMode === "own" && (
             <SettingRow
-              title="Clave de OpenAI"
-              actionLabel="Configurar"
+              title={tr("Clave de OpenAI")}
+              actionLabel={tr("Configurar")}
               summary={
                 org.aiKeyAlertMessage ? (
-                  <span className="text-danger">Hay un problema con la clave</span>
+                  <span className="text-danger">{tr("Hay un problema con la clave")}</span>
                 ) : org.openaiKeyLast4 ? (
-                  `Clave terminada en ${org.openaiKeyLast4}`
+                  tr("Clave terminada en {last4}", { last4: org.openaiKeyLast4 })
                 ) : (
-                  "Sin clave cargada"
+                  tr("Sin clave cargada")
                 )
               }
               defaultOpen={Boolean(org.aiKeyAlertMessage)}
-              description="El bot de WhatsApp, el asesor y los resúmenes de reuniones pueden funcionar con tu propia cuenta de OpenAI en vez de la de la plataforma."
+              description={tr("El bot de WhatsApp, el asesor y los resúmenes de reuniones pueden funcionar con tu propia cuenta de OpenAI en vez de la de la plataforma.")}
             >
               <OpenAiKeyForm last4={org.openaiKeyLast4} alertMessage={org.aiKeyAlertMessage} />
             </SettingRow>
@@ -480,16 +482,16 @@ export default async function OrganizationSettingsPage({
           {isMarketingEnabled() && (
             <SettingRow
               title="Meta Ads"
-              actionLabel={org.metaAdsAccessToken ? "Administrar" : "Conectar"}
+              actionLabel={org.metaAdsAccessToken ? tr("Administrar") : tr("Conectar")}
               summary={
                 org.metaAdsAccessToken
-                  ? `Conectada${org.metaAdAccountName ? ` · ${org.metaAdAccountName}` : ""}`
+                  ? `${tr("Conectada")}${org.metaAdAccountName ? ` · ${org.metaAdAccountName}` : ""}`
                   : org.metaAdAccountId
-                    ? "Hay que volver a conectarla"
-                    : "No conectada"
+                    ? tr("Hay que volver a conectarla")
+                    : tr("No conectada")
               }
               defaultOpen={pendingAdAccounts.length > 0}
-              description="Conecta tu cuenta publicitaria con Facebook (solo lectura) para ver el gasto junto a tus ventas en Marketing — se sincroniza sola cada ~20h."
+              description={tr("Conecta tu cuenta publicitaria con Facebook (solo lectura) para ver el gasto junto a tus ventas en Marketing — se sincroniza sola cada ~20h.")}
             >
               <MetaAdsConnect
                 accountId={org.metaAdAccountId}
@@ -503,9 +505,9 @@ export default async function OrganizationSettingsPage({
           )}
 
           <SettingRow
-            title="Extensión de subtítulos para Meet"
-            actionLabel="Ver cómo se usa"
-            summary="Extensión de Chrome para leer los subtítulos en vivo"
+            title={tr("Extensión de subtítulos para Meet")}
+            actionLabel={tr("Ver cómo se usa")}
+            summary={tr("Extensión de Chrome para leer los subtítulos en vivo")}
           >
             <p className="text-sm text-ink-muted">
               Extensión de Chrome que lee los subtítulos en vivo de Google Meet desde el navegador de quien esté en la

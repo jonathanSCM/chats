@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { SidePanel } from "@/components/side-panel";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * Un ajuste de la organización como fila compacta: nombre, cómo está hoy en una línea y un botón que abre
@@ -11,7 +12,7 @@ import { Button } from "@/components/ui/button";
 export function SettingRow({
   title,
   summary,
-  actionLabel = "Editar",
+  actionLabel,
   description,
   defaultOpen = false,
   children,
@@ -26,6 +27,7 @@ export function SettingRow({
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(defaultOpen);
   return (
     <>
@@ -35,7 +37,7 @@ export function SettingRow({
           {summary && <div className="mt-0.5 truncate text-sm text-ink-muted">{summary}</div>}
         </div>
         <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)} className="shrink-0">
-          {actionLabel}
+          {actionLabel ?? t("Editar")}
         </Button>
       </div>
       {open && (

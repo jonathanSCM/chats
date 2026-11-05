@@ -14,6 +14,7 @@ import {
   UserCircle,
   Megaphone,
   Lightbulb,
+  Settings,
 } from "lucide-react";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
@@ -23,6 +24,8 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { SidebarToggle } from "@/components/layout/sidebar-toggle";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-switch";
+import { getT } from "@/lib/i18n/server";
 import { ServerClock } from "@/components/layout/server-clock";
 import { OrgSwitcher } from "@/components/layout/org-switcher";
 import { getUserMemberships } from "@/server/services/organization-membership";
@@ -37,6 +40,7 @@ import { PlanChangeNotice } from "@/components/plan-change-notice";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
+  const t = await getT();
 
   // Un SUPERADMIN no pertenece a ninguna organización: este panel no aplica.
   if (session?.user.role === "SUPERADMIN" && !session.user.organizationId) {
@@ -97,20 +101,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <nav className="flex flex-1 flex-col gap-0.5">
         <NavLink href="/dashboard" exact icon={<LayoutDashboard size={18} />}>Dashboard</NavLink>
         <NavLink href="/dashboard/inbox" icon={<MessageCircle size={18} />}>Chats</NavLink>
-        <NavLink href="/dashboard/seguimiento" icon={<ClipboardList size={18} />}>Seguimiento</NavLink>
+        <NavLink href="/dashboard/seguimiento" icon={<ClipboardList size={18} />}>{t("Seguimiento")}</NavLink>
         {isMarketingEnabled() && (
           <NavLink href="/dashboard/marketing" icon={<Megaphone size={18} />}>Marketing</NavLink>
         )}
-        <NavLink href="/dashboard/calendario" icon={<CalendarDays size={18} />}>Calendario</NavLink>
+        <NavLink href="/dashboard/calendario" icon={<CalendarDays size={18} />}>{t("Calendario")}</NavLink>
         <NavLink href="/dashboard/reuniones/todas" matchPrefix="/dashboard/reuniones" icon={<Video size={18} />}>
-          Reuniones
+          {t("Reuniones")}
         </NavLink>
-        <NavLink href="/dashboard/whatsapp" icon={<Smartphone size={18} />}>Conexión WhatsApp</NavLink>
+        <NavLink href="/dashboard/whatsapp" icon={<Smartphone size={18} />}>{t("Conexión WhatsApp")}</NavLink>
         {session?.user.role === "OWNER" && (
           <>
-            <NavLink href="/dashboard/knowledge" icon={<BookOpen size={18} />}>Conocimiento</NavLink>
-            <NavLink href="/dashboard/aprendizaje" icon={<Lightbulb size={18} />}>Aprendizaje</NavLink>
-            <NavLink href="/dashboard/organization" icon={<Building2 size={18} />}>Organización</NavLink>
+            <NavLink href="/dashboard/knowledge" icon={<BookOpen size={18} />}>{t("Conocimiento")}</NavLink>
+            <NavLink href="/dashboard/aprendizaje" icon={<Lightbulb size={18} />}>{t("Aprendizaje")}</NavLink>
+            <NavLink href="/dashboard/organization" icon={<Building2 size={18} />}>{t("Organización")}</NavLink>
           </>
         )}
         {session?.user.role === "SUPERADMIN" && (
@@ -128,10 +132,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <span className="nav-label truncate">{session?.user.email}</span>
           </p>
           <p className="nav-extra truncate pl-[26px] text-xs text-[var(--sidebar-ink)]/70">
-            {org?.name ?? "Sin organización"}
+            {org?.name ?? t("Sin organización")}
           </p>
           <ServerClock initialIso={serverNowIso} timeZone={serverTimeZone} />
         </Link>
+        <NavLink href="/dashboard/ajustes" icon={<Settings size={18} />}>{t("Ajustes")}</NavLink>
+        <LanguageToggle />
         <ThemeToggle />
         {/* Selector solo si pertenece a más de una organización -- si no, no
             aparece nada acá (el nombre fijo de arriba alcanza). Afuera del
@@ -145,7 +151,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             type="submit"
             className="nav-item flex h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-medium text-[var(--sidebar-ink)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-white"
           >
-            <LogOut size={18} /> <span className="nav-label">Salir</span>
+            <LogOut size={18} /> <span className="nav-label">{t("Salir")}</span>
           </button>
         </form>
       </div>
@@ -224,7 +230,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           {org?.suspended ? (
             <div className="mx-auto max-w-md rounded-lg border border-danger/40 bg-danger-dim px-6 py-8 text-center">
               <p className="mb-1 font-display text-lg font-semibold text-ink">
-                Cuenta suspendida
+                {t("Cuenta suspendida")}
               </p>
               <p className="text-sm text-ink-muted">
                 Tu organización está suspendida y tus bots no responden mensajes. Contacta a

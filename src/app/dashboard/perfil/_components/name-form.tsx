@@ -4,8 +4,10 @@ import { useActionState, useEffect, useState } from "react";
 import { updateMyNameAction } from "@/server/actions/profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/lib/i18n/client";
 
 export function NameForm({ currentName }: { currentName: string }) {
+  const t = useT();
   const [state, formAction, isPending] = useActionState(updateMyNameAction, { error: null });
 
   // Campo controlado, no defaultValue: un <form action={...}> resetea solo
@@ -22,14 +24,14 @@ export function NameForm({ currentName }: { currentName: string }) {
           name="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Tu nombre"
+          placeholder={t("Tu nombre")}
           required
         />
         {state.error && <p className="text-xs text-danger">{state.error}</p>}
         {state.message && !state.error && <p className="text-xs text-accent">{state.message}</p>}
       </div>
       <Button type="submit" disabled={isPending} className="shrink-0">
-        {isPending ? "Guardando…" : "Guardar"}
+        {isPending ? t("Guardando…") : t("Guardar")}
       </Button>
     </form>
   );

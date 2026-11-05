@@ -8,6 +8,6 @@ import type { ActionState } from "./types";
 export async function disconnectGoogleCalendarAction(): Promise<ActionState> {
   const session = await requireSession();
   await disconnectGoogleCalendar(session.user.id);
-  revalidatePath("/dashboard/perfil");
+  revalidatePath("/dashboard/ajustes");
   return { error: null, message: "Google Calendar desconectado." };
 }

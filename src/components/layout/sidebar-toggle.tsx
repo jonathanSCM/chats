@@ -1,6 +1,7 @@
 "use client";
 
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * Pliega el menú lateral en escritorio para dar toda la pantalla al
@@ -12,6 +13,7 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
  * muestra el que corresponde, así no hay parpadeo ni desajuste al hidratar.
  */
 export function SidebarToggle() {
+  const t = useT();
   function toggle() {
     const root = document.documentElement;
     const next = root.dataset.sidebar === "closed" ? "open" : "closed";
@@ -27,8 +29,8 @@ export function SidebarToggle() {
     <button
       type="button"
       onClick={toggle}
-      aria-label="Mostrar u ocultar el menú"
-      title="Mostrar u ocultar el menú"
+      aria-label={t("Mostrar u ocultar el menú")}
+      title={t("Mostrar u ocultar el menú")}
       className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink md:flex"
     >
       <PanelLeftClose size={17} className="icon-when-open" />

@@ -7,6 +7,7 @@ import { loginAction } from "@/server/actions/login";
 import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
+import { useT } from "@/lib/i18n/client";
 
 export default function LoginPage() {
   return (
@@ -17,6 +18,7 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
+  const t = useT();
   const [state, formAction, isPending] = useActionState(loginAction, { error: null });
   const searchParams = useSearchParams();
   const sinOrganizacion = searchParams.get("sinOrganizacion") === "1";
@@ -26,27 +28,26 @@ function LoginForm() {
       <div className="w-full max-w-sm animate-fade-up">
         <div className="mb-8 flex flex-col items-center text-center">
           <Logo size="lg" className="mb-1" />
-          <p className="text-sm text-ink-muted">Bandeja de conversaciones de WhatsApp</p>
+          <p className="text-sm text-ink-muted">{t("Bandeja de conversaciones de WhatsApp")}</p>
         </div>
 
         {sinOrganizacion && (
           <p className="mb-4 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-center text-sm text-warning">
-            Tu cuenta ya no pertenece a ninguna organización. Si crees que es un error, contacta al
-            dueño de tu equipo.
+            {t("Tu cuenta ya no pertenece a ninguna organización. Si crees que es un error, contacta al dueño de tu equipo.")}
           </p>
         )}
 
         <div className="corner-brackets rounded-lg border border-border bg-surface p-6">
           <form action={formAction} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="email">Correo</Label>
+              <Label htmlFor="email">{t("Correo")}</Label>
               <Input id="email" name="email" type="email" required autoComplete="email" />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Contraseña</Label>
+                <Label htmlFor="password">{t("Contraseña")}</Label>
                 <Link href="/forgot-password" className="text-xs text-ink-faint hover:text-accent">
-                  ¿Olvidaste tu contraseña?
+                  {t("¿Olvidaste tu contraseña?")}
                 </Link>
               </div>
               <Input
@@ -65,7 +66,7 @@ function LoginForm() {
             )}
 
             <Button type="submit" className="w-full" disabled={isPending}>
-              {isPending ? "Ingresando…" : "Ingresar"}
+              {isPending ? t("Ingresando…") : t("Ingresar")}
             </Button>
           </form>
         </div>

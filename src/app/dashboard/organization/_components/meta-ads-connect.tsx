@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { loadFacebookSdk } from "@/lib/facebook-sdk";
 import { selectMetaAdAccountAction, disconnectMetaAdsAction, syncMetaAdsNowAction } from "@/server/actions/organization";
+import { useLocale, useT } from "@/lib/i18n/client";
 
 interface AdAccount {
   id: string;
@@ -29,6 +30,8 @@ export function MetaAdsConnect({
   lastSyncedAt: string | null;
 }) {
   const router = useRouter();
+  const t = useT();
+  const locale = useLocale();
   const [config, setConfig] = useState<{ appId: string | null; metaAdsConfigId: string | null } | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "connecting" | "saving" | "syncing">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +81,7 @@ export function MetaAdsConnect({
     const appId = config?.appId;
     const configId = config?.metaAdsConfigId;
     if (!appId || !configId) {
-      setError("Falta el Config ID de Meta Ads en la configuración de plataforma (/admin/settings).");
+      setError(t("Falta el Config ID de Meta Ads en la configuración de plataforma (/admin/settings)."));
       return;
     }
     setStatus("loading");
@@ -86,7 +89,7 @@ export function MetaAdsConnect({
     try {
       await loadFacebookSdk(appId);
     } catch {
-      setError("No se pudo cargar el SDK de Facebook. Si tenés un bloqueador de anuncios o rastreadores, desactivalo para este sitio.");
+      setError(t("No se pudo cargar el SDK de Facebook. Si tienes un bloqueador de anuncios o rastreadores, desactívalo para este sitio."));
       setStatus("idle");
       return;
     }
@@ -123,7 +126,7 @@ export function MetaAdsConnect({
     const result = await syncMetaAdsNowAction();
     setStatus("idle");
     if (result.error) setError(result.error);
-    else setSyncMessage(result.message ?? "Sincronizado.");
+    else setSyncMessage(result.message ? t(result.message) : t("Sincronizado."));
     router.refresh();
   }
 
@@ -141,7 +144,7 @@ export function MetaAdsConnect({
     <div className="space-y-3">
       {choices.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm text-ink-muted">Elegí la cuenta publicitaria que querés usar:</p>
+          <p className="text-sm text-ink-muted">{t("Elige la cuenta publicitaria que quieres usar:")}</p>
           <Select value={chosenId} onChange={(e) => setChosenId(e.target.value)} className="max-w-sm">
             {choices.map((a) => (
               <option key={a.id} value={a.id}>
@@ -150,7 +153,7 @@ export function MetaAdsConnect({
             ))}
           </Select>
           <Button type="button" variant="secondary" onClick={handleSelect} disabled={busy}>
-            {status === "saving" ? "Guardando…" : "Usar esta cuenta"}
+            {status === "saving" ? t("Guardando…") : t("Usar esta cuenta")}
           </Button>
         </div>
       )}
@@ -158,43 +161,43 @@ export function MetaAdsConnect({
       {choices.length === 0 && connected && accountId && !needsReconnect && (
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-ink">
-            Conectado: <span className="font-medium">{accountName ?? accountId}</span>{" "}
+            {t("Conectado:")} <span className="font-medium">{accountName ?? accountId}</span>{" "}
             <span className="font-code text-xs text-ink-faint">{accountId}</span>
           </p>
           <Button type="button" variant="secondary" onClick={handleSyncNow} disabled={busy}>
             <RefreshCw size={14} className={status === "syncing" ? "animate-spin" : ""} />
-            {status === "syncing" ? "Consultando Meta…" : "Sincronizar ahora"}
+            {status === "syncing" ? t("Consultando Meta…") : t("Sincronizar ahora")}
           </Button>
           <Button type="button" variant="secondary" onClick={handleDisconnect} disabled={busy}>
-            Desconectar
+            {t("Desconectar")}
           </Button>
         </div>
       )}
 
       {choices.length === 0 && connected && accountId && !needsReconnect && (
         <p className="text-xs text-ink-muted">
-          Última sincronización:{" "}
-          {lastSyncedAt ? new Date(lastSyncedAt).toLocaleString("es") : "todavía no se sincronizó"}
+          {t("Última sincronización:")}{" "}
+          {lastSyncedAt ? new Date(lastSyncedAt).toLocaleString(locale) : t("todavía no se sincronizó")}
           {syncMessage && <span className="ml-2 text-accent">{syncMessage}</span>}
         </p>
       )}
 
       {needsReconnect && (
         <p className="text-sm text-danger">
-          La conexión con Meta Ads venció o fue revocada. Volvé a conectar para seguir sincronizando el gasto.
+          {t("La conexión con Meta Ads venció o fue revocada. Vuelve a conectar para seguir sincronizando el gasto.")}
         </p>
       )}
 
       {(!connected || needsReconnect) && choices.length === 0 && (
         <Button type="button" variant="secondary" onClick={handleConnect} disabled={busy}>
           <Megaphone size={16} />
-          {status === "loading" && "Cargando…"}
-          {status === "connecting" && "Conectando…"}
-          {status !== "loading" && status !== "connecting" && (needsReconnect ? "Reconectar con Facebook" : "Conectar con Facebook")}
+          {status === "loading" && t("Cargando…")}
+          {status === "connecting" && t("Conectando…")}
+          {status !== "loading" && status !== "connecting" && (needsReconnect ? t("Reconectar con Facebook") : t("Conectar con Facebook"))}
         </Button>
       )}
 
-      {error && <p className="text-xs text-danger">{error}</p>}
+      {error && <p className="text-xs text-danger">{t(error)}</p>}
     </div>
   );
 }

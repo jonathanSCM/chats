@@ -61,6 +61,7 @@ import { ConversationPanel } from "./_components/conversation-panel";
 import { startPolling } from "@/lib/polling";
 import { formatPhoneDisplay, phoneHref } from "@/lib/phone";
 import { TemplatePickerModal } from "./_components/template-picker-modal";
+import { useT } from "@/lib/i18n/client";
 
 interface Vendor {
   id: string;
@@ -507,6 +508,7 @@ export function InboxClient({
   /** Cuentas de WhatsApp que este usuario puede ver — para el selector del lateral. */
   bots: BotAccount[];
 }) {
+  const t = useT();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
   const [view, setView] = useState<"active" | "archived" | "blocked">("active");
@@ -1448,7 +1450,7 @@ export function InboxClient({
                       }
                       className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 text-xs font-medium text-accent"
                     >
-                      Anuncio
+                      {t("Anuncio")}
                     </span>
                   ) : (
                     <button
@@ -1457,14 +1459,14 @@ export function InboxClient({
                       title="Marcar a mano que este chat vino de un anuncio. Ojo: esto solo cambia lo que ve el panel — si Meta no tiene realmente activa la ventana extendida, el mensaje igual puede rebotar."
                       className="shrink-0 cursor-pointer rounded-full border border-border px-1.5 py-0.5 text-xs font-medium text-ink-faint hover:border-accent-dim hover:text-accent"
                     >
-                      Marcar anuncio
+                      {t("Marcar anuncio")}
                     </button>
                   )}
                 </p>
                 {customerName && (
                   <p className="truncate text-xs text-ink-faint">
                     {phoneHref(customerPhone) ? (
-                      <a href={phoneHref(customerPhone) ?? undefined} className="hover:text-accent hover:underline" title="Llamar">
+                      <a href={phoneHref(customerPhone) ?? undefined} className="hover:text-accent hover:underline" title={t("Llamar")}>
                         {formatPhoneDisplay(customerPhone)}
                       </a>
                     ) : (
@@ -1483,32 +1485,32 @@ export function InboxClient({
                       type="button"
                       onClick={fetchAdInsights}
                       disabled={adInsightsLoading}
-                      title="Traer inversión, impresiones, alcance, clics, CTR, CPC y CPM de este anuncio desde Meta"
+                      title={t("Traer inversión, impresiones, alcance, clics, CTR, CPC y CPM de este anuncio desde Meta")}
                       className="shrink-0 cursor-pointer text-xs text-ink-faint underline decoration-dotted hover:text-accent disabled:cursor-default"
                     >
-                      {adInsightsLoading ? "cargando…" : "ver rendimiento"}
+                      {adInsightsLoading ? t("cargando…") : t("ver rendimiento")}
                     </button>
                   </p>
                 )}
                 {adInsightsError && (
-                  <p className="text-xs text-danger">{adInsightsError}</p>
+                  <p className="text-xs text-danger">{t(adInsightsError)}</p>
                 )}
                 {adInsights && (
                   <dl className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 rounded-md border border-border bg-surface-2 p-2 text-xs sm:grid-cols-5">
                     <div>
-                      <dt className="text-ink-faint">Inversión</dt>
+                      <dt className="text-ink-faint">{t("Inversión")}</dt>
                       <dd className="text-ink">{adInsights.spend ?? "—"}</dd>
                     </div>
                     <div>
-                      <dt className="text-ink-faint">Impresiones</dt>
+                      <dt className="text-ink-faint">{t("Impresiones")}</dt>
                       <dd className="text-ink">{adInsights.impressions ?? "—"}</dd>
                     </div>
                     <div>
-                      <dt className="text-ink-faint">Alcance</dt>
+                      <dt className="text-ink-faint">{t("Alcance")}</dt>
                       <dd className="text-ink">{adInsights.reach ?? "—"}</dd>
                     </div>
                     <div>
-                      <dt className="text-ink-faint">Clics</dt>
+                      <dt className="text-ink-faint">{t("Clics")}</dt>
                       <dd className="text-ink">{adInsights.clicks ?? "—"}</dd>
                     </div>
                     <div>
@@ -1524,7 +1526,7 @@ export function InboxClient({
                       <dd className="text-ink">{adInsights.cpm ?? "—"}</dd>
                     </div>
                     <div className="col-span-2 sm:col-span-2">
-                      <dt className="text-ink-faint">Conjunto de anuncios</dt>
+                      <dt className="text-ink-faint">{t("Conjunto de anuncios")}</dt>
                       <dd className="truncate text-ink">{adInsights.adsetName ?? "—"}</dd>
                     </div>
                   </dl>

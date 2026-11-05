@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Menu, X } from "lucide-react";
+import { useT } from "@/lib/i18n/client";
 
 // Barra superior + drawer para móvil. El contenido del drawer se pasa como
 // children desde el layout (server component), así la navegación no se
 // duplica entre la versión de escritorio y la de móvil.
 export function MobileNav({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   // Con el drawer abierto, el fondo no debe hacer scroll.
@@ -23,7 +25,7 @@ export function MobileNav({ children }: { children: React.ReactNode }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Abrir menú"
+        aria-label={t("Abrir menú")}
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-surface-2 md:hidden"
       >
         <Menu size={20} />
@@ -43,7 +45,7 @@ export function MobileNav({ children }: { children: React.ReactNode }) {
           <div data-portal className="fixed inset-0 z-[100] md:hidden">
             <button
               type="button"
-              aria-label="Cerrar menú"
+              aria-label={t("Cerrar menú")}
               onClick={() => setOpen(false)}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
@@ -58,7 +60,7 @@ export function MobileNav({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Cerrar menú"
+                aria-label={t("Cerrar menú")}
                 className="absolute right-3 top-4 flex h-9 w-9 items-center justify-center rounded-lg text-[var(--sidebar-ink)] transition-colors hover:bg-[var(--sidebar-hover)]"
               >
                 <X size={18} />

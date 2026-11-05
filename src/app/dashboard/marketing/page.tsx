@@ -7,8 +7,10 @@ import { getOrgServices } from "@/server/services/services-catalog";
 import { getOrgMemberUserIds } from "@/server/services/organization-membership";
 import { MarketingClient } from "./_components/marketing-client";
 import { isMarketingEnabled } from "@/lib/features";
+import { getT } from "@/lib/i18n/server";
 
 export default async function MarketingPage() {
+  const t = await getT();
   if (!isMarketingEnabled()) redirect("/dashboard");
   const session = await auth();
   if (!session?.user.organizationId) redirect("/login");
@@ -24,16 +26,15 @@ export default async function MarketingPage() {
     return (
       <div className="max-w-lg animate-fade-up">
         <h1 className="mb-1 text-2xl font-bold">Marketing</h1>
-        <p className="mb-8 text-sm text-ink-muted">Embudo comercial conectado al gasto de Meta Ads.</p>
+        <p className="mb-8 text-sm text-ink-muted">{t("Embudo comercial conectado al gasto de Meta Ads.")}</p>
         <Card>
-          <CardTitle className="mb-1">Todavía no hay cuenta publicitaria conectada</CardTitle>
+          <CardTitle className="mb-1">{t("Todavía no hay cuenta publicitaria conectada")}</CardTitle>
           <CardDescription className="mb-4">
-            Cargá el ID de tu cuenta de Meta Ads (formato act_XXXXXXXXX) en Organización para que
-            empiece a sincronizarse el gasto — se sincroniza sola cada ~20h una vez configurada.
+            {t("Conecta tu cuenta publicitaria con Facebook en Organización → Integraciones para que empiece a sincronizarse el gasto: después se actualiza sola cada ~20 horas.")}
           </CardDescription>
           {session.user.role === "OWNER" && (
             <Link href="/dashboard/organization" className="text-sm text-accent hover:underline">
-              Ir a Organización →
+              {t("Ir a Organización →")}
             </Link>
           )}
         </Card>

@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { StaleActionReload } from "@/components/stale-action-reload";
 import { PwaPrompts } from "@/components/pwa-prompts";
+import { I18nProvider } from "@/lib/i18n/client";
+import { dictionaries, getLocale } from "@/lib/i18n/server";
 import { LEGACY_BROWSER_NOTICE_SCRIPT } from "@/lib/legacy-browser-notice";
 import { PWA_EARLY_CAPTURE_SCRIPT } from "@/lib/pwa-install-store";
 import "./globals.css";
@@ -66,14 +68,15 @@ const themeInitScript = `
 })();
 `;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
   return (
     <html
-      lang="es"
+      lang={locale}
       suppressHydrationWarning
       className={`${sans.variable} ${code.variable} h-full antialiased`}
     >
@@ -83,9 +86,11 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: PWA_EARLY_CAPTURE_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col bg-canvas text-ink font-sans">
-        <StaleActionReload />
-        {children}
-        <PwaPrompts />
+        <I18nProvider locale={locale} dictionary={dictionaries[locale]}>
+          <StaleActionReload />
+          {children}
+          <PwaPrompts />
+        </I18nProvider>
       </body>
     </html>
   );

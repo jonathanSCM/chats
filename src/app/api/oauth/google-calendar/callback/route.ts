@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/server/auth/guards";
 import { exchangeGoogleCalendarCode } from "@/server/services/google-calendar-user";
 
-const PROFILE_PATH = "/dashboard/perfil";
+const PROFILE_PATH = "/dashboard/ajustes";
 
 // NEXTAUTH_URL como base en vez de req.url -- detrás del proxy de Coolify,
 // req.url a veces resuelve al origen interno del contenedor (0.0.0.0:3000)

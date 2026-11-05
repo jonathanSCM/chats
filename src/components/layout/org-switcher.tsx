@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Building2, Check, ChevronDown } from "lucide-react";
 import { switchOrganizationAction } from "@/server/actions/organization-switch";
+import { useT } from "@/lib/i18n/client";
 
 export function OrgSwitcher({
   currentOrganizationId,
@@ -11,6 +12,7 @@ export function OrgSwitcher({
   currentOrganizationId: string;
   memberships: { organizationId: string; organizationName: string }[];
 }) {
+  const t = useT();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const current = memberships.find((m) => m.organizationId === currentOrganizationId);
@@ -32,11 +34,11 @@ export function OrgSwitcher({
         type="button"
         disabled={isPending}
         onClick={() => setOpen((v) => !v)}
-        title="Cambiar de organización"
+        title={t("Cambiar de organización")}
         className="nav-item flex h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-medium text-[var(--sidebar-ink)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-ink-strong)] disabled:opacity-50"
       >
         <Building2 size={18} className="shrink-0" />
-        <span className="nav-label flex-1 truncate text-left">{current?.organizationName ?? "Sin organización"}</span>
+        <span className="nav-label flex-1 truncate text-left">{current?.organizationName ?? t("Sin organización")}</span>
         <ChevronDown size={14} className="nav-extra shrink-0" />
       </button>
 
@@ -44,7 +46,7 @@ export function OrgSwitcher({
         <>
           <button
             type="button"
-            aria-label="Cerrar selector de organización"
+            aria-label={t("Cerrar selector de organización")}
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-10 cursor-default"
           />

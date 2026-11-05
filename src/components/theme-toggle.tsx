@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/lib/i18n/client";
 import { Sun, Moon } from "lucide-react";
 
 export function ThemeToggle() {
+  const t = useT();
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -22,10 +24,10 @@ export function ThemeToggle() {
     <button
       onClick={toggle}
       className="nav-item flex h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-medium text-[var(--sidebar-ink)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-ink-strong)]"
-      title={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+      title={isDark ? t("Cambiar a modo claro") : t("Cambiar a modo oscuro")}
     >
       {isDark ? <Sun size={18} /> : <Moon size={18} />}
-      <span className="nav-label">{isDark ? "Modo claro" : "Modo oscuro"}</span>
+      <span className="nav-label">{isDark ? t("Modo claro") : t("Modo oscuro")}</span>
     </button>
   );
 }

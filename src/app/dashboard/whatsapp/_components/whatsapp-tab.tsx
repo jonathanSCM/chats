@@ -23,6 +23,8 @@ export function WhatsAppTab({
     displayNumber?: string | null;
     coexistence?: boolean;
     historySyncStatus?: "NONE" | "PENDING" | "COMPLETE" | "DECLINED";
+    disconnectedAt?: Date | string | null;
+    disconnectReason?: string | null;
   } | null;
   readOnly?: boolean;
 }) {
@@ -50,6 +52,15 @@ export function WhatsAppTab({
           </div>
           {connection && (
             <p className=" text-xs text-ink-muted">phone_number_id: {connection.phoneNumberId}</p>
+          )}
+          {connection && !connection.verified && connection.disconnectedAt && (
+            <p className="mt-1 flex items-start gap-1.5 text-xs text-danger">
+              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+              <span>
+                {connection.disconnectReason ?? "El número se desconectó de la plataforma."} No se envía ni se recibe nada por
+                este número hasta que lo conectes de nuevo (botón de abajo).
+              </span>
+            </p>
           )}
           {connection?.coexistence && connection.historySyncStatus === "PENDING" && (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-warning">

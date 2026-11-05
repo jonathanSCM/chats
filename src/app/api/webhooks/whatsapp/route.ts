@@ -18,6 +18,7 @@ import {
   handleHistoryImport,
   handleContactSync,
 } from "@/server/services/conversation";
+import { handleAccountUpdate } from "@/server/services/whatsapp-connection-events";
 import { runJobsSoon } from "@/server/jobs";
 
 // Handshake de verificación que hace Meta al configurar el webhook.
@@ -116,13 +117,18 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Todavía no cambiamos nada en la base a partir de esto -- solo lo
-  // logueamos para tener visibilidad (recién se suscribió este campo). Ver
-  // doc de Meta "reconnect-offboarded-coexistence-clients": ACCOUNT_OFFBOARDED
-  // se recupera solo en minutos, no hace falta actuar sobre eso.
+  // PARTNER_REMOVED (desconectado desde el celular, por inactividad o por cambio de plan) marca la conexión como
+  // desconectada con su motivo; el resto de los eventos solo se registran. Ver doc de Meta
+  // "reconnect-offboarded-coexistence-clients": ACCOUNT_OFFBOARDED se recupera solo en minutos.
   const accountUpdates = parseAccountUpdate(payload);
   for (const update of accountUpdates) {
     console.log("[webhook] account_update (coexistence):", JSON.stringify(update));
+    try {
+      const marked = await handleAccountUpdate(update);
+      if (marked > 0) console.warn(`[webhook] ${update.event}: ${marked} conexión(es) de WhatsApp marcada(s) como desconectada(s).`);
+    } catch (error) {
+      console.error("[webhook] Error procesando account_update:", error);
+    }
   }
 
   const contacts = parseContactSync(payload);

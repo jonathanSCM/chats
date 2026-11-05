@@ -11,6 +11,7 @@ import {
   deleteMessageTemplate,
   type TemplateCategory,
 } from "@/server/services/whatsapp";
+import { unsubscribeConnectionFromMeta } from "@/server/services/whatsapp-connection-events";
 import type { ActionState } from "./types";
 
 async function requireOrgOwner() {
@@ -73,6 +74,8 @@ export async function connectWhatsAppAction(
       displayNumber,
       accessToken: encrypt(accessToken),
       verified: true,
+      disconnectedAt: null,
+      disconnectReason: null,
     },
   });
 
@@ -183,6 +186,7 @@ export async function setAiTestPhoneAction(botId: string, phone: string): Promis
 export async function disconnectBotWhatsAppAction(botId: string): Promise<ActionState> {
   const { bot } = await requireBotOwnerAccess(botId);
 
+  await unsubscribeConnectionFromMeta(bot.id);
   await prisma.whatsAppConnection.deleteMany({ where: { botId: bot.id } });
 
   revalidatePath("/dashboard/whatsapp");

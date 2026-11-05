@@ -113,6 +113,8 @@ export async function POST(req: NextRequest) {
         verified: true,
         coexistence: true,
         historySyncStatus: "PENDING",
+        disconnectedAt: null,
+        disconnectReason: null,
       },
     });
 

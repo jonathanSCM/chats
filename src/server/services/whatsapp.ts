@@ -1279,6 +1279,43 @@ export async function subscribeAppToWaba(params: {
   }
 }
 
+/**
+ * Le pide a Meta que deje de mandarle a esta app los avisos (webhooks) de la cuenta de WhatsApp Business -- se usa al
+ * desconectar un número desde el CRM. Para un número de Coexistence NO corta el enlace del celular con la plataforma
+ * (eso solo se hace en la app de WhatsApp Business: Ajustes > Cuenta > Plataforma empresarial > Desconectar). Es un
+ * intento: quien lo llama no debe fallar si Meta lo rechaza.
+ */
+export async function unsubscribeAppFromWaba(params: { wabaId: string; accessToken: string }): Promise<void> {
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${params.wabaId}/subscribed_apps`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${params.accessToken}` },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) {
+    throw new Error(`No se pudo cancelar la suscripción de la app a la WABA (${res.status}): ${await res.text()}`);
+  }
+}
+
+/** El motivo de un PARTNER_REMOVED en palabras de una persona (reason e initiated_by vienen de disconnection_info). */
+export function describeDisconnection(reason: string | null, initiatedBy: string | null): string {
+  const base =
+    initiatedBy === "USER"
+      ? "Se desconectó desde la app de WhatsApp Business del celular"
+      : initiatedBy === "SYSTEM"
+        ? "Meta desconectó el número"
+        : "El número se desconectó de la plataforma";
+  switch (reason) {
+    case "PRIMARY_INACTIVITY":
+      return `${base}: el celular principal estuvo inactivo demasiado tiempo (unos 14 días).`;
+    case "COMPANION_INACTIVITY":
+      return `${base}: un dispositivo vinculado estuvo inactivo demasiado tiempo (unos 30 días).`;
+    case "BUSINESS_DOWNGRADE":
+      return `${base}: la cuenta pasó a un plan de WhatsApp Business que no permite la API.`;
+    default:
+      return `${base}.`;
+  }
+}
+
 // ─── Perfil de negocio (foto, descripción, dirección, etc.) ─────
 //
 // Es el perfil que ve el cliente al abrir el chat — distinto del catálogo

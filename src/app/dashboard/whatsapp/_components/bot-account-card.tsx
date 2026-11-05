@@ -20,6 +20,8 @@ interface Connection {
   displayNumber?: string | null;
   coexistence?: boolean;
   historySyncStatus?: "NONE" | "PENDING" | "COMPLETE" | "DECLINED";
+  disconnectedAt?: Date | string | null;
+  disconnectReason?: string | null;
 }
 
 export function BotAccountCard({
@@ -139,7 +141,7 @@ export function BotAccountCard({
           </div>
         )}
 
-        {isOwner && connection?.verified && (
+        {isOwner && connection && (
           <button
             type="button"
             disabled={isPending}
@@ -157,10 +159,17 @@ export function BotAccountCard({
             className="flex shrink-0 cursor-pointer items-center gap-1 text-xs text-ink-faint hover:text-danger"
           >
             <Trash2 size={13} />
-            {confirmDelete ? "¿Seguro? Toca de nuevo" : "Desconectar"}
+            {confirmDelete ? "¿Seguro? Toca de nuevo" : connection.verified ? "Desconectar" : "Quitar conexión"}
           </button>
         )}
       </div>
+
+      {isOwner && connection?.verified && connection.coexistence && (
+        <p className="text-[11px] text-ink-faint">
+          Con Coexistence, «Desconectar» corta el número en el CRM. Para cortar también el enlace con Meta, desconéctalo además en la app de
+          WhatsApp Business del celular: Ajustes → Cuenta → Plataforma empresarial → Desconectar.
+        </p>
+      )}
 
       <WhatsAppTab botId={bot.id} connection={connection} readOnly={!isOwner} />
 

@@ -11,6 +11,7 @@ import { sendMail } from "@/server/services/mailer";
 import { inviteEmail } from "@/server/services/email-templates";
 import { addMembership, removeMembership } from "@/server/services/organization-membership";
 import { audit } from "@/server/services/audit";
+import { unsubscribeConnectionFromMeta } from "@/server/services/whatsapp-connection-events";
 import { seatBlockedMessage } from "@/server/services/org-limits";
 import { syncChildrenForMember } from "@/server/services/suborganizations";
 import type { ActionState } from "./types";
@@ -173,6 +174,7 @@ export async function disconnectWhatsAppAction(botId: string): Promise<ActionSta
   const bot = await prisma.bot.findUnique({ where: { id: botId }, select: { organizationId: true } });
   if (!bot) return { error: "Bot no encontrado" };
 
+  await unsubscribeConnectionFromMeta(botId);
   await prisma.whatsAppConnection.deleteMany({ where: { botId } });
   await audit({
     entityType: "WhatsAppConnection",

@@ -372,6 +372,10 @@ model WhatsAppConnection {
   accessToken       String            @db.Text // cifrado a nivel de aplicación
   verified          Boolean           @default(false)
   coexistence       Boolean           @default(false) // conectado vía Embedded Signup en modo Coexistence (mismo número también usado en la app de WhatsApp Business)
+  // Meta avisó (account_update PARTNER_REMOVED) que el número se desconectó de la plataforma -- p. ej. a mano desde el celular.
+  // Con verified = false no se envía nada; el motivo queda a la vista hasta que se reconecte o se quite la conexión.
+  disconnectedAt    DateTime?
+  disconnectReason  String?
   historySyncStatus HistorySyncStatus @default(NONE)
   // Dataset de la Conversions API para reportar de vuelta a Meta qué leads
   // de un anuncio terminaron en venta -- se crea una sola vez por WABA (la

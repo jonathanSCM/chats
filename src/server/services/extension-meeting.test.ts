@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const m = vi.hoisted(() => ({ findFirst: vi.fn() }));
+const m = vi.hoisted(() => ({ findFirst: vi.fn(), create: vi.fn(), update: vi.fn() }));
 
-vi.mock("@/server/db/client", () => ({ prisma: { meeting: { findFirst: m.findFirst } } }));
+vi.mock("@/server/db/client", () => ({ prisma: { meeting: { findFirst: m.findFirst, create: m.create, update: m.update } } }));
 
-import { isPlatformBotEmail, resolveExtensionOrganizationId } from "./extension-meeting";
+import { isPlatformBotEmail, resolveExtensionMeeting, resolveExtensionOrganizationId } from "./extension-meeting";
 
 const bot = { organizationId: "org-proshop", email: "meet-captions@internal.proshop.lat" };
 const person = { organizationId: "org-proshop", email: "vendedora@ejemplo.com" };
@@ -38,3 +38,31 @@ describe("resolveExtensionOrganizationId", () => {
     await expect(resolveExtensionOrganizationId(bot, "no es un link")).resolves.toBe("org-proshop");
   });
 });
+
+describe("por id de sesión del asistente", () => {
+  it("la organización sale de la reunión con ESA sesión, aunque otra organización use el mismo link", async () => {
+    m.findFirst.mockResolvedValueOnce({ organizationId: "org-peru" });
+    await expect(resolveExtensionOrganizationId(bot, "https://meet.google.com/abc-defg-hij", 321)).resolves.toBe("org-peru");
+    expect(m.findFirst).toHaveBeenCalledTimes(1);
+    expect(m.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { vexaSessionId: 321 } }));
+  });
+
+  it("si la sesión todavía no está guardada, usa el link como respaldo", async () => {
+    m.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ organizationId: "org-test" });
+    await expect(resolveExtensionOrganizationId(bot, "https://meet.google.com/abc-defg-hij", 999)).resolves.toBe("org-test");
+  });
+
+  it("una persona ignora el id de sesión: trabaja en su organización", async () => {
+    await expect(resolveExtensionOrganizationId(person, "https://meet.google.com/abc-defg-hij", 321)).resolves.toBe("org-proshop");
+    expect(m.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("la reunión se encuentra por la sesión dentro de la organización, sin crear una suelta", async () => {
+    m.findFirst.mockResolvedValueOnce({ id: "mtg-exacta", transcript: null, audioTranscript: null });
+    const resolved = await resolveExtensionMeeting({ organizationId: "org-peru", meetingUrl: "https://meet.google.com/abc-defg-hij", vexaSessionId: 321 });
+    expect(resolved.id).toBe("mtg-exacta");
+    expect(m.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ organizationId: "org-peru", vexaSessionId: 321 }) }));
+    expect(m.create).not.toHaveBeenCalled();
+  });
+});
+

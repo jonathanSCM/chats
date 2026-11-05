@@ -27,6 +27,8 @@ const bodySchema = z.object({
   // de la extensión, que solo llama una vez al final) sigue guardando el
   // adjunto como siempre; `false` solo actualiza el texto en la reunión.
   final: z.boolean().optional(),
+  // Solo lo manda el asistente (Vexa): id de su sesión, que el CRM guarda en cada reunión.
+  vexaSessionId: z.number().int().positive().nullable().optional(),
 });
 
 // El content script de la extensión corre pegado al origen de la propia
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return withCors(new NextResponse("Datos inválidos", { status: 400 }));
   }
-  const { meetingUrl, transcript, final } = parsed.data;
+  const { meetingUrl, transcript, final, vexaSessionId } = parsed.data;
 
   const token =
     req.headers.get("authorization")?.replace("Bearer ", "").trim() || parsed.data.token;
@@ -73,9 +75,10 @@ export async function POST(req: NextRequest) {
   }
 
   const resolved = await resolveExtensionMeeting({
-    organizationId: await resolveExtensionOrganizationId({ organizationId: user.organizationId, email: user.email }, meetingUrl),
+    organizationId: await resolveExtensionOrganizationId({ organizationId: user.organizationId, email: user.email }, meetingUrl, vexaSessionId),
     meetingUrl,
     recordedById: user.id,
+    vexaSessionId,
   });
 
   // No se pisa una transcripción que ya tenga contenido (por ej. si el bot

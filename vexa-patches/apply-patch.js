@@ -33,9 +33,20 @@ try {
   process.exit(1);
 }
 
+const INJECTED_VERSION = "session-id-v1"; // súbelo cuando cambie lo que se inyecta: se reemplaza el bloque anterior
 if (src.includes(MARKER)) {
-  console.log("[proshop-patch] Ya estaba parchado -- nada que hacer.");
-  process.exit(0);
+  if (src.includes(`/* ${INJECTED_VERSION} */`)) {
+    console.log("[proshop-patch] Ya estaba parchado con esta versión -- nada que hacer.");
+    process.exit(0);
+  }
+  // Versión anterior: se saca su bloque (una sola línea larga: el script va como literal JSON) y se inyecta de nuevo.
+  const OLD_BLOCK = /\n  \/\/ __PROSHOP_MEET_CAPTIONS_PATCH__\n(?:  \/\* [a-z0-9-]+ \*\/\n)?  if \(inv\.platform === 'google_meet'\) \{\n    await context\.addInitScript\(.*\)\.catch\(\(\) => \{\}\);\n  \}\n/;
+  if (!OLD_BLOCK.test(src)) {
+    console.error("[proshop-patch] Ya estaba parchado con una versión anterior pero no se pudo ubicar su bloque -- se deja como está.");
+    process.exit(0);
+  }
+  src = src.replace(OLD_BLOCK, "");
+  console.log("[proshop-patch] Reemplazando el parche anterior.");
 }
 
 const anchorIdx = src.indexOf(ANCHOR);
@@ -75,6 +86,12 @@ const browserCode = `(() => {
 
   function currentMeetingUrl() {
     return "https://meet.google.com" + window.location.pathname;
+  }
+
+  // Id de la sesión del bot en Vexa (lo pone el lado Node al inyectar el script). El CRM lo guarda en cada reunión,
+  // así sabe EXACTAMENTE de qué reunión y de qué organización es lo que se manda, sin depender del link de Meet.
+  function sessionId() {
+    return typeof window.__PROSHOP_SESSION_ID__ === "number" ? window.__PROSHOP_SESSION_ID__ : null;
   }
 
   function findButtonByName(regex) {
@@ -175,7 +192,7 @@ const browserCode = `(() => {
       var res = await fetch(APP_URL.replace(/\\/$/, "") + API_PATH, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + TOKEN },
-        body: JSON.stringify({ meetingUrl: currentMeetingUrl(), transcript: delta, final: !!isFinal }),
+        body: JSON.stringify({ meetingUrl: currentMeetingUrl(), vexaSessionId: sessionId(), transcript: delta, final: !!isFinal }),
       });
       lastSentIndex = finalizedLines.length;
       try { window.logBot && window.logBot("proshop-meet-captions: sendTranscript status=" + res.status); } catch (e2) {}
@@ -191,7 +208,7 @@ const browserCode = `(() => {
     if (p) delta = delta ? delta + String.fromCharCode(10) + p : p;
     delta = delta.trim();
     if (delta.length < 40) return;
-    var blob = new Blob([JSON.stringify({ meetingUrl: currentMeetingUrl(), transcript: delta, token: TOKEN, final: true })], { type: "application/json" });
+    var blob = new Blob([JSON.stringify({ meetingUrl: currentMeetingUrl(), vexaSessionId: sessionId(), transcript: delta, token: TOKEN, final: true })], { type: "application/json" });
     navigator.sendBeacon(APP_URL.replace(/\\/$/, "") + API_PATH, blob);
   });
 
@@ -217,7 +234,7 @@ const browserCode = `(() => {
       fetch(APP_URL.replace(/\\/$/, "") + COMMAND_PATH, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + TOKEN },
-        body: JSON.stringify({ meetingUrl: currentMeetingUrl(), command: "debug:" + msg }),
+        body: JSON.stringify({ meetingUrl: currentMeetingUrl(), vexaSessionId: sessionId(), command: "debug:" + msg }),
       }).catch(function () {});
     } catch (e) {}
   }
@@ -301,7 +318,7 @@ const browserCode = `(() => {
       var res = await fetch(APP_URL.replace(/\\/$/, "") + COMMAND_PATH, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + TOKEN },
-        body: JSON.stringify({ meetingUrl: currentMeetingUrl(), command: command }),
+        body: JSON.stringify({ meetingUrl: currentMeetingUrl(), vexaSessionId: sessionId(), command: command }),
       });
       var data = await res.json().catch(function () { return null; });
       var reply = (data && data.reply) || "Asistente: no pude procesar el comando (" + res.status + ").";
@@ -378,8 +395,9 @@ const browserCode = `(() => {
 // ambigüedad de escapado.
 const injected = `
   // ${MARKER}
+  /* ${INJECTED_VERSION} */
   if (inv.platform === 'google_meet') {
-    await context.addInitScript(${JSON.stringify(browserCode)}).catch(() => {});
+    await context.addInitScript("window.__PROSHOP_SESSION_ID__ = " + JSON.stringify(typeof inv.meeting_id === "number" ? inv.meeting_id : null) + ";\n" + ${JSON.stringify(browserCode)}).catch(() => {});
   }
 `;
 

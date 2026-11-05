@@ -19,6 +19,8 @@ import { AiCreditsError } from "@/server/services/ai/client";
 const bodySchema = z.object({
   meetingUrl: z.string().min(1).max(500),
   command: z.string().min(1).max(200),
+  // Id de la sesión del asistente en Vexa (lo manda el parche del bot): identifica la reunión exacta.
+  vexaSessionId: z.number().int().positive().nullable().optional(),
 });
 
 const ALLOWED_ORIGIN = "https://meet.google.com";
@@ -49,7 +51,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return withCors(new NextResponse("Datos inválidos", { status: 400 }));
   }
-  const { meetingUrl, command } = parsed.data;
+  const { meetingUrl, command, vexaSessionId } = parsed.data;
 
   const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
   if (!token) {
@@ -76,12 +78,13 @@ export async function POST(req: NextRequest) {
   // A diferencia de resolveExtensionMeeting (api/extension/transcript), acá
   // NO se crea una reunión si no existe -- un comando sin una reunión de bot
   // real detrás no tiene nada que ejecutar.
-  const organizationId = await resolveExtensionOrganizationId({ organizationId: user.organizationId, email: user.email }, meetingUrl);
+  const organizationId = await resolveExtensionOrganizationId({ organizationId: user.organizationId, email: user.email }, meetingUrl, vexaSessionId);
   const code = extractMeetCode(meetingUrl);
   const meeting = await prisma.meeting.findFirst({
     where: {
       organizationId,
-      meetingUrl: code ? { contains: code, mode: "insensitive" } : meetingUrl,
+      // Con el id de la sesión del asistente es EXACTAMENTE esa reunión; sin él, por el link de Meet.
+      ...(vexaSessionId ? { vexaSessionId } : { meetingUrl: code ? { contains: code, mode: "insensitive" as const } : meetingUrl }),
       status: { not: "CANCELED" },
       botStatus: { not: null },
     },

@@ -172,10 +172,14 @@
   // pestaña de Meet (mismo origen que sendTranscript, así que el fetch()
   // sale como si lo hiciera meet.google.com, sujeto a las mismas reglas de
   // CORS que ya resolvieron transcript/route.ts).
+  // Organización de esta reunión: se fija al tocar "Grabar" (aunque después se cambie la elegida en el popup o la activa del
+  // CRM, lo que se grabó acá sigue yendo a la misma). Sin elegir (cuenta de una sola organización) va null.
+  let lockedOrgId;
+
   function getStoredAuth() {
     return new Promise((resolve) => {
-      chrome.storage.local.get(["apiBase", "token"], ({ apiBase, token }) => {
-        resolve({ base: (apiBase || "https://chats.proshop.lat").replace(/\/$/, ""), token });
+      chrome.storage.local.get(["apiBase", "token", "orgId"], ({ apiBase, token, orgId }) => {
+        resolve({ base: (apiBase || "https://chats.proshop.lat").replace(/\/$/, ""), token, orgId: lockedOrgId !== undefined ? lockedOrgId : orgId || null });
       });
     });
   }
@@ -222,10 +226,10 @@
         return;
       }
       debounceTimer = setTimeout(async () => {
-        const { base, token } = await getStoredAuth();
+        const { base, token, orgId } = await getStoredAuth();
         if (!token) return;
         try {
-          const res = await fetch(`${base}/api/extension/opportunities/search?q=${encodeURIComponent(q)}`, {
+          const res = await fetch(`${base}/api/extension/opportunities/search?q=${encodeURIComponent(q)}${orgId ? `&organizationId=${encodeURIComponent(orgId)}` : ""}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           const data = await res.json();
@@ -257,13 +261,13 @@
     });
 
     async function postClassify(extra) {
-      const { base, token } = await getStoredAuth();
+      const { base, token, orgId } = await getStoredAuth();
       if (!token) return;
       try {
         await fetch(`${base}/api/extension/meetings/classify`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ meetingUrl, ...extra }),
+          body: JSON.stringify({ meetingUrl, ...(orgId ? { organizationId: orgId } : {}), ...extra }),
         });
       } catch (error) {
         console.error("[proshop-captions] No se pudo clasificar la reunión:", error);
@@ -289,7 +293,8 @@
     }
     sent = true;
 
-    chrome.storage.local.get(["apiBase", "token"], async ({ apiBase, token }) => {
+    chrome.storage.local.get(["apiBase", "token", "orgId"], async ({ apiBase, token, orgId: storedOrgId }) => {
+      const orgId = lockedOrgId !== undefined ? lockedOrgId : storedOrgId || null;
       if (!token) {
         console.warn("[proshop-captions] Sin token configurado — abrí el ícono de la extensión y pegalo.");
         return;
@@ -299,7 +304,7 @@
         const res = await fetch(base + API_PATH, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ meetingUrl, transcript }),
+          body: JSON.stringify({ meetingUrl, transcript, ...(orgId ? { organizationId: orgId } : {}) }),
         });
         console.log(`[proshop-captions] Transcripción enviada (${reason}):`, res.status);
       } catch (error) {
@@ -359,10 +364,11 @@
     if (!started || sent) return;
     const transcript = currentTranscript().trim();
     if (transcript.length < 40) return;
-    chrome.storage.local.get(["apiBase", "token"], ({ apiBase, token }) => {
+    chrome.storage.local.get(["apiBase", "token", "orgId"], ({ apiBase, token, orgId: storedOrgId }) => {
       if (!token) return;
+      const orgId = lockedOrgId !== undefined ? lockedOrgId : storedOrgId || null;
       const base = (apiBase || "https://chats.proshop.lat").replace(/\/$/, "");
-      const blob = new Blob([JSON.stringify({ meetingUrl, transcript, token })], {
+      const blob = new Blob([JSON.stringify({ meetingUrl, transcript, token, ...(orgId ? { organizationId: orgId } : {}) })], {
         type: "application/json",
       });
       navigator.sendBeacon(base + API_PATH, blob);
@@ -388,6 +394,7 @@
       return false;
     }
     if (message?.type === "START_RECORDING") {
+      if (lockedOrgId === undefined) lockedOrgId = message.organizationId || null;
       void start().then(() => sendResponse({ ok: true }));
       return true; // respuesta async
     }

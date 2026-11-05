@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
-import { resolveExtensionMeeting } from "@/server/services/extension-meeting";
+import { resolveExtensionMeeting, resolveExtensionOrg } from "@/server/services/extension-meeting";
 import { isMeetingBotEnabled, scheduleMeetingBotJoinNow } from "@/server/services/meeting-bot";
 
 /**
@@ -15,6 +15,8 @@ import { isMeetingBotEnabled, scheduleMeetingBotJoinNow } from "@/server/service
  */
 const bodySchema = z.object({
   meetingUrl: z.string().min(1).max(500),
+  // Organización elegida en el panel de la extensión; sin ella, la del link ya agendado o la activa del CRM.
+  organizationId: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -25,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { meetExtensionToken: token },
-    select: { id: true, organizationId: true },
+    select: { id: true, organizationId: true, email: true },
   });
   if (!user?.organizationId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -43,8 +45,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
   }
 
+  const org = await resolveExtensionOrg({
+    user: { id: user.id, organizationId: user.organizationId, email: user.email },
+    meetingUrl: parsed.data.meetingUrl,
+    requestedOrganizationId: parsed.data.organizationId,
+  });
+  if (!org.ok) return NextResponse.json({ error: org.error }, { status: 403 });
+
   const resolved = await resolveExtensionMeeting({
-    organizationId: user.organizationId,
+    organizationId: org.organizationId,
     meetingUrl: parsed.data.meetingUrl,
     recordedById: user.id,
   });

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
-import { resolveExtensionMeeting, resolveExtensionOrganizationId } from "@/server/services/extension-meeting";
+import { resolveExtensionMeeting, resolveExtensionOrg } from "@/server/services/extension-meeting";
 import { attemptAutoLinkMeeting } from "@/server/services/meeting-link";
 
 /**
@@ -29,6 +29,8 @@ const bodySchema = z.object({
   final: z.boolean().optional(),
   // Solo lo manda el asistente (Vexa): id de su sesión, que el CRM guarda en cada reunión.
   vexaSessionId: z.number().int().positive().nullable().optional(),
+  // Organización elegida en el panel de la extensión (fijada al empezar a grabar).
+  organizationId: z.string().optional(),
 });
 
 // El content script de la extensión corre pegado al origen de la propia
@@ -58,7 +60,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return withCors(new NextResponse("Datos inválidos", { status: 400 }));
   }
-  const { meetingUrl, transcript, final, vexaSessionId } = parsed.data;
+  const { meetingUrl, transcript, final, vexaSessionId, organizationId: requestedOrganizationId } = parsed.data;
 
   const token =
     req.headers.get("authorization")?.replace("Bearer ", "").trim() || parsed.data.token;
@@ -74,8 +76,16 @@ export async function POST(req: NextRequest) {
     return withCors(new NextResponse("Unauthorized", { status: 401 }));
   }
 
+  const org = await resolveExtensionOrg({
+    user: { id: user.id, organizationId: user.organizationId, email: user.email },
+    meetingUrl,
+    vexaSessionId,
+    requestedOrganizationId,
+  });
+  if (!org.ok) return withCors(new NextResponse(org.error, { status: 403 }));
+
   const resolved = await resolveExtensionMeeting({
-    organizationId: await resolveExtensionOrganizationId({ organizationId: user.organizationId, email: user.email }, meetingUrl, vexaSessionId),
+    organizationId: org.organizationId,
     meetingUrl,
     recordedById: user.id,
     vexaSessionId,

@@ -38,6 +38,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           type: "OFFSCREEN_START",
           streamId,
           meetingUrl: message.meetingUrl,
+          organizationId: message.organizationId || null,
         });
         if (started?.ok === false) {
           sendResponse({ ok: false, error: started.error });

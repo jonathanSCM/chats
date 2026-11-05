@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/server/db/client";
+import { resolveExtensionOrg } from "@/server/services/extension-meeting";
 
 /**
  * Búsqueda rápida de clientes/oportunidades para el panel que la extensión
@@ -30,11 +31,18 @@ export async function GET(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { meetExtensionToken: token },
-    select: { organizationId: true },
+    select: { id: true, organizationId: true, email: true },
   });
   if (!user?.organizationId) {
     return withCors(new NextResponse("Unauthorized", { status: 401 }));
   }
+  // Los clientes que se buscan son los de la organización elegida en el panel (no siempre la activa del CRM).
+  const org = await resolveExtensionOrg({
+    user: { id: user.id, organizationId: user.organizationId, email: user.email },
+    meetingUrl: "",
+    requestedOrganizationId: req.nextUrl.searchParams.get("organizationId"),
+  });
+  if (!org.ok) return withCors(new NextResponse(org.error, { status: 403 }));
 
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (q.length < 2) {
@@ -43,7 +51,7 @@ export async function GET(req: NextRequest) {
 
   const opportunities = await prisma.opportunity.findMany({
     where: {
-      organizationId: user.organizationId,
+      organizationId: org.organizationId,
       archivedAt: null,
       OR: [
         { title: { contains: q, mode: "insensitive" } },

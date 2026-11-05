@@ -9,6 +9,9 @@ const meetingText = document.getElementById("meetingText");
 const meetingStatus = document.getElementById("meetingStatus");
 const recordBtn = document.getElementById("recordBtn");
 const joinAssistantBtn = document.getElementById("joinAssistantBtn");
+const orgBox = document.getElementById("orgBox");
+const orgSelect = document.getElementById("orgSelect");
+const orgOnly = document.getElementById("orgOnly");
 const micBtn = document.getElementById("micBtn");
 const micStatus = document.getElementById("micStatus");
 
@@ -55,7 +58,47 @@ function renderAccount({ token, userName }) {
   }
 }
 
-chrome.storage.local.get(["token", "userName"], renderAccount);
+// Organización de esta reunión: si la cuenta tiene varias, se elige ANTES de grabar o de llamar al asistente (con una
+// reunión sin agendar no hay otra forma de saber a cuál va). La elegida se recuerda; sin elegir, la activa del CRM.
+async function loadOrganizations(token) {
+  orgBox.style.display = "none";
+  if (!token) return;
+  try {
+    const res = await fetch(`${CRM_BASE}/api/extension/me`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return;
+    const { organizations, activeOrganizationId } = await res.json();
+    if (!organizations || organizations.length === 0) return;
+    const { orgId } = await chrome.storage.local.get(["orgId"]);
+    const selected = organizations.some((o) => o.id === orgId) ? orgId : activeOrganizationId;
+    orgSelect.replaceChildren(
+      ...organizations.map((o) => {
+        const option = document.createElement("option");
+        option.value = o.id;
+        option.textContent = o.name;
+        return option;
+      }),
+    );
+    orgSelect.value = selected;
+    chrome.storage.local.set({ orgId: selected });
+    if (organizations.length === 1) {
+      orgSelect.style.display = "none";
+      orgOnly.style.display = "block";
+      orgOnly.textContent = `Organización: ${organizations[0].name}`;
+    } else {
+      orgSelect.style.display = "block";
+      orgOnly.style.display = "none";
+    }
+    orgBox.style.display = "block";
+  } catch (e) {
+    /* sin conexión: se usa la organización recordada / la activa */
+  }
+}
+orgSelect.addEventListener("change", () => chrome.storage.local.set({ orgId: orgSelect.value }));
+
+chrome.storage.local.get(["token", "userName"], (stored) => {
+  renderAccount(stored);
+  void loadOrganizations(stored.token);
+});
 
 loginBtn.addEventListener("click", () => {
   chrome.tabs.create({ url: `${CRM_BASE}/dashboard/extension-authorize` });
@@ -75,7 +118,10 @@ logoutBtn.addEventListener("click", () => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
   if (changes.token || changes.userName) {
-    chrome.storage.local.get(["token", "userName"], renderAccount);
+    chrome.storage.local.get(["token", "userName"], (stored) => {
+      renderAccount(stored);
+      void loadOrganizations(stored.token);
+    });
   }
 });
 
@@ -104,7 +150,8 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       recordBtn.addEventListener("click", () => {
         recordBtn.disabled = true;
 
-        chrome.tabs.sendMessage(tab.id, { type: "START_RECORDING" }, () => {
+        const organizationId = orgBox.style.display === "none" ? null : orgSelect.value;
+        chrome.tabs.sendMessage(tab.id, { type: "START_RECORDING", organizationId }, () => {
           meetingText.innerHTML = '<span class="dot"></span>Grabando esta reunión.';
           recordBtn.style.display = "none";
           meetingStatus.textContent = "Subtítulos activados.";
@@ -114,7 +161,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
         // Audio real para whisper.cpp, además de los subtítulos -- best
         // effort: si tabCapture falla por lo que sea, los subtítulos de
         // arriba siguen andando igual, no se cae toda la grabación por esto.
-        chrome.runtime.sendMessage({ type: "START_AUDIO_CAPTURE", tabId: tab.id, meetingUrl }, (response) => {
+        chrome.runtime.sendMessage({ type: "START_AUDIO_CAPTURE", tabId: tab.id, meetingUrl, organizationId }, (response) => {
           if (chrome.runtime.lastError || !response?.ok) {
             meetingStatus.textContent += " Audio: no se pudo activar (sigue grabando solo subtítulos).";
             return;
@@ -140,7 +187,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
         fetch(`${base}/api/extension/join-bot`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ meetingUrl }),
+          body: JSON.stringify({ meetingUrl, organizationId: orgBox.style.display === "none" ? undefined : orgSelect.value }),
         })
           .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
           .then(({ ok, data }) => {

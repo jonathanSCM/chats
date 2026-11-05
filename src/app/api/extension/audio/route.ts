@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
-import { resolveExtensionMeeting, resolveExtensionOrganizationId } from "@/server/services/extension-meeting";
+import { resolveExtensionMeeting, resolveExtensionOrg } from "@/server/services/extension-meeting";
 import { transcribeAudioViaBotService } from "@/server/services/meeting-bot";
 
 /**
@@ -43,8 +43,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Audio vacío" }, { status: 400 });
   }
 
+  const org = await resolveExtensionOrg({
+    user: { id: user.id, organizationId: user.organizationId, email: user.email },
+    meetingUrl,
+    requestedOrganizationId: req.headers.get("x-organization-id"),
+  });
+  if (!org.ok) return NextResponse.json({ error: org.error }, { status: 403 });
+
   const resolved = await resolveExtensionMeeting({
-    organizationId: await resolveExtensionOrganizationId({ organizationId: user.organizationId, email: user.email }, meetingUrl),
+    organizationId: org.organizationId,
     meetingUrl,
     recordedById: user.id,
   });

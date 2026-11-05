@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
-import { resolveExtensionMeeting } from "@/server/services/extension-meeting";
+import { resolveExtensionMeeting, resolveExtensionOrg } from "@/server/services/extension-meeting";
 import { audit } from "@/server/services/audit";
 import { getOrgStages, defaultEntryStage } from "@/server/services/pipeline";
 
@@ -18,6 +18,7 @@ const bodySchema = z.object({
   newContactPhone: z.string().max(50).optional(),
   newOpportunityTitle: z.string().max(200).optional(),
   title: z.string().max(200).optional(),
+  organizationId: z.string().optional(),
 });
 
 const ALLOWED_ORIGIN = "https://meet.google.com";
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return withCors(new NextResponse("Datos inválidos", { status: 400 }));
   }
-  const { meetingUrl, opportunityId, newContactName, newContactPhone, newOpportunityTitle, title } = parsed.data;
+  const { meetingUrl, opportunityId, newContactName, newContactPhone, newOpportunityTitle, title, organizationId: requestedOrganizationId } = parsed.data;
 
   const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
   if (!token) {
@@ -47,12 +48,19 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { meetExtensionToken: token },
-    select: { id: true, organizationId: true },
+    select: { id: true, organizationId: true, email: true },
   });
   if (!user?.organizationId) {
     return withCors(new NextResponse("Unauthorized", { status: 401 }));
   }
-  const { organizationId, id: userId } = user;
+  const { id: userId } = user;
+  const org = await resolveExtensionOrg({
+    user: { id: user.id, organizationId: user.organizationId, email: user.email },
+    meetingUrl,
+    requestedOrganizationId,
+  });
+  if (!org.ok) return withCors(new NextResponse(org.error, { status: 403 }));
+  const organizationId = org.organizationId;
 
   const resolved = await resolveExtensionMeeting({ organizationId, meetingUrl, recordedById: userId });
 

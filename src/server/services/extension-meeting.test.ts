@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const m = vi.hoisted(() => ({ findFirst: vi.fn(), create: vi.fn(), update: vi.fn() }));
+const m = vi.hoisted(() => ({ findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), memberFind: vi.fn(), memberMany: vi.fn() }));
 
-vi.mock("@/server/db/client", () => ({ prisma: { meeting: { findFirst: m.findFirst, create: m.create, update: m.update } } }));
+vi.mock("@/server/db/client", () => ({
+  prisma: {
+    meeting: { findFirst: m.findFirst, create: m.create, update: m.update },
+    organizationMembership: { findUnique: m.memberFind, findMany: m.memberMany },
+  },
+}));
 
-import { isPlatformBotEmail, resolveExtensionMeeting, resolveExtensionOrganizationId } from "./extension-meeting";
+import { isPlatformBotEmail, resolveExtensionMeeting, resolveExtensionOrg, resolveExtensionOrganizationId } from "./extension-meeting";
 
 const bot = { organizationId: "org-proshop", email: "meet-captions@internal.proshop.lat" };
 const person = { organizationId: "org-proshop", email: "vendedora@ejemplo.com" };
@@ -63,6 +68,51 @@ describe("por id de sesión del asistente", () => {
     expect(resolved.id).toBe("mtg-exacta");
     expect(m.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ organizationId: "org-peru", vexaSessionId: 321 }) }));
     expect(m.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveExtensionOrg (persona con varias organizaciones)", () => {
+  const me = { id: "u1", organizationId: "org-a", email: "vendedora@ejemplo.com" };
+  const url = "https://meet.google.com/abc-defg-hij";
+
+  it("usa la organización que ELIGIÓ si pertenece a ella (reunión de emergencia, sin agendar)", async () => {
+    m.memberFind.mockResolvedValue({ id: "mem1" });
+    await expect(resolveExtensionOrg({ user: me, meetingUrl: url, requestedOrganizationId: "org-b" })).resolves.toEqual({ ok: true, organizationId: "org-b" });
+    expect(m.memberFind).toHaveBeenCalledWith(expect.objectContaining({ where: { userId_organizationId: { userId: "u1", organizationId: "org-b" } } }));
+  });
+
+  it("rechaza una organización a la que no pertenece", async () => {
+    m.memberFind.mockResolvedValue(null);
+    await expect(resolveExtensionOrg({ user: me, meetingUrl: url, requestedOrganizationId: "org-ajena" })).resolves.toEqual({ ok: false, error: expect.stringMatching(/No perteneces/) });
+  });
+
+  it("si elige la activa no consulta nada más", async () => {
+    await expect(resolveExtensionOrg({ user: me, meetingUrl: url, requestedOrganizationId: "org-a" })).resolves.toEqual({ ok: true, organizationId: "org-a" });
+    expect(m.memberFind).not.toHaveBeenCalled();
+  });
+
+  it("sin elegir: la organización activa si ahí está agendada la reunión", async () => {
+    m.findFirst.mockResolvedValueOnce({ id: "mtg" });
+    await expect(resolveExtensionOrg({ user: me, meetingUrl: url })).resolves.toEqual({ ok: true, organizationId: "org-a" });
+  });
+
+  it("sin elegir: otra organización suya donde la reunión ya está agendada", async () => {
+    m.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ organizationId: "org-b" });
+    m.memberMany.mockResolvedValue([{ organizationId: "org-a" }, { organizationId: "org-b" }]);
+    await expect(resolveExtensionOrg({ user: me, meetingUrl: url })).resolves.toEqual({ ok: true, organizationId: "org-b" });
+  });
+
+  it("sin elegir y sin agendar en ninguna: la activa", async () => {
+    m.findFirst.mockResolvedValue(null);
+    m.memberMany.mockResolvedValue([{ organizationId: "org-a" }, { organizationId: "org-b" }]);
+    await expect(resolveExtensionOrg({ user: me, meetingUrl: url })).resolves.toEqual({ ok: true, organizationId: "org-a" });
+  });
+
+  it("la cuenta interna del asistente no pasa por aquí: sigue su propia regla", async () => {
+    m.findFirst.mockResolvedValueOnce({ organizationId: "org-peru" });
+    const bot = { id: "bot", organizationId: "org-proshop", email: "meet-captions@internal.proshop.lat" };
+    await expect(resolveExtensionOrg({ user: bot, meetingUrl: url, vexaSessionId: 5, requestedOrganizationId: "org-otra" })).resolves.toEqual({ ok: true, organizationId: "org-peru" });
+    expect(m.memberFind).not.toHaveBeenCalled();
   });
 });
 

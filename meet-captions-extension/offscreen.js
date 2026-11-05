@@ -10,6 +10,7 @@ let audioContext = null;
 let mediaRecorder = null;
 let chunks = [];
 let meetingUrl = null;
+let organizationId = null;
 let micStream = null;
 let tabStream = null;
 
@@ -39,7 +40,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // Antes esto era "dispara y olvida" -- background.js nunca sabía si la
     // grabación había arrancado de verdad, así que el popup siempre mostraba
     // "Audio activado" aunque tabCapture hubiera fallado en silencio.
-    startRecording(message.streamId, message.meetingUrl)
+    startRecording(message.streamId, message.meetingUrl, message.organizationId)
       .then(() => sendResponse({ ok: true }))
       .catch((error) => sendResponse({ ok: false, error: String(error) }));
     return true; // respuesta async
@@ -56,10 +57,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-async function startRecording(streamId, url) {
+async function startRecording(streamId, url, orgId) {
   if (mediaRecorder && mediaRecorder.state !== "inactive") return; // ya está grabando
 
   meetingUrl = url;
+  organizationId = orgId || null;
   chunks = [];
 
   // Antes, si esto tiraba error (streamId vencido, otra captura ya activa
@@ -156,6 +158,7 @@ async function stopRecording() {
       headers: {
         Authorization: `Bearer ${token}`,
         "X-Meeting-Url": meetingUrl || "",
+        ...(organizationId ? { "X-Organization-Id": organizationId } : {}),
         "Content-Type": "audio/webm",
       },
       body: blob,

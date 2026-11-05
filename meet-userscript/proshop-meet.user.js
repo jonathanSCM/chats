@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ProShop CRM — Subtítulos de Meet
 // @namespace    https://chats.proshop.lat
-// @version      1.1.0
+// @version      1.2.0
 // @description  Lee los subtítulos de Google Meet y los manda al CRM, o avisa al asistente para que entre solo. Se conecta con tu sesión del CRM (sin pegar tokens). Sin audio: eso solo lo hace la extensión de Chrome.
 // @match        https://meet.google.com/*
 // @match        https://chats.proshop.lat/dashboard/extension-authorize*
@@ -22,10 +22,14 @@
 
   const CRM_BASE = "https://chats.proshop.lat";
   const AUTHORIZE_URL = `${CRM_BASE}/dashboard/extension-authorize`;
-  const API = { transcript: "/api/extension/transcript", join: "/api/extension/join-bot", classify: "/api/extension/meetings/classify", search: "/api/extension/opportunities/search" };
+  const API = { me: "/api/extension/me", transcript: "/api/extension/transcript", join: "/api/extension/join-bot", classify: "/api/extension/meetings/classify", search: "/api/extension/opportunities/search" };
 
   const getToken = () => GM_getValue("token", "") || "";
   const getName = () => GM_getValue("userName", "") || "";
+  // Organización elegida en el panel (se recuerda). Sin elegir (cuenta de una sola organización) es null y el servidor usa la
+  // organización donde la reunión ya está agendada, o la activa del CRM.
+  const getOrgId = () => GM_getValue("orgId", "") || null;
+  const withOrg = (orgId) => (orgId ? { organizationId: orgId } : {});
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // ── Estilos y constructor de elementos (sin innerHTML)
@@ -104,6 +108,7 @@
       code,
       meetingUrl: `https://meet.google.com/${code}`,
       started: false,
+      orgId: null, // se fija al tocar «Grabar»: lo que se grabó acá sigue yendo a esa organización
       sent: false,
       ticks: 0,
       endSignals: 0,
@@ -221,7 +226,7 @@
     }
     session.sent = true;
     const s = session;
-    request("POST", API.transcript, { meetingUrl: s.meetingUrl, transcript }, (status) => {
+    request("POST", API.transcript, { meetingUrl: s.meetingUrl, transcript, ...withOrg(s.orgId) }, (status) => {
       console.log(`[ProShop] Transcripción enviada (${reason}):`, status);
       if (status === 0 || status >= 500) s.sent = false; // se reintenta en el próximo aviso de fin
       if (status === 401) GM_deleteValue("token");
@@ -256,6 +261,7 @@
   async function startRecording() {
     if (!session || session.started) return;
     session.started = true;
+    session.orgId = getOrgId();
     ensureBadge();
     await sleep(500);
     await enableCaptions();
@@ -305,6 +311,40 @@
     account.append(accountText, connectBtn, logoutBtn);
     panelEl.appendChild(account);
 
+    const orgBox = el("div", "margin-bottom:10px;display:none;");
+    orgBox.appendChild(el("label", "display:block;font-size:11px;color:#667781;margin-bottom:4px;", "Organización de esta reunión"));
+    const orgSelect = el("select", "width:100%;padding:7px 8px;border:1px solid #e9edef;border-radius:6px;font:inherit;");
+    const orgOnly = el("div", "font-size:12px;display:none;");
+    orgBox.append(orgSelect, orgOnly);
+    panelEl.appendChild(orgBox);
+    orgSelect.addEventListener("change", () => GM_setValue("orgId", orgSelect.value));
+
+    function loadOrganizations() {
+      orgBox.style.display = "none";
+      if (!getToken()) return;
+      request("GET", API.me, null, (statusCode, text) => {
+        let data = null;
+        try { data = JSON.parse(text); } catch (e) { /* sin datos */ }
+        if (!data || !data.organizations || data.organizations.length === 0) return;
+        const saved = getOrgId();
+        const selected = data.organizations.some((o) => o.id === saved) ? saved : data.activeOrganizationId;
+        orgSelect.replaceChildren();
+        for (const o of data.organizations) {
+          const option = el("option", "", o.name);
+          option.value = o.id;
+          orgSelect.appendChild(option);
+        }
+        orgSelect.value = selected;
+        GM_setValue("orgId", selected);
+        const several = data.organizations.length > 1;
+        orgSelect.style.display = several ? "block" : "none";
+        orgOnly.style.display = several ? "none" : "block";
+        if (!several) orgOnly.textContent = `Organización: ${data.organizations[0].name}`;
+        orgBox.style.display = "block";
+        refresh();
+      });
+    }
+
     const recordBtn = el("button", BTN("#c62828") + "margin-bottom:6px;", "Grabar esta reunión");
     const joinBtn = el("button", BTN("#00a884"), "Unir al asistente");
     const status = el("div", "font-size:11px;color:#059669;margin-top:8px;min-height:14px;");
@@ -329,6 +369,7 @@
     document.body.appendChild(panelEl);
     panelRefresh = refresh;
     refresh();
+    loadOrganizations();
 
     recordBtn.addEventListener("click", () => {
       void startRecording();
@@ -341,7 +382,7 @@
         return;
       }
       joinBtn.disabled = true;
-      request("POST", API.join, { meetingUrl: session.meetingUrl }, (statusCode) => {
+      request("POST", API.join, { meetingUrl: session.meetingUrl, ...withOrg(getOrgId()) }, (statusCode) => {
         if (statusCode === 401) GM_deleteValue("token");
         if (!statusCode || statusCode >= 400) {
           joinBtn.disabled = false;
@@ -358,6 +399,7 @@
   function showClassifyPanel() {
     if (classifyEl && classifyEl.isConnected) return;
     const meetingUrl = session.meetingUrl;
+    const orgForClassify = session.orgId || getOrgId();
     classifyEl = el("div", `position:fixed;bottom:16px;right:16px;z-index:999999;width:310px;background:#fff;color:#111b21;${FONT}border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);padding:14px;`);
     const panel = classifyEl;
     const close = () => {
@@ -390,7 +432,7 @@
     });
 
     const classify = (extra) => {
-      if (getToken()) request("POST", API.classify, { meetingUrl, ...extra });
+      if (getToken()) request("POST", API.classify, { meetingUrl, ...withOrg(orgForClassify), ...extra });
     };
 
     let debounce = null;
@@ -401,7 +443,7 @@
       if (q.length < 2) return;
       debounce = setTimeout(() => {
         if (!getToken()) return;
-        request("GET", `${API.search}?q=${encodeURIComponent(q)}`, null, (statusCode, text) => {
+        request("GET", `${API.search}?q=${encodeURIComponent(q)}${orgForClassify ? `&organizationId=${encodeURIComponent(orgForClassify)}` : ""}`, null, (statusCode, text) => {
           let data = {};
           try {
             data = JSON.parse(text);
@@ -452,7 +494,7 @@
     if (!session || !session.started || session.sent) return;
     const transcript = currentTranscript().trim();
     if (transcript.length < 40 || !getToken()) return;
-    navigator.sendBeacon(CRM_BASE + API.transcript, new Blob([JSON.stringify({ meetingUrl: session.meetingUrl, transcript, token: getToken() })], { type: "application/json" }));
+    navigator.sendBeacon(CRM_BASE + API.transcript, new Blob([JSON.stringify({ meetingUrl: session.meetingUrl, transcript, token: getToken(), ...withOrg(session.orgId) })], { type: "application/json" }));
   });
 
   // Si el token cambia (se conectó desde la otra pestaña), el panel abierto se actualiza solo.

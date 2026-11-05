@@ -33,7 +33,7 @@ try {
   process.exit(1);
 }
 
-const INJECTED_VERSION = "session-id-v1"; // súbelo cuando cambie lo que se inyecta: se reemplaza el bloque anterior
+const INJECTED_VERSION = "session-id-v2"; // súbelo cuando cambie lo que se inyecta: se reemplaza el bloque anterior
 if (src.includes(MARKER)) {
   if (src.includes(`/* ${INJECTED_VERSION} */`)) {
     console.log("[proshop-patch] Ya estaba parchado con esta versión -- nada que hacer.");
@@ -397,7 +397,7 @@ const injected = `
   // ${MARKER}
   /* ${INJECTED_VERSION} */
   if (inv.platform === 'google_meet') {
-    await context.addInitScript("window.__PROSHOP_SESSION_ID__ = " + JSON.stringify(typeof inv.meeting_id === "number" ? inv.meeting_id : null) + ";\n" + ${JSON.stringify(browserCode)}).catch(() => {});
+    await context.addInitScript("window.__PROSHOP_SESSION_ID__ = " + JSON.stringify(typeof inv.meeting_id === "number" ? inv.meeting_id : null) + ";\\n" + ${JSON.stringify(browserCode)}).catch(() => {});
   }
 `;
 

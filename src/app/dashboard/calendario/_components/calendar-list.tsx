@@ -4,6 +4,8 @@ import Link from "next/link";
 import { CalendarDays, Clock, Copy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { vendorColor } from "@/lib/vendor-color";
+import { formatTimeIn, useOrgTimeZone } from "@/components/org-time";
+import { useLocale } from "@/lib/i18n/client";
 
 export interface MeetingRow {
   id: string;
@@ -43,10 +45,6 @@ function dayLabel(iso: string): { text: string; color: string } {
     text: date.toLocaleDateString("es", { weekday: "long", day: "2-digit", month: "2-digit" }),
     color: "var(--color-ink-faint)",
   };
-}
-
-function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 }
 
 // Día calendario LOCAL de la reunión — no .slice(0,10) del ISO crudo
@@ -99,10 +97,12 @@ export function CalendarList({ rows }: { rows: MeetingRow[] }) {
 }
 
 function MeetingCard({ m }: { m: MeetingRow }) {
+  const orgTimeZone = useOrgTimeZone();
+  const locale = useLocale();
   return (
     <Card className="flex flex-wrap items-center gap-3 py-3">
       <div className="flex w-16 shrink-0 items-center gap-1 text-sm text-ink">
-        <Clock size={13} className="text-ink-faint" /> {timeLabel(m.scheduledAt)}
+        <Clock size={13} className="text-ink-faint" /> {formatTimeIn(m.scheduledAt, orgTimeZone, locale)}
       </div>
 
       <div className="min-w-0 flex-1">

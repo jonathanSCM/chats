@@ -132,6 +132,12 @@ async function getCalendarClientForUser(userId: string): Promise<{ calendar: cal
   return { calendar: google.calendar({ version: "v3", auth: client }), accountId: account.id };
 }
 
+/** La zona horaria de la organización activa de esa persona (para marcar la zona de los eventos que se le crean). */
+async function timeZoneOfUserOrg(userId: string): Promise<string | undefined> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { organization: { select: { timezone: true } } } });
+  return user?.organization?.timezone || undefined;
+}
+
 export async function hasGoogleCalendarConnected(userId: string): Promise<boolean> {
   const account = await prisma.googleCalendarAccount.findUnique({ where: { userId }, select: { id: true } });
   return Boolean(account);
@@ -159,6 +165,7 @@ export async function createUserMeetEvent({
   attendeeEmails,
   existingMeetingUrl,
   generateMeetLink,
+  timeZone,
 }: {
   userId: string;
   summary: string;
@@ -167,10 +174,13 @@ export async function createUserMeetEvent({
   attendeeEmails?: string[];
   existingMeetingUrl?: string | null;
   generateMeetLink?: boolean;
+  /** Zona horaria del evento; sin ella, la de la organización activa de la persona. */
+  timeZone?: string;
 }): Promise<CreatedUserMeetEvent> {
   const client = await getCalendarClientForUser(userId);
   if (!client) throw new Error("Este usuario no tiene Google Calendar conectado.");
   const endAt = new Date(scheduledAt.getTime() + durationMinutes * 60_000);
+  const tz = timeZone ?? (await timeZoneOfUserOrg(userId));
 
   const res = await client.calendar.events.insert({
     calendarId: "primary",
@@ -179,8 +189,8 @@ export async function createUserMeetEvent({
     requestBody: {
       summary,
       ...proshopEventStyle(),
-      start: { dateTime: scheduledAt.toISOString() },
-      end: { dateTime: endAt.toISOString() },
+      start: { dateTime: scheduledAt.toISOString(), ...(tz ? { timeZone: tz } : {}) },
+      end: { dateTime: endAt.toISOString(), ...(tz ? { timeZone: tz } : {}) },
       location: existingMeetingUrl ?? undefined,
       conferenceData:
         generateMeetLink && !existingMeetingUrl
@@ -201,20 +211,27 @@ export async function updateUserMeetEvent({
   eventId,
   scheduledAt,
   durationMinutes,
+  timeZone,
 }: {
   userId: string;
   eventId: string;
   scheduledAt: Date;
   durationMinutes: number;
+  /** Zona horaria del evento; sin ella, la de la organización activa de la persona. */
+  timeZone?: string;
 }): Promise<void> {
   const client = await getCalendarClientForUser(userId);
   if (!client) return;
   const endAt = new Date(scheduledAt.getTime() + durationMinutes * 60_000);
+  const tz = timeZone ?? (await timeZoneOfUserOrg(userId));
   await client.calendar.events.patch({
     calendarId: "primary",
     eventId,
     sendUpdates: "all",
-    requestBody: { start: { dateTime: scheduledAt.toISOString() }, end: { dateTime: endAt.toISOString() } },
+    requestBody: {
+      start: { dateTime: scheduledAt.toISOString(), ...(tz ? { timeZone: tz } : {}) },
+      end: { dateTime: endAt.toISOString(), ...(tz ? { timeZone: tz } : {}) },
+    },
   });
 }
 

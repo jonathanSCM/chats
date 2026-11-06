@@ -3,6 +3,7 @@
 import { useActionState, useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { SlowActionNotice, useSlowPending } from "@/components/slow-action-notice";
+import { MeetingWhen } from "@/components/org-time";
 import {
   X,
   StickyNote,
@@ -983,12 +984,7 @@ function MeetingsPanel({
               )}
               <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
                 <span className="">
-                  {new Date(m.scheduledAt).toLocaleString("es", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}{" "}
+                  <MeetingWhen iso={m.scheduledAt} />{" "}
                   · {m.status}
                 </span>
                 {m.meetingUrl && (

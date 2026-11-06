@@ -9,6 +9,7 @@ import { Input, Select } from "@/components/ui/input";
 import { LOSS_REASON_LABEL, type LossReason } from "@/lib/pipeline";
 import { vendorColor } from "@/lib/vendor-color";
 import { STATUS_COLOR } from "@/lib/status-colors";
+import { MeetingWhen } from "@/components/org-time";
 
 interface UpcomingMeeting {
   id: string;
@@ -454,12 +455,7 @@ export function DashboardClient({
                 className="flex items-center gap-3 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-surface-2/60"
               >
                 <span className="w-28 shrink-0 text-xs text-ink-muted">
-                  {new Date(m.scheduledAt).toLocaleDateString("es", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  <MeetingWhen iso={m.scheduledAt} />
                 </span>
                 <span className="flex-1 truncate text-ink">{m.client}</span>
                 {m.isInternal && (

@@ -188,6 +188,7 @@ export const en: Record<string, string> = {
   "Reconectar con Facebook": "Reconnect with Facebook",
   "Conectar con Facebook": "Connect with Facebook",
   Editar: "Edit",
+  "hora de {zone}": "{zone} time",
 
   // Organización: pestañas (se traducen por variable, el test no las ve), subtítulo y filas de Integraciones
   General: "General",

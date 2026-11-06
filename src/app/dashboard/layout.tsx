@@ -25,6 +25,7 @@ import { SidebarToggle } from "@/components/layout/sidebar-toggle";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-switch";
+import { OrgTimeZoneProvider } from "@/components/org-time";
 import { getT } from "@/lib/i18n/server";
 import { ServerClock } from "@/components/layout/server-clock";
 import { OrgSwitcher } from "@/components/layout/org-switcher";
@@ -238,7 +239,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               </p>
             </div>
           ) : (
-            children
+            <OrgTimeZoneProvider timeZone={serverTimeZone}>{children}</OrgTimeZoneProvider>
           )}
         </main>
       </div>

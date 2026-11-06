@@ -7,6 +7,8 @@ import { notifyNewMessage } from "@/server/services/push";
 import { getOrgStages, defaultEntryStage } from "@/server/services/pipeline";
 import { getAvailableDays, getAvailableSlots, hasSchedulingConflict, formatSlotLabel } from "@/server/services/availability";
 import { createCalendarEvent, getOrCreateOrgCalendar, isGoogleMeetEnabled } from "@/server/services/google-calendar";
+import { createUserMeetEvent, hasGoogleCalendarConnected } from "@/server/services/google-calendar-user";
+import { zoneLabel } from "@/lib/timezone";
 import { linkAttributionToOpportunity } from "@/server/services/meta-attribution";
 import { autoAssignLead } from "@/server/services/lead-assignment";
 import { MODELS, runStructured } from "./client";
@@ -358,6 +360,16 @@ async function ensureOpportunity(
   return created.id;
 }
 
+/** Por qué falló Google Calendar, corto y legible (va a las notas de la reunión y al aviso). */
+function describeCalendarError(error: unknown): string {
+  const code = (error as { code?: number }).code;
+  const message = error instanceof Error ? error.message : String(error);
+  if (code === 404) return "el calendario ya no existe en Google (404).";
+  if (code === 401 || /invalid_grant/i.test(message)) return "la conexión con Google venció o fue revocada: vuelve a conectar el calendario.";
+  if (code === 403) return "Google rechazó el permiso o se excedió la cuota (403).";
+  return `${message.slice(0, 140)}${message.length > 140 ? "…" : ""}`;
+}
+
 async function sendAndSave(conversation: ConversationForBot, text: string): Promise<void> {
   const { messageId } = await sendTextMessage({
     phoneNumberId: conversation.phoneNumberId,
@@ -451,7 +463,7 @@ export async function sendHourList(conversationId: string, dateKey: string): Pro
   const rows: InteractiveListRow[] = slots.map((slot) => ({ id: `slot:${slot.date.toISOString()}`, title: slot.label.slice(0, 24) }));
   await sendListAndSave(
     conversation,
-    { bodyText: "Perfecto 👍 Estos son los horarios libres ese día.", buttonText: "Ver horarios", sectionTitle: "Horarios disponibles", rows },
+    { bodyText: `Perfecto 👍 Estos son los horarios libres ese día (hora de ${zoneLabel(conversation.timezone)}).`, buttonText: "Ver horarios", sectionTitle: "Horarios disponibles", rows },
     `[Lista de horarios] ${slots.map((s) => s.label).join(" · ")}`,
   );
 }
@@ -534,13 +546,36 @@ export async function confirmMeetingSlot(conversationId: string, isoDate: string
   const title = `Reunión de diagnóstico — ${conversation.contact?.fullName || conversation.contact?.phone || "Lead"}`;
 
   // El bot agenda solo -- no hay nadie eligiendo modalidad (Meet, llamada,
-  // presencial), así que no le inventamos un link de Meet. Igual se crea el
-  // evento en el calendario compartido de la organización para que la
-  // reunión bloquee el horario y sea visible para el equipo, no solo en el
-  // CRM. Si Calendar falla, no se bloquea el agendamiento -- la reunión
-  // queda igual en el CRM, solo sin sincronizar (se loguea el error).
+  // presencial), así que no le inventamos un link de Meet. El evento se crea
+  // en el Google Calendar PERSONAL del vendedor asignado si lo conectó (así
+  // queda en su agenda y se sincroniza en las dos direcciones); si no, en el
+  // calendario compartido de la organización. Si Calendar falla, no se
+  // bloquea el agendamiento -- la reunión queda en el CRM pero se deja
+  // escrito en sus notas por qué no se sincronizó (antes solo iba a la consola
+  // del servidor y nadie se enteraba).
   let googleEventId: string | null = null;
-  if (isGoogleMeetEnabled()) {
+  let googleCalendarOwnerId: string | null = null;
+  let syncError: string | null = null;
+
+  const sellerId = conversation.assignedToId ?? (opportunityId ? (await prisma.opportunity.findUnique({ where: { id: opportunityId }, select: { assignedToId: true } }))?.assignedToId ?? null : null);
+  if (sellerId && (await hasGoogleCalendarConnected(sellerId))) {
+    try {
+      const event = await createUserMeetEvent({
+        userId: sellerId,
+        summary: title,
+        scheduledAt: slotDate,
+        durationMinutes: org.bookingDurationMinutes,
+        timeZone: conversation.timezone,
+      });
+      googleEventId = event.eventId;
+      googleCalendarOwnerId = sellerId;
+    } catch (error) {
+      console.error("[bot] Error creando el evento en el Google Calendar del vendedor:", error);
+      syncError = describeCalendarError(error);
+    }
+  }
+
+  if (!googleEventId && isGoogleMeetEnabled()) {
     try {
       const calendarId = await getOrCreateOrgCalendar(conversation.organizationId, org.name);
       const event = await createCalendarEvent({
@@ -548,11 +583,16 @@ export async function confirmMeetingSlot(conversationId: string, isoDate: string
         summary: title,
         scheduledAt: slotDate,
         durationMinutes: org.bookingDurationMinutes,
+        timeZone: conversation.timezone,
       });
       googleEventId = event.eventId;
+      syncError = null; // el calendario compartido sí quedó: el fallo del personal ya no importa
     } catch (error) {
       console.error("[bot] Error creando el evento en Google Calendar:", error);
+      syncError = describeCalendarError(error);
     }
+  } else if (!googleEventId && !isGoogleMeetEnabled() && !syncError) {
+    syncError = "Google Calendar no está configurado en el servidor.";
   }
 
   await prisma.meeting.create({
@@ -564,14 +604,20 @@ export async function confirmMeetingSlot(conversationId: string, isoDate: string
       durationMinutes: org.bookingDurationMinutes,
       meetingUrl: null,
       googleEventId,
+      googleCalendarOwnerId,
       status: "SCHEDULED",
-      notes: conflict
-        ? "⚠️ Posible choque de horario: otra reunión ya ocupaba esta franja cuando se confirmó. Revisar y reagendar si hace falta. Agendada automáticamente por el bot de calificación."
-        : "Agendada automáticamente por el bot de calificación.",
+      notes: [
+        conflict
+          ? "⚠️ Posible choque de horario: otra reunión ya ocupaba esta franja cuando se confirmó. Revisar y reagendar si hace falta. Agendada automáticamente por el bot de calificación."
+          : "Agendada automáticamente por el bot de calificación.",
+        syncError ? `⚠️ No se pudo sincronizar con Google Calendar: ${syncError} Agrégala a mano al calendario.` : null,
+      ]
+        .filter(Boolean)
+        .join("\n"),
     },
   });
 
-  await sendAndSave(conversation, `Listo, quedó agendada para el ${label} 🙌 Nos vemos ahí.`);
+  await sendAndSave(conversation, `Listo, quedó agendada para el ${label} (hora de ${zoneLabel(conversation.timezone, slotDate)}) 🙌 Nos vemos ahí.`);
 
   await notifyNewMessage({
     conversationId: conversation.id,
@@ -580,7 +626,9 @@ export async function confirmMeetingSlot(conversationId: string, isoDate: string
     customerLabel: conversation.customerName || conversation.customerPhone,
     preview: conflict
       ? `⚠️ El bot agendó una reunión para ${label}, pero choca con otra — revisar`
-      : `📅 El bot agendó una reunión para ${label} — falta el link de Meet`,
+      : syncError
+        ? `⚠️ El bot agendó una reunión para ${label}, pero NO llegó a Google Calendar (${syncError})`
+        : `📅 El bot agendó una reunión para ${label} — falta el link de Meet`,
   }).catch((error) => console.error("[bot] Error notificando reunión agendada:", error));
 }
 

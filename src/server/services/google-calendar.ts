@@ -46,19 +46,43 @@ function getCalendarClient(): calendar_v3.Calendar {
 export async function getOrCreateOrgCalendar(organizationId: string, organizationName: string): Promise<string> {
   const org = await prisma.organization.findUniqueOrThrow({
     where: { id: organizationId },
-    select: { googleCalendarId: true },
+    select: { googleCalendarId: true, timezone: true },
   });
-  if (org.googleCalendarId) return org.googleCalendarId;
-
   const calendar = getCalendarClient();
+
+  if (org.googleCalendarId) {
+    // El id guardado puede apuntar a un calendario que ya no existe (se borró en Google o es de otra cuenta): sin esto,
+    // cada reunión nueva fallaba con 404 para siempre. Si no existe, se crea uno nuevo y se guarda su id.
+    if (await calendarExists(calendar, org.googleCalendarId)) return org.googleCalendarId;
+    console.warn(`[google-calendar] El calendario compartido de la organización ${organizationId} ya no existe en Google (${org.googleCalendarId}); se crea uno nuevo.`);
+  }
+
   const res = await calendar.calendars.insert({
-    requestBody: { summary: `${organizationName} — Reuniones` },
+    requestBody: { summary: `${organizationName} — Reuniones`, timeZone: org.timezone || undefined },
   });
   const calendarId = res.data.id;
   if (!calendarId) throw new Error("Google Calendar no devolvió un id para el calendario creado.");
 
   await prisma.organization.update({ where: { id: organizationId }, data: { googleCalendarId: calendarId } });
   return calendarId;
+}
+
+/** ¿Sigue existiendo ese calendario? Solo un 404/410 cuenta como "no existe": cualquier otro error (red, permisos) se propaga. */
+async function calendarExists(calendar: calendar_v3.Calendar, calendarId: string): Promise<boolean> {
+  try {
+    await calendar.calendars.get({ calendarId });
+    return true;
+  } catch (error) {
+    const code = (error as { code?: number }).code;
+    if (code === 404 || code === 410) return false;
+    throw error;
+  }
+}
+
+/** La zona horaria de la organización dueña de ese calendario compartido (para marcar la zona del evento). */
+async function timeZoneOfOrgCalendar(calendarId: string): Promise<string | undefined> {
+  const org = await prisma.organization.findFirst({ where: { googleCalendarId: calendarId }, select: { timezone: true } });
+  return org?.timezone || undefined;
 }
 
 /** Comparte (solo lectura) el calendario de la organización con un correo. */
@@ -91,6 +115,7 @@ export async function createMeetEvent({
   scheduledAt,
   durationMinutes,
   attendeeEmails,
+  timeZone,
 }: {
   calendarId: string;
   summary: string;
@@ -98,9 +123,12 @@ export async function createMeetEvent({
   durationMinutes: number;
   /** Si se pasa, Calendar les manda a estos correos la invitación real (aceptar/rechazar, recordatorio). */
   attendeeEmails?: string[];
+  /** Zona horaria del evento; sin ella, la de la organización dueña del calendario. */
+  timeZone?: string;
 }): Promise<CreatedMeetEvent> {
   const calendar = getCalendarClient();
   const endAt = new Date(scheduledAt.getTime() + durationMinutes * 60_000);
+  const tz = timeZone ?? (await timeZoneOfOrgCalendar(calendarId));
 
   const res = await calendar.events.insert({
     calendarId,
@@ -111,8 +139,8 @@ export async function createMeetEvent({
     requestBody: {
       summary,
       ...proshopEventStyle(),
-      start: { dateTime: scheduledAt.toISOString() },
-      end: { dateTime: endAt.toISOString() },
+      start: { dateTime: scheduledAt.toISOString(), ...(tz ? { timeZone: tz } : {}) },
+      end: { dateTime: endAt.toISOString(), ...(tz ? { timeZone: tz } : {}) },
       conferenceData: {
         createRequest: { requestId: randomUUID(), conferenceSolutionKey: { type: "hangoutsMeet" } },
       },
@@ -137,22 +165,26 @@ export async function createCalendarEvent({
   summary,
   scheduledAt,
   durationMinutes,
+  timeZone,
 }: {
   calendarId: string;
   summary: string;
   scheduledAt: Date;
   durationMinutes: number;
+  /** Zona horaria del evento; sin ella, la de la organización dueña del calendario. */
+  timeZone?: string;
 }): Promise<{ eventId: string }> {
   const calendar = getCalendarClient();
   const endAt = new Date(scheduledAt.getTime() + durationMinutes * 60_000);
+  const tz = timeZone ?? (await timeZoneOfOrgCalendar(calendarId));
 
   const res = await calendar.events.insert({
     calendarId,
     requestBody: {
       summary,
       ...proshopEventStyle(),
-      start: { dateTime: scheduledAt.toISOString() },
-      end: { dateTime: endAt.toISOString() },
+      start: { dateTime: scheduledAt.toISOString(), ...(tz ? { timeZone: tz } : {}) },
+      end: { dateTime: endAt.toISOString(), ...(tz ? { timeZone: tz } : {}) },
     },
   });
 
@@ -168,6 +200,7 @@ export async function updateMeetEvent({
   scheduledAt,
   durationMinutes,
   summary,
+  timeZone,
 }: {
   calendarId: string;
   eventId: string;
@@ -175,9 +208,12 @@ export async function updateMeetEvent({
   durationMinutes: number;
   /** Título nuevo del evento; sin esto no se toca. */
   summary?: string;
+  /** Zona horaria del evento; sin ella, la de la organización dueña del calendario. */
+  timeZone?: string;
 }): Promise<void> {
   const calendar = getCalendarClient();
   const endAt = new Date(scheduledAt.getTime() + durationMinutes * 60_000);
+  const tz = timeZone ?? (await timeZoneOfOrgCalendar(calendarId));
 
   await calendar.events.patch({
     calendarId,
@@ -185,8 +221,8 @@ export async function updateMeetEvent({
     sendUpdates: "all",
     requestBody: {
       ...(summary ? { summary } : {}),
-      start: { dateTime: scheduledAt.toISOString() },
-      end: { dateTime: endAt.toISOString() },
+      start: { dateTime: scheduledAt.toISOString(), ...(tz ? { timeZone: tz } : {}) },
+      end: { dateTime: endAt.toISOString(), ...(tz ? { timeZone: tz } : {}) },
     },
   });
 }

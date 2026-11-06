@@ -6,6 +6,8 @@ import { ChevronLeft, ChevronRight, CalendarDays, List, LayoutGrid, X, Clock, Co
 import { Card } from "@/components/ui/card";
 import { vendorColor } from "@/lib/vendor-color";
 import { CalendarList, type MeetingRow } from "./calendar-list";
+import { formatTimeIn, useOrgTimeZone } from "@/components/org-time";
+import { useLocale } from "@/lib/i18n/client";
 
 const WEEKDAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -22,10 +24,6 @@ function dateKey(d: Date): string {
 // fuerza a que el motor lo lea en horario local, coherente con dateKey.
 function parseYmd(s: string): Date {
   return new Date(`${s}T00:00:00`);
-}
-
-function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -58,6 +56,8 @@ export function CalendarMonth({
   nextHref: string;
   todayHref: string;
 }) {
+  const orgTimeZone = useOrgTimeZone();
+  const locale = useLocale();
   const [view, setView] = useState<"mes" | "agenda">("mes");
   const [dayDetail, setDayDetail] = useState<string | null>(null);
 
@@ -183,7 +183,7 @@ export function CalendarMonth({
                           key={m.id}
                           type="button"
                           onClick={() => setDayDetail(key)}
-                          title={`${timeLabel(m.scheduledAt)} · ${m.client}`}
+                          title={`${formatTimeIn(m.scheduledAt, orgTimeZone, locale)} · ${m.client}`}
                           className="flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-xs hover:bg-surface-2"
                           style={{ backgroundColor: `${vendorColor(m.assignedTo?.id ?? "sin-asignar", m.assignedTo?.color)}1a` }}
                         >
@@ -191,7 +191,7 @@ export function CalendarMonth({
                             className="h-1.5 w-1.5 shrink-0 rounded-full"
                             style={{ backgroundColor: vendorColor(m.assignedTo?.id ?? "sin-asignar", m.assignedTo?.color) }}
                           />
-                          <span className="shrink-0 text-ink-faint">{timeLabel(m.scheduledAt)}</span>
+                          <span className="shrink-0 text-ink-faint">{formatTimeIn(m.scheduledAt, orgTimeZone, locale)}</span>
                           <span className="truncate text-ink-muted">{m.client}</span>
                         </button>
                       ))}
@@ -240,7 +240,7 @@ export function CalendarMonth({
                 <Card key={m.id} className="py-3">
                   <div className="mb-1.5 flex items-center gap-2">
                     <span className="flex items-center gap-1 text-sm text-ink">
-                      <Clock size={12} className="text-ink-faint" /> {timeLabel(m.scheduledAt)}
+                      <Clock size={12} className="text-ink-faint" /> {formatTimeIn(m.scheduledAt, orgTimeZone, locale)}
                     </span>
                     <span className="ml-auto rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-muted">
                       {STATUS_LABEL[m.status] ?? m.status}

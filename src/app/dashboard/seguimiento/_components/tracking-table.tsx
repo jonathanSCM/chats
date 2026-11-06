@@ -52,6 +52,7 @@ import {
   cancelMeetingAction,
 } from "@/server/actions/crm";
 import { MeetingAttachments, type MeetingAttachmentInfo } from "@/components/meeting-attachments";
+import { MeetingWhen } from "@/components/org-time";
 import { PdfViewerModal } from "@/components/pdf-viewer-modal";
 import { MeetingAiSummary } from "@/components/meeting-ai-summary";
 import { EditableTitle } from "@/components/editable-title";
@@ -2302,12 +2303,7 @@ function MeetingsSection({
                     <p className="text-xs text-ink-faint">grabada por {m.recordedByName}</p>
                   )}
                   <p className="flex items-center gap-1.5 text-xs text-ink-muted">
-                    {new Date(m.scheduledAt).toLocaleString("es", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}{" "}
+                    <MeetingWhen iso={m.scheduledAt} />{" "}
                     · {m.status}
                   </p>
                   {m.context && <p className="line-clamp-1 text-xs italic text-ink-faint">{m.context}</p>}
@@ -2363,13 +2359,7 @@ function MeetingsSection({
                   className="text-2xl font-bold text-ink"
                 />
                 <p className="mt-1.5 text-[13px] text-ink-faint">
-                  {new Date(m.scheduledAt).toLocaleString("es", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}{" "}
+                  <MeetingWhen iso={m.scheduledAt} year />{" "}
                   · {m.durationMinutes} min
                   {m.recordedByName && ` · grabada por ${m.recordedByName}`}
                 </p>

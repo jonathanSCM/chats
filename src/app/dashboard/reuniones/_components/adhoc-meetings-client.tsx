@@ -26,6 +26,7 @@ import { MeetingAttachments, type MeetingAttachmentInfo } from "@/components/mee
 import { PdfViewerModal } from "@/components/pdf-viewer-modal";
 import { MeetingAiSummary } from "@/components/meeting-ai-summary";
 import { EditableTitle } from "@/components/editable-title";
+import { MeetingWhen } from "@/components/org-time";
 import { SidePanel, PanelSection } from "@/components/side-panel";
 import { panelAccent, PILL_BUTTON, hasMeetingEnded } from "@/lib/meeting-panel-ui";
 
@@ -58,16 +59,6 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELED: "Cancelada",
   NO_SHOW: "No se presentó",
 };
-
-function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleString("es", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 
 /**
@@ -458,7 +449,7 @@ export function AdhocMeetingsClient({
                   />
                   <p className="flex items-center gap-1.5 text-sm text-ink-muted">
                     <Clock size={14} className="shrink-0 text-ink-faint" />
-                    {timeLabel(m.scheduledAt)} · {m.durationMinutes} min
+                    <MeetingWhen iso={m.scheduledAt} year /> · {m.durationMinutes} min
                   </p>
                 </div>
 
@@ -526,7 +517,7 @@ export function AdhocMeetingsClient({
                   className="text-2xl font-bold text-ink"
                 />
                 <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-ink-faint">
-                  <Clock size={13} className="text-accent" /> {timeLabel(m.scheduledAt)} · {m.durationMinutes} min
+                  <Clock size={13} className="text-accent" /> <MeetingWhen iso={m.scheduledAt} year /> · {m.durationMinutes} min
                 </p>
               </>
             }

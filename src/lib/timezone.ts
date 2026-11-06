@@ -47,9 +47,11 @@ export function getZonedParts(date: Date, timeZone: string): ZonedParts {
 
 /**
  * El instante UTC real que corresponde a esa hora de pared en `timeZone`.
- * Un solo ajuste por diferencia de offset alcanza para el uso de acá
- * (agendar reuniones, no aritmética de calendario exacta en el instante de
- * un cambio de horario de verano).
+ * Se ajusta dos veces: el offset de la zona puede ser distinto en el instante
+ * de partida y en el resultado cuando hay un cambio de horario de verano de por
+ * medio (con un solo ajuste, una hora de pared pocas horas después del cambio
+ * salía 1 hora corrida). Una hora que no existe (el "salto" de primavera) cae
+ * en la hora válida siguiente.
  */
 export function zonedTimeToUtc(
   year: number,
@@ -63,5 +65,24 @@ export function zonedTimeToUtc(
   const seen = getZonedParts(guess, timeZone);
   const seenAsUtc = Date.UTC(seen.year, seen.month - 1, seen.day, seen.hour, seen.minute);
   const wantedAsUtc = Date.UTC(year, month - 1, day, hour, minute);
-  return new Date(guess.getTime() + (wantedAsUtc - seenAsUtc));
+  const first = new Date(guess.getTime() + (wantedAsUtc - seenAsUtc));
+
+  const seen2 = getZonedParts(first, timeZone);
+  const seen2AsUtc = Date.UTC(seen2.year, seen2.month - 1, seen2.day, seen2.hour, seen2.minute);
+  return new Date(first.getTime() + (wantedAsUtc - seen2AsUtc));
+}
+
+/**
+ * Cómo nombrarle una zona horaria a una persona: "Lima (GMT-5)". Para decirle en qué hora está expresado un horario
+ * ("9:00, hora de Lima (GMT-5)") y que nadie lo lea en otra zona sin darse cuenta.
+ */
+export function zoneLabel(timeZone: string, at: Date = new Date()): string {
+  const city = (timeZone.split("/").pop() ?? timeZone).replace(/_/g, " ");
+  let offset = "";
+  try {
+    offset = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "shortOffset" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value ?? "";
+  } catch {
+    /* zona desconocida: se deja solo el nombre */
+  }
+  return offset ? `${city} (${offset})` : city;
 }

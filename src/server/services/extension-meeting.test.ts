@@ -9,7 +9,7 @@ vi.mock("@/server/db/client", () => ({
   },
 }));
 
-import { cleanMeetingTitle, isPlatformBotEmail, resolveExtensionMeeting, resolveExtensionOrg, resolveExtensionOrganizationId } from "./extension-meeting";
+import { ExtensionMeetingNotFoundError, cleanMeetingTitle, isPlatformBotEmail, resolveExtensionMeeting, resolveExtensionOrg, resolveExtensionOrganizationId } from "./extension-meeting";
 
 const bot = { organizationId: "org-proshop", email: "meet-captions@internal.proshop.lat" };
 const person = { organizationId: "org-proshop", email: "vendedora@ejemplo.com" };
@@ -150,6 +150,21 @@ describe("nombre de la reunión", () => {
     m.findFirst.mockResolvedValue({ id: "e2", title: "Reunión con Liliana", transcript: null, audioTranscript: null, recordedById: "u1" });
     await resolveExtensionMeeting({ ...base, title: "Otro nombre" });
     expect(m.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("solo buscar (asistente de Vexa)", () => {
+  const base = { organizationId: "org-a", meetingUrl: "https://meet.google.com/abc-defg-hij" };
+
+  it("si la reunión no es del CRM, no crea una suelta: lanza el error para descartar lo recibido", async () => {
+    m.findFirst.mockResolvedValue(null);
+    await expect(resolveExtensionMeeting({ ...base, onlyExisting: true })).rejects.toBeInstanceOf(ExtensionMeetingNotFoundError);
+    expect(m.create).not.toHaveBeenCalled();
+  });
+
+  it("si la reunión existe, la devuelve igual que siempre", async () => {
+    m.findFirst.mockResolvedValue({ id: "e1", title: "Demo", transcript: null, audioTranscript: null, recordedById: "u1" });
+    await expect(resolveExtensionMeeting({ ...base, onlyExisting: true })).resolves.toMatchObject({ id: "e1" });
   });
 });
 

@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
-import { resolveExtensionMeeting, resolveExtensionOrg } from "@/server/services/extension-meeting";
+import {
+  ExtensionMeetingNotFoundError,
+  isPlatformBotEmail,
+  resolveExtensionMeeting,
+  resolveExtensionOrg,
+} from "@/server/services/extension-meeting";
 import { attemptAutoLinkMeeting } from "@/server/services/meeting-link";
 
 /**
@@ -86,13 +91,22 @@ export async function POST(req: NextRequest) {
   });
   if (!org.ok) return withCors(new NextResponse(org.error, { status: 403 }));
 
-  const resolved = await resolveExtensionMeeting({
-    organizationId: org.organizationId,
-    meetingUrl,
-    recordedById: user.id,
-    vexaSessionId,
-    title,
-  });
+  // El asistente de Vexa manda los subtítulos de TODAS las reuniones que atiende, también las de otros proyectos que usen el
+  // mismo Vexa: si el CRM no pidió ese asistente (no hay reunión suya), se descarta y no se guarda nada.
+  let resolved;
+  try {
+    resolved = await resolveExtensionMeeting({
+      organizationId: org.organizationId,
+      meetingUrl,
+      recordedById: user.id,
+      vexaSessionId,
+      title,
+      onlyExisting: isPlatformBotEmail(user.email),
+    });
+  } catch (error) {
+    if (error instanceof ExtensionMeetingNotFoundError) return withCors(NextResponse.json({ ok: true, ignored: true }, { status: 202 }));
+    throw error;
+  }
 
   // No se pisa una transcripción que ya tenga contenido (por ej. si el bot
   // grabador también corrió en esta misma reunión) -- se concatena en vez

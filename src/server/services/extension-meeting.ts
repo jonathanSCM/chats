@@ -48,6 +48,13 @@ export function cleanMeetingTitle(raw: string | null | undefined): string | null
   return title ? title : null;
 }
 
+/** El asistente de Vexa mandó algo de una reunión que el CRM no conoce (p. ej. de otro proyecto que usa el mismo Vexa). */
+export class ExtensionMeetingNotFoundError extends Error {
+  constructor() {
+    super("No hay una reunión del CRM para esta sesión del asistente.");
+  }
+}
+
 export type ExtensionOrgResult = { ok: true; organizationId: string } | { ok: false; error: string };
 
 /**
@@ -136,6 +143,9 @@ export async function resolveExtensionMeeting(params: {
   // nombre; si ya existía con un nombre automático ("Reunión Extensión", "Reunión en vivo") se lo cambia. Una reunión ya
   // agendada o renombrada conserva el suyo.
   title?: string | null;
+  // Solo buscar: si no existe, lanza ExtensionMeetingNotFoundError en vez de crear una "Reunión Extensión" suelta.
+  // Lo usa el asistente de Vexa: el CRM solo debe guardar lo de reuniones que él mismo pidió.
+  onlyExisting?: boolean;
 }): Promise<{ id: string; transcript: string | null; audioTranscript: string | null }> {
   const { organizationId, recordedById = null, vexaSessionId = null } = params;
   const title = cleanMeetingTitle(params.title);
@@ -174,6 +184,8 @@ export async function resolveExtensionMeeting(params: {
     }
     return existing;
   }
+
+  if (params.onlyExisting) throw new ExtensionMeetingNotFoundError();
 
   return prisma.meeting.create({
     data: {

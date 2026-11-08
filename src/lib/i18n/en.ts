@@ -189,6 +189,32 @@ export const en: Record<string, string> = {
   "Conectar con Facebook": "Connect with Facebook",
   Editar: "Edit",
   "hora de {zone}": "{zone} time",
+  "Google Calendar del equipo": "Team Google Calendar",
+  "Quién tiene su calendario conectado. Las reuniones que agenda el bot van al calendario de la persona asignada si lo conectó; si no, al calendario compartido de la organización.":
+    "Who has their calendar connected. Meetings the bot schedules go to the assigned person's calendar if they connected one; otherwise to the organization's shared calendar.",
+  "{n} conexión(es) se desconectaron: esas reuniones no llegan al Google de esa persona (van al calendario compartido). Pídele que vuelva a conectarlo en Ajustes.":
+    "{n} connection(s) got disconnected: those meetings don't reach that person's Google (they go to the shared calendar). Ask them to reconnect in Settings.",
+  "Calendario compartido de la organización": "Organization shared calendar",
+  "Creado en la cuenta de Google del CRM. Es el de respaldo cuando quien atiende no conectó el suyo.":
+    "Created in the CRM's Google account. It's the fallback when the assigned person hasn't connected theirs.",
+  "Todavía no se creó: se crea con la primera reunión que lo necesite.": "Not created yet: it's created with the first meeting that needs it.",
+  Activo: "Active",
+  "Sin crear": "Not created",
+  Conectado: "Connected",
+  "Desconectado — debe volver a conectar": "Disconnected — needs to reconnect",
+  "Conectado (no se pudo verificar ahora)": "Connected (couldn't verify right now)",
+  "Sin conectar": "Not connected",
+  "Cada persona conecta el suyo en": "Each person connects theirs in",
+  "Funcionando: {ok} de {total}.": "Working: {ok} of {total}.",
+  "Ver el calendario compartido en tu Google": "See the shared calendar in your Google",
+  "Dale acceso de lectura a tu correo para ver todas las reuniones de la organización en un solo calendario.":
+    "Give your email read access to see all the organization's meetings in one calendar.",
+  "Sacar acceso": "Remove access",
+  "correo@ejemplo.com": "email@example.com",
+  "Compartiendo…": "Sharing…",
+  "Tu Google Calendar ({email}) se desconectó. Las reuniones nuevas ya no llegan a tu calendario hasta que lo vuelvas a conectar.":
+    "Your Google Calendar ({email}) got disconnected. New meetings won't reach your calendar until you reconnect it.",
+  "Volver a conectar": "Reconnect",
 
   // Organización: pestañas (se traducen por variable, el test no las ve), subtítulo y filas de Integraciones
   General: "General",

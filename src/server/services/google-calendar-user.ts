@@ -132,6 +132,43 @@ async function getCalendarClientForUser(userId: string): Promise<{ calendar: cal
   return { calendar: google.calendar({ version: "v3", auth: client }), accountId: account.id };
 }
 
+/**
+ * "ok" = Google aceptó renovar el acceso; "broken" = la conexión murió (la persona revocó el acceso, cambió su
+ * contraseña, venció…) y hay que volver a conectar; "unknown" = no se pudo comprobar ahora (red, Google caído).
+ */
+export type CalendarConnectionStatus = "ok" | "broken" | "unknown";
+
+/** Un error de Google que significa "este permiso ya no vale" (no un fallo pasajero). */
+export function isRevokedGrantError(error: unknown): boolean {
+  const e = error as { code?: number | string; message?: string; response?: { data?: { error?: string } } };
+  const text = `${e?.message ?? ""} ${e?.response?.data?.error ?? ""}`;
+  return /invalid_grant|unauthorized_client|invalid_client/i.test(text) || e?.code === 401;
+}
+
+/**
+ * Comprueba de verdad, pidiéndole a Google un acceso nuevo, si cada conexión sigue viva. Se usa para mostrar al
+ * dueño (y a la propia persona) cuándo una conexión se cayó, en vez de seguir diciendo "Conectado" hasta que falle
+ * una reunión. Corre en paralelo y con tope de tiempo para no trabar la pantalla.
+ */
+export async function checkCalendarConnections(userIds: string[]): Promise<Map<string, CalendarConnectionStatus>> {
+  const result = new Map<string, CalendarConnectionStatus>();
+  if (userIds.length === 0) return result;
+  const accounts = await prisma.googleCalendarAccount.findMany({ where: { userId: { in: userIds } } });
+  await Promise.all(
+    accounts.map(async (account) => {
+      try {
+        const client = await getClientForAccount(account);
+        const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 6000));
+        await Promise.race([client.refreshAccessToken(), timeout]);
+        result.set(account.userId, "ok");
+      } catch (error) {
+        result.set(account.userId, isRevokedGrantError(error) ? "broken" : "unknown");
+      }
+    }),
+  );
+  return result;
+}
+
 /** La zona horaria de la organización activa de esa persona (para marcar la zona de los eventos que se le crean). */
 async function timeZoneOfUserOrg(userId: string): Promise<string | undefined> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { organization: { select: { timezone: true } } } });

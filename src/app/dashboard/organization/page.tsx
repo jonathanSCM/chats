@@ -34,6 +34,7 @@ import { RequestCreditsForm, RequestRenewalForm, type PendingRequestView } from 
 import { SubOrgsPanel } from "./_components/suborgs-panel";
 import { SettingRow } from "./_components/setting-row";
 import { Fold } from "./_components/fold";
+import { checkCalendarConnections, type CalendarConnectionStatus } from "@/server/services/google-calendar-user";
 import { SharedCalendarForm } from "./_components/shared-calendar-form";
 import { formatCredits } from "@/lib/ai-credits";
 import { PLAN_STATE_LABEL } from "@/lib/plan-period";
@@ -190,14 +191,19 @@ export default async function OrganizationSettingsPage({
   const vendedores = members.filter((m) => m.role === "MEMBER");
 
   // Google Calendar conectado por cada persona del equipo (solo se consulta en la pestaña Equipo).
-  const calendarAccounts =
+  const [calendarAccounts, calendarHealth] =
     tab === "equipo"
-      ? await prisma.googleCalendarAccount.findMany({
-          where: { userId: { in: members.map((m) => m.id) } },
-          select: { userId: true, googleEmail: true, updatedAt: true },
-        })
-      : [];
+      ? await Promise.all([
+          prisma.googleCalendarAccount.findMany({
+            where: { userId: { in: members.map((m) => m.id) } },
+            select: { userId: true, googleEmail: true },
+          }),
+          checkCalendarConnections(members.map((m) => m.id)),
+        ])
+      : [[], new Map<string, CalendarConnectionStatus>()];
   const calendarByUser = new Map(calendarAccounts.map((a) => [a.userId, a]));
+  const brokenCalendars = calendarAccounts.filter((a) => calendarHealth.get(a.userId) === "broken").length;
+  const workingCalendars = calendarAccounts.length - brokenCalendars;
 
   // API de integración: solo se consulta cuando se mira esa pestaña.
   const [integrationKeys, integrationWebhook] =
@@ -602,50 +608,61 @@ export default async function OrganizationSettingsPage({
           </Card>
 
           <Card className="mb-6">
-            <CardTitle className="mb-1">Google Calendar del equipo</CardTitle>
+            <CardTitle className="mb-1">{tr("Google Calendar del equipo")}</CardTitle>
             <CardDescription className="mb-4">
-              Quién tiene su calendario conectado. Las reuniones que agenda el bot van al calendario de la persona asignada
-              si lo conectó; si no, al calendario compartido de la organización.
+              {tr("Quién tiene su calendario conectado. Las reuniones que agenda el bot van al calendario de la persona asignada si lo conectó; si no, al calendario compartido de la organización.")}
             </CardDescription>
+            {brokenCalendars > 0 && (
+              <p className="mb-3 rounded-control border border-danger/40 px-3 py-2 text-xs text-danger">
+                {tr("{n} conexión(es) se desconectaron: esas reuniones no llegan al Google de esa persona (van al calendario compartido). Pídele que vuelva a conectarlo en Ajustes.", { n: brokenCalendars })}
+              </p>
+            )}
             <ul className="divide-y divide-border rounded-md border border-border text-sm">
               <li className="flex items-center justify-between gap-3 px-3 py-2">
                 <div className="min-w-0">
-                  <p className="font-medium">Calendario compartido de la organización</p>
+                  <p className="font-medium">{tr("Calendario compartido de la organización")}</p>
                   <p className="text-xs text-ink-muted">
                     {org.googleCalendarId
-                      ? "Creado en la cuenta de Google del CRM. Es el de respaldo cuando quien atiende no conectó el suyo."
-                      : "Todavía no se creó: se crea con la primera reunión que lo necesite."}
+                      ? tr("Creado en la cuenta de Google del CRM. Es el de respaldo cuando quien atiende no conectó el suyo.")
+                      : tr("Todavía no se creó: se crea con la primera reunión que lo necesite.")}
                   </p>
                 </div>
                 <span className={`shrink-0 text-xs ${org.googleCalendarId ? "text-accent" : "text-ink-faint"}`}>
-                  {org.googleCalendarId ? "Activo" : "Sin crear"}
+                  {org.googleCalendarId ? tr("Activo") : tr("Sin crear")}
                 </span>
               </li>
               {members.map((m) => {
                 const acc = calendarByUser.get(m.id);
+                const health = acc ? calendarHealth.get(m.id) ?? "unknown" : null;
+                const [label, tone] =
+                  health === "ok"
+                    ? [tr("Conectado"), "text-accent"]
+                    : health === "broken"
+                      ? [tr("Desconectado — debe volver a conectar"), "text-danger"]
+                      : health === "unknown"
+                        ? [tr("Conectado (no se pudo verificar ahora)"), "text-ink-muted"]
+                        : [tr("Sin conectar"), "text-ink-faint"];
                 return (
                   <li key={m.id} className="flex items-center justify-between gap-3 px-3 py-2">
                     <div className="min-w-0">
                       <p className="truncate font-medium">{m.name || m.email}</p>
                       <p className="truncate text-xs text-ink-muted">{acc ? acc.googleEmail : m.email}</p>
                     </div>
-                    <span className={`shrink-0 text-xs ${acc ? "text-accent" : "text-ink-faint"}`}>
-                      {acc ? "Conectado" : "Sin conectar"}
-                    </span>
+                    <span className={`shrink-0 text-right text-xs ${tone}`}>{label}</span>
                   </li>
                 );
               })}
             </ul>
             <p className="mt-3 text-xs text-ink-muted">
-              Cada persona conecta el suyo en <Link href="/dashboard/ajustes" className="underline">Ajustes</Link>.
-              {" "}Conectados: {calendarAccounts.length} de {members.length}.
+              {tr("Cada persona conecta el suyo en")} <Link href="/dashboard/ajustes" className="underline">{tr("Ajustes")}</Link>.{" "}
+              {tr("Funcionando: {ok} de {total}.", { ok: workingCalendars, total: members.length })}
             </p>
           </Card>
 
           {org.googleCalendarId && (
             <Fold
-              title="Ver el calendario compartido en tu Google"
-              description="Dale acceso de lectura a tu correo para ver todas las reuniones de la organización en un solo calendario."
+              title={tr("Ver el calendario compartido en tu Google")}
+              description={tr("Dale acceso de lectura a tu correo para ver todas las reuniones de la organización en un solo calendario.")}
             >
               <SharedCalendarForm sharedEmails={org.googleCalendarShares} />
             </Fold>

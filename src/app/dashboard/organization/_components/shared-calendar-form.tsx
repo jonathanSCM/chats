@@ -5,11 +5,13 @@ import { X } from "lucide-react";
 import { shareOrgCalendarAction, unshareOrgCalendarAction } from "@/server/actions/organization";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n/client";
 
 export function SharedCalendarForm({ sharedEmails }: { sharedEmails: string[] }) {
   const [state, formAction, isPending] = useActionState(shareOrgCalendarAction, { error: null });
   const [isRemoving, startTransition] = useTransition();
   const [removingEmail, setRemovingEmail] = useState<string | null>(null);
+  const t = useT();
 
   function handleRemove(email: string) {
     setRemovingEmail(email);
@@ -31,7 +33,7 @@ export function SharedCalendarForm({ sharedEmails }: { sharedEmails: string[] })
                 disabled={isRemoving && removingEmail === email}
                 onClick={() => handleRemove(email)}
                 className="shrink-0 cursor-pointer text-ink-faint hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
-                title="Sacar acceso"
+                title={t("Sacar acceso")}
               >
                 <X size={14} />
               </button>
@@ -42,10 +44,10 @@ export function SharedCalendarForm({ sharedEmails }: { sharedEmails: string[] })
 
       <form action={formAction} className="flex items-end gap-3">
         <div className="flex-1">
-          <Input type="email" name="email" placeholder="correo@ejemplo.com" required />
+          <Input type="email" name="email" placeholder={t("correo@ejemplo.com")} required />
         </div>
         <Button type="submit" variant="secondary" disabled={isPending}>
-          {isPending ? "Compartiendo…" : "Compartir"}
+          {isPending ? t("Compartiendo…") : t("Compartir")}
         </Button>
       </form>
       {state.message && <p className="text-xs text-accent">{state.message}</p>}

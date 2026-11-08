@@ -6,6 +6,7 @@ import { LanguageSwitch } from "@/components/language-switch";
 import { GoogleCalendarCard } from "../perfil/_components/google-calendar-card";
 import { InstallAppCard } from "../perfil/_components/install-app-card";
 import { getT } from "@/lib/i18n/server";
+import { checkCalendarConnections } from "@/server/services/google-calendar-user";
 
 export default async function SettingsPage({
   searchParams,
@@ -22,6 +23,10 @@ export default async function SettingsPage({
     where: { userId: session.user.id },
     select: { googleEmail: true },
   });
+
+  const calendarBroken = calendarAccount
+    ? (await checkCalendarConnections([session.user.id])).get(session.user.id) === "broken"
+    : false;
 
   const calendarNotice = calendarConnected
     ? { type: "ok" as const, text: t("Google Calendar conectado — tus próximas reuniones se van a crear ahí.") }
@@ -47,7 +52,7 @@ export default async function SettingsPage({
         <CardDescription className="mb-4">
           {t("Conecta tu cuenta para que las reuniones que crees se agenden directo en tu calendario (con sincronización en las dos direcciones: lo que edites acá o en Google se refleja del otro lado).")}
         </CardDescription>
-        <GoogleCalendarCard connectedEmail={calendarAccount?.googleEmail ?? null} notice={calendarNotice} />
+        <GoogleCalendarCard connectedEmail={calendarAccount?.googleEmail ?? null} notice={calendarNotice} broken={calendarBroken} />
       </Card>
 
       <Card className="mb-6">

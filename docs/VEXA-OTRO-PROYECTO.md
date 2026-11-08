@@ -18,12 +18,78 @@ Todo eso ya existe en la imagen actual. Lo que **no** se puede hacer sin tocar V
 ```
  Otro proyecto ──(1) POST /bots  [X-API-Key: clave del otro proyecto]──▶ Vexa (gateway :8056)
                                                                           │ entra a la reunión y transcribe
- Otro proyecto ◀─(2) webhook "meeting.completed" firmado (HTTPS)──────────┘
- Otro proyecto ──(3) GET /transcripts/by-id/{id}  [misma clave]──────────▶ Vexa
-                 ──(4) GET /recordings …  (audio, opcional)
+ Otro proyecto ◀─(2) AVISO: webhook "meeting.completed" (opcional) ───────┘   (solo avisa; no trae el audio)
+                   …o preguntar cada 15 s: GET /bots (como hace el CRM)
+ Otro proyecto ──(3) GET /transcripts/by-id/{id}  [misma clave]──────────▶ Vexa → texto (segments) + datos del audio
+ Otro proyecto ──(4) GET playback_url.audio → raw_url → archivo de audio ▶ Vexa → audio (.webm)
 ```
 
 El CRM (ProShop) sigue igual con **su** usuario de Vexa (usuario 2 hoy). Cada usuario solo ve sus reuniones.
+
+## Qué le devuelve Vexa al otro proyecto (datos, rutas, archivos)
+
+**Respuesta directa: Vexa no "empuja" ni el audio ni la transcripción.** Lo único que puede empujar es un **aviso** (webhook) de que algo pasó. La transcripción y el audio **los pide el otro proyecto** cuando quiere, con su clave, a rutas del gateway. Así lo hace el CRM hoy (no usa webhooks: pregunta cada 15 s hasta que la reunión termina; ver `src/server/jobs/handlers/vexa-bot-poll.ts`).
+
+Todo lo marcado ✅ está **verificado**: lo hace el CRM en producción hoy. Lo marcado ⚠️ no lo pude comprobar (ver al final).
+
+Todas las rutas son del **gateway** (`https://<gateway>`), con la cabecera `X-API-Key: <clave del otro proyecto>`:
+
+| # | Qué | Ruta | Qué devuelve |
+|---|---|---|---|
+| 1 ✅ | Mandar el asistente | `POST /bots` con `{platform, native_meeting_id, bot_name, language}` | Un JSON con el **id de la sesión** (número entero; el CRM lo lee de `id`, `meeting_id` o `meeting.id`). Guárdalo: con él se pide todo lo demás. |
+| 2 ✅ | Estado de las sesiones | `GET /bots` | `{ meetings: [ … ] }`, una entrada por sesión (ver "Campos de la sesión"). |
+| 3 ✅ | **Transcripción** (texto) | `GET /transcripts/by-id/{id}` | `{ segments: [ { speaker, text, … } ], recordings: [ { id, playback_url: { audio } } ] }` |
+| 4 ✅ | **Audio**, paso 1 | `GET {gateway}{recordings[].playback_url.audio}` | Un JSON con `raw_url` (la dirección del archivo). |
+| 5 ✅ | **Audio**, paso 2 | `GET raw_url` (si empieza con `/`, anteponer el gateway) | El **archivo de audio** (en el CRM llega como `audio/webm`; se guarda como `grabacion.webm`). |
+| 6 ✅ | Transcripción por sala | `GET /transcripts/google_meet/{native_meeting_id}` | Igual que la 3, pero mezcla todas las sesiones de esa sala (úsala solo si no tienes el id). |
+| 7 ✅ | Detener el asistente | `DELETE /bots/google_meet/{native_meeting_id}` | — |
+| 8 ✅ | Buscar en transcripciones | `GET /transcripts/search` | ⚠️ formato no verificado. |
+
+### Campos de la sesión (`GET /bots` → `meetings[]`) ✅
+
+| Campo | Qué es |
+|---|---|
+| `id` | Id de la sesión (el mismo del `POST /bots`). |
+| `status` | Estado. En curso: se une, `awaiting_admission` (sala de espera), `active` (grabando). Cualquier otro (`completed`, `failed`, `error`…) es **terminal**. |
+| `native_meeting_id`, `platform` | Código de la reunión (`abc-defg-hij`) y plataforma (`google_meet`). |
+| `created_at`, `updated_at` | Fechas ISO. |
+| `failure_stage` | Si falló: en qué etapa (`joining`, `awaiting_admission`…). Vacío si salió bien. |
+| `completion_reason` | Por qué terminó. |
+| `data.join_evidence.reason` | Motivo técnico si no pudo entrar: `awaiting_admission_timeout` (nadie lo admitió en 15 min), `awaiting_admission_rejected`, `never_reached_lobby`… |
+
+### Campos de la transcripción (`segments[]`) ✅ solo estos dos
+
+- `speaker`: nombre del que habla (puede venir vacío; el CRM pone `?`).
+- `text`: lo dicho.
+
+Vexa probablemente trae más por segmento (tiempos de inicio/fin, idioma…), pero **no lo verifiqué**: míralo con el comando de abajo antes de depender de ello.
+
+### Los archivos que acaban en el otro proyecto
+
+Vexa no deja archivos en el otro proyecto: **los crea el otro proyecto** a partir de las respuestas. El CRM, por ejemplo, arma:
+
+| Archivo (en el CRM) | De dónde sale |
+|---|---|
+| `transcripcion-audio-whisper.txt` | Los `segments` unidos como `Nombre: texto`, una línea por segmento (descartando frases inventadas por Whisper en los silencios). |
+| `grabacion.webm` | El audio de las rutas 4 y 5. |
+| `subtitulos-meet.txt` | **No viene de Vexa**: son los subtítulos de Meet que manda el parche (ver "El peligro" más abajo). El otro proyecto **no** los recibe, solo recibiría la transcripción de audio (Whisper). |
+
+### El webhook (opcional) = solo un aviso
+
+Si el otro proyecto prefiere no preguntar cada pocos segundos, Vexa le avisa por webhook (configuración en el paso 2). Formato ✅ (leído del código de Vexa): `{ event_id, event_type, api_version, created_at, data }`, con las cabeceras de firma `X-Webhook-Timestamp` y `X-Webhook-Signature`. Eventos: `meeting.completed`, `meeting.started`, `meeting.status_change`.
+
+⚠️ **No verifiqué qué trae `data`.** Trátalo como un aviso ("la sesión X terminó") y, al recibirlo, **pide la transcripción y el audio con las rutas 3–5**. No asumas que el texto o el audio vienen dentro del webhook.
+
+### Comprobarlo con tus propios ojos (2 minutos)
+
+Con la clave del otro proyecto y una reunión de prueba terminada (`<id>` = el id de la sesión):
+
+```bash
+curl -s https://<gateway>/transcripts/by-id/<id> -H "X-API-Key: <clave>" | jq '{claves: keys, segmento: .segments[0], grabaciones: .recordings}'
+curl -s https://<gateway>/bots -H "X-API-Key: <clave>" | jq '.meetings[0]'
+```
+
+Eso muestra los campos **reales** (tiempos, idioma, etc.) y sirve para completar esta tabla.
 
 ## Paso a paso
 
@@ -85,8 +151,9 @@ curl -s -X POST https://<gateway-con-https>/bots \
   -H "X-API-Key: <clave del otro proyecto>" -H "Content-Type: application/json" \
   -d '{ "platform": "google_meet", "native_meeting_id": "abc-defg-hij",
         "bot_name": "Asistente de Otro Proyecto", "language": "es" }'
-# → 201 con el id de la sesión (guárdalo)
 ```
+
+La respuesta es **201** con el id de la sesión: guárdalo.
 
 - Estos cuatro campos son los que usa el CRM hoy y funcionan. Vexa acepta más opciones (por ejemplo grabación y transcripción); su esquema exacto no está publicado en la API: pruébalas con una reunión de prueba antes de depender de ellas.
 - **El código de la reunión es el de Meet** (`abc-defg-hij`, sin la URL).
@@ -102,8 +169,13 @@ Cuando llegue `meeting.completed` (o consultando el estado):
 ```bash
 curl -s https://<gateway-con-https>/transcripts/by-id/<id de la sesión> -H "X-API-Key: <clave>"
 # → { segments: [{ speaker, text, … }], recordings: [{ id, playback_url: { audio } }] }
-curl -s https://<gateway-con-https>/recordings -H "X-API-Key: <clave>"
+
+# Audio (dos pasos, como hace el CRM): la ruta de playback_url.audio devuelve { raw_url }, y raw_url es el archivo.
+curl -s https://<gateway-con-https><playback_url.audio> -H "X-API-Key: <clave>"          # → { "raw_url": "…" }
+curl -s -o grabacion.webm https://<gateway-con-https><raw_url> -H "X-API-Key: <clave>"    # → el audio
 ```
+
+(El detalle de cada campo está en "Qué le devuelve Vexa al otro proyecto", más arriba.)
 
 > **No verifiqué** que el cuerpo del webhook `meeting.completed` traiga el texto de la transcripción. Lo seguro es usarlo como **aviso** y pedir la transcripción con `GET /transcripts/by-id/{id}`, como hace el CRM (`vexa-bot-poll.ts`). Filtra frases inventadas por Whisper cuando hay silencio (ver `isLikelyWhisperHallucination` en ese archivo).
 
@@ -173,6 +245,6 @@ Levantar **otro Vexa independiente** (otro contenedor con su propia base y sus p
 
 ## Qué no pude verificar
 
-- El cuerpo exacto de `meeting.completed` (si incluye la transcripción).
+- El cuerpo exacto de `meeting.completed` (si incluye la transcripción) y todos los campos de cada segmento de la transcripción (solo `speaker` y `text` están confirmados). Intenté revisarlo en el servidor el 7-nov-2026, pero el SSH no respondía; el comando de la sección "Comprobarlo con tus propios ojos" lo resuelve en 2 minutos.
 - Las opciones adicionales de `POST /bots` y los campos exactos de `POST /admin/users` (la cabecera `X-Admin-API-Key` sí está confirmada; revisa `localhost:8001/docs` dentro del contenedor).
 - Cuántos bots simultáneos aguanta el servidor: hay que medirlo.

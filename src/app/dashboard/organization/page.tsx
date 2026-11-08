@@ -34,6 +34,7 @@ import { RequestCreditsForm, RequestRenewalForm, type PendingRequestView } from 
 import { SubOrgsPanel } from "./_components/suborgs-panel";
 import { SettingRow } from "./_components/setting-row";
 import { Fold } from "./_components/fold";
+import { SharedCalendarForm } from "./_components/shared-calendar-form";
 import { formatCredits } from "@/lib/ai-credits";
 import { PLAN_STATE_LABEL } from "@/lib/plan-period";
 import {
@@ -187,6 +188,16 @@ export default async function OrganizationSettingsPage({
     availableForLeads: m.availableForLeads,
   }));
   const vendedores = members.filter((m) => m.role === "MEMBER");
+
+  // Google Calendar conectado por cada persona del equipo (solo se consulta en la pestaña Equipo).
+  const calendarAccounts =
+    tab === "equipo"
+      ? await prisma.googleCalendarAccount.findMany({
+          where: { userId: { in: members.map((m) => m.id) } },
+          select: { userId: true, googleEmail: true, updatedAt: true },
+        })
+      : [];
+  const calendarByUser = new Map(calendarAccounts.map((a) => [a.userId, a]));
 
   // API de integración: solo se consulta cuando se mira esa pestaña.
   const [integrationKeys, integrationWebhook] =
@@ -589,6 +600,56 @@ export default async function OrganizationSettingsPage({
               />
             </SettingRow>
           </Card>
+
+          <Card className="mb-6">
+            <CardTitle className="mb-1">Google Calendar del equipo</CardTitle>
+            <CardDescription className="mb-4">
+              Quién tiene su calendario conectado. Las reuniones que agenda el bot van al calendario de la persona asignada
+              si lo conectó; si no, al calendario compartido de la organización.
+            </CardDescription>
+            <ul className="divide-y divide-border rounded-md border border-border text-sm">
+              <li className="flex items-center justify-between gap-3 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="font-medium">Calendario compartido de la organización</p>
+                  <p className="text-xs text-ink-muted">
+                    {org.googleCalendarId
+                      ? "Creado en la cuenta de Google del CRM. Es el de respaldo cuando quien atiende no conectó el suyo."
+                      : "Todavía no se creó: se crea con la primera reunión que lo necesite."}
+                  </p>
+                </div>
+                <span className={`shrink-0 text-xs ${org.googleCalendarId ? "text-accent" : "text-ink-faint"}`}>
+                  {org.googleCalendarId ? "Activo" : "Sin crear"}
+                </span>
+              </li>
+              {members.map((m) => {
+                const acc = calendarByUser.get(m.id);
+                return (
+                  <li key={m.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{m.name || m.email}</p>
+                      <p className="truncate text-xs text-ink-muted">{acc ? acc.googleEmail : m.email}</p>
+                    </div>
+                    <span className={`shrink-0 text-xs ${acc ? "text-accent" : "text-ink-faint"}`}>
+                      {acc ? "Conectado" : "Sin conectar"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="mt-3 text-xs text-ink-muted">
+              Cada persona conecta el suyo en <Link href="/dashboard/ajustes" className="underline">Ajustes</Link>.
+              {" "}Conectados: {calendarAccounts.length} de {members.length}.
+            </p>
+          </Card>
+
+          {org.googleCalendarId && (
+            <Fold
+              title="Ver el calendario compartido en tu Google"
+              description="Dale acceso de lectura a tu correo para ver todas las reuniones de la organización en un solo calendario."
+            >
+              <SharedCalendarForm sharedEmails={org.googleCalendarShares} />
+            </Fold>
+          )}
 
           <Fold title="Accesos por cuenta de WhatsApp" description="Marca a qué cuentas puede entrar cada vendedor — sin marcar, no ve esos chats.">
             <BotAccessMatrix

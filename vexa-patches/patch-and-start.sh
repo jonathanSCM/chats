@@ -13,4 +13,6 @@ node /patches/apply-min-stay.js /app/core/meetings/services/bot/dist/aloneness.j
 
 node /patches/apply-shots.js /app/core/meetings/modules/join/dist || echo "[proshop-shots] Fallo el parche de capturas (no fatal)."
 
+node /patches/apply-guest-blocked.js /app/core/meetings/modules/join/dist || echo "[proshop-guest-blocked] Fallo el parche (no fatal)."
+
 exec /entrypoint.sh "$@"

@@ -105,6 +105,19 @@ describe("describeJoinFailure", () => {
     expect(describeJoinFailure(failed("never_reached_lobby"))).toMatch(/Meet no dejó/);
     expect(describeJoinFailure({ failure_stage: "joining", data: null })).toMatch(/no pudo entrar/);
   });
+
+  it("si Meet bloqueó al invitado («You can't join this video call») no dice que lo rechazó una persona", () => {
+    const blocked = {
+      failure_stage: "awaiting_admission",
+      data: { join_evidence: { reason: "awaiting_admission_rejected", detail: "Google Meet blocked the guest: You can't join this video call (…)" } },
+    };
+    expect(describeJoinFailure(blocked)).toMatch(/Workspace/);
+    expect(describeJoinFailure(blocked)).not.toMatch(/rechazó/);
+    // un rechazo real del anfitrión sigue diciéndolo
+    expect(
+      describeJoinFailure({ failure_stage: "awaiting_admission", data: { join_evidence: { reason: "awaiting_admission_rejected", detail: "Bot admission was rejected by meeting admin" } } }),
+    ).toMatch(/rechazó/);
+  });
 });
 
 describe("shouldRetryJoin", () => {

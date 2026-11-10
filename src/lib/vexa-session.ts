@@ -5,6 +5,8 @@
  * todo lo demás (estado, transcripción, grabación) se busca por ese id.
  */
 
+import { SHOT_REASONS } from "./bot-shot";
+
 export const NON_TERMINAL_STATUSES = new Set(["requested", "joining", "awaiting_admission", "active"]);
 
 export interface VexaSessionEntry {
@@ -17,7 +19,7 @@ export interface VexaSessionEntry {
   failure_stage?: string | null;
   completion_reason?: string | null;
   /** Detalle que guarda Vexa de la sesión; `join_evidence.reason` dice por qué no se pudo entrar. */
-  data?: { join_evidence?: { reason?: string | null } | null } | null;
+  data?: { join_evidence?: { reason?: string | null; detail?: string | null } | null } | null;
 }
 
 /** Motivo técnico del fallo al entrar (`awaiting_admission_timeout`, `never_reached_lobby`…), si Vexa lo informó. */
@@ -31,6 +33,9 @@ export function describeJoinFailure(entry: Pick<VexaSessionEntry, "data" | "fail
     case "awaiting_admission_timeout":
       return "Nadie admitió al asistente en la sala de espera (esperó 15 minutos). Quien organiza la reunión tiene que aceptarlo cuando aparezca el aviso de Meet.";
     case "awaiting_admission_rejected":
+      // El parche de ProShop (vexa-patches/apply-guest-blocked.js) deja en el detalle que Meet mostró "You can't join this
+      // video call": no lo rechazó una persona, Meet bloqueó al invitado anónimo.
+      if (/video call/i.test(entry.data?.join_evidence?.detail ?? "")) return SHOT_REASONS.blocked;
       return "Quien organiza la reunión rechazó al asistente.";
     case "never_reached_lobby":
       return "Meet no dejó que el asistente llegara a la sala (el link no abrió una reunión activa, o Meet lo bloqueó).";

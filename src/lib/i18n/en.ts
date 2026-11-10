@@ -165,9 +165,6 @@ export const en: Record<string, string> = {
   "No conectada": "Not connected",
   "Conecta tu cuenta publicitaria con Facebook (solo lectura) para ver el gasto junto a tus ventas en Marketing — se sincroniza sola cada ~20h.":
     "Connect your ad account with Facebook (read-only) to see your spend next to your sales in Marketing — it syncs by itself about every 20 hours.",
-  "Extensión de subtítulos para Meet": "Captions extension for Meet",
-  "Ver cómo se usa": "See how it works",
-  "Extensión de Chrome para leer los subtítulos en vivo": "Chrome extension that reads live captions",
   "Falta el Config ID de Meta Ads en la configuración de plataforma (/admin/settings).":
     "The Meta Ads Config ID is missing from the platform settings (/admin/settings).",
   "No se pudo cargar el SDK de Facebook. Si tienes un bloqueador de anuncios o rastreadores, desactívalo para este sitio.":

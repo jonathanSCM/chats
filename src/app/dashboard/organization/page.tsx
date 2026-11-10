@@ -521,22 +521,6 @@ export default async function OrganizationSettingsPage({
             </SettingRow>
           )}
 
-          <SettingRow
-            title={tr("Extensión de subtítulos para Meet")}
-            actionLabel={tr("Ver cómo se usa")}
-            summary={tr("Extensión de Chrome para leer los subtítulos en vivo")}
-          >
-            <p className="text-sm text-ink-muted">
-              Extensión de Chrome que lee los subtítulos en vivo de Google Meet desde el navegador de quien esté en la
-              reunión — no hace falta que un bot pida entrar ni que nadie lo admita. Función aparte del bot grabador: el
-              bot sigue disponible para cuando sí se necesita audio.
-            </p>
-            <p className="text-sm text-ink-muted">
-              Cada vendedor se identifica solo, con su propia sesión del CRM — no hace falta generar ni pegar ningún token:
-              instala la extensión, toca su ícono y elige &quot;Iniciar sesión&quot;.
-            </p>
-          </SettingRow>
-
           {/* Solo si el superadmin habilitó el Jefe de Operaciones para esta organización. */}
           {org.jefeEnabled && (
             <SettingRow

@@ -6,10 +6,24 @@
 export type ShotPageKind = "meet" | "inactive" | "sign-in" | "other";
 
 export const SHOT_REASONS = {
+  // El asistente ni llegó a la sala: Meet lo mandó a su página de inicio al abrir el link.
   inactive:
-    "La reunión ya no estaba activa: Meet mandó al asistente a su página de inicio (el link no abre una reunión en curso, o ya terminó).",
+    "Meet no abrió la sala y mandó al asistente a su página de inicio. O el link no es de una reunión en curso (ya terminó o no existe), o es una reunión de una cuenta de Google Workspace (empresa) que no admite invitados sin cuenta de Google.",
+  // El asistente sí llegó a pedir entrada y Meet lo echó ("No puedes unirte a esta videollamada") sin que nadie respondiera.
+  blocked:
+    "Meet no dejó entrar al asistente: le mostró «No puedes unirte a esta videollamada» y lo devolvió a la página de inicio. Pasa cuando la reunión es de una cuenta de Google Workspace (empresa) que no admite invitados sin cuenta de Google, o cuando el anfitrión la restringió. No es una falla del CRM: a esa reunión el asistente no puede entrar como invitado.",
   "sign-in": "Meet pidió iniciar sesión con una cuenta de Google: esa reunión no deja entrar a invitados anónimos.",
 } as const;
+
+/**
+ * El motivo que se anota cuando una captura muestra que Meet sacó al asistente de la sala. Si ya había pedido entrar
+ * (llegó a la sala de espera) y después apareció la página de inicio, Meet lo bloqueó; si nunca llegó a la sala, la
+ * reunión no se abrió.
+ */
+export function shotFailureReason(kind: "inactive" | "sign-in", reachedLobby: boolean): string {
+  if (kind === "sign-in") return SHOT_REASONS["sign-in"];
+  return reachedLobby ? SHOT_REASONS.blocked : SHOT_REASONS.inactive;
+}
 
 /** Qué página tenía abierta el asistente cuando sacó la captura. */
 export function classifyShotPage(pageUrl: string): ShotPageKind {

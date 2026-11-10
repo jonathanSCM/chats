@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
 import { extractMeetCode } from "@/lib/meet-code";
-import { classifyShotPage, shotFileName, SHOT_REASONS } from "@/lib/bot-shot";
+import { classifyShotPage, shotFailureReason, shotFileName } from "@/lib/bot-shot";
 import { stopMeetingBot } from "@/server/services/meeting-bot";
 import { isPlatformBotEmail } from "@/server/services/extension-meeting";
 
@@ -67,7 +67,11 @@ export async function POST(req: NextRequest) {
 
   const kind = classifyShotPage(pageUrl);
   if ((kind === "inactive" || kind === "sign-in") && meeting.botStatus && (LIVE_STATUSES as readonly string[]).includes(meeting.botStatus)) {
-    await prisma.meeting.update({ where: { id: meeting.id }, data: { botFailureReason: SHOT_REASONS[kind] } });
+    // ¿Ya había pedido entrar? (Vexa lo marcó en la sala de espera, o hay una captura de ese momento): entonces Meet lo bloqueó.
+    const reachedLobby =
+      meeting.botStatus === "WAITING_ADMISSION" ||
+      (await prisma.meetingAttachment.count({ where: { meetingId: meeting.id, fileName: { contains: "en la sala de espera" } } })) > 0;
+    await prisma.meeting.update({ where: { id: meeting.id }, data: { botFailureReason: shotFailureReason(kind, reachedLobby) } });
     const stopped = await stopMeetingBot(meeting.id);
     if (!stopped.ok) console.warn(`[meeting-bot-shot] No se pudo sacar al asistente de ${meeting.id}: ${stopped.error}`);
   }

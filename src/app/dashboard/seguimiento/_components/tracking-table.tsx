@@ -1,6 +1,7 @@
 "use client";
 
 import { DUE_COLOR, leadScoreColor } from "@/lib/status-colors";
+import { TranscriptUpload } from "./transcript-upload";
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -2093,6 +2094,7 @@ function MeetingsSection({
   canCreateGoogleMeet: boolean;
 }) {
   const [adding, setAdding] = useState(false);
+  const [uploadingTranscript, setUploadingTranscript] = useState(false);
   const [withGoogleMeet, setWithGoogleMeet] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [state, formAction] = useActionState(createMeetingAction, { error: null });
@@ -2190,16 +2192,30 @@ function MeetingsSection({
           <Video size={11} /> Reuniones
         </p>
         {editable && (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => setAdding((v) => !v)}
-            className="cursor-pointer text-xs text-accent hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {adding ? "Cancelar" : "+ Registrar reunión"}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => setUploadingTranscript((v) => !v)}
+              className="cursor-pointer text-xs text-accent hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {uploadingTranscript ? "Cancelar" : "+ Subir transcripción"}
+            </button>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => setAdding((v) => !v)}
+              className="cursor-pointer text-xs text-accent hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {adding ? "Cancelar" : "+ Registrar reunión"}
+            </button>
+          </div>
         )}
       </div>
+
+      {uploadingTranscript && (
+        <TranscriptUpload opportunityId={opportunityId} onDone={() => setUploadingTranscript(false)} />
+      )}
 
       {adding && (
         <form action={formAction} className="mb-3 space-y-2 rounded-md border border-border p-2.5">

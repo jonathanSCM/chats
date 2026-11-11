@@ -23,6 +23,8 @@ import { createUserMeetEvent, hasGoogleCalendarConnected } from "@/server/servic
 import { scheduleMeetingBotJoin, cancelMeetingBotJoin, stopMeetingBot } from "@/server/services/meeting-bot";
 import { requestMeetingSummaryPdf } from "@/server/services/meeting-transcript";
 import { generateMeetingSummary } from "@/server/services/meeting-summary";
+import { PDFParse } from "pdf-parse";
+import { checkTranscriptText } from "@/lib/transcript-upload";
 import { meetingTitleForClient } from "@/lib/meeting-title";
 import { meetingSummarySchema } from "@/lib/meeting-summary";
 import { buildProposals, type ApplyKey } from "@/lib/meeting-apply";
@@ -1197,4 +1199,103 @@ export async function getAiSpendToday(organizationId: string): Promise<{
     enabled: await isAiEnabledFor(organizationId),
     source,
   };
+}
+
+// ─── Transcripción de una reunión externa subida a la ficha ──────────────
+
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+
+async function readTranscriptFile(file: File): Promise<{ text: string } | { error: string }> {
+  if (file.size > MAX_UPLOAD_BYTES) return { error: "El archivo pesa más de 8 MB." };
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf") || file.type === "application/pdf") {
+    const parser = new PDFParse({ data: Buffer.from(await file.arrayBuffer()) });
+    try {
+      const result = await parser.getText();
+      return { text: result.text };
+    } catch (error) {
+      console.error("[crm] No se pudo leer el PDF de la transcripción:", error);
+      return { error: "No se pudo leer ese PDF (¿es una imagen escaneada?)." };
+    } finally {
+      await parser.destroy();
+    }
+  }
+  if (/\.(txt|md|vtt|srt|csv)$/.test(name) || file.type.startsWith("text/")) return { text: await file.text() };
+  return { error: "Formato no admitido: usa .txt, .md, .vtt, .srt o .pdf (para Word, copia el texto y pégalo)." };
+}
+
+/**
+ * Sube a la ficha de un cliente la transcripción de una reunión que no se agendó en el CRM (Zoom, Teams, otra
+ * herramienta): como archivo o como texto pegado. Crea una reunión ya realizada, sin Google Calendar ni asistente.
+ * El texto queda guardado como transcripción, se genera su resumen y, si se pide, el calificador analiza la ficha
+ * con esa información.
+ */
+export async function uploadMeetingTranscriptAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const { organizationId, userId, isAdmin } = await requireOrg();
+
+  const opportunityId = String(formData.get("opportunityId") ?? "");
+  const opportunity = await prisma.opportunity.findUnique({
+    where: { id: opportunityId },
+    select: { organizationId: true, assignedToId: true },
+  });
+  if (!opportunity || opportunity.organizationId !== organizationId) return { error: "Cliente no encontrado" };
+  if (!canEditOpportunity(opportunity, userId, isAdmin)) return { error: "Este cliente está asignado a otro vendedor." };
+
+  const parts: string[] = [];
+  const pasted = String(formData.get("text") ?? "");
+  if (pasted.trim()) parts.push(pasted);
+  const file = formData.get("file");
+  if (file instanceof File && file.size > 0) {
+    const read = await readTranscriptFile(file);
+    if ("error" in read) return { error: read.error };
+    parts.unshift(read.text);
+  }
+  const checked = checkTranscriptText(parts.join("\n\n"));
+  if (!checked.ok) return { error: parts.length === 0 ? "Sube un archivo o pega el texto de la transcripción." : checked.error };
+
+  const dateField = String(formData.get("date") ?? "");
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(dateField) ? dateField : new Date().toISOString().slice(0, 10);
+  const scheduledAt = new Date(`${day}T12:00:00.000Z`);
+  if (Number.isNaN(scheduledAt.getTime())) return { error: "Fecha inválida" };
+  const title = String(formData.get("title") ?? "").replace(/\s+/g, " ").trim().slice(0, 160) || "Reunión (transcripción subida)";
+
+  const meeting = await prisma.meeting.create({
+    data: {
+      organizationId,
+      opportunityId,
+      title,
+      scheduledAt,
+      durationMinutes: 30,
+      status: "DONE",
+      transcript: checked.text,
+      recordedById: userId,
+    },
+    select: { id: true },
+  });
+  const url = await saveMediaFile(Buffer.from(checked.text, "utf-8"), "text/plain");
+  await prisma.meetingAttachment.create({
+    data: { meetingId: meeting.id, url, fileName: "transcripcion-subida.txt", mimeType: "text/plain", fileSize: Buffer.byteLength(checked.text, "utf-8") },
+  });
+
+  const notes: string[] = ["Transcripción guardada en la reunión."];
+  try {
+    const summary = await generateMeetingSummary(meeting.id);
+    notes.push(summary.status === "generated" ? "Resumen listo." : "No se generó el resumen (texto corto o IA no disponible).");
+  } catch (error) {
+    if (!(error instanceof AiBudgetExceededError)) console.error("[crm] No se pudo resumir la transcripción subida:", error);
+    notes.push("No se pudo generar el resumen ahora (créditos o IA no disponible).");
+  }
+
+  if (formData.get("analyze") === "on") {
+    try {
+      await analyzeFollowUp(opportunityId, userId);
+      notes.push("El calificador ya la tomó en cuenta.");
+    } catch (error) {
+      if (!(error instanceof AiBudgetExceededError)) console.error("[crm] No se pudo analizar tras subir la transcripción:", error);
+      notes.push(error instanceof AiCreditsError ? error.message : "No se pudo calificar ahora: pulsa «Analizar» más tarde.");
+    }
+  }
+
+  revalidatePath(PATH);
+  return { error: null, message: notes.join(" ") };
 }

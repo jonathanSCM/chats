@@ -219,6 +219,21 @@ export const en: Record<string, string> = {
   "Cada chat nuevo recibe su tarjeta en Seguimiento y la IA le pone calidad de lead y prioridad sin que nadie lo pida.":
     "Every new chat gets its Follow-up card and the AI sets its lead quality and priority without anyone asking.",
   Activado: "Enabled",
+  "Sube la transcripción de una reunión que no se agendó acá (Zoom, Teams, otra herramienta). Queda en la ficha como una reunión realizada.":
+    "Upload the transcript of a meeting that wasn't scheduled here (Zoom, Teams, another tool). It is saved on the card as a completed meeting.",
+  "Nombre de la reunión (opcional)": "Meeting name (optional)",
+  "Fecha de la reunión": "Meeting date",
+  "Subir archivo (.txt, .md, .vtt, .srt, .pdf)": "Upload file (.txt, .md, .vtt, .srt, .pdf)",
+  "Texto pegado": "Pasted text",
+  caracteres: "characters",
+  Ocultar: "Hide",
+  Ver: "View",
+  Quitar: "Remove",
+  "O pega acá el texto de la transcripción… (si es largo se guarda como una etiqueta)": "Or paste the transcript text here… (long text is kept as a tag)",
+  "Calificar la ficha con esta reunión al subirla (gasta créditos de IA)": "Score the card with this meeting on upload (uses AI credits)",
+  "Subiendo…": "Uploading…",
+  "Subir transcripción": "Upload transcript",
+  Cerrar: "Close",
   Desactivado: "Disabled",
 
   // Organización: pestañas (se traducen por variable, el test no las ve), subtítulo y filas de Integraciones
@@ -230,7 +245,6 @@ export const en: Record<string, string> = {
   Suborganizaciones: "Sub-organizations",
   "Datos, plan, equipo, ventas e integraciones.": "Details, plan, team, sales and integrations.",
   "Inteligencia artificial": "Artificial intelligence",
-  Ver: "View",
   "Este mes: {usage}": "This month: {usage}",
   "Con límite mensual": "With a monthly limit",
   "Tu plan incluye IA con un límite mensual. Si lo alcanzas, la IA se detiene hasta el mes siguiente o hasta que el administrador de la plataforma lo amplíe.":

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { audit } from "@/server/services/audit";
 import { MODELS, runStructured } from "./client";
+import { hasMeetingEvidence, MAX_MEETINGS_FOR_ANALYSIS, renderMeetingEvidence } from "@/lib/meeting-evidence";
 
 export const PROMPT_VERSION = "seguimiento-v2";
 
@@ -247,10 +248,13 @@ async function buildInput(opportunity: OpportunityContext): Promise<string> {
       take: 10,
     }),
     prisma.meeting.findMany({
-      where: { opportunityId: opportunity.id, notes: { not: null } },
-      select: { scheduledAt: true, status: true, notes: true },
+      where: {
+        opportunityId: opportunity.id,
+        OR: [{ notes: { not: null } }, { transcript: { not: null } }, { audioTranscript: { not: null } }, { aiSummary: { not: null } }],
+      },
+      select: { scheduledAt: true, status: true, notes: true, transcript: true, audioTranscript: true, aiSummary: true },
       orderBy: { scheduledAt: "desc" },
-      take: 5,
+      take: MAX_MEETINGS_FOR_ANALYSIS * 2,
     }),
   ]);
 
@@ -287,16 +291,9 @@ async function buildInput(opportunity: OpportunityContext): Promise<string> {
     ? notes.map((n) => `- ${n.createdAt.toISOString().slice(0, 10)}: ${n.body}`).join("\n")
     : "(Sin notas.)";
 
-  // Fuente de mayor confianza: declaraciones directas del lead en una
-  // reunión, cargadas a mano por el vendedor (transcripción o resumen).
-  const meetingsText = meetings.length
-    ? meetings
-        .map(
-          (m) =>
-            `--- Reunión del ${m.scheduledAt.toISOString().slice(0, 10)} (${m.status}) ---\n${m.notes}`,
-        )
-        .join("\n\n")
-    : null;
+  // Fuente de mayor confianza: declaraciones directas del lead en una reunión -- notas del vendedor, transcripción
+  // (subtítulos, audio o una reunión externa subida a la ficha) y el resumen automático.
+  const meetingsText = renderMeetingEvidence(meetings.filter(hasMeetingEvidence));
 
   // El orden importa para el prompt caching automático de OpenAI: cachea el
   // PREFIJO de tokens desde el principio, así que lo que es igual para toda

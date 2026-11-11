@@ -227,7 +227,7 @@ export const en: Record<string, string> = {
   "Descargar extensión": "Download extension",
   "Descarga el .zip y descomprímelo en una carpeta que no vayas a borrar (por ejemplo, Documentos).": "Download the .zip and unzip it into a folder you won't delete (for example, Documents).",
   "En Chrome abre chrome://extensions y activa «Modo de desarrollador» (arriba a la derecha).": "In Chrome open chrome://extensions and turn on “Developer mode” (top right).",
-  "Pulsa «Cargar descomprimida» y elige esa carpeta.": "Click “Load unpacked” and choose that folder.",
+  "Pulsa «Cargar extensión sin empaquetar» y elige esa carpeta.": "Click “Load unpacked” and choose that folder.",
   "Fija la extensión en la barra de Chrome y haz clic en su ícono dentro de una reunión de Meet.": "Pin the extension to the Chrome toolbar and click its icon inside a Meet meeting.",
   "Para actualizar: descarga el .zip nuevo, reemplaza los archivos de la carpeta y pulsa «Recargar» en chrome://extensions.": "To update: download the new .zip, replace the files in the folder and click “Reload” in chrome://extensions.",
   "Para instalarlos: abre Tampermonkey en Chrome → «Crear un nuevo script», borra lo que trae, pega el script completo y guarda (Ctrl+S). Si ya lo tenías, reemplaza el código por la versión nueva.":

@@ -29,7 +29,7 @@ export function ExtensionCard({ version }: { version: string | null }) {
       <ol className="mt-3 list-decimal space-y-1 pl-5 text-xs text-ink-muted">
         <li>{t("Descarga el .zip y descomprímelo en una carpeta que no vayas a borrar (por ejemplo, Documentos).")}</li>
         <li>{t("En Chrome abre chrome://extensions y activa «Modo de desarrollador» (arriba a la derecha).")}</li>
-        <li>{t("Pulsa «Cargar descomprimida» y elige esa carpeta.")}</li>
+        <li>{t("Pulsa «Cargar extensión sin empaquetar» y elige esa carpeta.")}</li>
         <li>{t("Fija la extensión en la barra de Chrome y haz clic en su ícono dentro de una reunión de Meet.")}</li>
         <li>{t("Para actualizar: descarga el .zip nuevo, reemplaza los archivos de la carpeta y pulsa «Recargar» en chrome://extensions.")}</li>
       </ol>

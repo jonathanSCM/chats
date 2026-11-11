@@ -18,6 +18,7 @@ describe("manifest de la extensión de Chrome", () => {
       manifest.side_panel.default_path,
       ...Object.values<string>(manifest.icons),
       ...Object.values<string>(manifest.action.default_icon),
+      ...manifest.web_accessible_resources.flatMap((r: { resources: string[] }) => r.resources),
       ...manifest.content_scripts.flatMap((c: { js: string[] }) => c.js),
     ];
     for (const file of files) expect(exists(file), `falta ${file}`).toBe(true);
@@ -28,6 +29,13 @@ describe("manifest de la extensión de Chrome", () => {
     expect(exists("popup.html")).toBe(false);
     expect(manifest.side_panel.default_path).toBe("sidepanel.html");
     expect(readFileSync(path.join(dir, "background.js"), "utf8")).toContain("openPanelOnActionClick: true");
+  });
+
+  it("el script de la pestaña de Meet no deja llamadas chrome.* sueltas: con la extensión recargada fallarían con «Extension context invalidated»", () => {
+    const content = readFileSync(path.join(dir, "content.js"), "utf8");
+    expect(content.match(/chrome\.runtime\.sendMessage\(/g)).toHaveLength(1); // solo dentro de send()
+    expect(content.match(/chrome\.storage\.local\.get\(/g)).toHaveLength(2); // store() y el aviso al cerrar la pestaña
+    expect(content).toContain("Extension context invalidated");
   });
 
   it("captions-dom.js se carga antes que content.js (content.js lo usa)", () => {

@@ -38,6 +38,8 @@ const bodySchema = z.object({
   organizationId: z.string().optional(),
   // Nombre de la reunión escrito en el panel (opcional).
   title: z.string().max(300).optional(),
+  // Id de esta grabación (la extensión de Chrome): cada grabación es su propia reunión.
+  recordingId: z.string().max(80).optional(),
 });
 
 // El content script de la extensión corre pegado al origen de la propia
@@ -67,7 +69,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return withCors(new NextResponse("Datos inválidos", { status: 400 }));
   }
-  const { meetingUrl, transcript, final, vexaSessionId, organizationId: requestedOrganizationId, title } = parsed.data;
+  const { meetingUrl, transcript, final, vexaSessionId, organizationId: requestedOrganizationId, title, recordingId } = parsed.data;
 
   const token =
     req.headers.get("authorization")?.replace("Bearer ", "").trim() || parsed.data.token;
@@ -101,6 +103,7 @@ export async function POST(req: NextRequest) {
       recordedById: user.id,
       vexaSessionId,
       title,
+      recordingId,
       onlyExisting: isPlatformBotEmail(user.email),
     });
   } catch (error) {

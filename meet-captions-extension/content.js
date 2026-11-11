@@ -1,102 +1,159 @@
-// Extensión de subtítulos de Meet — ProShop CRM.
+// Extensión ProShop CRM — script de la pestaña de Meet.
 //
-// Corre dentro del navegador de quien esté en la reunión, como un
-// participante más (no un bot aparte). Lee el panel de subtítulos en vivo
-// de Meet exactamente igual que meeting-bot/src/captions.ts (mismos
-// selectores, confirmados contra el HTML real de Meet), arma líneas
-// "Nombre: lo que dijo", y al detectar que la reunión terminó las manda al
-// CRM. Es una función aparte del bot grabador (meeting-bot/) -- ese sigue
-// existiendo para cuando sí hace falta audio real.
+// Corre dentro del navegador de quien está en la reunión, como un participante más (no hay bot aparte): lee los subtítulos
+// de Meet ("Nombre: lo que dijo"), vigila si tu micrófono está silenciado (para que tu voz no se grabe mientras lo estás),
+// detecta el fin de la reunión y manda todo al CRM. Cada vez que se pulsa «Grabar» es UNA grabación con su propio id: se
+// puede detener y empezar otra en la misma sala (primero el cliente, después el equipo) y quedan como reuniones separadas.
 (function () {
   "use strict";
 
   // Meet usa tanto /abc-defg-hij como /meet/abc-defg-hij (el que sale al abrir el link desde Calendar o Gmail).
   const MEETING_CODE_RE = /^\/(?:meet\/)?([a-z]{3}-[a-z]{4}-[a-z]{3})\/?$/i;
   const POLL_MS = 2000;
-  const END_CHECK_TICKS = 10; // cada 10 polls (~20s) se fija si la reunión terminó
+  const END_CHECK_TICKS = 10; // cada 10 polls (~20 s) se fija si la reunión terminó
   const API_PATH = "/api/extension/transcript";
 
+  // ───────── Contexto de la extensión ─────────
+  // Si la extensión se recarga o se actualiza mientras esta pestaña sigue abierta, este script queda "huérfano": cada llamada
+  // a chrome.* lanza «Extension context invalidated». Todo pasa por estas funciones y, al detectarlo, se apaga limpio
+  // (sin errores en la consola, sin dejar botones colgados). La pestaña nueva/recargada ya carga el script actualizado.
+  let dead = false;
+  const alive = () => {
+    try {
+      return Boolean(chrome.runtime && chrome.runtime.id);
+    } catch {
+      return false;
+    }
+  };
+  const intervals = [];
+  const observers = [];
+  let launcherEl = null;
+  let badgeEl = null;
+  function every(fn, ms) {
+    const id = setInterval(() => {
+      if (dead) return;
+      if (!alive()) return shutdown();
+      try {
+        fn();
+      } catch (error) {
+        if (!alive()) shutdown();
+        else console.error("[proshop-captions]", error);
+      }
+    }, ms);
+    intervals.push(id);
+    return id;
+  }
+  function shutdown() {
+    if (dead) return;
+    dead = true;
+    for (const id of intervals) clearInterval(id);
+    for (const o of observers) o.disconnect();
+    for (const el of [launcherEl, badgeEl]) if (el) el.remove();
+    launcherEl = badgeEl = null;
+    try {
+      if (window.ProShopCaptions) window.ProShopCaptions.setHidden(false); // deja la pantalla de Meet como estaba
+    } catch {
+      /* nada más que hacer */
+    }
+  }
+  function send(message) {
+    if (dead || !alive()) return Promise.resolve(undefined);
+    try {
+      return Promise.resolve(chrome.runtime.sendMessage(message)).catch(() => undefined);
+    } catch {
+      return Promise.resolve(undefined);
+    }
+  }
+  function store(keys) {
+    if (dead || !alive()) return Promise.resolve({});
+    try {
+      return Promise.resolve(chrome.storage.local.get(keys)).catch(() => ({}));
+    } catch {
+      return Promise.resolve({});
+    }
+  }
+  const dbg = (text) => void send({ type: "DEBUG", text: "[página] " + text });
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // ───────── Estado de la grabación ─────────
   // Meet es una SPA: se pasa de la pantalla de inicio a una reunión SIN recargar la página, así que la reunión se mira de
-  // nuevo cada segundo en vez de decidirlo una sola vez al cargar (antes, entrar desde el inicio dejaba a la extensión
-  // sin conexión hasta recargar). Una vez que se empieza a grabar, el enlace queda fijo.
-  // Siempre el link canónico, así la misma reunión cae en la misma fila del CRM sin importar cómo se abrió.
+  // nuevo cada segundo. Mientras se graba, el enlace queda fijo. Siempre el link canónico: la misma reunión cae en la
+  // misma fila del CRM sin importar cómo se abrió.
   let meetingUrl = null;
-  let started = false;
+  let phase = "idle"; // idle → recording → stopped (y de stopped se puede volver a grabar)
+  let recordingId = null;
+  let startedAt = null;
+  let endedAt = null;
+  let ticks = 0;
+  let consecutiveEndSignals = 0;
+  let sent = false;
+  let paused = false; // en pausa: no se guarda nada hasta reanudar
+  let warning = null; // aviso visible en el panel (subtítulos que no se activaron, no llegan…)
+  let noCaptionsWarned = false;
+  let timer = null;
+  let pending = null;
+  let maxParticipantsSeen = 0;
+  let lockedOrgId; // organización de ESTA grabación (se fija al pulsar «Grabar»); sin elegir va null
+  let lockedTitle = null; // nombre de la reunión (opcional), fijado al pulsar «Grabar»
+  const finalizedKeys = new Set();
+  const finalizedLines = [];
+
+  const isRecording = () => phase === "recording";
+
   function syncMeetingUrl() {
-    if (started) return;
+    if (isRecording()) return;
     const match = MEETING_CODE_RE.exec(window.location.pathname);
     meetingUrl = match ? `https://meet.google.com/${match[1].toLowerCase()}` : null;
   }
   syncMeetingUrl();
-  setInterval(syncMeetingUrl, 1000);
+  every(syncMeetingUrl, 1000);
 
-  // Botón «PS» siempre a mano en la reunión: abre el panel lateral (o la ventana separada si Chrome no deja abrir el panel).
-  let launcherEl = null;
-  function syncLauncher() {
-    if (!meetingUrl) {
-      if (launcherEl) launcherEl.remove();
-      launcherEl = null;
-      return;
-    }
-    if (!launcherEl || !launcherEl.isConnected) {
-      launcherEl = document.createElement("div");
-      launcherEl.id = "proshop-launcher";
-      launcherEl.title = "ProShop CRM: abrir el panel de subtítulos";
-      launcherEl.style.cssText =
-        "position:fixed;bottom:64px;left:16px;z-index:999998;width:40px;height:40px;border-radius:50%;background:#00a884;" +
-        "color:#fff;font:600 13px/40px system-ui,sans-serif;text-align:center;cursor:pointer;user-select:none;" +
-        "box-shadow:0 2px 8px rgba(0,0,0,.35);";
-      launcherEl.textContent = "PS";
-      const rec = document.createElement("span");
-      rec.id = "proshop-launcher-rec";
-      rec.style.cssText = "position:absolute;top:2px;right:2px;width:10px;height:10px;border-radius:50%;background:#ef4444;display:none;";
-      launcherEl.appendChild(rec);
-      launcherEl.addEventListener("click", () => chrome.runtime.sendMessage({ type: "OPEN_PANEL" }).catch(() => {}));
-      document.body.appendChild(launcherEl);
-    }
-    const rec = launcherEl.querySelector("#proshop-launcher-rec");
-    if (rec) rec.style.display = started && !stopped ? "block" : "none";
-  }
-  setInterval(syncLauncher, 1000);
-
-  let ticks = 0;
-  let consecutiveEndSignals = 0;
-  let sent = false;
-  const finalizedKeys = new Set();
-  const finalizedLines = [];
-  let pending = null;
-  let paused = false; // en pausa: no se guarda nada hasta reanudar
-  let stopped = false; // se detuvo con «Detener y enviar» o al terminar la reunión
-  let warning = null; // aviso visible en el panel lateral (subtítulos que no se activaron, no llegan…)
-  let noCaptionsWarned = false;
-  let timer = null;
-
-  function dbg(text) {
-    chrome.runtime.sendMessage({ type: "DEBUG", text: "[página] " + text }).catch(() => {});
+  // Empieza de cero para una grabación nueva (la anterior ya se envió).
+  function resetSession() {
+    clearInterval(timer);
+    timer = null;
+    phase = "idle";
+    recordingId = null;
+    startedAt = endedAt = null;
+    ticks = 0;
+    consecutiveEndSignals = 0;
+    sent = false;
+    paused = false;
+    warning = null;
+    noCaptionsWarned = false;
+    pending = null;
+    maxParticipantsSeen = 0;
+    lockedOrgId = undefined;
+    lockedTitle = null;
+    finalizedKeys.clear();
+    finalizedLines.length = 0;
   }
 
-  // Estado en vivo para el panel lateral y la ventana separada (el service worker lo guarda).
+  let lastMicMuted = null;
+
+  // Estado en vivo para el panel (el service worker lo guarda).
   function pushLive() {
     const lines = [...finalizedLines];
     if (pending && pending.text) lines.push(`${pending.name}: ${pending.text}`);
-    chrome.runtime
-      .sendMessage({
-        type: "LIVE_STATE",
-        state: {
-          meetingUrl,
-          recording: started && !stopped,
-          stopped,
-          paused,
-          lines: finalizedLines.length + (pending && pending.text ? 1 : 0),
-          organizationId: lockedOrgId === undefined ? null : lockedOrgId,
-          title: lockedTitle,
-          last: lines.slice(-60),
-          warning,
-          micMuted: lastMicMuted === true,
-          hideMeetCaptions: window.ProShopCaptions.isHidden(),
-        },
-      })
-      .catch(() => {});
+    void send({
+      type: "LIVE_STATE",
+      state: {
+        meetingUrl,
+        recording: isRecording(),
+        stopped: phase === "stopped",
+        paused,
+        recordingId,
+        startedAt,
+        endedAt,
+        lines: finalizedLines.length + (pending && pending.text ? 1 : 0),
+        organizationId: lockedOrgId === undefined ? null : lockedOrgId,
+        title: lockedTitle,
+        last: lines.slice(-60),
+        warning,
+        micMuted: lastMicMuted === true,
+        hideMeetCaptions: window.ProShopCaptions ? window.ProShopCaptions.isHidden() : true,
+      },
+    });
   }
 
   function recordIfNew(name, text) {
@@ -104,322 +161,230 @@
     if (text && !finalizedKeys.has(key)) {
       finalizedKeys.add(key);
       finalizedLines.push(`${name}: ${text}`);
-      updateBadge();
     }
   }
-
   function currentTranscript() {
     const lines = [...finalizedLines];
     if (pending && pending.text) lines.push(`${pending.name}: ${pending.text}`);
     return lines.join("\n");
   }
 
-  // ── Badge flotante: confirmación visual de que está grabando subtítulos,
-  // igual que cualquier notetaker comercial muestra un indicador en pantalla.
-  let badgeEl = null;
-  function ensureBadge() {
-    if (badgeEl) return badgeEl;
-    badgeEl = document.createElement("div");
-    badgeEl.id = "proshop-captions-badge";
-    badgeEl.style.cssText =
-      "position:fixed;bottom:16px;left:16px;z-index:999999;background:#111827;color:#fff;" +
-      "font:12px/1.4 system-ui,sans-serif;padding:8px 12px;border-radius:8px;" +
-      "box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;gap:6px;pointer-events:none;";
-    const dot = document.createElement("span");
-    dot.style.cssText = "width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0;";
-    badgeEl.appendChild(dot);
-    const label = document.createElement("span");
-    label.id = "proshop-captions-label";
-    label.textContent = "ProShop CRM — subtítulos: 0 líneas";
-    badgeEl.appendChild(label);
-    document.body.appendChild(badgeEl);
-    return badgeEl;
+  // ───────── Botón de la extensión en la pantalla de la reunión (con el logo del CRM) ─────────
+  function syncLauncher() {
+    if (!meetingUrl) {
+      if (launcherEl) launcherEl.remove();
+      launcherEl = null;
+      return;
+    }
+    if (!launcherEl || !launcherEl.isConnected) {
+      launcherEl = document.createElement("button");
+      launcherEl.id = "proshop-launcher";
+      launcherEl.type = "button";
+      launcherEl.title = "ProShop CRM — abrir el asistente de la reunión";
+      launcherEl.setAttribute("aria-label", "ProShop CRM: abrir el asistente de la reunión");
+      launcherEl.style.cssText =
+        "position:fixed;bottom:72px;left:16px;z-index:999998;width:44px;height:44px;padding:0;border:0;border-radius:12px;" +
+        "background:none;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.4);";
+      const logo = document.createElement("img");
+      logo.src = chrome.runtime.getURL("icons/icon48.png");
+      logo.alt = "";
+      logo.style.cssText = "display:block;width:44px;height:44px;border-radius:12px;";
+      const dot = document.createElement("span");
+      dot.id = "proshop-launcher-rec";
+      dot.style.cssText =
+        "position:absolute;top:-4px;right:-4px;width:12px;height:12px;border-radius:50%;background:#ef4444;border:2px solid #fff;display:none;";
+      launcherEl.append(logo, dot);
+      launcherEl.addEventListener("click", () => void send({ type: "OPEN_PANEL" }));
+      document.body.appendChild(launcherEl);
+    }
+    const dot = launcherEl.querySelector("#proshop-launcher-rec");
+    if (dot) dot.style.display = isRecording() ? "block" : "none";
   }
-  function updateBadge() {
-    const el = ensureBadge().querySelector("#proshop-captions-label");
-    if (el) el.textContent = `ProShop CRM — subtítulos: ${finalizedLines.length} líneas`;
-  }
+  every(syncLauncher, 1000);
 
-  // ── Encontrar botones por su nombre accesible (aria-label o texto), sin
-  // depender de las clases internas de Meet (que cambian con rediseños).
+  // ───────── Indicador de grabación (visible para quien graba, como cualquier notetaker) ─────────
+  const clock = (ms) => {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    return (h ? `${h}:${String(m).padStart(2, "0")}` : String(m)) + `:${String(s).padStart(2, "0")}`;
+  };
+  function syncBadge() {
+    if (!isRecording()) {
+      if (badgeEl) badgeEl.remove();
+      badgeEl = null;
+      return;
+    }
+    if (!badgeEl || !badgeEl.isConnected) {
+      badgeEl = document.createElement("div");
+      badgeEl.id = "proshop-captions-badge";
+      badgeEl.style.cssText =
+        "position:fixed;bottom:16px;left:16px;z-index:999999;background:#111827;color:#fff;font:12px/1.4 system-ui,sans-serif;" +
+        "padding:8px 12px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;gap:8px;pointer-events:none;";
+      const dot = document.createElement("span");
+      dot.id = "proshop-badge-dot";
+      dot.style.cssText = "width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0;";
+      const label = document.createElement("span");
+      label.id = "proshop-captions-label";
+      badgeEl.append(dot, label);
+      document.body.appendChild(badgeEl);
+    }
+    const label = badgeEl.querySelector("#proshop-captions-label");
+    const dot = badgeEl.querySelector("#proshop-badge-dot");
+    if (label) label.textContent = `ProShop CRM · ${paused ? "en pausa" : "grabando"} ${clock(Date.now() - startedAt)}`;
+    if (dot) dot.style.background = paused ? "#f59e0b" : "#ef4444";
+  }
+  every(syncBadge, 1000);
+
+  // ───────── Utilidades de la pantalla de Meet ─────────
+  // Encontrar botones por su nombre accesible, sin depender de las clases internas de Meet (que cambian con rediseños).
   function findButtonByName(regex) {
-    const candidates = document.querySelectorAll('[role="button"], button');
-    for (const el of candidates) {
+    for (const el of document.querySelectorAll('[role="button"], button')) {
       const name = (el.getAttribute("aria-label") || el.textContent || "").trim();
       if (regex.test(name)) return el;
     }
     return null;
   }
 
-  function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  // ── Silenciar en Meet solo corta lo que se manda a los demás
-  // participantes -- no afecta el getUserMedia aparte que pide esta
-  // extensión, así que sin esto seguiría grabando tu voz aunque la lucecita
-  // de Meet diga que estás en silencio. Meet marca el botón del micrófono
-  // con data-is-muted, y como respaldo (por si cambia en un rediseño) se
-  // mira también el texto del botón: "Activar micrófono" significa que
-  // ahora mismo está apagado (el botón ofrece prenderlo).
+  // ───────── Micrófono silenciado ─────────
+  // Silenciar en Meet solo corta lo que se manda a los demás: la grabación abre el micrófono aparte. Por eso se vigila el
+  // botón de Meet (data-is-muted; de respaldo su texto) y se le avisa al grabador, que CORTA tu voz por completo (silencio
+  // total, no volumen bajo). Se revisa al instante cuando el botón cambia y cada 250 ms como respaldo: el corte ocurre en
+  // menos de un cuarto de segundo, y mientras estás en silencio nada de tu micrófono entra a la grabación.
   function isMicMuted() {
     const el = document.querySelector('[data-is-muted][aria-label*="micrófono" i], [data-is-muted][aria-label*="microphone" i]');
     if (el) return el.getAttribute("data-is-muted") === "true";
-
     const fallback = findButtonByName(/micrófono|microphone/i);
-    if (!fallback) return false; // no se encontró el botón -- mejor no cortar el mic por las dudas
-    const label = (fallback.getAttribute("aria-label") || "").trim();
-    return /activar|turn on/i.test(label);
+    if (!fallback) return false; // no se encontró el botón: mejor no cortar el micrófono por las dudas
+    return /activar|turn on/i.test((fallback.getAttribute("aria-label") || "").trim());
+  }
+  function syncMic(force) {
+    const muted = isMicMuted();
+    if (!force && muted === lastMicMuted) return;
+    lastMicMuted = muted;
+    void send({ type: "SET_MIC_ENABLED", enabled: !muted });
+  }
+  every(() => syncMic(false), 250);
+  try {
+    const muteObserver = new MutationObserver(() => syncMic(false));
+    muteObserver.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ["data-is-muted"] });
+    observers.push(muteObserver);
+  } catch {
+    /* el sondeo de arriba alcanza */
   }
 
-  // ── Activa subtítulos y los pone en español, igual que hace el bot
-  // (services captions.ts) pero con DOM plano en vez de Playwright.
+  // ───────── Subtítulos ─────────
+  // Activa los subtítulos (sin apagarlos si ya estaban) y los pone en el idioma elegido en Ajustes.
   async function enableCaptions() {
-    // Revisa si ya estaban activos antes de pulsar (un clic de más los apagaría) y abre el panel de Meet si hace falta.
     const activos = await window.ProShopCaptions.activate();
     if (!activos) return false;
     await sleep(500);
-    // Idioma de los subtítulos (Ajustes del panel): español por defecto; «none» no toca el idioma de Meet.
-    const { captionLang } = await chrome.storage.local.get(["captionLang"]);
+    const { captionLang } = await store(["captionLang"]);
     const lang = captionLang || "es";
     if (lang === "none") return true;
     const langRe = lang === "en" ? /english|inglés/i : /español|spanish/i;
-
     try {
       const combo = document.querySelector('[role="combobox"][aria-label*="idioma de la reunión" i], [role="combobox"][aria-label*="meeting language" i]');
       if (combo) {
         combo.focus();
         combo.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
         await sleep(500);
-        const options = document.querySelectorAll('[role="option"]');
-        const spanish = [...options].find((o) => langRe.test(o.textContent || ""));
-        if (spanish) {
-          spanish.scrollIntoView({ block: "center" });
-          spanish.click();
+        const wanted = [...document.querySelectorAll('[role="option"]')].find((o) => langRe.test(o.textContent || ""));
+        if (wanted) {
+          wanted.scrollIntoView({ block: "center" });
+          wanted.click();
         }
         document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       }
     } catch {
-      // Sin idioma en español, Meet igual sigue transcribiendo (puede que en
-      // inglés) — mejor eso que no tener nada.
+      // Sin cambiar el idioma Meet igual sigue transcribiendo: mejor eso que no tener nada.
     }
     return true;
   }
 
-  // ── Mismo selector que meeting-bot/src/captions.ts, confirmado contra el
-  // HTML real de una reunión con subtítulos andando.
   function readCaptionsPanel() {
     const region = document.querySelector('[role="region"][aria-label="Subtítulos"], [role="region"][aria-label="Captions"]');
     if (!region) return { blocks: [], fallback: "" };
-
     const blockEls = Array.from(region.querySelectorAll(".nMcdL"));
     if (blockEls.length > 0) {
-      const blocks = blockEls.map((el) => ({
-        name: el.querySelector(".NWpY1d")?.textContent?.trim() || "Alguien",
-        text: el.querySelector(".ygicle")?.textContent?.trim() || "",
-      }));
-      return { blocks, fallback: "" };
+      return {
+        blocks: blockEls.map((el) => ({
+          name: el.querySelector(".NWpY1d")?.textContent?.trim() || "Alguien",
+          text: el.querySelector(".ygicle")?.textContent?.trim() || "",
+        })),
+        fallback: "",
+      };
     }
     return { blocks: [], fallback: (region.innerText || "").trim() };
   }
 
-  // Si quien prueba la extensión está solo (ej. reproduciendo un video de
-  // YouTube en la propia llamada para probar), el conteo de participantes
-  // nunca pasa de 1 -- con la versión vieja de esta función eso se
-  // interpretaba como "la reunión terminó" a los ~40s, cortando la
-  // transcripción real mucho antes de tiempo. Ahora solo se dispara si ANTES
-  // hubo más de una persona y DESPUÉS bajó a 1 -- o sea, "todos se fueron",
-  // no "esta reunión nunca tuvo a nadie más".
-  let maxParticipantsSeen = 0;
+  // «La reunión terminó» solo si ANTES hubo más de una persona y DESPUÉS quedó una (o el botón de personas desapareció):
+  // quien prueba solo, sin nadie más, no corta la grabación a los 40 s.
   function meetingLooksOver() {
     const el = findButtonByName(/personas|people/i);
-    if (!el) return true; // el botón desapareció -- Meet ya cerró la UI de la llamada
+    if (!el) return true;
     const match = (el.textContent || "").match(/\d+/);
     const count = match ? Number(match[0]) : null;
     if (count === null) return false;
     if (count > maxParticipantsSeen) maxParticipantsSeen = count;
-    if (maxParticipantsSeen <= 1) return false; // nunca hubo nadie más -- no es "se fueron"
+    if (maxParticipantsSeen <= 1) return false;
     return count <= 1;
   }
 
-  // ── Panel de clasificación al cortar: no bloquea nada -- si se ignora, la
-  // reunión queda igual que hoy (sin opportunityId). Vive en la misma
-  // pestaña de Meet (mismo origen que sendTranscript, así que el fetch()
-  // sale como si lo hiciera meet.google.com, sujeto a las mismas reglas de
-  // CORS que ya resolvieron transcript/route.ts).
-  // Organización de esta reunión: se fija al tocar "Grabar" (aunque después se cambie la elegida en el popup o la activa del
-  // CRM, lo que se grabó acá sigue yendo a la misma). Sin elegir (cuenta de una sola organización) va null.
-  let lockedOrgId;
-  // Nombre de la reunión (opcional), fijado al tocar «Grabar».
-  let lockedTitle = null;
-
-  function getStoredAuth() {
-    return new Promise((resolve) => {
-      chrome.storage.local.get(["apiBase", "token", "orgId"], ({ apiBase, token, orgId }) => {
-        resolve({ base: (apiBase || "https://chats.proshop.lat").replace(/\/$/, ""), token, orgId: lockedOrgId !== undefined ? lockedOrgId : orgId || null });
-      });
-    });
-  }
-
-  function showClassifyPanel() {
-    if (document.getElementById("proshop-classify-panel")) return;
-
-    const panel = document.createElement("div");
-    panel.id = "proshop-classify-panel";
-    panel.style.cssText =
-      "position:fixed;bottom:16px;right:16px;z-index:999999;width:300px;background:#fff;" +
-      "color:#111b21;font:13px/1.4 system-ui,sans-serif;border-radius:12px;" +
-      "box-shadow:0 8px 24px rgba(0,0,0,.25);padding:14px;";
-    panel.innerHTML = `
-      <div style="font-weight:600;margin-bottom:8px;">¿A qué cliente fue esta reunión?</div>
-      <input id="ps-search" placeholder="Buscar cliente..." style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #e9edef;border-radius:6px;font:inherit;margin-bottom:6px;" />
-      <div id="ps-results" style="max-height:140px;overflow:auto;"></div>
-      <div id="ps-new" style="display:none;margin-top:8px;">
-        <input id="ps-new-name" placeholder="Nombre" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #e9edef;border-radius:6px;font:inherit;margin-bottom:6px;" />
-        <input id="ps-new-phone" placeholder="Teléfono" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #e9edef;border-radius:6px;font:inherit;margin-bottom:6px;" />
-        <button id="ps-new-save" style="width:100%;padding:7px;border:0;border-radius:6px;background:#00a884;color:#fff;font:inherit;cursor:pointer;">Crear y vincular</button>
-      </div>
-      <div style="display:flex;gap:6px;margin-top:8px;">
-        <button id="ps-new-toggle" style="flex:1;padding:6px;border:1px solid #e9edef;border-radius:6px;background:#fff;font:inherit;cursor:pointer;">Cliente nuevo</button>
-        <button id="ps-dismiss" style="flex:1;padding:6px;border:1px solid #e9edef;border-radius:6px;background:#fff;font:inherit;cursor:pointer;">Ahora no</button>
-      </div>
-    `;
-    document.body.appendChild(panel);
-
-    const close = () => panel.remove();
-    panel.querySelector("#ps-dismiss").addEventListener("click", close);
-    panel.querySelector("#ps-new-toggle").addEventListener("click", () => {
-      const el = panel.querySelector("#ps-new");
-      el.style.display = el.style.display === "none" ? "block" : "none";
-    });
-
-    let debounceTimer = null;
-    panel.querySelector("#ps-search").addEventListener("input", (e) => {
-      clearTimeout(debounceTimer);
-      const q = e.target.value.trim();
-      const resultsEl = panel.querySelector("#ps-results");
-      if (q.length < 2) {
-        resultsEl.innerHTML = "";
-        return;
-      }
-      debounceTimer = setTimeout(async () => {
-        const { base, token, orgId } = await getStoredAuth();
-        if (!token) return;
-        try {
-          const res = await fetch(`${base}/api/extension/opportunities/search?q=${encodeURIComponent(q)}${orgId ? `&organizationId=${encodeURIComponent(orgId)}` : ""}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const data = await res.json();
-          resultsEl.innerHTML = "";
-          for (const r of data.results || []) {
-            const item = document.createElement("div");
-            item.textContent = `${r.title} — ${r.contactName}`;
-            item.style.cssText = "padding:7px 8px;border-radius:6px;cursor:pointer;font-size:12.5px;";
-            item.addEventListener("mouseenter", () => (item.style.background = "#f0f2f5"));
-            item.addEventListener("mouseleave", () => (item.style.background = "transparent"));
-            item.addEventListener("click", async () => {
-              await postClassify({ opportunityId: r.id });
-              close();
-            });
-            resultsEl.appendChild(item);
-          }
-        } catch {
-          // best-effort -- si falla la búsqueda, el panel sigue disponible para reintentar.
-        }
-      }, 300);
-    });
-
-    panel.querySelector("#ps-new-save").addEventListener("click", async () => {
-      const name = panel.querySelector("#ps-new-name").value.trim();
-      const phone = panel.querySelector("#ps-new-phone").value.trim();
-      if (!phone) return;
-      await postClassify({ newContactName: name, newContactPhone: phone, newOpportunityTitle: name });
-      close();
-    });
-
-    async function postClassify(extra) {
-      const { base, token, orgId } = await getStoredAuth();
-      if (!token) return;
-      try {
-        await fetch(`${base}/api/extension/meetings/classify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ meetingUrl, ...(orgId ? { organizationId: orgId } : {}), ...extra }),
-        });
-      } catch (error) {
-        console.error("[proshop-captions] No se pudo clasificar la reunión:", error);
-      }
-    }
-
-    // Se cierra solo a los 45s si nadie lo toca -- no hay que dejarlo
-    // colgado en pantalla para siempre en una reunión que ya terminó.
-    setTimeout(close, 45_000);
-  }
-
+  // ───────── Enviar al CRM ─────────
   async function sendTranscript(reason) {
     if (sent) return;
     const transcript = currentTranscript().trim();
     if (transcript.length < 40) {
-      // Antes esto cortaba en silencio -- en una prueba corta (dos líneas
-      // de "hola, probando") parecía que la extensión no había hecho nada,
-      // cuando en realidad decidió a propósito no mandar algo tan corto.
-      console.log(
-        `[proshop-captions] No se manda (${reason}): transcripción muy corta (${transcript.length} caracteres, mínimo 40). Texto: "${transcript}"`,
-      );
+      dbg(`no se mandan subtítulos (${reason}): muy cortos (${transcript.length} caracteres, mínimo 40)`);
       return;
     }
     sent = true;
-
-    chrome.storage.local.get(["apiBase", "token", "orgId"], async ({ apiBase, token, orgId: storedOrgId }) => {
-      const orgId = lockedOrgId !== undefined ? lockedOrgId : storedOrgId || null;
-      if (!token) {
-        console.warn("[proshop-captions] Sin token configurado — abrí el ícono de la extensión y pegalo.");
-        return;
-      }
-      const base = (apiBase || "https://chats.proshop.lat").replace(/\/$/, "");
-      try {
-        const res = await fetch(base + API_PATH, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ meetingUrl, transcript, ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}) }),
-        });
-        console.log(`[proshop-captions] Transcripción enviada (${reason}):`, res.status);
-      } catch (error) {
-        console.error("[proshop-captions] No se pudo enviar la transcripción:", error);
-        sent = false; // permite reintentar en el próximo intento de cierre
-      }
-    });
+    const { apiBase, token, orgId: storedOrgId } = await store(["apiBase", "token", "orgId"]);
+    const orgId = lockedOrgId !== undefined ? lockedOrgId : storedOrgId || null;
+    if (!token) {
+      sent = false;
+      dbg("sin sesión del CRM: no se pudieron mandar los subtítulos");
+      return;
+    }
+    const base = (apiBase || "https://chats.proshop.lat").replace(/\/$/, "");
+    try {
+      const res = await fetch(base + API_PATH, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ meetingUrl, transcript, recordingId, ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}) }),
+      });
+      dbg(`subtítulos enviados (${reason}): ${res.status}`);
+      if (!res.ok) sent = false; // se puede reintentar al detener de nuevo
+    } catch (error) {
+      sent = false;
+      dbg("no se pudieron enviar los subtítulos: " + (error && error.message ? error.message : error));
+    }
   }
 
-  // Termina la grabación: manda subtítulos, sube la última parte del audio, vuelve a mostrar la franja de Meet y abre
-  // el panel «¿a qué cliente fue?». Seguro de llamar varias veces.
+  // Termina esta grabación: manda los subtítulos, sube la última parte del audio y vuelve a mostrar la franja de Meet.
+  // Después se puede empezar otra grabación (la de otro cliente, la del equipo…). Seguro de llamar varias veces.
   async function stopAndSend(reason) {
-    if (stopped) return;
-    stopped = true;
+    if (!isRecording()) return;
+    phase = "stopped";
+    endedAt = Date.now();
     clearInterval(timer);
+    timer = null;
     if (pending) recordIfNew(pending.name, pending.text);
+    pending = null;
+    pushLive(); // el panel pasa a «terminada» enseguida
     await sendTranscript(reason);
-    // Sin efecto si nunca se activó el audio en esta reunión.
-    chrome.runtime.sendMessage({ type: "STOP_AUDIO_CAPTURE" });
+    void send({ type: "STOP_AUDIO_CAPTURE" });
     window.ProShopCaptions.setHidden(false);
-    showClassifyPanel();
+    syncBadge();
     pushLive();
   }
 
-  let lastMicMuted = null;
-  function checkMicMuteSync() {
-    const muted = isMicMuted();
-    if (muted === lastMicMuted) return;
-    lastMicMuted = muted;
-    // Sin efecto si no hay grabación de audio activa en esta reunión -- el
-    // offscreen document ignora esto si micStream no existe.
-    chrome.runtime.sendMessage({ type: "SET_MIC_ENABLED", enabled: !muted });
-  }
-
   async function tick() {
-    if (stopped) return;
+    if (!isRecording()) return;
     ticks += 1;
-    checkMicMuteSync();
+    syncMic(true); // reenvía el estado del micrófono: si el grabador arrancó después, igual se entera
     const { blocks, fallback } = readCaptionsPanel();
 
     if (paused) {
@@ -445,89 +410,110 @@
     if (ticks % END_CHECK_TICKS === 0) {
       if (meetingLooksOver()) {
         consecutiveEndSignals += 1;
-        if (consecutiveEndSignals >= 2) {
-          void stopAndSend("fin de reunión detectado");
-        }
+        if (consecutiveEndSignals >= 2) void stopAndSend("fin de reunión detectado");
       } else {
         consecutiveEndSignals = 0;
       }
     }
   }
 
-  // Red de seguridad: si se cierra la pestaña sin que se detecte el fin de
-  // la reunión (el chequeo de arriba corre cada ~20s), sendBeacon manda lo
-  // acumulado hasta ese momento -- sendBeacon no permite headers custom, así
-  // que acá el token viaja en el body en vez de en Authorization (el
-  // endpoint acepta las dos formas).
+  // Red de seguridad: si se cierra la pestaña sin detectar el fin, sendBeacon manda lo acumulado (no admite headers
+  // propios: el token viaja en el cuerpo, que el servidor también acepta).
   window.addEventListener("pagehide", () => {
-    chrome.runtime.sendMessage({ type: "STOP_AUDIO_CAPTURE" });
-    if (!started || sent) return;
+    if (dead || !alive()) return;
+    void send({ type: "STOP_AUDIO_CAPTURE" });
+    if (!isRecording() || sent) return;
     const transcript = currentTranscript().trim();
     if (transcript.length < 40) return;
-    chrome.storage.local.get(["apiBase", "token", "orgId"], ({ apiBase, token, orgId: storedOrgId }) => {
-      if (!token) return;
-      const orgId = lockedOrgId !== undefined ? lockedOrgId : storedOrgId || null;
-      const base = (apiBase || "https://chats.proshop.lat").replace(/\/$/, "");
-      const blob = new Blob([JSON.stringify({ meetingUrl, transcript, token, ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}) })], {
-        type: "application/json",
+    try {
+      chrome.storage.local.get(["apiBase", "token", "orgId"], ({ apiBase, token, orgId: storedOrgId }) => {
+        if (!token) return;
+        const orgId = lockedOrgId !== undefined ? lockedOrgId : storedOrgId || null;
+        const base = (apiBase || "https://chats.proshop.lat").replace(/\/$/, "");
+        const blob = new Blob(
+          [JSON.stringify({ meetingUrl, transcript, token, recordingId, ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}) })],
+          { type: "application/json" },
+        );
+        navigator.sendBeacon(base + API_PATH, blob);
       });
-      navigator.sendBeacon(base + API_PATH, blob);
-    });
+    } catch {
+      /* la extensión ya no está */
+    }
   });
 
+  // ───────── Empezar a grabar ─────────
   async function start() {
-    if (started || !meetingUrl) return;
-    started = true;
-    ensureBadge();
-    await sleep(500); // ya está en la llamada hace rato para cuando se activa a mano
+    if (isRecording() || !meetingUrl) return false;
+    phase = "recording";
+    startedAt = Date.now();
+    endedAt = null;
+    syncBadge();
+    pushLive();
+    await sleep(500); // por si se activa justo al entrar a la llamada
     dbg("grabación iniciada: activando subtítulos…");
     const activos = await enableCaptions();
     dbg(`subtítulos ${activos ? "activos" : "NO se pudieron activar"}`);
     if (!activos) {
       warning = "No se pudieron activar los subtítulos de Meet: actívalos a mano con el botón «Subtítulos» (CC) de la barra de abajo.";
     }
-    const { hideMeetCaptions } = await chrome.storage.local.get(["hideMeetCaptions"]);
+    const { hideMeetCaptions } = await store(["hideMeetCaptions"]);
     window.ProShopCaptions.setHidden(hideMeetCaptions !== false); // por defecto la franja de Meet se esconde: se ven en el panel
-    for (const ms of [1500, 5000]) setTimeout(() => dbg("pantalla de Meet: " + window.ProShopCaptions.describe()), ms);
-    timer = setInterval(() => void tick(), POLL_MS);
+    for (const ms of [1500, 5000]) setTimeout(() => !dead && dbg("pantalla de Meet: " + window.ProShopCaptions.describe()), ms);
+    syncMic(true);
+    timer = setInterval(() => {
+      if (dead) return;
+      if (!alive()) return shutdown();
+      void tick();
+    }, POLL_MS);
+    intervals.push(timer);
     pushLive();
+    return true;
   }
 
-  // No arranca solo: hay que abrir el ícono de la extensión y tocar "Grabar
-  // esta reunión" para cada reunión en la que se quiera usar. Sin eso, esta
-  // pestaña de Meet no manda absolutamente nada -- ni siquiera empieza a
-  // leer subtítulos ni activa el badge.
+  // ───────── Mensajes del panel ─────────
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === "GET_STATUS") {
-      sendResponse({ onMeeting: Boolean(meetingUrl), recording: started && !stopped, lines: finalizedLines.length });
-      return false;
-    }
-    if (message?.type === "PAUSE_RECORDING" || message?.type === "RESUME_RECORDING") {
-      paused = message.type === "PAUSE_RECORDING";
-      if (paused && pending) {
-        recordIfNew(pending.name, pending.text); // lo dicho hasta ahora se conserva
-        pending = null;
+    if (dead) return false;
+    switch (message?.type) {
+      case "GET_STATUS":
+        sendResponse({ onMeeting: Boolean(meetingUrl), recording: isRecording(), lines: finalizedLines.length });
+        return false;
+      case "START_RECORDING": {
+        if (!meetingUrl) {
+          sendResponse({ ok: false, error: "Esta pestaña no es una reunión de Meet." });
+          return false;
+        }
+        if (isRecording()) {
+          sendResponse({ ok: true, already: true });
+          return false;
+        }
+        if (phase === "stopped") resetSession(); // otra grabación en la misma reunión: empieza de cero
+        lockedOrgId = message.organizationId || null;
+        lockedTitle = message.title || null;
+        recordingId = message.recordingId || crypto.randomUUID();
+        void start().then((ok) => sendResponse({ ok }));
+        return true; // respuesta async
       }
-      pushLive();
-      sendResponse({ ok: true });
-      return false;
+      case "PAUSE_RECORDING":
+      case "RESUME_RECORDING":
+        paused = message.type === "PAUSE_RECORDING";
+        if (paused && pending) {
+          recordIfNew(pending.name, pending.text); // lo dicho hasta ahora se conserva
+          pending = null;
+        }
+        syncBadge();
+        pushLive();
+        sendResponse({ ok: true });
+        return false;
+      case "STOP_AND_SEND":
+        void stopAndSend("detenido a mano").then(() => sendResponse({ ok: true }));
+        return true; // respuesta async
+      case "SET_HIDE_CAPTIONS":
+        window.ProShopCaptions.setHidden(Boolean(message.hidden));
+        pushLive();
+        sendResponse({ ok: true });
+        return false;
+      default:
+        return false;
     }
-    if (message?.type === "STOP_AND_SEND") {
-      void stopAndSend("detenido a mano").then(() => sendResponse({ ok: true }));
-      return true; // respuesta async
-    }
-    if (message?.type === "SET_HIDE_CAPTIONS") {
-      window.ProShopCaptions.setHidden(Boolean(message.hidden));
-      pushLive();
-      sendResponse({ ok: true });
-      return false;
-    }
-    if (message?.type === "START_RECORDING") {
-      if (lockedOrgId === undefined) lockedOrgId = message.organizationId || null;
-      if (!lockedTitle) lockedTitle = message.title || null;
-      void start().then(() => sendResponse({ ok: true }));
-      return true; // respuesta async
-    }
-    return false;
   });
 })();

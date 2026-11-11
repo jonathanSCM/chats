@@ -65,13 +65,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-async function startRecording({ streamId, tabId, meetingUrl, organizationId, title, token, apiBase, micDeviceId }) {
+async function startRecording({ streamId, tabId, meetingUrl, organizationId, title, token, apiBase, micDeviceId, recordMic, recordingId }) {
   if (active) {
     if (session && session.tabId === tabId) return; // ya está grabando esta pestaña
     throw new Error("Ya hay una grabación de audio en otra pestaña.");
   }
   dbg(`inicio pedido (pestaña ${tabId})`);
-  session = { tabId, meetingUrl, organizationId: organizationId || null, title: title || null, token: token || null, apiBase: apiBase || null, micDeviceId: micDeviceId || "" };
+  session = { tabId, meetingUrl, organizationId: organizationId || null, title: title || null, token: token || null, apiBase: apiBase || null, micDeviceId: micDeviceId || "", recordMic: recordMic !== false, recordingId: recordingId || null };
   paused = false;
   stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, micState: "pending", paused: false, micLabel: null, lastError: null };
 
@@ -102,6 +102,14 @@ async function startRecording({ streamId, tabId, meetingUrl, organizationId, tit
 }
 
 async function startMic() {
+  if (session && session.recordMic === false) {
+    // Ajuste «Grabar mi micrófono» apagado: solo se graban las voces de los demás.
+    stats.micState = "off";
+    stats.micAvailable = false;
+    dbg("micrófono: apagado en los Ajustes (solo se graban los demás)");
+    publish();
+    return;
+  }
   await connectMic((session && session.micDeviceId) || "");
   dbg(`micrófono: ${stats.micState}${stats.micLabel ? " (" + stats.micLabel + ")" : ""}`);
   publish();
@@ -235,6 +243,7 @@ async function sendPart(blob, part, current) {
       Authorization: `Bearer ${token}`,
       "X-Meeting-Url": (current && current.meetingUrl) || "",
       "X-Audio-Part": String(part),
+      ...(current && current.recordingId ? { "X-Recording-Id": current.recordingId } : {}),
       ...(current && current.organizationId ? { "X-Organization-Id": current.organizationId } : {}),
       // Los encabezados HTTP no admiten tildes ni emojis: va codificado y el servidor lo decodifica.
       ...(current && current.title ? { "X-Meeting-Title": encodeURIComponent(current.title) } : {}),

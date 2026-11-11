@@ -19,6 +19,8 @@ const bodySchema = z.object({
   newOpportunityTitle: z.string().max(200).optional(),
   title: z.string().max(200).optional(),
   organizationId: z.string().optional(),
+  // Id de la grabación que se está clasificando (la extensión de Chrome): así se vincula ESA reunión, no otra de la misma sala.
+  recordingId: z.string().max(80).optional(),
 });
 
 const ALLOWED_ORIGIN = "https://meet.google.com";
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return withCors(new NextResponse("Datos inválidos", { status: 400 }));
   }
-  const { meetingUrl, opportunityId, newContactName, newContactPhone, newOpportunityTitle, title, organizationId: requestedOrganizationId } = parsed.data;
+  const { meetingUrl, opportunityId, newContactName, newContactPhone, newOpportunityTitle, title, organizationId: requestedOrganizationId, recordingId } = parsed.data;
 
   const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
   if (!token) {
@@ -62,7 +64,7 @@ export async function POST(req: NextRequest) {
   if (!org.ok) return withCors(new NextResponse(org.error, { status: 403 }));
   const organizationId = org.organizationId;
 
-  const resolved = await resolveExtensionMeeting({ organizationId, meetingUrl, recordedById: userId });
+  const resolved = await resolveExtensionMeeting({ organizationId, meetingUrl, recordedById: userId, recordingId });
 
   if (opportunityId) {
     const opportunity = await prisma.opportunity.findUnique({ where: { id: opportunityId }, select: { organizationId: true } });

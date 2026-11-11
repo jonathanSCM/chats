@@ -1,4 +1,4 @@
-# ProShop CRM — Asistente de reuniones de Meet (extensión de Chrome, v2.2)
+# ProShop CRM — Asistente de reuniones de Meet (extensión de Chrome, v2.3)
 
 Graba **los subtítulos y el audio** de tus reuniones de Google Meet y los guarda en tu CRM, con un **panel lateral** que
 muestra los subtítulos en vivo (y se puede separar en su propia ventana). Corre en tu navegador, como un participante
@@ -10,7 +10,7 @@ más: no hay bot, nadie tiene que admitirlo.
 2. **Cargar descomprimida** → elige esta carpeta (`meet-captions-extension`).
 3. Fija el ícono (el rompecabezas de la barra → alfiler).
 4. Entra a una reunión de Meet y **haz clic en el ícono**: se abre el panel con todo.
-5. Si no has iniciado sesión, el panel muestra **Iniciar sesión con el CRM** (usa tu sesión; no hay que pegar tokens).
+5. Si no has iniciado sesión, el panel muestra **Iniciar sesión y permitir el micrófono** (un solo paso; usa tu sesión, sin tokens).
 6. (Nombre y organización si quieres) → **Grabar esta reunión**. Chrome pide el permiso del micrófono una sola vez.
 
 Importante: para capturar el **audio**, Chrome exige que abras el panel **con el ícono** de la extensión (no con el botón «PS» de la
@@ -31,8 +31,8 @@ Con ese clic se activan a la vez: los subtítulos de Meet (en español), el audi
 - **Ajustes** (en el panel): elegir **qué micrófono** se graba (con barra de nivel para comprobarlo; cambia en vivo si ya
   grabas, y si el elegido se desconecta usa el predeterminado), idioma de los subtítulos, esconder la franja de Meet y abrir
   la ventana sola al entrar a una reunión.
-- **Botón verde «PS»** en la pantalla de la reunión (abajo a la izquierda): abre el panel cuando quieras, aunque no estés
-  grabando. Chrome no permite abrir el panel sin un clic, por eso el botón; para que la **ventana separada** aparezca sola
+- **Botón con el logo del CRM** en la pantalla de la reunión (abajo a la izquierda): abre el panel cuando quieras, aunque no
+  estés grabando. Chrome no permite abrir el panel sin un clic, por eso el botón; para que la **ventana separada** aparezca sola
   al entrar, activa «Abrir la ventana sola…» en el ícono o en los Ajustes.
 - Muestra **a qué organización** se está enviando la reunión (y su nombre) arriba del panel.
 - **Permiso del micrófono**: si falta, el panel muestra un aviso con el botón «Permitir micrófono» y Chrome pide el permiso
@@ -42,7 +42,14 @@ Con ese clic se activan a la vez: los subtítulos de Meet (en español), el audi
 - **Diagnóstico** (Ajustes del panel): registro de lo que hizo la extensión (audio, subtítulos, pantalla de Meet) con un botón
   para copiarlo; sirve para ver por qué algo no arrancó.
 - Funciona al entrar a una reunión desde la pantalla de inicio de Meet, sin recargar la pestaña.
-- Al terminar (o al detener) pregunta **¿a qué cliente fue esta reunión?** para vincularla a una ficha de Seguimiento.
+- **Varias grabaciones por reunión**: «Detener y enviar» cierra esa grabación y el panel deja **grabar otra** en la misma sala
+  (primero el cliente, después el equipo). Cada una es una reunión separada en el CRM (requiere el CRM desplegado con la
+  columna `extensionRecordingId`; con un CRM anterior se mezclan en una sola).
+- Al terminar muestra un resumen (duración, líneas, partes de audio) y pregunta **¿a qué cliente fue esta reunión?** ahí mismo,
+  en el panel, para vincularla a una ficha de Seguimiento.
+- **Un solo paso inicial**: «Iniciar sesión y permitir el micrófono» pide el permiso de Chrome y abre el CRM.
+- **Tu micrófono se corta al instante** cuando te silencias en Meet (silencio total, menos de ¼ de segundo); no baja el volumen.
+- Si recargas la extensión con una pestaña de Meet abierta, el script viejo se apaga solo sin errores (recarga la pestaña).
 - Es **prueba de fallos**: si falla el audio siguen los subtítulos, y al revés.
 
 ## Archivos

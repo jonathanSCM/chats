@@ -1136,9 +1136,14 @@ model Meeting {
   recordedById String?
   recordedBy   User?   @relation("MeetingRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
 
+  // Id de cada grabación de la extensión de Chrome (lo genera la extensión al pulsar «Grabar»). Así dos grabaciones seguidas
+  // en la misma sala de Meet (la del cliente y, después, la del equipo) quedan como reuniones separadas.
+  extensionRecordingId String?
+
   attachments MeetingAttachment[]
 
   @@index([organizationId, scheduledAt])
+  @@index([organizationId, extensionRecordingId])
   @@index([organizationId, isTeam, updatedAt])
   @@index([vexaSessionId])
   @@map("meetings")

@@ -9,7 +9,7 @@ vi.mock("@/server/db/client", () => ({
   },
 }));
 
-import { ExtensionMeetingNotFoundError, cleanMeetingTitle, isPlatformBotEmail, resolveExtensionMeeting, resolveExtensionOrg, resolveExtensionOrganizationId } from "./extension-meeting";
+import { ExtensionMeetingNotFoundError, cleanMeetingTitle, cleanRecordingId, isPlatformBotEmail, resolveExtensionMeeting, resolveExtensionOrg, resolveExtensionOrganizationId } from "./extension-meeting";
 
 const bot = { organizationId: "org-proshop", email: "meet-captions@internal.proshop.lat" };
 const person = { organizationId: "org-proshop", email: "vendedora@ejemplo.com" };
@@ -168,3 +168,45 @@ describe("solo buscar (asistente de Vexa)", () => {
   });
 });
 
+
+describe("cada grabación de la extensión es su propia reunión", () => {
+  const base = { organizationId: "org1", meetingUrl: "https://meet.google.com/abc-defg-hij", recordedById: "u1" };
+
+  it("el id de grabación solo acepta letras, números y guiones", () => {
+    expect(cleanRecordingId("3f2a9c1e-7b64-4d0a-9f55-0a1b2c3d4e5f")).toBe("3f2a9c1e-7b64-4d0a-9f55-0a1b2c3d4e5f");
+    expect(cleanRecordingId("corto")).toBeNull();
+    expect(cleanRecordingId("con espacios y ;DROP")).toBeNull();
+    expect(cleanRecordingId(null)).toBeNull();
+  });
+
+  it("lo que llega con el id de una grabación va a la reunión de ESA grabación", async () => {
+    m.findFirst.mockResolvedValueOnce({ id: "m-propia", transcript: "hola", audioTranscript: null });
+    await expect(resolveExtensionMeeting({ ...base, recordingId: "rec-0000-1111" })).resolves.toMatchObject({ id: "m-propia" });
+    expect(m.create).not.toHaveBeenCalled();
+    expect(m.findFirst.mock.calls[0][0].where).toMatchObject({ extensionRecordingId: "rec-0000-1111" });
+  });
+
+  it("la primera grabación se queda con la reunión de la sala (la agendada) y la marca como suya", async () => {
+    m.findFirst
+      .mockResolvedValueOnce(null) // no hay reunión de esa grabación todavía
+      .mockResolvedValueOnce({ id: "m-agenda", title: "Demo", transcript: null, audioTranscript: null, recordedById: null, extensionRecordingId: null });
+    await expect(resolveExtensionMeeting({ ...base, recordingId: "rec-0000-1111" })).resolves.toMatchObject({ id: "m-agenda" });
+    expect(m.update).toHaveBeenCalledWith({ where: { id: "m-agenda" }, data: { extensionRecordingId: "rec-0000-1111" } });
+    expect(m.create).not.toHaveBeenCalled();
+  });
+
+  it("una segunda grabación en la misma sala crea una reunión NUEVA en vez de mezclarse con la primera", async () => {
+    m.findFirst
+      .mockResolvedValueOnce(null) // la segunda grabación no tiene reunión todavía
+      .mockResolvedValueOnce({ id: "m-cliente", title: "Demo con Ana", transcript: "…", audioTranscript: null, recordedById: "u1", extensionRecordingId: "rec-primera-1" });
+    m.create.mockResolvedValue({ id: "m-equipo", transcript: null, audioTranscript: null });
+    await expect(resolveExtensionMeeting({ ...base, title: "Reunión del equipo", recordingId: "rec-segunda-2" })).resolves.toMatchObject({ id: "m-equipo" });
+    expect(m.create.mock.calls[0][0].data).toMatchObject({ title: "Reunión del equipo", extensionRecordingId: "rec-segunda-2" });
+  });
+
+  it("sin id de grabación (script de Tampermonkey, versiones viejas) todo va a la misma reunión, como siempre", async () => {
+    m.findFirst.mockResolvedValueOnce({ id: "m-sala", title: "x", transcript: null, audioTranscript: null, recordedById: "u1", extensionRecordingId: "rec-otra-xx" });
+    await expect(resolveExtensionMeeting(base)).resolves.toMatchObject({ id: "m-sala" });
+    expect(m.create).not.toHaveBeenCalled();
+  });
+});

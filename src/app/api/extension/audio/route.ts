@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
     recordedById: user.id,
     // El nombre viaja codificado (encabezado HTTP): encodeURIComponent en la extensión.
     title: safeDecode(req.headers.get("x-meeting-title")),
+    recordingId: req.headers.get("x-recording-id"),
   });
 
   const part = Number(req.headers.get("x-audio-part"));

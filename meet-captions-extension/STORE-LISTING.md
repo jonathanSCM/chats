@@ -52,7 +52,7 @@ Grabar y guardar en el CRM ProShop del usuario los subtítulos y el audio de las
 
 ## Imágenes que hay que subir
 
-- Ícono 128×128 (provisional incluido en `icons/`; conviene reemplazarlo por el definitivo).
+- Ícono 128×128: ya incluido en `icons/` (es el logo del CRM, el mismo de la app).
 - Al menos 1 captura de 1280×800 (mejor 3–5): el panel lateral con subtítulos en vivo, el ícono con «Grabar», la ficha del CRM con la transcripción.
 - Imagen promocional pequeña 440×280 (opcional pero recomendada).
 

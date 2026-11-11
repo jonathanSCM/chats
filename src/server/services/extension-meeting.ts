@@ -49,6 +49,12 @@ export function cleanMeetingTitle(raw: string | null | undefined): string | null
 }
 
 /** El asistente de Vexa mandó algo de una reunión que el CRM no conoce (p. ej. de otro proyecto que usa el mismo Vexa). */
+/** El id de una grabación: letras, números y guiones (un UUID). Cualquier otra cosa se ignora. */
+export function cleanRecordingId(value: string | null | undefined): string | null {
+  const id = (value ?? "").trim();
+  return /^[A-Za-z0-9-]{8,64}$/.test(id) ? id : null;
+}
+
 export class ExtensionMeetingNotFoundError extends Error {
   constructor() {
     super("No hay una reunión del CRM para esta sesión del asistente.");
@@ -143,12 +149,25 @@ export async function resolveExtensionMeeting(params: {
   // nombre; si ya existía con un nombre automático ("Reunión Extensión", "Reunión en vivo") se lo cambia. Una reunión ya
   // agendada o renombrada conserva el suyo.
   title?: string | null;
+  // Id de esta grabación de la extensión (uno por cada vez que se pulsa «Grabar»). Sin él (script de Tampermonkey, versiones
+  // viejas) todo lo de la misma sala va a la misma reunión, como siempre.
+  recordingId?: string | null;
   // Solo buscar: si no existe, lanza ExtensionMeetingNotFoundError en vez de crear una "Reunión Extensión" suelta.
   // Lo usa el asistente de Vexa: el CRM solo debe guardar lo de reuniones que él mismo pidió.
   onlyExisting?: boolean;
 }): Promise<{ id: string; transcript: string | null; audioTranscript: string | null }> {
   const { organizationId, recordedById = null, vexaSessionId = null } = params;
   const title = cleanMeetingTitle(params.title);
+  const recordingId = cleanRecordingId(params.recordingId);
+
+  // Una grabación que ya tiene su reunión: todo lo que llegue con ese id va ahí (subtítulos, cada parte del audio, el cliente).
+  if (recordingId) {
+    const byRecording = await prisma.meeting.findFirst({
+      where: { organizationId, extensionRecordingId: recordingId, status: { not: "CANCELED" } },
+      select: { id: true, transcript: true, audioTranscript: true },
+    });
+    if (byRecording) return byRecording;
+  }
 
   if (vexaSessionId) {
     const bySession = await prisma.meeting.findFirst({
@@ -171,9 +190,15 @@ export async function resolveExtensionMeeting(params: {
       status: { not: "CANCELED" },
     },
     orderBy: { scheduledAt: "desc" },
-    select: { id: true, title: true, transcript: true, audioTranscript: true, recordedById: true },
+    select: { id: true, title: true, transcript: true, audioTranscript: true, recordedById: true, extensionRecordingId: true },
   });
-  if (existing) {
+  // La reunión de esta sala ya la usó OTRA grabación: esta es una reunión nueva (p. ej. primero el cliente, después el equipo).
+  const takenByAnotherRecording = Boolean(existing && recordingId && existing.extensionRecordingId && existing.extensionRecordingId !== recordingId);
+  if (existing && !takenByAnotherRecording) {
+    // La primera grabación se queda con la reunión de la sala (agendada o no): desde aquí es suya.
+    if (recordingId && !existing.extensionRecordingId) {
+      await prisma.meeting.update({ where: { id: existing.id }, data: { extensionRecordingId: recordingId } });
+    }
     if (title && existing.title !== title && PLACEHOLDER_TITLES.includes(existing.title ?? "")) {
       await prisma.meeting.update({ where: { id: existing.id }, data: { title } });
     }
@@ -198,6 +223,7 @@ export async function resolveExtensionMeeting(params: {
       status: "DONE",
       botEnabled: false,
       recordedById,
+      extensionRecordingId: recordingId,
     },
     select: { id: true, transcript: true, audioTranscript: true },
   });

@@ -101,6 +101,47 @@ export async function loadExtensionFiles(): Promise<{ version: string | null; fi
   }
 }
 
+/**
+ * Versión para la Chrome Web Store. La tienda actualiza las extensiones sola y PROHÍBE el código alojado fuera del paquete, así
+ * que se quita el «Actualizar ahora» (que baja archivos del CRM y los escribe en la carpeta) y el aviso de versión nueva, que
+ * solo tienen sentido en la instalación manual «sin empaquetar».
+ */
+export function forStore(entries: ZipEntry[]): ZipEntry[] {
+  return entries.map((e) => {
+    if (e.name === "sidepanel.js") {
+      let js = e.data.toString("utf8").replace(/\r\n/g, "\n");
+      const from = js.indexOf("// ───────── Aviso de versión nueva");
+      const to = js.indexOf("// ───────── Recuperar una grabación");
+      if (from < 0 || to < from) throw new Error("forStore: no se encontró el bloque de actualización en sidepanel.js");
+      js = js.slice(0, from) + js.slice(to);
+      const tail = "void checkUpdate();\nsetInterval(checkUpdate, 60 * 60 * 1000);\n";
+      if (!js.includes(tail)) throw new Error("forStore: no se encontró el arranque del aviso de versión");
+      return { name: e.name, data: Buffer.from(js.replace(tail, ""), "utf8") };
+    }
+    if (e.name === "sidepanel.html") {
+      const html = e.data.toString("utf8").replace(/\r\n/g, "\n");
+      const out = html.replace(/ *<div class="notice warn" id="updateBox"[\s\S]*?<\/div>\n/, "");
+      if (out === html) throw new Error("forStore: no se encontró el aviso de versión en sidepanel.html");
+      return { name: e.name, data: Buffer.from(out, "utf8") };
+    }
+    return e;
+  });
+}
+
+export async function buildExtensionZip(options: { store?: boolean } = {}): Promise<{ zip: Buffer; version: string | null; files: string[] } | null> {
+  try {
+    let entries = await collect(extensionDir());
+    if (options.store) entries = forStore(entries);
+    const manifest = entries.find((e) => e.name === "manifest.json");
+    if (!manifest) return null;
+    const version = (JSON.parse(manifest.data.toString("utf8")) as { version?: string }).version ?? null;
+    return { zip: buildZip(entries), version, files: entries.map((e) => e.name) };
+  } catch (error) {
+    if (options.store) throw error;
+    return null;
+  }
+}
+
 export function extensionDir(): string {
   return path.join(process.cwd(), "meet-captions-extension");
 }

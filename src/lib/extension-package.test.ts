@@ -24,3 +24,26 @@ describe("extension-package", () => {
     expect(text).not.toContain("README.md");
   });
 });
+
+describe("paquete para la Chrome Web Store", () => {
+  it("quita la auto-actualización (código alojado fuera del paquete) y el aviso de versión, y el JS sigue siendo válido", async () => {
+    const { buildExtensionZip } = await import("./extension-package");
+    const store = await buildExtensionZip({ store: true });
+    const manual = await buildExtensionZip({ store: false });
+    expect(store).not.toBeNull();
+    // El zip va comprimido: se comprueba sobre el contenido armado, no sobre los bytes del zip.
+    const { forStore } = await import("./extension-package");
+    const { readFileSync } = await import("node:fs");
+    const dir = `${process.cwd()}/meet-captions-extension`;
+    const entries = ["sidepanel.js", "sidepanel.html"].map((name) => ({ name, data: readFileSync(`${dir}/${name}`) }));
+    const [js, html] = forStore(entries).map((e) => e.data.toString("utf8"));
+    expect(js).not.toContain("showDirectoryPicker");
+    expect(js).not.toContain("/api/extension/files");
+    expect(js).not.toContain("checkUpdate");
+    expect(js).toContain("checkRecover"); // la recuperación de grabaciones SÍ se queda
+    expect(html).not.toContain("updateBox");
+    expect(html).toContain("recoverBox");
+    expect(() => new Function(js.replace(/^\s*(import|export)\s.*$/gm, ""))).not.toThrow();
+    expect(store!.files).toEqual(manual!.files); // mismos archivos: solo cambian esos dos
+  });
+});

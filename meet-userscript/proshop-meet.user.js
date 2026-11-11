@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ProShop CRM — Subtítulos de Meet
 // @namespace    https://chats.proshop.lat
-// @version      1.3.0
-// @description  Lee los subtítulos de Google Meet y los manda al CRM, o avisa al asistente para que entre solo. Se conecta con tu sesión del CRM (sin pegar tokens). Sin audio: eso solo lo hace la extensión de Chrome.
+// @version      1.4.0
+// @description  Lee los subtítulos de Google Meet y los manda al CRM, o avisa al asistente para que entre solo. Se conecta con tu sesión del CRM (sin pegar tokens). Graba también el audio (voces de la reunión + tu micrófono, solo cuando no estás silenciado) y el CRM lo transcribe con Whisper.
 // @match        https://meet.google.com/*
 // @match        https://chats.proshop.lat/dashboard/extension-authorize*
 // @grant        GM_getValue
@@ -22,7 +22,7 @@
 
   const CRM_BASE = "https://chats.proshop.lat";
   const AUTHORIZE_URL = `${CRM_BASE}/dashboard/extension-authorize`;
-  const API = { me: "/api/extension/me", transcript: "/api/extension/transcript", join: "/api/extension/join-bot", classify: "/api/extension/meetings/classify", search: "/api/extension/opportunities/search" };
+  const API = { me: "/api/extension/me", transcript: "/api/extension/transcript", join: "/api/extension/join-bot", audio: "/api/extension/audio", classify: "/api/extension/meetings/classify", search: "/api/extension/opportunities/search" };
 
   const getToken = () => GM_getValue("token", "") || "";
   const getName = () => GM_getValue("userName", "") || "";
@@ -153,7 +153,129 @@
   function updateBadge() {
     if (!session) return;
     const label = ensureBadge().querySelector("#ps-label");
-    if (label) label.textContent = `ProShop CRM — subtítulos: ${session.lines.length} líneas`;
+    if (label) label.textContent = `ProShop CRM — subtítulos: ${session.lines.length} líneas${audio ? ` · audio activo (${audio.uploaded} partes enviadas)` : ""}`;
+  }
+
+
+  // ── Audio: voces de la reunión (pestaña compartida) + tu micrófono, mezclados y grabados en partes de 10 min.
+  // Cada parte es un archivo completo que se sube apenas termina (así no se pierde todo si se cierra la pestaña) y el CRM
+  // la transcribe con Whisper. El micrófono propio solo suena mientras NO estás silenciado en Meet.
+  const AUDIO_SEGMENT_MS = 10 * 60 * 1000;
+  const AUDIO_BITRATE = 24000; // voz: una hora pesa ~11 MB
+  let audio = null;
+
+  function isMicMuted() {
+    const node = document.querySelector('[data-is-muted][aria-label*="micrófono" i], [data-is-muted][aria-label*="microphone" i]');
+    if (node) return node.getAttribute("data-is-muted") === "true";
+    const fallback = findButtonByName(/micrófono|microphone/i);
+    if (!fallback) return false;
+    return /activar|turn on/i.test((fallback.getAttribute("aria-label") || "").trim());
+  }
+
+  function uploadAudioPart(a, blob, part, attempt) {
+    const retry = () => attempt < 3 && setTimeout(() => uploadAudioPart(a, blob, part, attempt + 1), 5000 * (attempt + 1));
+    GM_xmlhttpRequest({
+      method: "POST",
+      url: CRM_BASE + API.audio,
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+        "Content-Type": "audio/webm",
+        "X-Meeting-Url": a.meetingUrl,
+        "X-Audio-Part": String(part),
+        ...(a.orgId ? { "X-Organization-Id": a.orgId } : {}),
+        ...(a.title ? { "X-Meeting-Title": encodeURIComponent(a.title) } : {}),
+      },
+      data: blob,
+      timeout: 180000,
+      onload: (r) => {
+        console.log(`[ProShop] Audio parte ${part} enviada:`, r.status);
+        if (r.status >= 500) retry();
+        else if (r.status === 401) GM_deleteValue("token");
+        else if (r.status >= 200 && r.status < 300) {
+          a.uploaded += 1;
+          updateBadge();
+        }
+      },
+      onerror: retry,
+      ontimeout: retry,
+    });
+  }
+
+  function startSegment(a) {
+    const chunks = [];
+    const recorder = new MediaRecorder(a.dest.stream, { mimeType: "audio/webm;codecs=opus", audioBitsPerSecond: AUDIO_BITRATE });
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+    recorder.onstop = () => {
+      clearTimeout(a.segTimer);
+      const blob = new Blob(chunks, { type: "audio/webm" });
+      if (blob.size > 2000) {
+        a.part += 1;
+        uploadAudioPart(a, blob, a.part, 0);
+      }
+      if (a.active) startSegment(a);
+      else releaseAudio(a);
+    };
+    recorder.start(1000);
+    a.recorder = recorder;
+    a.segTimer = setTimeout(() => recorder.state !== "inactive" && recorder.stop(), AUDIO_SEGMENT_MS);
+  }
+
+  function releaseAudio(a) {
+    clearInterval(a.muteTimer);
+    for (const stream of [a.tabStream, a.micStream]) if (stream) stream.getTracks().forEach((t) => t.stop());
+    if (a.ctx && a.ctx.state !== "closed") a.ctx.close();
+  }
+
+  // Termina la grabación: la última parte se sube igual. Seguro de llamar varias veces.
+  function stopAudio() {
+    if (!audio) return;
+    const a = audio;
+    audio = null;
+    a.active = false;
+    if (a.recorder && a.recorder.state !== "inactive") a.recorder.stop();
+    else releaseAudio(a);
+    updateBadge();
+  }
+
+  // Devuelve un mensaje para el panel. Debe llamarse directo desde el clic (Chrome exige un gesto para compartir pestaña).
+  async function startAudio() {
+    if (!session || audio) return "";
+    if (!getToken()) return "Sin conexión con el CRM: no se grabó el audio.";
+    let display;
+    try {
+      display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, preferCurrentTab: true, selfBrowserSurface: "include", systemAudio: "include" });
+    } catch (e) {
+      return "No se pudo grabar el audio: hay que permitir compartir esta pestaña (con audio).";
+    }
+    display.getVideoTracks().forEach((t) => t.stop());
+    if (display.getAudioTracks().length === 0) {
+      display.getTracks().forEach((t) => t.stop());
+      return "No se pudo grabar el audio: marca «Compartir audio de la pestaña» y vuelve a intentar.";
+    }
+
+    const a = { active: true, part: 0, uploaded: 0, meetingUrl: session.meetingUrl, orgId: session.orgId || getOrgId(), title: session.title || getTitle(), tabStream: new MediaStream(display.getAudioTracks()), micStream: null, recorder: null };
+    a.ctx = new AudioContext();
+    a.dest = a.ctx.createMediaStreamDestination();
+    a.ctx.createMediaStreamSource(a.tabStream).connect(a.dest); // sin conectar a los parlantes: la pestaña sigue sonando normal
+    let micNote = "";
+    try {
+      a.micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      a.ctx.createMediaStreamSource(a.micStream).connect(a.dest);
+      const track = a.micStream.getAudioTracks()[0];
+      track.enabled = !isMicMuted();
+      a.muteTimer = setInterval(() => {
+        track.enabled = !isMicMuted();
+      }, 300);
+    } catch (e) {
+      micNote = " (sin tu micrófono: permite el acceso para grabar tu voz)";
+    }
+    a.tabStream.getAudioTracks()[0].addEventListener("ended", () => audio === a && stopAudio());
+    audio = a;
+    startSegment(a);
+    updateBadge();
+    return `Audio activado${micNote}.`;
   }
 
   // ── Lectura de subtítulos (mismos selectores que la extensión de Chrome)
@@ -254,6 +376,7 @@
         if (session.endSignals >= 2 && !session.sent) {
           if (session.pending) recordIfNew(session.pending.name, session.pending.text);
           sendTranscript("fin de reunión detectado");
+          stopAudio();
           showClassifyPanel();
         }
       } else {
@@ -276,6 +399,7 @@
   // Al salir de la reunión (o pasar a otra): se manda lo que haya y se limpia todo.
   function endSession(reason) {
     if (!session) return;
+    stopAudio();
     if (session.started) {
       if (session.pending) recordIfNew(session.pending.name, session.pending.text);
       sendTranscript(reason);
@@ -359,9 +483,10 @@
     }
 
     const recordBtn = el("button", BTN("#c62828") + "margin-bottom:6px;", "Grabar esta reunión");
+    const audioBtn = el("button", BTN("#455a64") + "margin-bottom:6px;display:none;", "Activar audio (voces + micrófono)");
     const joinBtn = el("button", BTN("#00a884"), "Unir al asistente");
     const status = el("div", "font-size:11px;color:#059669;margin-top:8px;min-height:14px;");
-    panelEl.append(recordBtn, joinBtn, status);
+    panelEl.append(recordBtn, audioBtn, joinBtn, status);
 
     const setStatus = (text, bad) => {
       status.textContent = text || "";
@@ -376,7 +501,8 @@
       logoutBtn.style.display = logged ? "inline" : "none";
       recordBtn.disabled = !session || session.started;
       recordBtn.style.opacity = recordBtn.disabled ? "0.5" : "1";
-      if (session && session.started) recordBtn.textContent = "Grabando subtítulos…";
+      if (session && session.started) recordBtn.textContent = audio ? "Grabando subtítulos y audio…" : "Grabando subtítulos…";
+      audioBtn.style.display = session && session.started && !audio ? "block" : "none";
       if (message) setStatus(message, /no se pudo|falta|sin /i.test(message));
     }
     document.body.appendChild(panelEl);
@@ -385,8 +511,14 @@
     loadOrganizations();
 
     recordBtn.addEventListener("click", () => {
+      // El audio va primero y sin await antes: Chrome solo deja compartir la pestaña si viene directo del clic.
+      const audioResult = startAudio();
       void startRecording();
       refresh("Subtítulos activados.");
+      audioResult.then((message) => message && refresh(message));
+    });
+    audioBtn.addEventListener("click", () => {
+      startAudio().then((message) => refresh(message || undefined));
     });
 
     joinBtn.addEventListener("click", () => {
@@ -504,6 +636,7 @@
 
   // Red de seguridad al cerrar la pestaña sin que se haya detectado el fin.
   window.addEventListener("pagehide", () => {
+    stopAudio();
     if (!session || !session.started || session.sent) return;
     const transcript = currentTranscript().trim();
     if (transcript.length < 40 || !getToken()) return;

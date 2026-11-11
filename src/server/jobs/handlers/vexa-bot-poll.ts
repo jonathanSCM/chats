@@ -3,6 +3,7 @@ import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
 import { enqueue, enqueueOrReschedule } from "../queue";
 import { NON_TERMINAL_STATUSES, describeJoinFailure, pickSession, shouldRetryJoin, type VexaSessionEntry } from "@/lib/vexa-session";
+import { isLikelyWhisperHallucination } from "@/lib/whisper-filter";
 import { billableMinutes, creditsForAudio } from "@/lib/ai-credits";
 import { chargeCredits } from "@/server/services/ai/credits";
 
@@ -301,24 +302,6 @@ async function chargeTranscription(meetingId: string): Promise<void> {
     // La reunión ya quedó guardada: un fallo al anotar los créditos no debe volver a correr todo el job.
     console.error(`[vexa-bot-poll] No se pudieron cobrar los créditos de la reunión ${meetingId}:`, error);
   }
-}
-
-// Frases que Whisper "inventa" con frecuencia documentada cuando le llega un
-// tramo de audio silencioso o con ruido de fondo -- las aprendió de su
-// entrenamiento con subtítulos de YouTube, no las dijo nadie en la reunión.
-// Filtrarlas de raíz es mejor que dejarlas y que parezca que alguien las dijo.
-const WHISPER_HALLUCINATION_PATTERNS = [
-  /subt[ií]tulos (realizados |hechos )?por la comunidad de amara\.org/i,
-  /subt[ií]tulos por la comunidad de amara\.org/i,
-  /m[aá]s informaci[oó]n (en )?www\./i,
-  /suscr[ií]bete/i,
-  /gracias por ver( el video)?/i,
-  /cc por antarctica films argentina/i,
-];
-
-function isLikelyWhisperHallucination(text: string): boolean {
-  const trimmed = text.trim();
-  return WHISPER_HALLUCINATION_PATTERNS.some((re) => re.test(trimmed));
 }
 
 /** Se agotaron los reintentos del polling (errores repetidos de red/API) — queda visible como fallido. */

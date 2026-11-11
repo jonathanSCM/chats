@@ -2,24 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
 import { resolveExtensionMeeting, resolveExtensionOrg } from "@/server/services/extension-meeting";
-import { transcribeAudioViaBotService } from "@/server/services/meeting-bot";
+import { transcribeAudio } from "@/server/services/audio-transcription";
 
 /**
- * Recibe el audio real que graba la extensión de subtítulos de Meet en el
- * navegador (tabCapture del resto de los participantes + micrófono propio,
- * mezclados -- ver offscreen.js) y lo pasa por whisper.cpp reutilizando el
- * servicio del bot grabador (services/meeting-bot.ts), sin duplicar el
- * binario/modelo acá. Es best-effort: si whisper.cpp falla, el audio ya
- * quedó guardado como adjunto igual, solo no hay `audioTranscript`.
+ * Recibe el audio real que graba la extensión (tabCapture) o el userscript (getDisplayMedia) de Meet en el navegador:
+ * las voces de la reunión + el micrófono propio (solo mientras no está silenciado), mezclados, y lo transcribe con el
+ * Whisper de OpenAI (services/audio-transcription.ts). Es best-effort: si la transcripción falla, el audio ya quedó
+ * guardado como adjunto igual, solo no hay `audioTranscript`.
  *
- * A diferencia de api/extension/transcript, esto lo llama el "offscreen
- * document" de la extensión (una página de la extensión, no un content
- * script pegado al origen de meet.google.com), así que no pasa por CORS --
- * host_permissions alcanza, no hace falta manejar OPTIONS acá.
+ * El userscript manda el audio en partes de ~10 minutos (encabezado X-Audio-Part = 1, 2, 3…): cada parte queda como su
+ * propio adjunto y su texto se suma al de la reunión. Sin ese encabezado (extensión de Chrome) es una sola grabación.
  *
- * Auth por Bearer token contra User.meetExtensionToken (token personal, ver
- * dashboard/extension-authorize) -- antes era un token único por
- * organización.
+ * A diferencia de api/extension/transcript, esto lo llama una página de la extensión (o GM_xmlhttpRequest del
+ * userscript), no un content script pegado al origen de meet.google.com, así que no pasa por CORS.
+ *
+ * Auth por Bearer token contra User.meetExtensionToken (token personal, ver dashboard/extension-authorize).
  */
 function safeDecode(value: string | null): string | null {
   if (!value) return null;
@@ -67,29 +64,34 @@ export async function POST(req: NextRequest) {
     title: safeDecode(req.headers.get("x-meeting-title")),
   });
 
+  const part = Number(req.headers.get("x-audio-part"));
+  const suffix = Number.isInteger(part) && part > 0 ? `-parte-${part}` : "";
+
   const audioUrl = await saveMediaFile(buffer, mimeType);
   await prisma.meetingAttachment.create({
     data: {
       meetingId: resolved.id,
       url: audioUrl,
-      fileName: "grabacion-extension.webm",
+      fileName: `grabacion-extension${suffix}.webm`,
       mimeType,
       fileSize: buffer.length,
     },
   });
 
-  const result = await transcribeAudioViaBotService(buffer, mimeType);
+  const result = await transcribeAudio(org.organizationId, buffer, mimeType);
   if (!result.ok) {
-    console.error("[extension/audio] No se pudo transcribir con whisper.cpp:", result.error);
+    console.error("[extension/audio] No se pudo transcribir el audio:", result.error);
     return NextResponse.json({ ok: true, meetingId: resolved.id, transcribed: false });
   }
+  // Tramo sin nadie hablando (micrófono apagado y reunión en silencio): el audio queda guardado, no hay texto que sumar.
+  if (!result.transcript) return NextResponse.json({ ok: true, meetingId: resolved.id, transcribed: true, empty: true });
 
+  // Se relee el texto actual: las partes llegan una tras otra y cada una se suma a lo que ya hay.
+  const current = await prisma.meeting.findUnique({ where: { id: resolved.id }, select: { audioTranscript: true } });
   await prisma.meeting.update({
     where: { id: resolved.id },
     data: {
-      audioTranscript: resolved.audioTranscript
-        ? `${resolved.audioTranscript}\n\n${result.transcript}`
-        : result.transcript,
+      audioTranscript: current?.audioTranscript ? `${current.audioTranscript}\n\n${result.transcript}` : result.transcript,
     },
   });
 
@@ -98,7 +100,7 @@ export async function POST(req: NextRequest) {
     data: {
       meetingId: resolved.id,
       url: txtUrl,
-      fileName: "transcripcion-audio-extension.txt",
+      fileName: `transcripcion-audio-extension${suffix}.txt`,
       mimeType: "text/plain",
       fileSize: Buffer.byteLength(result.transcript, "utf-8"),
     },

@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 import { prisma } from "@/server/db/client";
 import { decrypt } from "@/lib/crypto";
 import { chooseKey, classifyKeyError, parseAiMode, type AiMode } from "@/lib/ai-key";
@@ -330,6 +330,44 @@ export interface RunOptions<T> {
  * Si el JSON no valida se reintenta una vez; si vuelve a fallar se guarda
  * como no procesado en vez de escribir datos dudosos (§36).
  */
+/**
+ * Transcribe un audio (Whisper) con la clave que corresponde a la organización: la propia, la personalizada, la de su
+ * organización principal o la de la plataforma -- igual que runStructured. Respeta el interruptor general, el tope diario
+ * de la plataforma, los topes de la clave personalizada y la vigencia del plan. No cobra créditos (la transcripción de
+ * reuniones hoy es gratis para el cliente y la absorbe la plataforma).
+ */
+export async function transcribeAudioForOrg(options: {
+  organizationId: string;
+  buffer: Buffer;
+  mimeType: string;
+  model?: string;
+  language?: string;
+}): Promise<string> {
+  const key = await resolveKey(options.organizationId);
+  if (!key.apiKey || !isAiGloballyEnabled()) throw new AiNotConfiguredError();
+  if (key.ownerOrgId === null && !(await isWithinBudget(options.organizationId))) throw new AiBudgetExceededError();
+  if (key.mode === "custom" && key.limits && key.ownerOrgId) {
+    const status = checkMonthlyLimit(key.limits, await getMonthUsage(key.ownerOrgId));
+    if (!status.ok) throw new AiMonthlyLimitError(status.message);
+  }
+  try {
+    await assertPlanActive(options.organizationId);
+  } catch (error) {
+    if (error instanceof PlanExpiredError) throw new AiCreditsError(error.message);
+    throw error;
+  }
+
+  const extension = options.mimeType.includes("mp4") ? "m4a" : options.mimeType.includes("ogg") ? "ogg" : options.mimeType.includes("wav") ? "wav" : "webm";
+  const file = await toFile(options.buffer, `audio.${extension}`, { type: options.mimeType });
+  const response = await getClient(key.apiKey).audio.transcriptions.create({
+    file,
+    model: options.model ?? "whisper-1",
+    response_format: "text",
+    ...(options.language ? { language: options.language } : {}),
+  });
+  return (typeof response === "string" ? response : ((response as { text?: string }).text ?? "")).trim();
+}
+
 export async function runStructured<T>(options: RunOptions<T>): Promise<T> {
   const key = await resolveKey(options.organizationId);
   if (!key.apiKey || !isAiGloballyEnabled()) {

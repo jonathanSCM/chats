@@ -412,5 +412,30 @@
     return JSON.stringify({ ventana: window.innerHeight, mainAbajo: top, barraArriba: bottom, hueco: top == null ? null : bottom - top, enElMedio: medio ? cadena(medio) : null, ocupantes });
   }
 
-  self.ProShopCaptions = { activate, setHidden, isHidden: () => hidden, sleep, describe, hueco };
+  // Dónde guarda Meet el tamaño de las cámaras: elementos con estilo en línea (alto, abajo, arriba…) y la cadena del video.
+  function estructura() {
+    const main = document.querySelector("main");
+    const r2 = (el) => {
+      const r = el.getBoundingClientRect();
+      return `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`;
+    };
+    const etiqueta = (el) => `${el.tagName.toLowerCase()}.${String(el.className || "").split(" ").slice(0, 2).join(".")}${el.getAttribute("jsname") ? "@" + el.getAttribute("jsname") : ""}`;
+    const conEstilo = [];
+    if (main) {
+      for (const el of [main, ...main.querySelectorAll("*")]) {
+        const st = el.getAttribute("style");
+        if (!st || !/height|bottom|top|inset|width|transform/i.test(st)) continue;
+        const r = el.getBoundingClientRect();
+        if (r.height < 150 && r.width < 150) continue;
+        if (conEstilo.length >= 24) break;
+        conEstilo.push(`${etiqueta(el)} [${r2(el)}] style="${st.slice(0, 110)}"${el.dataset.psHide ? " ps=" + el.dataset.psHide : ""}`);
+      }
+    }
+    const vid = document.querySelector("main video, main [data-participant-id], main [data-self-name]");
+    const cadena = [];
+    for (let n = vid, i = 0; n && n !== document.body && i < 10; n = n.parentElement, i++) cadena.push(`${etiqueta(n)} [${r2(n)}]${n.getAttribute("style") ? " style=" + n.getAttribute("style").slice(0, 80) : ""}`);
+    return JSON.stringify({ main: main ? r2(main) + " " + (main.getAttribute("style") || "") : null, conEstilo, cadenaCamara: cadena });
+  }
+
+  self.ProShopCaptions = { activate, setHidden, isHidden: () => hidden, sleep, describe, hueco, estructura };
 })();

@@ -117,9 +117,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           debug("[audio] Chrome dio permiso para capturar la pestaña");
           await ensureOffscreenDocument();
           debug("[audio] página de grabación lista");
+          // La página del grabador es invisible y Chrome NO le da acceso a chrome.storage (solo a chrome.runtime): la sesión del
+          // CRM y el micrófono elegido se le pasan aquí, en el mensaje de inicio.
+          const { token, apiBase, micDeviceId } = await chrome.storage.local.get(["token", "apiBase", "micDeviceId"]);
           const started = await chrome.runtime.sendMessage({
             type: "OFFSCREEN_START",
             streamId,
+            token: token || null,
+            apiBase: apiBase || null,
+            micDeviceId: micDeviceId || "",
             tabId: message.tabId,
             meetingUrl: message.meetingUrl,
             organizationId: message.organizationId || null,

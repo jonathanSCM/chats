@@ -65,13 +65,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-async function startRecording({ streamId, tabId, meetingUrl, organizationId, title }) {
+async function startRecording({ streamId, tabId, meetingUrl, organizationId, title, token, apiBase, micDeviceId }) {
   if (active) {
     if (session && session.tabId === tabId) return; // ya está grabando esta pestaña
     throw new Error("Ya hay una grabación de audio en otra pestaña.");
   }
   dbg(`inicio pedido (pestaña ${tabId})`);
-  session = { tabId, meetingUrl, organizationId: organizationId || null, title: title || null };
+  session = { tabId, meetingUrl, organizationId: organizationId || null, title: title || null, token: token || null, apiBase: apiBase || null, micDeviceId: micDeviceId || "" };
   paused = false;
   stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, micState: "pending", paused: false, micLabel: null, lastError: null };
 
@@ -102,13 +102,7 @@ async function startRecording({ streamId, tabId, meetingUrl, organizationId, tit
 }
 
 async function startMic() {
-  let deviceId = "";
-  try {
-    deviceId = (chrome.storage && chrome.storage.local && (await chrome.storage.local.get(["micDeviceId"])).micDeviceId) || "";
-  } catch {
-    /* sin acceso al almacenamiento: micrófono predeterminado */
-  }
-  await connectMic(deviceId);
+  await connectMic((session && session.micDeviceId) || "");
   dbg(`micrófono: ${stats.micState}${stats.micLabel ? " (" + stats.micLabel + ")" : ""}`);
   publish();
 }
@@ -230,53 +224,71 @@ function stopRecording() {
   publish();
 }
 
-async function getStorageWithRetry(keys, attempts = 3, delayMs = 300) {
-  for (let i = 0; i < attempts; i++) {
-    if (chrome.storage?.local) return chrome.storage.local.get(keys);
-    if (i < attempts - 1) await sleep(delayMs);
-  }
-  throw new Error("chrome.storage.local no está disponible");
+// Sube una parte. Devuelve true si el CRM la aceptó. (Esta página NO puede usar chrome.storage: la sesión viene en `current`.)
+async function sendPart(blob, part, current) {
+  const token = current && current.token;
+  if (!token) throw Object.assign(new Error("Sin sesión del CRM: vuelve a conectarte desde el ícono de la extensión."), { fatal: true });
+  const base = ((current && current.apiBase) || "https://chats.proshop.lat").replace(/\/$/, "");
+  const res = await fetch(base + "/api/extension/audio", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Meeting-Url": (current && current.meetingUrl) || "",
+      "X-Audio-Part": String(part),
+      ...(current && current.organizationId ? { "X-Organization-Id": current.organizationId } : {}),
+      // Los encabezados HTTP no admiten tildes ni emojis: va codificado y el servidor lo decodifica.
+      ...(current && current.title ? { "X-Meeting-Title": encodeURIComponent(current.title) } : {}),
+      "Content-Type": "audio/webm",
+    },
+    body: blob,
+  });
+  if (res.status === 401) throw Object.assign(new Error("Sesión del CRM vencida: vuelve a conectarte."), { fatal: true });
+  if (!res.ok) throw new Error(`El CRM respondió ${res.status}.`);
+  return true;
 }
+
+// Las partes que no se pudieron subir se guardan (en memoria) y se reintentan cada minuto mientras esta página siga viva.
+const failedParts = []; // { blob, part, current, tries }
 
 async function uploadPart(blob, part) {
   const current = session; // la sesión puede cambiar si empieza otra reunión mientras sube
   let lastError = null;
   for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt++) {
     try {
-      const { apiBase, token } = await getStorageWithRetry(["apiBase", "token"]);
-      if (!token) throw new Error("Sin sesión del CRM: vuelve a conectarte desde el ícono de la extensión.");
-      const base = (apiBase || "https://chats.proshop.lat").replace(/\/$/, "");
-      const res = await fetch(base + "/api/extension/audio", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "X-Meeting-Url": current?.meetingUrl || "",
-          "X-Audio-Part": String(part),
-          ...(current?.organizationId ? { "X-Organization-Id": current.organizationId } : {}),
-          // Los encabezados HTTP no admiten tildes ni emojis: va codificado y el servidor lo decodifica.
-          ...(current?.title ? { "X-Meeting-Title": encodeURIComponent(current.title) } : {}),
-          "Content-Type": "audio/webm",
-        },
-        body: blob,
-      });
-      if (res.status === 401) throw Object.assign(new Error("Sesión del CRM vencida: vuelve a conectarte."), { fatal: true });
-      if (res.ok) {
-        dbg(`parte ${part} subida`);
-        stats.uploaded += 1;
-        stats.lastError = null;
-        publish();
-        return;
-      }
-      throw new Error(`El CRM respondió ${res.status}.`);
+      await sendPart(blob, part, current);
+      dbg(`parte ${part} subida`);
+      stats.uploaded += 1;
+      stats.lastError = null;
+      publish();
+      return;
     } catch (error) {
       lastError = error;
       if (error && error.fatal) break;
       await sleep(4000 * attempt);
     }
   }
-  dbg(`parte ${part} NO se pudo subir: ${lastError && lastError.message ? lastError.message : lastError}`);
-  stats.failed += 1;
+  dbg(`parte ${part} NO se pudo subir (se reintenta cada minuto): ${lastError && lastError.message ? lastError.message : lastError}`);
+  failedParts.push({ blob, part, current, tries: 0 });
+  stats.failed = failedParts.length;
   stats.lastError = lastError && lastError.message ? lastError.message : "No se pudo subir una parte del audio.";
   console.error(`[proshop-captions] No se pudo subir la parte ${part}:`, lastError);
   publish();
 }
+
+setInterval(async () => {
+  for (const item of [...failedParts]) {
+    if (item.tries >= 30) continue; // media hora de reintentos
+    item.tries += 1;
+    try {
+      await sendPart(item.blob, item.part, item.current);
+    } catch {
+      continue;
+    }
+    failedParts.splice(failedParts.indexOf(item), 1);
+    dbg(`parte ${item.part} subida en un reintento`);
+    stats.uploaded += 1;
+    stats.failed = failedParts.length;
+    if (failedParts.length === 0) stats.lastError = null;
+    publish();
+  }
+}, 60000);

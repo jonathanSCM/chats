@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ProShop CRM — Subtítulos de Meet
 // @namespace    https://chats.proshop.lat
-// @version      1.4.0
+// @version      1.4.1
 // @description  Lee los subtítulos de Google Meet y los manda al CRM, o avisa al asistente para que entre solo. Se conecta con tu sesión del CRM (sin pegar tokens). Graba también el audio (voces de la reunión + tu micrófono, solo cuando no estás silenciado) y el CRM lo transcribe con Whisper.
 // @match        https://meet.google.com/*
 // @match        https://chats.proshop.lat/dashboard/extension-authorize*
@@ -111,6 +111,7 @@
       code,
       meetingUrl: `https://meet.google.com/${code}`,
       started: false,
+      stopped: false, // se detuvo a mano con «Detener y enviar»
       orgId: null, // se fija al tocar «Grabar»: lo que se grabó acá sigue yendo a esa organización
       title: null, // nombre de la reunión, fijado al tocar «Grabar»
       sent: false,
@@ -484,9 +485,10 @@
 
     const recordBtn = el("button", BTN("#c62828") + "margin-bottom:6px;", "Grabar esta reunión");
     const audioBtn = el("button", BTN("#455a64") + "margin-bottom:6px;display:none;", "Activar audio (voces + micrófono)");
+    const stopBtn = el("button", BTN("#b71c1c") + "margin-bottom:6px;display:none;", "Detener y enviar");
     const joinBtn = el("button", BTN("#00a884"), "Unir al asistente");
     const status = el("div", "font-size:11px;color:#059669;margin-top:8px;min-height:14px;");
-    panelEl.append(recordBtn, audioBtn, joinBtn, status);
+    panelEl.append(recordBtn, audioBtn, stopBtn, joinBtn, status);
 
     const setStatus = (text, bad) => {
       status.textContent = text || "";
@@ -501,8 +503,9 @@
       logoutBtn.style.display = logged ? "inline" : "none";
       recordBtn.disabled = !session || session.started;
       recordBtn.style.opacity = recordBtn.disabled ? "0.5" : "1";
-      if (session && session.started) recordBtn.textContent = audio ? "Grabando subtítulos y audio…" : "Grabando subtítulos…";
-      audioBtn.style.display = session && session.started && !audio ? "block" : "none";
+      if (session && session.started) recordBtn.textContent = session.stopped ? "Grabación enviada" : audio ? "Grabando subtítulos y audio…" : "Grabando subtítulos…";
+      audioBtn.style.display = session && session.started && !session.stopped && !audio ? "block" : "none";
+      stopBtn.style.display = session && session.started && !session.stopped ? "block" : "none";
       if (message) setStatus(message, /no se pudo|falta|sin /i.test(message));
     }
     document.body.appendChild(panelEl);
@@ -516,6 +519,17 @@
       void startRecording();
       refresh("Subtítulos activados.");
       audioResult.then((message) => message && refresh(message));
+    });
+    stopBtn.addEventListener("click", () => {
+      if (!session || !session.started || session.stopped) return;
+      if (session.pending) recordIfNew(session.pending.name, session.pending.text);
+      clearInterval(session.timer);
+      session.timer = null;
+      session.stopped = true;
+      stopAudio(); // sube la última parte del audio
+      sendTranscript("detenido a mano");
+      showClassifyPanel();
+      refresh("Grabación detenida y enviada. El audio termina de subirse en unos segundos: no cierres la pestaña todavía.");
     });
     audioBtn.addEventListener("click", () => {
       startAudio().then((message) => refresh(message || undefined));

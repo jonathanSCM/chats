@@ -14,6 +14,7 @@ import { InvitePanel } from "./_components/invite-panel";
 import { AiSettingsForm } from "./_components/ai-settings-form";
 import { LEAD_AUTO_ASSIGN_AVAILABLE } from "@/lib/lead-assignment";
 import { AutoAssignSettings } from "./_components/auto-assign-settings";
+import { AutoTrackSettings } from "./_components/auto-track-settings";
 import { BookingSettingsForm } from "./_components/booking-settings-form";
 import { PipelineStagesList } from "./_components/pipeline-stages-list";
 import { ServicesList } from "./_components/services-list";
@@ -394,6 +395,14 @@ export default async function OrganizationSettingsPage({
                 currentDurationMinutes={org.bookingDurationMinutes}
                 currentLeadHours={org.bookingLeadHours}
               />
+            </SettingRow>
+
+            <SettingRow
+              title={tr("Seguimiento automático de leads")}
+              summary={org.autoTrackLeads ? tr("Activado") : tr("Desactivado")}
+              description={tr("Cada chat nuevo recibe su tarjeta en Seguimiento y la IA le pone calidad de lead y prioridad sin que nadie lo pida.")}
+            >
+              <AutoTrackSettings enabled={org.autoTrackLeads} />
             </SettingRow>
 
             {LEAD_AUTO_ASSIGN_AVAILABLE && (

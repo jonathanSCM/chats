@@ -1,6 +1,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import { emitMessageCreated } from "@/server/integrations/domain-events";
 import { autoAssignLead } from "@/server/services/lead-assignment";
+import { trackLeadFromMessage } from "@/server/services/lead-tracking";
 import { prisma } from "@/server/db/client";
 import type {
   ParsedInboundMessage,
@@ -187,6 +188,12 @@ export async function handleIncomingMessage(inbound: ParsedInboundMessage): Prom
       customerLabel: conversation.customerName || conversation.customerPhone,
       preview,
     }).catch((error) => console.error("[conversation] Error notificando por push:", error));
+  }
+
+  // Seguimiento automático (opcional por organización): el chat nuevo recibe su tarjeta en Seguimiento y la IA la
+  // analiza sola unos minutos después del último mensaje. Nunca lanza.
+  if (connection.bot.organization.autoTrackLeads) {
+    await trackLeadFromMessage(conversationId);
   }
 
   // Respuesta a la lista de agendamiento real del bot de calificación (ver

@@ -193,6 +193,34 @@ export async function updateAutoAssignSettingsAction(
   };
 }
 
+/** Enciende o apaga el seguimiento automático: tarjeta en Seguimiento + análisis de la IA para cada chat nuevo. */
+export async function updateAutoTrackLeadsAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireSession();
+  if (session.user.role !== "OWNER" || !session.user.organizationId) {
+    return { error: "Solo el dueño de la organización puede cambiar este dato" };
+  }
+  const organizationId = session.user.organizationId;
+  const enabled = formData.get("autoTrackLeads") === "on";
+
+  const before = await prisma.organization.findUnique({ where: { id: organizationId }, select: { autoTrackLeads: true } });
+  await prisma.organization.update({ where: { id: organizationId }, data: { autoTrackLeads: enabled } });
+  await audit({
+    entityType: "Organization",
+    entityId: organizationId,
+    action: "auto_track_leads_updated",
+    userId: session.user.id,
+    organizationId,
+    before,
+    after: { autoTrackLeads: enabled },
+  });
+
+  revalidatePath("/dashboard/organization");
+  return { error: null, message: enabled ? "Seguimiento automático activado." : "Seguimiento automático desactivado." };
+}
+
 /** Marca si un integrante entra o no al reparto de leads. */
 export async function setMemberAvailabilityAction(userId: string, available: boolean): Promise<ActionState> {
   const session = await requireSession();

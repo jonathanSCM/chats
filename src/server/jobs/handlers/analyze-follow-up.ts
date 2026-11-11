@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { prisma } from "@/server/db/client";
 import { analyzeFollowUp } from "@/server/services/ai/follow-up";
 import { AiBudgetExceededError, isAiGloballyEnabled } from "@/server/services/ai/client";
 
@@ -11,6 +12,13 @@ export async function handleAnalyzeFollowUp(rawPayload: unknown): Promise<void> 
 
   // Solo el interruptor general: si esta organización no tiene clave disponible, runStructured la omite por su cuenta.
   if (!isAiGloballyEnabled()) return;
+
+  // La tarjeta pudo borrarse, archivarse o cerrarse (ganada/perdida) mientras esperaba el análisis: ya no hay nada que analizar.
+  const opportunity = await prisma.opportunity.findUnique({
+    where: { id: opportunityId },
+    select: { archivedAt: true, stage: { select: { role: true } } },
+  });
+  if (!opportunity || opportunity.archivedAt || opportunity.stage.role !== null) return;
 
   try {
     await analyzeFollowUp(opportunityId);

@@ -111,6 +111,9 @@ model Organization {
   // Asignación automática de leads (F14): apagada por defecto. Reparte por turnos entre los
   // vendedores marcados como disponibles (OrganizationMembership.availableForLeads).
   autoAssignEnabled      Boolean                @default(false)
+  // Seguimiento automático: cada chat nuevo recibe su tarjeta en Seguimiento y la IA la analiza sola (calidad del
+  // lead, prioridad, siguiente paso…) sin esperar a que el bot lo califique ni a que alguien pulse "Analizar".
+  autoTrackLeads         Boolean                @default(false)
   // Tope de oportunidades abiertas por vendedor; null = sin tope.
   autoAssignMaxOpen      Int?
   // Minutos que un cliente puede esperar respuesta humana antes de avisar (y, al doble, reasignar).

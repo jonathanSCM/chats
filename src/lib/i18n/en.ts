@@ -212,6 +212,14 @@ export const en: Record<string, string> = {
   "Tu Google Calendar ({email}) se desconectó. Las reuniones nuevas ya no llegan a tu calendario hasta que lo vuelvas a conectar.":
     "Your Google Calendar ({email}) got disconnected. New meetings won't reach your calendar until you reconnect it.",
   "Volver a conectar": "Reconnect",
+  "Dar seguimiento automático a cada chat nuevo": "Automatically track every new chat",
+  "Cada cliente nuevo que escribe por WhatsApp recibe su tarjeta en Seguimiento y la IA la analiza sola unos minutos después de su último mensaje: calidad del lead, prioridad, dolor principal, qué falta saber y la siguiente pregunta. Se vuelve a analizar cuando el cliente sigue escribiendo. Cada análisis gasta créditos de IA; si se acaban, las tarjetas se crean igual pero sin análisis.":
+    "Every new customer who writes on WhatsApp gets a card in Follow-up, and the AI analyzes it on its own a few minutes after their last message: lead quality, priority, main pain point, what's missing and the next question. It is re-analyzed when the customer keeps writing. Each analysis uses AI credits; if they run out, cards are still created but without analysis.",
+  "Seguimiento automático de leads": "Automatic lead tracking",
+  "Cada chat nuevo recibe su tarjeta en Seguimiento y la IA le pone calidad de lead y prioridad sin que nadie lo pida.":
+    "Every new chat gets its Follow-up card and the AI sets its lead quality and priority without anyone asking.",
+  Activado: "Enabled",
+  Desactivado: "Disabled",
 
   // Organización: pestañas (se traducen por variable, el test no las ve), subtítulo y filas de Integraciones
   General: "General",

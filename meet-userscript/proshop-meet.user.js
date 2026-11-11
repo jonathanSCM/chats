@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ProShop CRM — Subtítulos de Meet
 // @namespace    https://chats.proshop.lat
-// @version      1.4.1
-// @description  Lee los subtítulos de Google Meet y los manda al CRM, o avisa al asistente para que entre solo. Se conecta con tu sesión del CRM (sin pegar tokens). Graba también el audio (voces de la reunión + tu micrófono, solo cuando no estás silenciado) y el CRM lo transcribe con Whisper.
+// @version      1.5.0
+// @description  Lee los subtítulos de Google Meet (y los saca a una ventana flotante) y los manda al CRM, o avisa al asistente para que entre solo. Se conecta con tu sesión del CRM (sin pegar tokens). Graba también el audio (voces de la reunión + tu micrófono, solo cuando no estás silenciado) y el CRM lo transcribe con Whisper.
 // @match        https://meet.google.com/*
 // @match        https://chats.proshop.lat/dashboard/extension-authorize*
 // @grant        GM_getValue
@@ -10,6 +10,7 @@
 // @grant        GM_deleteValue
 // @grant        GM_addValueChangeListener
 // @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // @connect      chats.proshop.lat
 // @run-at       document-idle
 // ==/UserScript==
@@ -38,6 +39,7 @@
   // ── Estilos y constructor de elementos (sin innerHTML)
   function el(tag, css, text, attrs) {
     const node = document.createElement(tag);
+    node.setAttribute("data-ps-panel", "1");
     if (css) node.style.cssText = css;
     if (text != null) node.textContent = text;
     if (attrs) for (const k of Object.keys(attrs)) node.setAttribute(k, attrs[k]);
@@ -157,6 +159,499 @@
     if (label) label.textContent = `ProShop CRM — subtítulos: ${session.lines.length} líneas${audio ? ` · audio activo (${audio.uploaded} partes enviadas)` : ""}`;
   }
 
+
+
+  // ── Subtítulos en una ventana flotante (Document Picture-in-Picture), sin la franja negra de Meet.
+  // Es el único dueño de los subtítulos de Meet: los activa SOLO si no estaban activos (un clic de más los apagaría) y
+  // al cerrar la ventana NO los apaga mientras se está grabando, porque la grabación lee esos mismos subtítulos.
+  function createPopout(ctx) {
+    const TAG = "[ProShop · subtítulos]";
+    const log = (...a) => console.log(TAG, ...a);
+    const W = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
+
+    let pip = null, out = null, cap = null, mo = null, raf = 0, vacioDesde = 0;
+    let yoActiveLosSubs = false;
+    const touched = new Set();
+
+    const norm = (t) => (t || "").replace(/\s+/g, " ").trim();
+    const ICONO = /^[a-z0-9_]+$/; // ligaduras de Material Icons
+    const ICONO_LINEA = /^[a-z]+(_[a-z]+)+$/; // p.ej. arrow_downward
+
+    const REGION =
+      '[role="region"][aria-label*="aption" i],' +
+      '[role="region"][aria-label*="ubtítulo" i],' +
+      '[role="region"][aria-label*="ubtitulo" i]';
+
+    // ---------- 1) Activar los subtítulos de Meet ----------
+    const etiqueta = (b) => b.getAttribute("aria-label") || b.getAttribute("data-tooltip") || b.getAttribute("title") || "";
+    const textoBtn = (b) => norm(b.textContent) + " " + etiqueta(b);
+    function iconoDe(b) {
+      const i = b.querySelector('i,[class*="material"],[class*="icon"]');
+      return norm((i && i.textContent) || "");
+    }
+    const visible = (b) => {
+      const r = b.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    };
+    const RE_ACTIVAR = /(activar|encender|turn on)\s+(los\s+)?(subt[ií]tulos|captions)/i;
+    const RE_DESACT = /(desactivar|apagar|turn off)\s+(los\s+)?(subt[ií]tulos|captions)/i;
+    const botones = () => [...document.querySelectorAll('button,[role="button"]')].filter(visible);
+    const buscarBtn = (re) => botones().find((b) => re.test(textoBtn(b))) || null;
+
+    // El botón de la barra de abajo que abre el panel de subtítulos/traducción.
+    function botonBarraCC() {
+      const todos = botones();
+      const exacto = todos.find((b) => /subt[ií]tulos y traducci[oó]n|captions and translation/i.test(textoBtn(b)) || iconoDe(b) === "translate_cc");
+      if (exacto) return exacto;
+      return (
+        todos.find((b) => {
+          if (b.getBoundingClientRect().top < W.innerHeight * 0.75) return false;
+          const t = textoBtn(b);
+          if (RE_ACTIVAR.test(t) || RE_DESACT.test(t)) return false;
+          if (/traducir voz|configur|ajuste|setting|recientes|al final|latest|jump/i.test(t)) return false;
+          return /subt[ií]tulo|caption|traduc|translat/i.test(t) || /^(closed_caption(_off)?|subtitles(_off)?|g_translate|translate)$/.test(iconoDe(b));
+        }) || null
+      );
+    }
+
+    // Secuencia completa de eventos de ratón: algunos botones de Google ignoran un click() suelto.
+    function clicReal(b) {
+      for (const t of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+        const Ev = t.startsWith("pointer") ? PointerEvent : MouseEvent;
+        b.dispatchEvent(new Ev(t, { bubbles: true, cancelable: true, button: 0 }));
+      }
+    }
+
+    function escape() {
+      for (const t of [document.activeElement, document]) {
+        if (t) t.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true }));
+      }
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    }
+
+    const hayTextoDeSubs = () => !!document.querySelector('div[jsname="tgaKEf"]');
+
+    // Devuelve true si los subtítulos quedaron (o ya estaban) activos.
+    async function activarSubs() {
+      if (hayTextoDeSubs()) return true;
+      const tb0 = botonBarraCC();
+      if (tb0 && tb0.getAttribute("aria-pressed") === "true") {
+        log("los subtítulos ya estaban activos (botón pulsado)");
+        return true;
+      }
+      let abierto = false;
+      for (let i = 0; i < 28; i++) {
+        // ~7 s
+        const act = buscarBtn(RE_ACTIVAR);
+        if (act) {
+          log("pulso:", textoBtn(act));
+          clicReal(act);
+          yoActiveLosSubs = true;
+          await sleep(500);
+          escape();
+          return true;
+        }
+        if (buscarBtn(RE_DESACT)) {
+          log("los subtítulos ya estaban activos");
+          escape();
+          return true;
+        }
+        if (!abierto) {
+          const t = botonBarraCC();
+          if (t) {
+            log("abro el panel con:", textoBtn(t) || iconoDe(t));
+            clicReal(t);
+            abierto = true;
+            await sleep(400);
+            continue;
+          }
+        }
+        await sleep(250);
+      }
+      if (abierto) {
+        log('abrí el panel pero no vi "Activar subtítulos"');
+        escape();
+        return false;
+      }
+      log("no encontré ningún botón de subtítulos, pruebo con la tecla C");
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "c", code: "KeyC", keyCode: 67, bubbles: true }));
+      yoActiveLosSubs = true;
+      return false;
+    }
+
+    async function desactivarSubs() {
+      if (!yoActiveLosSubs) return;
+      yoActiveLosSubs = false;
+      let abierto = false;
+      for (let i = 0; i < 16; i++) {
+        const d = buscarBtn(RE_DESACT);
+        if (d) {
+          clicReal(d);
+          await sleep(300);
+          escape();
+          return;
+        }
+        if (buscarBtn(RE_ACTIVAR)) {
+          escape();
+          return;
+        }
+        if (!abierto) {
+          const t = botonBarraCC();
+          if (t) {
+            clicReal(t);
+            abierto = true;
+            await sleep(400);
+            continue;
+          }
+        }
+        await sleep(250);
+      }
+    }
+
+    // ---------- 2) Localizar el contenedor de subtítulos ----------
+    function dentroDelEscenario(el) {
+      let n = el.parentElement;
+      for (let d = 0; d < 10 && n && n !== document.body; d++) {
+        if (n.querySelector("video")) return true;
+        n = n.parentElement;
+      }
+      return false;
+    }
+
+    function candidatoHeuristico() {
+      const vh = W.innerHeight, vw = W.innerWidth;
+      let min = null;
+      for (const node of document.querySelectorAll("div,span,p")) {
+        if (node.closest('[role="tooltip"]')) continue;
+        if (node.closest('[aria-label*="hat" i]')) continue;
+        if (node.closest("[data-ps-panel]")) continue;
+        const r = node.getBoundingClientRect();
+        if (r.height < 14 || r.width < 20) continue;
+        if (r.top < vh * 0.55) continue;
+        if (r.left > vw * 0.78) continue;
+        if (node.querySelector("video,button")) continue;
+        const t = norm(node.textContent);
+        if (t.length < 4 || t.length > 400) continue;
+        if (ICONO.test(t)) continue;
+        if (!dentroDelEscenario(node)) continue;
+        const area = r.width * r.height;
+        if (!min || area < min.area) min = { node, area };
+      }
+      if (!min) return null;
+      let n = min.node;
+      for (let d = 0; d < 6; d++) {
+        const par = n.parentElement;
+        if (!par || par === document.body) break;
+        if (par.querySelector("video")) break;
+        const pr = par.getBoundingClientRect();
+        if (pr.top < vh * 0.4 || pr.height > vh * 0.6) break;
+        if (!norm(par.textContent)) break;
+        n = par;
+      }
+      return n;
+    }
+
+    // Selectores conocidos de Meet, por orden de preferencia (el contenedor antes que el texto).
+    const SELECTORES = ['div[jsname="tgaKEf"]', REGION];
+
+    // Un candidato solo vale si está abajo, visible, sin vídeo y fuera de diálogos/popups.
+    function valido(node) {
+      if (!node || !node.isConnected) return false;
+      if (node.closest('[role="dialog"],[role="tooltip"],[role="alertdialog"]')) return false;
+      if (node.closest("[data-ps-panel]")) return false;
+      if (node.querySelector("video")) return false;
+      const r = node.getBoundingClientRect();
+      if (r.height < 10 || r.width < 20) return false;
+      if (r.top < W.innerHeight * 0.45) return false;
+      const t = norm(node.textContent);
+      if (!t) return false;
+      if (/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}|Copiar v[ií]nculo|Copy (joining )?(link|info)|Agrega otras personas|Add others/i.test(t)) return false;
+      return true;
+    }
+
+    function buscar() {
+      for (const sel of SELECTORES) {
+        for (const node of document.querySelectorAll(sel)) {
+          if (valido(node)) {
+            log("enganchado vía", sel);
+            return node;
+          }
+        }
+      }
+      const h = candidatoHeuristico();
+      return valido(h) ? h : null;
+    }
+
+    // ---------- 3) Quitar la franja negra ----------
+    // Meet mide cada panel inferior y reserva ese hueco bajo el escenario. Si el panel de subtítulos mide 0, Meet recupera
+    // el espacio solo, igual que con los subtítulos apagados. El texto sigue en el DOM (fuera de la vista), así que la
+    // grabación puede seguir leyéndolo.
+    function centro() {
+      return document.elementFromPoint(Math.round(W.innerWidth / 2), Math.round(W.innerHeight * 0.35));
+    }
+
+    function panelSubs(node) {
+      const w = node.closest('[data-side="3"]');
+      if (!w) return null;
+      if (w.querySelector('button[aria-label*="Salir de la llamada" i],button[aria-label*="Leave call" i],[role="region"][aria-label*="ontroles" i],[role="region"][aria-label*="ontrols" i]')) return null;
+      return w;
+    }
+
+    function collapse(node) {
+      touched.add(node);
+      node.dataset.psPopout = "leaf";
+      let par = node.parentElement;
+      const w = panelSubs(node);
+      if (w) {
+        while (par && par !== document.body) {
+          touched.add(par);
+          par.dataset.psPopout = "collapse";
+          if (par === w) break;
+          par = par.parentElement;
+        }
+      } else {
+        const c = centro();
+        while (par && par !== document.body && !(c && par.contains(c))) {
+          if (par.querySelector("button")) break;
+          touched.add(par);
+          par.dataset.psPopout = "collapse";
+          par = par.parentElement;
+        }
+      }
+      reclamar();
+      for (const ms of [300, 900, 2000]) setTimeout(reclamar, ms);
+    }
+
+    // Red de seguridad: si tras colapsar el panel el escenario sigue sin llegar a la barra, se le fija el margen inferior.
+    let ultimoReclamo = 0;
+    function reclamar() {
+      if (!pip || !cap) return;
+      ultimoReclamo = Date.now();
+      const main = document.querySelector("main");
+      if (!main) return;
+      const w = cap.closest && cap.closest('[data-side="3"]');
+      let topBarra = W.innerHeight, hay = false;
+      for (const o of document.querySelectorAll('[data-side="3"]')) {
+        if (o === w) continue;
+        const r = o.getBoundingClientRect();
+        if (r.height > 0) {
+          hay = true;
+          if (r.top < topBarra) topBarra = r.top;
+        }
+      }
+      if (!hay) return;
+      const hueco = topBarra - main.getBoundingClientRect().bottom;
+      if (main.dataset.psPopout !== "stage" && hueco <= 40) return;
+      const bottom = Math.max(0, Math.round(W.innerHeight - topBarra + 8));
+      const antes = parseInt(main.style.getPropertyValue("--ps-bottom"), 10);
+      touched.add(main);
+      main.dataset.psPopout = "stage";
+      main.style.setProperty("--ps-bottom", bottom + "px");
+      if (antes !== bottom) {
+        log("escenario: margen inferior fijado a", bottom, "px (hueco era", Math.round(hueco), "px)");
+        W.dispatchEvent(new Event("resize"));
+      }
+    }
+
+    function restore() {
+      const habia = touched.size > 0;
+      for (const node of touched) {
+        delete node.dataset.psPopout;
+        node.style.removeProperty("--ps-bottom");
+      }
+      touched.clear();
+      if (habia) W.dispatchEvent(new Event("resize"));
+    }
+
+    function bind(node) {
+      if (!node || node === cap) return;
+      restore();
+      cap = node;
+      vacioDesde = 0;
+      collapse(cap);
+      render();
+    }
+
+    // ---------- 4) Dibujar en la ventana flotante ----------
+    function render() {
+      if (!out) return;
+      const t = ((cap && cap.innerText) || "").replace(/\u00a0/g, " ");
+      if (!norm(t)) {
+        if (!vacioDesde) vacioDesde = Date.now();
+      } else vacioDesde = 0;
+      const lines = t.split("\n").map(norm).filter((l) => l && !ICONO_LINEA.test(l)).slice(-8);
+      out.textContent = lines.length ? lines.join("\n") : "Esperando subtítulos…";
+      out.style.opacity = lines.length ? "1" : ".5";
+    }
+
+    function startObserver() {
+      mo = new MutationObserver(() => {
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          if (!cap || !document.contains(cap)) {
+            const c = buscar();
+            if (c) bind(c);
+            else render();
+            return;
+          }
+          if (cap.dataset.psPopout !== "leaf") collapse(cap);
+          else if (Date.now() - ultimoReclamo > 1200) reclamar();
+          render();
+          if (vacioDesde && Date.now() - vacioDesde > 2000) {
+            const c = buscar();
+            if (c && c !== cap) {
+              log("reenganche");
+              bind(c);
+            }
+          }
+        });
+      });
+      mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+    }
+
+    // ---------- 5) Diagnóstico (Alt+clic sobre los subtítulos) ----------
+    function dump(node) {
+      const rows = [];
+      let n = node;
+      for (let d = 0; d < 9 && n && n !== document.body; d++) {
+        const cs = getComputedStyle(n);
+        const r = n.getBoundingClientRect();
+        rows.push({
+          tag: n.tagName, jsname: n.getAttribute("jsname"), role: n.getAttribute("role"), aria: n.getAttribute("aria-label"),
+          cls: String(n.className || "").slice(0, 90), pos: cs.position, h: cs.height, pb: cs.paddingBottom,
+          top: Math.round(r.top), height: Math.round(r.height), tieneVideo: !!n.querySelector("video"), tieneBoton: !!n.querySelector("button"),
+        });
+        n = n.parentElement;
+      }
+      const text = JSON.stringify(rows, null, 2);
+      console.log(TAG, text);
+      if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+      return text;
+    }
+
+    // ---------- 6) Abrir y cerrar la ventana ----------
+    const CSS = `
+      [data-ps-popout="leaf"]{
+        position:fixed !important; left:-10000px !important; top:0 !important;
+        width:100vw !important; height:auto !important; max-height:none !important;
+        min-height:0 !important; margin:0 !important; padding:0 !important;
+        border:0 !important; pointer-events:none !important;
+      }
+      [data-ps-popout="collapse"]{
+        height:0 !important; min-height:0 !important; max-height:0 !important;
+        padding:0 !important; margin:0 !important; border-width:0 !important;
+        overflow:hidden !important; flex:0 0 0 !important; gap:0 !important;
+      }
+      main[data-ps-popout="stage"]{
+        bottom:var(--ps-bottom) !important;
+      }
+    `;
+
+    function limpiar() {
+      if (mo) mo.disconnect();
+      mo = null;
+      pip = null;
+      out = null;
+      cap = null;
+      vacioDesde = 0;
+      restore();
+      const st = document.getElementById("ps-popout-style");
+      if (st) st.remove();
+    }
+
+    async function open() {
+      if (pip) return true;
+      if (!("documentPictureInPicture" in W)) {
+        alert("Este Chrome no soporta la ventana flotante (Document Picture-in-Picture, hace falta Chrome 116 o más).");
+        return false;
+      }
+      // El CSS va primero para que, al aparecer la franja, ya esté neutralizada.
+      const style = document.createElement("style");
+      style.id = "ps-popout-style";
+      style.textContent = CSS;
+      document.head.append(style);
+
+      // La ventana se pide YA, mientras el clic todavía cuenta como gesto del usuario.
+      try {
+        pip = await W.documentPictureInPicture.requestWindow({ width: 560, height: 150, disallowReturnToOpener: true });
+      } catch (err) {
+        log("no se pudo abrir la ventana", err);
+        style.remove();
+        return false;
+      }
+
+      pip.document.documentElement.style.cssText = "background:#000;margin:0";
+      pip.document.body.style.cssText =
+        "margin:0;padding:14px 16px;background:#000;color:#fff;height:100%;box-sizing:border-box;overflow:hidden;font:600 20px/1.4 system-ui,sans-serif";
+      // Caja del texto: anclada abajo, así siempre se ve lo último que se dijo.
+      const caja = pip.document.createElement("div");
+      caja.style.cssText = "height:100%;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;";
+      out = pip.document.createElement("div");
+      out.style.cssText = "white-space:pre-wrap;transition:opacity .15s";
+      out.textContent = "Activando subtítulos…";
+      out.style.opacity = ".5";
+      caja.append(out);
+      pip.document.body.append(caja);
+
+      pip.addEventListener("pagehide", () => {
+        limpiar();
+        // Si se está grabando, los subtítulos se quedan encendidos: la grabación los lee.
+        if (!ctx.isRecording()) desactivarSubs();
+        ctx.onChange();
+        log("cerrado y restaurado");
+      });
+
+      startObserver();
+      ctx.onChange();
+      await activarSubs();
+      for (let i = 0; i < 20 && pip && !cap; i++) {
+        const c = buscar();
+        if (c) bind(c);
+        else await sleep(250);
+      }
+      render();
+      return true;
+    }
+
+    function close() {
+      if (pip) pip.close();
+    }
+    async function toggle() {
+      if (pip) close();
+      else await open();
+    }
+
+    // Alt+C abre/cierra; Alt+clic sobre los subtítulos fuerza el elemento y copia un diagnóstico.
+    document.addEventListener(
+      "click",
+      (e) => {
+        if (!e.altKey || e.shiftKey) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dump(e.target);
+        bind(e.target);
+        if (!pip) open();
+      },
+      true,
+    );
+    W.addEventListener("keydown", (e) => {
+      if (e.altKey && e.code === "KeyC") {
+        e.preventDefault();
+        toggle();
+      }
+    });
+    W.addEventListener("resize", () => {
+      if (pip && cap) reclamar();
+    });
+
+    return { open, close, toggle, isOpen: () => Boolean(pip), activarSubs };
+  }
+
+  const popout = createPopout({
+    isRecording: () => Boolean(session && session.started && !session.stopped),
+    onChange: () => panelRefresh && panelRefresh(),
+  });
 
   // ── Audio: voces de la reunión (pestaña compartida) + tu micrófono, mezclados y grabados en partes de 10 min.
   // Cada parte es un archivo completo que se sube apenas termina (así no se pierde todo si se cierra la pestaña) y el CRM
@@ -289,10 +784,10 @@
   }
 
   async function enableCaptions() {
-    const button = findButtonByName(/subt[ií]tulos|captions/i);
-    if (!button) return false;
-    button.click();
-    await sleep(800);
+    // Revisa si ya estaban activos antes de pulsar (un clic de más los apagaría) y abre el panel de Meet si hace falta.
+    const activos = await popout.activarSubs();
+    if (!activos) return false;
+    await sleep(500);
     try {
       const combo = document.querySelector('[role="combobox"][aria-label*="idioma de la reunión" i], [role="combobox"][aria-label*="meeting language" i]');
       if (combo) {
@@ -400,6 +895,7 @@
   // Al salir de la reunión (o pasar a otra): se manda lo que haya y se limpia todo.
   function endSession(reason) {
     if (!session) return;
+    popout.close();
     stopAudio();
     if (session.started) {
       if (session.pending) recordIfNew(session.pending.name, session.pending.text);
@@ -485,10 +981,11 @@
 
     const recordBtn = el("button", BTN("#c62828") + "margin-bottom:6px;", "Grabar esta reunión");
     const audioBtn = el("button", BTN("#455a64") + "margin-bottom:6px;display:none;", "Activar audio (voces + micrófono)");
+    const popBtn = el("button", BTN("#37474f") + "margin-bottom:6px;", "Subtítulos en ventana");
     const stopBtn = el("button", BTN("#b71c1c") + "margin-bottom:6px;display:none;", "Detener y enviar");
     const joinBtn = el("button", BTN("#00a884"), "Unir al asistente");
     const status = el("div", "font-size:11px;color:#059669;margin-top:8px;min-height:14px;");
-    panelEl.append(recordBtn, audioBtn, stopBtn, joinBtn, status);
+    panelEl.append(recordBtn, audioBtn, popBtn, stopBtn, joinBtn, status);
 
     const setStatus = (text, bad) => {
       status.textContent = text || "";
@@ -506,6 +1003,7 @@
       if (session && session.started) recordBtn.textContent = session.stopped ? "Grabación enviada" : audio ? "Grabando subtítulos y audio…" : "Grabando subtítulos…";
       audioBtn.style.display = session && session.started && !session.stopped && !audio ? "block" : "none";
       stopBtn.style.display = session && session.started && !session.stopped ? "block" : "none";
+      popBtn.textContent = popout.isOpen() ? "Cerrar subtítulos en ventana" : "Subtítulos en ventana";
       if (message) setStatus(message, /no se pudo|falta|sin /i.test(message));
     }
     document.body.appendChild(panelEl);
@@ -519,6 +1017,9 @@
       void startRecording();
       refresh("Subtítulos activados.");
       audioResult.then((message) => message && refresh(message));
+    });
+    popBtn.addEventListener("click", () => {
+      popout.toggle().then(() => refresh());
     });
     stopBtn.addEventListener("click", () => {
       if (!session || !session.started || session.stopped) return;

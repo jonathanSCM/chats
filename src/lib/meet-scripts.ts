@@ -18,13 +18,7 @@ export const MEET_SCRIPTS: MeetScript[] = [
     file: "proshop-meet.user.js",
     title: "ProShop CRM — Subtítulos y audio de Meet",
     description:
-      "Graba los subtítulos y el audio de la reunión (voces + tu micrófono cuando no estás silenciado) y los manda al CRM, o avisa al asistente para que entre solo.",
-  },
-  {
-    id: "popout",
-    file: "meet-captions-popout.user.js",
-    title: "Meet Captions Pop-out",
-    description: "Saca los subtítulos de Meet a una ventana flotante para que no ocupen espacio en la pantalla de la reunión.",
+      "Un solo script para todo: graba los subtítulos y el audio de la reunión (voces + tu micrófono cuando no estás silenciado) y los manda al CRM, saca los subtítulos a una ventana flotante y puede avisar al asistente para que entre solo.",
   },
 ];
 

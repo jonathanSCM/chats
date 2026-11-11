@@ -12,6 +12,14 @@ describe("scripts de Meet para copiar", () => {
     }
   });
 
+  it("es un solo script, y trae la grabación de audio y la ventana de subtítulos", async () => {
+    const scripts = await loadMeetScripts();
+    expect(scripts).toHaveLength(1);
+    expect(scripts[0].code).toContain("createPopout");
+    expect(scripts[0].code).toContain("startAudio");
+    expect(scripts[0].code).toContain("@grant        unsafeWindow");
+  });
+
   it("lee la versión del encabezado", () => {
     expect(scriptVersion("// ==UserScript==\n// @version      1.4.1\n// ==/UserScript==")).toBe("1.4.1");
     expect(scriptVersion("sin encabezado")).toBeNull();

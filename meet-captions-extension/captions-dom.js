@@ -307,10 +307,14 @@
   // lo recalcula aunque el escenario crezca: queda una cámara chica con negro debajo. Se agranda el bloque de cámaras (el primer
   // elemento con ancho y alto en línea dentro de main) con una escala para que llene el espacio liberado, pegado arriba y centrado.
   function escalar(main) {
-    const cont = [...main.querySelectorAll("[style]")].find((el) => {
+    const candidatos = [...main.querySelectorAll("[style]")].filter((el) => {
       const st = el.getAttribute("style") || "";
       return /width/.test(st) && /height/.test(st) && el.offsetHeight > 150 && el.offsetWidth > 150 && !el.closest(OWN);
     });
+    const externos = candidatos.filter((el) => !candidatos.some((o) => o !== el && o.contains(el)));
+    // Con una sola cámara hay un único bloque: se agranda. Con varias, cada una es su propio bloque y agrandar una sola la
+    // desacomoda (queda cortada): ahí Meet ya reparte las cámaras a lo ancho y no se toca nada.
+    const cont = externos.length === 1 ? externos[0] : null;
     for (const o of main.querySelectorAll('[data-ps-hide="tile"]')) if (o !== cont) delete o.dataset.psHide;
     if (!cont) {
       document.documentElement.style.removeProperty("--ps-scale");

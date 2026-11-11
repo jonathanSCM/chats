@@ -683,5 +683,33 @@ if (!detached) {
 }
 clockTimer = setInterval(paintHeaderStatus, 1000);
 void clockTimer;
+// ───────── Aviso de versión nueva ─────────
+// Instalada «sin empaquetar» Chrome no la actualiza sola: se consulta al CRM cuál es la versión desplegada y, si es más nueva,
+// se avisa con el enlace a Ajustes (descargar el .zip, reemplazar los archivos de la carpeta y pulsar «Recargar»).
+function newer(a, b) {
+  const x = String(a).split(".").map(Number);
+  const y = String(b).split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+}
+async function checkUpdate() {
+  try {
+    const base = await apiBase();
+    const res = await fetch(`${base}/api/extension/version`, { cache: "no-store" });
+    const { version } = await res.json();
+    const mine = chrome.runtime.getManifest().version;
+    const box = $("updateBox");
+    if (version && newer(version, mine)) {
+      $("updateText").textContent = `Hay una versión nueva de la extensión: ${version} (tienes la ${mine}). Descarga el zip, reemplaza los archivos de tu carpeta y pulsa «Recargar» en chrome://extensions.`;
+      $("updateBtn").onclick = () => chrome.tabs.create({ url: `${base}/dashboard/ajustes` });
+      box.style.display = "block";
+    } else box.style.display = "none";
+  } catch {
+    /* sin conexión: no se avisa */
+  }
+}
+void checkUpdate();
+setInterval(checkUpdate, 60 * 60 * 1000);
+
 void loadSettings();
 void render().then(renderDebug);

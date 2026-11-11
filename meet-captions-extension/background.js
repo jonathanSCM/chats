@@ -122,22 +122,33 @@ async function ensureOffscreenDocument() {
   await creatingOffscreen;
 }
 
-// Chrome solo deja una captura activa por pestaña («Cannot capture a tab with an active stream»). Si quedó una de la grabación
-// anterior (se detuvo y se grabó de nuevo enseguida, o el grabador no alcanzó a soltarla), se le pide al grabador que termine,
-// y si aun así Chrome la sigue viendo activa se cierra la página del grabador (eso libera todo) y se reintenta una vez.
+// Chrome solo deja una captura activa por pestaña («Cannot capture a tab with an active stream»). Antes de pedir el id se mira,
+// con getCapturedTabs (Chrome 116+), si esta pestaña todavía tiene una captura de la grabación anterior; si la tiene se le pide
+// al grabador que la suelte y se espera a que Chrome la dé por terminada. Si aun así falla, se cierra la página del grabador
+// (eso libera todo) y se reintenta una vez.
+async function tabIsCaptured(tabId) {
+  try {
+    const list = await chrome.tabCapture.getCapturedTabs();
+    return list.some((c) => c.tabId === tabId && (c.status === "active" || c.status === "pending"));
+  } catch {
+    return false; // Chrome sin getCapturedTabs: se sigue sin esta comprobación
+  }
+}
 async function tabStreamId(tabId) {
   const hayGrabador = async () => (await chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] })).length > 0;
-  if (await hayGrabador()) {
-    await chrome.runtime.sendMessage({ type: "OFFSCREEN_STOP" }).catch(() => {});
-    await new Promise((r) => setTimeout(r, 500));
+  if (await tabIsCaptured(tabId)) {
+    debug("[audio] la pestaña todavía tiene una captura anterior: se le pide al grabador que la suelte");
+    if (await hayGrabador()) await chrome.runtime.sendMessage({ type: "OFFSCREEN_STOP" }).catch(() => {});
+    for (let i = 0; i < 15 && (await tabIsCaptured(tabId)); i++) await new Promise((r) => setTimeout(r, 200)); // hasta ~3 s
   }
   try {
     return await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
   } catch (error) {
     if (!/active stream/i.test(String(error))) throw error;
-    debug("[audio] Chrome veía una captura anterior activa: se cierra el grabador y se reintenta");
+    debug("[audio] Chrome seguía viendo una captura anterior activa: se cierra el grabador y se reintenta");
     if (await hayGrabador()) await chrome.offscreen.closeDocument().catch(() => {});
     await new Promise((r) => setTimeout(r, 400));
+    await ensureOffscreenDocument();
     return await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
   }
 }
@@ -149,15 +160,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         try {
           debug(`[audio] pedido recibido (pestaña ${message.tabId})`);
           await patchState(message.tabId, { audio: { active: false, starting: true } });
-          // Normal: Chrome da el id de la pestaña (hace falta haber usado el ícono de la extensión). Plan B: el panel ya trae un id
-          // elegido por la persona con el selector de pestañas de Chrome (no depende de ese permiso).
-          const streamId = message.streamId || (await tabStreamId(message.tabId));
-          debug(message.streamId ? "[audio] pestaña elegida con el selector de Chrome" : "[audio] Chrome dio permiso para capturar la pestaña");
+          // El id de captura de Chrome vence a los pocos segundos: todo lo lento (crear la página del grabador, leer los ajustes)
+          // se hace ANTES de pedirlo, y se usa enseguida.
           await ensureOffscreenDocument();
           debug("[audio] página de grabación lista");
           // La página del grabador es invisible y Chrome NO le da acceso a chrome.storage (solo a chrome.runtime): la sesión del
           // CRM y el micrófono elegido se le pasan aquí, en el mensaje de inicio.
           const { token, apiBase, micDeviceId, recordMic } = await chrome.storage.local.get(["token", "apiBase", "micDeviceId", "recordMic"]);
+          // Normal: Chrome da el id de la pestaña (hace falta haber usado el ícono de la extensión). Plan B: el panel ya trae un id
+          // elegido por la persona con el selector de pestañas de Chrome (no depende de ese permiso).
+          const streamId = message.streamId || (await tabStreamId(message.tabId));
+          debug(message.streamId ? "[audio] pestaña elegida con el selector de Chrome" : "[audio] Chrome dio permiso para capturar la pestaña");
           const started = await chrome.runtime.sendMessage({
             type: "OFFSCREEN_START",
             streamId,

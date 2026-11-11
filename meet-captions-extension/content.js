@@ -127,6 +127,7 @@
     lockedTitle = null;
     finalizedKeys.clear();
     finalizedLines.length = 0;
+    sentCount = 0;
   }
 
   let lastMicMuted = null;
@@ -335,33 +336,108 @@
   }
 
   // ───────── Enviar al CRM ─────────
-  async function sendTranscript(reason) {
-    if (sent) return;
-    const transcript = currentTranscript().trim();
-    if (transcript.length < 40) {
-      dbg(`no se mandan subtítulos (${reason}): muy cortos (${transcript.length} caracteres, mínimo 40)`);
-      return;
+  // Los subtítulos se mandan POR PARTES mientras se graba (cada ~30 s, solo las líneas nuevas) y al detener se manda lo que
+  // falte. Así un cierre brusco del navegador o un fallo de red no se lleva la reunión entera. Además cada ~30 s queda una copia
+  // local (chrome.storage.local, clave «rec:<id>»): si la grabación se corta sin cerrarse, el panel ofrece enviarla al CRM.
+  // El servidor SUMA lo que recibe a lo ya guardado, por eso cada envío lleva solo texto nuevo.
+  const AUTOSAVE_TICKS = 15; // 15 polls de 2 s = ~30 s
+  const MIN_TRANSCRIPT = 40; // por debajo de esto no se manda nada (una prueba de 2 palabras no crea una reunión)
+  let sentCount = 0; // cuántas líneas de finalizedLines ya recibió el CRM
+  let saving = Promise.resolve(); // los envíos van en fila: nunca dos a la vez
+  const recKey = () => "rec:" + recordingId;
+
+  function storeSet(obj) {
+    if (dead || !alive()) return Promise.resolve();
+    try {
+      return Promise.resolve(chrome.storage.local.set(obj)).catch(() => {});
+    } catch {
+      return Promise.resolve();
     }
-    sent = true;
+  }
+  function storeRemove(keys) {
+    if (dead || !alive()) return Promise.resolve();
+    try {
+      return Promise.resolve(chrome.storage.local.remove(keys)).catch(() => {});
+    } catch {
+      return Promise.resolve();
+    }
+  }
+  function saveLocal(closed) {
+    if (!recordingId) return Promise.resolve();
+    return storeSet({
+      [recKey()]: {
+        recordingId,
+        meetingUrl,
+        organizationId: lockedOrgId === undefined ? null : lockedOrgId,
+        title: lockedTitle,
+        startedAt,
+        lines: [...finalizedLines],
+        sentCount,
+        closed: Boolean(closed),
+        updatedAt: Date.now(),
+      },
+    });
+  }
+
+  // Un envío al CRM. `final` = cierre de la grabación (el servidor guarda el adjunto con el texto completo).
+  async function postTranscript(text, final) {
     const { apiBase, token, orgId: storedOrgId } = await store(["apiBase", "token", "orgId"]);
     const orgId = lockedOrgId !== undefined ? lockedOrgId : storedOrgId || null;
     if (!token) {
-      sent = false;
       dbg("sin sesión del CRM: no se pudieron mandar los subtítulos");
-      return;
+      return false;
     }
     const base = (apiBase || "https://chats.proshop.lat").replace(/\/$/, "");
     try {
       const res = await fetch(base + API_PATH, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ meetingUrl, transcript, recordingId, ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}) }),
+        body: JSON.stringify({ meetingUrl, transcript: text, recordingId, final, ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}) }),
       });
-      dbg(`subtítulos enviados (${reason}): ${res.status}`);
-      if (!res.ok) sent = false; // se puede reintentar al detener de nuevo
+      dbg(`subtítulos enviados (${final ? "cierre" : "parte"}): ${res.status}`);
+      return res.ok;
     } catch (error) {
-      sent = false;
       dbg("no se pudieron enviar los subtítulos: " + (error && error.message ? error.message : error));
+      return false;
+    }
+  }
+
+  // Guardado periódico mientras se graba.
+  function autosave() {
+    saving = saving
+      .then(async () => {
+        if (!isRecording() || sent) return;
+        const total = finalizedLines.length;
+        await saveLocal(false);
+        if (total <= sentCount || currentTranscript().trim().length < MIN_TRANSCRIPT) return;
+        const text = finalizedLines.slice(sentCount, total).join("\n");
+        if (await postTranscript(text, false)) {
+          sentCount = Math.max(sentCount, total);
+          await saveLocal(false);
+        }
+      })
+      .catch(() => {});
+    return saving;
+  }
+
+  async function sendTranscript(reason) {
+    if (sent) return;
+    await saving; // si hay una parte enviándose, se espera: no se manda dos veces la misma línea
+    if (sent) return;
+    if (currentTranscript().trim().length < MIN_TRANSCRIPT) {
+      dbg(`no se mandan subtítulos (${reason}): muy cortos (${currentTranscript().trim().length} caracteres, mínimo ${MIN_TRANSCRIPT})`);
+      void storeRemove(recKey());
+      return;
+    }
+    sent = true;
+    const total = finalizedLines.length;
+    const rest = finalizedLines.slice(sentCount, total).join("\n");
+    if (await postTranscript(rest, true)) {
+      sentCount = total;
+      void storeRemove(recKey());
+    } else {
+      sent = false; // se puede reintentar al detener de nuevo
+      void saveLocal(true); // y queda la copia local para que el panel ofrezca enviarla
     }
   }
 
@@ -409,6 +485,7 @@
       warning = "Llevo 1½ minutos sin recibir subtítulos: actívalos en Meet (botón «Subtítulos» o CC) y que alguien hable. El audio sigue grabándose.";
     }
     pushLive();
+    if (ticks % AUTOSAVE_TICKS === 0) void autosave();
 
     if (ticks % END_CHECK_TICKS === 0) {
       if (meetingLooksOver()) {
@@ -420,24 +497,27 @@
     }
   }
 
-  // Red de seguridad: si se cierra la pestaña sin detectar el fin, sendBeacon manda lo acumulado (no admite headers
-  // propios: el token viaja en el cuerpo, que el servidor también acepta).
+  // Red de seguridad: si se cierra la pestaña sin detectar el fin, sendBeacon manda lo que falte (no admite headers propios:
+  // el token viaja en el cuerpo, que el servidor también acepta).
   window.addEventListener("pagehide", () => {
     if (dead || !alive()) return;
     void send({ type: "STOP_AUDIO_CAPTURE" });
     if (!isRecording() || sent) return;
-    const transcript = currentTranscript().trim();
-    if (transcript.length < 40) return;
+    if (currentTranscript().trim().length < MIN_TRANSCRIPT) return;
+    const lines = finalizedLines.slice(sentCount);
+    if (pending && pending.text) lines.push(`${pending.name}: ${pending.text}`);
+    const transcript = lines.join("\n");
     try {
       chrome.storage.local.get(["apiBase", "token", "orgId"], ({ apiBase, token, orgId: storedOrgId }) => {
         if (!token) return;
         const orgId = lockedOrgId !== undefined ? lockedOrgId : storedOrgId || null;
         const base = (apiBase || "https://chats.proshop.lat").replace(/\/$/, "");
         const blob = new Blob(
-          [JSON.stringify({ meetingUrl, transcript, token, recordingId, ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}) })],
+          [JSON.stringify({ meetingUrl, transcript, token, recordingId, final: true, ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}) })],
           { type: "application/json" },
         );
-        navigator.sendBeacon(base + API_PATH, blob);
+        // Se asume enviado: se borra la copia local para que el panel no ofrezca enviarla otra vez.
+        if (navigator.sendBeacon(base + API_PATH, blob)) void storeRemove(recKey());
       });
     } catch {
       /* la extensión ya no está */
@@ -452,6 +532,7 @@
     endedAt = null;
     syncBadge();
     pushLive();
+    void saveLocal(false);
     await sleep(500); // por si se activa justo al entrar a la llamada
     dbg("grabación iniciada: activando subtítulos…");
     const activos = await enableCaptions();

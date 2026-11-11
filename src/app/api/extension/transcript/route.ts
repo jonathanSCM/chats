@@ -20,7 +20,9 @@ import { attemptAutoLinkMeeting } from "@/server/services/meeting-link";
  */
 const bodySchema = z.object({
   meetingUrl: z.string().min(1).max(500),
-  transcript: z.string().min(1).max(500_000),
+  // Puede venir vacío SOLO en el cierre (final): la extensión va guardando los subtítulos por partes mientras graba y, al detener,
+  // ya no queda texto nuevo que mandar, pero igual avisa que terminó para que se guarde el adjunto con el texto completo.
+  transcript: z.string().max(500_000),
   // `sendBeacon` (red de seguridad si se cierra la pestaña sin detectar el
   // fin de la reunión) no permite mandar headers custom -- para ese caso el
   // token viaja acá en vez de en Authorization.
@@ -71,6 +73,10 @@ export async function POST(req: NextRequest) {
   }
   const { meetingUrl, transcript, final, vexaSessionId, organizationId: requestedOrganizationId, title, recordingId } = parsed.data;
 
+  const addition = transcript.trim();
+  // Una parte intermedia (final=false) sin texto no tiene nada que guardar.
+  if (!addition && final === false) return withCors(NextResponse.json({ ok: true, ignored: true }, { status: 202 }));
+
   const token =
     req.headers.get("authorization")?.replace("Bearer ", "").trim() || parsed.data.token;
   if (!token) {
@@ -117,12 +123,12 @@ export async function POST(req: NextRequest) {
   // subtítulos del bot de Vexa) manda solo texto NUEVO en cada llamada, no
   // todo lo acumulado de nuevo -- si mandara todo de nuevo cada vez, esto
   // se duplicaría en cascada con cada actualización.
-  const newTranscriptValue = resolved.transcript ? `${resolved.transcript}\n\n${transcript}` : transcript;
-  const meeting = await prisma.meeting.update({
-    where: { id: resolved.id },
-    data: { transcript: newTranscriptValue },
-    select: { id: true },
-  });
+  // El cierre sin texto nuevo (la extensión ya mandó todo por partes) solo termina: sin nada acumulado no hay qué cerrar.
+  if (!addition && !resolved.transcript) return withCors(NextResponse.json({ ok: true, ignored: true }, { status: 202 }));
+  const newTranscriptValue = !addition ? (resolved.transcript as string) : resolved.transcript ? `${resolved.transcript}\n\n${transcript}` : transcript;
+  const meeting = addition
+    ? await prisma.meeting.update({ where: { id: resolved.id }, data: { transcript: newTranscriptValue }, select: { id: true } })
+    : { id: resolved.id };
 
   // El parche de subtítulos del bot manda una actualización cada ~20s
   // durante toda la reunión (final=false) para tener el texto al día en

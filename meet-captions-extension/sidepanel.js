@@ -801,6 +801,104 @@ async function updateNow() {
   }
 }
 $("updateNowBtn").addEventListener("click", () => void updateNow());
+
+// ───────── Recuperar una grabación que quedó sin cerrar ─────────
+// Mientras se graba, la página de Meet guarda cada ~30 s una copia local («rec:<id>») y se borra al enviarse bien. Si queda una
+// (se cerró el navegador, falló la red al detener…), aquí se ofrece mandarla al CRM. Se considera «sin cerrar» si lleva más de 5
+// minutos sin actualizarse (las que están grabando ahora se actualizan cada 30 s) o si ya se detuvo pero el envío falló.
+const RECOVER_STALE_MS = 5 * 60 * 1000;
+const RECOVER_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+let recoverKey = null;
+async function checkRecover() {
+  try {
+    const all = await chrome.storage.local.get(null);
+    const now = Date.now();
+    const old = [];
+    let found = null;
+    for (const [key, rec] of Object.entries(all)) {
+      if (!key.startsWith("rec:") || !rec) continue;
+      if (now - (rec.updatedAt || 0) > RECOVER_MAX_AGE_MS) {
+        old.push(key);
+        continue;
+      }
+      const live = lastState && lastState.recording && lastState.recordingId === rec.recordingId;
+      if (live) continue;
+      if (rec.closed || now - (rec.updatedAt || 0) > RECOVER_STALE_MS) {
+        if (!found || (rec.updatedAt || 0) > (found.rec.updatedAt || 0)) found = { key, rec };
+      }
+    }
+    if (old.length) await chrome.storage.local.remove(old);
+    const box = $("recoverBox");
+    if (!found) {
+      recoverKey = null;
+      box.style.display = "none";
+      return;
+    }
+    recoverKey = found.key;
+    const rec = found.rec;
+    const pendingLines = (rec.lines || []).length - (rec.sentCount || 0);
+    const when = new Date(rec.updatedAt || now).toLocaleString("es", { dateStyle: "short", timeStyle: "short" });
+    $("recoverText").textContent = `Quedó una grabación sin cerrar${rec.title ? ` («${rec.title}»)` : ""} del ${when}: ${rec.lines.length} líneas de subtítulos, ${Math.max(0, pendingLines)} sin enviar. ¿La mando al CRM?`;
+    $("recoverStatus").textContent = "";
+    box.style.display = "block";
+  } catch {
+    /* sin acceso al almacenamiento: no se ofrece nada */
+  }
+}
+async function recoverSend() {
+  if (!recoverKey) return;
+  const status = $("recoverStatus");
+  const btn = $("recoverSend");
+  btn.disabled = true;
+  try {
+    const rec = (await chrome.storage.local.get(recoverKey))[recoverKey];
+    if (!rec) return;
+    const { token, orgId } = await chrome.storage.local.get(["token", "orgId"]);
+    if (!token) {
+      status.textContent = "Inicia sesión para enviarla.";
+      return;
+    }
+    const all = (rec.lines || []).join("\n");
+    if (all.trim().length < 40) {
+      await chrome.storage.local.remove(recoverKey);
+      await checkRecover();
+      return;
+    }
+    status.textContent = "Enviando…";
+    const org = rec.organizationId || orgId || null;
+    const res = await fetch(`${await apiBase()}/api/extension/transcript`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        meetingUrl: rec.meetingUrl,
+        transcript: (rec.lines || []).slice(rec.sentCount || 0).join("\n"),
+        recordingId: rec.recordingId,
+        final: true,
+        ...(org ? { organizationId: org } : {}),
+        ...(rec.title ? { title: rec.title } : {}),
+      }),
+    });
+    if (!res.ok) throw new Error(`El CRM respondió ${res.status}.`);
+    await chrome.storage.local.remove(recoverKey);
+    status.textContent = "✓ Enviada al CRM.";
+    setTimeout(checkRecover, 1500);
+  } catch (error) {
+    status.textContent = "No se pudo enviar: " + (error && error.message ? error.message : error);
+  } finally {
+    btn.disabled = false;
+  }
+}
+$("recoverSend").addEventListener("click", () => void recoverSend());
+$("recoverDiscard").addEventListener("click", async () => {
+  if (recoverKey) await chrome.storage.local.remove(recoverKey);
+  await checkRecover();
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && Object.keys(changes).some((k) => k.startsWith("rec:"))) void checkRecover();
+});
+void checkRecover();
+setInterval(checkRecover, 60 * 1000);
+
 void checkUpdate();
 setInterval(checkUpdate, 60 * 60 * 1000);
 

@@ -97,8 +97,6 @@
       .meter > div { height: 100%; width: 0; background: var(--accent); transition: width 0.08s linear; }
       .hint { color: var(--muted); font-size: 11.5px; margin: 0; }
       .ver { color: var(--muted); font-size: 11px; text-align: center; }
-      #results { display: grid; gap: 2px; max-height: 150px; overflow: auto; }
-      #results button { text-align: left; font-weight: 400; padding: 7px 9px; }
       .link-a { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 12.5px; }
       .link-a:hover { text-decoration: underline; }
     </style>
@@ -135,23 +133,11 @@
       <button class="accent big" id="loginBtn">Iniciar sesión y permitir el micrófono</button>
     </section>
 
-    <!-- Reunión terminada: resumen, a qué cliente fue, y volver a grabar -->
+    <!-- Reunión terminada: resumen y volver a grabar -->
     <section class="card" id="doneBox" style="display: none">
       <h2>✓ Grabación enviada al CRM</h2>
       <p class="hint" id="doneSummary"></p>
       <a class="link-a" id="crmLink" href="#" target="_blank" rel="noopener">Ver las reuniones en el CRM</a>
-      <h2 style="margin-top: 4px">¿A qué cliente fue esta reunión?</h2>
-      <input id="clientSearch" type="text" placeholder="Buscar cliente…" autocomplete="off" />
-      <div id="results"></div>
-      <div id="newClient" style="display: none; gap: 6px">
-        <input id="newName" type="text" placeholder="Nombre" />
-        <input id="newPhone" type="text" placeholder="Teléfono (con código de país)" />
-        <button class="accent" id="newSave">Crear cliente y vincular</button>
-      </div>
-      <div class="row">
-        <button id="newToggle">Cliente nuevo</button>
-      </div>
-      <p class="hint" id="classifyStatus"></p>
     </section>
 
     <!-- Antes de grabar -->

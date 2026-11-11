@@ -41,11 +41,6 @@ const recordStatus = $("recordStatus");
 const doneBox = $("doneBox");
 const doneSummary = $("doneSummary");
 const crmLink = $("crmLink");
-const clientSearch = $("clientSearch");
-const results = $("results");
-const newClient = $("newClient");
-const newToggle = $("newToggle");
-const classifyStatus = $("classifyStatus");
 const hideToggle = $("hideToggle");
 const autoOpenToggle = $("autoOpenToggle");
 const recordMicToggle = $("recordMicToggle");
@@ -336,69 +331,6 @@ joinBtn.addEventListener("click", async () => {
   }
 });
 
-// ───────── Reunión terminada: a qué cliente fue ─────────
-let searchTimer = null;
-clientSearch.addEventListener("input", () => {
-  clearTimeout(searchTimer);
-  const q = clientSearch.value.trim();
-  results.replaceChildren();
-  if (q.length < 2) return;
-  searchTimer = setTimeout(async () => {
-    const { token } = await chrome.storage.local.get(["token"]);
-    if (!token) return;
-    const orgId = lastState && lastState.organizationId;
-    try {
-      const res = await fetch(`${await apiBase()}/api/extension/opportunities/search?q=${encodeURIComponent(q)}${orgId ? `&organizationId=${encodeURIComponent(orgId)}` : ""}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      results.replaceChildren(
-        ...(data.results || []).map((r) => {
-          const b = document.createElement("button");
-          b.textContent = `${r.title} — ${r.contactName}`;
-          b.addEventListener("click", () => void classify({ opportunityId: r.id }, r.title));
-          return b;
-        }),
-      );
-      if (!data.results || data.results.length === 0) classifyStatus.textContent = "No hay clientes con ese nombre: puedes crear uno nuevo.";
-      else classifyStatus.textContent = "";
-    } catch {
-      classifyStatus.textContent = "No se pudo buscar ahora. Inténtalo de nuevo.";
-    }
-  }, 300);
-});
-newToggle.addEventListener("click", () => {
-  newClient.style.display = newClient.style.display === "none" ? "grid" : "none";
-});
-$("newSave").addEventListener("click", () => {
-  const name = $("newName").value.trim();
-  const phone = $("newPhone").value.trim();
-  if (!phone) {
-    classifyStatus.textContent = "Falta el teléfono del cliente.";
-    return;
-  }
-  void classify({ newContactName: name, newContactPhone: phone, newOpportunityTitle: name }, name || phone);
-});
-async function classify(extra, label) {
-  const { token } = await chrome.storage.local.get(["token"]);
-  if (!token || !lastState) return;
-  classifyStatus.textContent = "Vinculando…";
-  try {
-    const res = await fetch(`${await apiBase()}/api/extension/meetings/classify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ meetingUrl: lastState.meetingUrl, recordingId: lastState.recordingId, ...(lastState.organizationId ? { organizationId: lastState.organizationId } : {}), ...extra }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    classifyStatus.textContent = `✓ Reunión vinculada a «${label}».`;
-    results.replaceChildren();
-    clientSearch.value = "";
-    newClient.style.display = "none";
-  } catch {
-    classifyStatus.textContent = "No se pudo vincular. Inténtalo de nuevo.";
-  }
-}
-
 function showDoneBox(state) {
   doneBox.style.display = "grid";
   const audio = state.audio || {};
@@ -407,14 +339,6 @@ function showDoneBox(state) {
   parts.push(`${state.lines || 0} líneas de subtítulos`);
   if (audio.part) parts.push(`${audio.uploaded || 0} de ${audio.part} parte(s) de audio subidas`);
   doneSummary.textContent = parts.join(" · ") + (state.title ? ` · ${state.title}` : "");
-  if (doneBox.dataset.rec !== String(state.recordingId)) {
-    // Grabación distinta a la que se estaba mostrando: se limpia la vinculación anterior.
-    doneBox.dataset.rec = String(state.recordingId);
-    classifyStatus.textContent = "";
-    clientSearch.value = "";
-    results.replaceChildren();
-    newClient.style.display = "none";
-  }
 }
 
 // ───────── Pantalla ─────────

@@ -37,6 +37,7 @@ Grabar y guardar en el CRM ProShop del usuario los subtítulos y el audio de las
 | `offscreen` | Mantener la grabación de audio (necesita APIs de audio que el service worker no tiene). |
 | `activeTab` | Chrome exige que el usuario invoque la extensión para poder capturar el audio de la pestaña. |
 | `sidePanel` | Mostrar en un panel lateral los subtítulos en vivo y el estado de la grabación. |
+| `desktopCapture` (opcional) | Plan B para capturar el audio: si Chrome no permite la captura automática de la pestaña, la persona elige la pestaña de Meet en el selector de Chrome. Solo se pide si ella decide usarlo. |
 | `storage` | Guardar la sesión del CRM, la organización elegida y el estado de la grabación. |
 | Host `https://meet.google.com/*` | Leer los subtítulos de la reunión y detectar cuándo termina. |
 | Host `https://chats.proshop.lat/*` | Conectar con la cuenta del CRM y enviar los subtítulos y el audio. |

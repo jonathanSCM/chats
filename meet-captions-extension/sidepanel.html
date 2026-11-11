@@ -175,6 +175,14 @@
           </div>
           <label class="toggle"><input type="checkbox" id="recordMicToggle" checked /> <span>Grabar mi micrófono (se corta al instante cuando te silencias en Meet)</span></label>
           <label class="field">
+            Cómo capturar el audio de la reunión
+            <select id="audioMethodSelect">
+              <option value="auto">Automático (recomendado)</option>
+              <option value="picker">Elegir la pestaña con el selector de Chrome</option>
+            </select>
+          </label>
+          <p class="hint">Si el audio no arranca solo, usa el selector: Chrome te deja elegir la pestaña de Meet y marcar «Compartir audio de la pestaña».</p>
+          <label class="field">
             Micrófono
             <select id="micSelect"></select>
           </label>

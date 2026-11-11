@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ProShop CRM — Asistente de reuniones de Meet",
   "short_name": "ProShop Meet",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "minimum_chrome_version": "116",
   "description": "Graba los subtítulos y el audio de tus reuniones de Google Meet y los guarda en tu CRM, con subtítulos en vivo en un panel.",
   "icons": {
@@ -12,6 +12,7 @@
     "128": "icons/icon128.png"
   },
   "permissions": ["storage", "activeTab", "tabCapture", "offscreen", "sidePanel"],
+  "optional_permissions": ["desktopCapture"],
   "host_permissions": [
     "https://meet.google.com/*",
     "https://chats.proshop.lat/*"

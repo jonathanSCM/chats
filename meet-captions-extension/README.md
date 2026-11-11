@@ -1,4 +1,4 @@
-# ProShop CRM — Asistente de reuniones de Meet (extensión de Chrome, v2.3)
+# ProShop CRM — Asistente de reuniones de Meet (extensión de Chrome, v2.4)
 
 Graba **los subtítulos y el audio** de tus reuniones de Google Meet y los guarda en tu CRM, con un **panel lateral** que
 muestra los subtítulos en vivo (y se puede separar en su propia ventana). Corre en tu navegador, como un participante
@@ -13,8 +13,10 @@ más: no hay bot, nadie tiene que admitirlo.
 5. Si no has iniciado sesión, el panel muestra **Iniciar sesión y permitir el micrófono** (un solo paso; usa tu sesión, sin tokens).
 6. (Nombre y organización si quieres) → **Grabar esta reunión**. Chrome pide el permiso del micrófono una sola vez.
 
-Importante: para capturar el **audio**, Chrome exige que abras el panel **con el ícono** de la extensión (no con el botón «PS» de la
-pantalla). Si lo abriste con «PS», el panel te lo avisa: haz clic en el ícono y vuelve a pulsar «Grabar».
+**Audio, dos formas.** Automática: Chrome da la captura de la pestaña si abriste el panel **con el ícono** de la extensión. Si no la da
+(o prefieres no depender de eso), el panel muestra el botón **«Elegir la pestaña de Meet (audio)»**: Chrome abre su selector, eliges la
+pestaña de Meet y marcas «Compartir audio de la pestaña» (el permiso de captura de pantalla es opcional y solo se pide ahí). En Ajustes
+puedes dejar el selector como método fijo.
 
 Con ese clic se activan a la vez: los subtítulos de Meet (en español), el audio (voces + tu micrófono) y el panel lateral.
 

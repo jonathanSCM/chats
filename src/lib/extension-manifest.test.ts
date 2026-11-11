@@ -46,6 +46,8 @@ describe("manifest de la extensión de Chrome", () => {
   it("pide exactamente los permisos que usa, y ningún permiso amplio", () => {
     expect([...manifest.permissions].sort()).toEqual(["activeTab", "offscreen", "sidePanel", "storage", "tabCapture"]);
     expect(manifest.host_permissions).toEqual(["https://meet.google.com/*", "https://chats.proshop.lat/*"]);
+    // El plan B de audio (selector de pestañas) usa un permiso OPCIONAL: solo se pide si la persona lo usa.
+    expect(manifest.optional_permissions).toEqual(["desktopCapture"]);
     expect(Number(manifest.minimum_chrome_version)).toBeGreaterThanOrEqual(116); // sidePanel.open
   });
 

@@ -116,8 +116,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         try {
           debug(`[audio] pedido recibido (pestaña ${message.tabId})`);
           await patchState(message.tabId, { audio: { active: false, starting: true } });
-          const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: message.tabId });
-          debug("[audio] Chrome dio permiso para capturar la pestaña");
+          // Normal: Chrome da el id de la pestaña (hace falta haber usado el ícono de la extensión). Plan B: el panel ya trae un id
+          // elegido por la persona con el selector de pestañas de Chrome (no depende de ese permiso).
+          const streamId = message.streamId || (await chrome.tabCapture.getMediaStreamId({ targetTabId: message.tabId }));
+          debug(message.streamId ? "[audio] pestaña elegida con el selector de Chrome" : "[audio] Chrome dio permiso para capturar la pestaña");
           await ensureOffscreenDocument();
           debug("[audio] página de grabación lista");
           // La página del grabador es invisible y Chrome NO le da acceso a chrome.storage (solo a chrome.runtime): la sesión del
@@ -126,6 +128,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const started = await chrome.runtime.sendMessage({
             type: "OFFSCREEN_START",
             streamId,
+            source: message.streamId ? "desktop" : "tab",
             token: token || null,
             apiBase: apiBase || null,
             micDeviceId: micDeviceId || "",

@@ -8,6 +8,7 @@ const detached = params.get("detached") === "1";
 let tabId = params.get("tab") ? Number(params.get("tab")) : null;
 let meetingUrl = null;
 let lastState = null;
+let audioMethod = "auto"; // «auto» (tabCapture) o «picker» (selector de pestañas de Chrome); se lee al abrir y al cambiarlo
 
 const $ = (id) => document.getElementById(id);
 const dot = $("dot");
@@ -43,6 +44,7 @@ const hideToggle = $("hideToggle");
 const autoOpenToggle = $("autoOpenToggle");
 const recordMicToggle = $("recordMicToggle");
 const langSelect = $("langSelect");
+const audioMethodSelect = $("audioMethodSelect");
 const micSelect = $("micSelect");
 const micHint = $("micHint");
 const settings = $("settings");
@@ -238,14 +240,55 @@ recordBtn.addEventListener("click", () => {
     .catch(() => {
       recordStatus.textContent = "No se pudo conectar con la reunión: recarga la pestaña de Meet e inténtalo de nuevo.";
     });
-  chrome.runtime
+  startAudio({ organizationId, title, recordingId });
+  void askMic(false); // si falta el permiso del micrófono, Chrome lo pide ahora mismo
+});
+
+// ───────── Audio de la reunión: dos formas de capturar la pestaña ─────────
+// Automático: Chrome da la captura de la pestaña si la extensión se abrió con su ícono (permiso activeTab). Si Chrome no la da
+// (se abrió con el botón de la pantalla de Meet, o el permiso no se mantuvo), queda el plan B: el selector de pestañas de Chrome,
+// que no depende de ese permiso. El permiso de «captura de pantalla» es OPCIONAL: solo se pide si se usa el selector.
+function startAudio({ organizationId, title, recordingId }) {
+  if (audioMethod === "picker") return pickAudio({ organizationId, title, recordingId });
+  return chrome.runtime
     .sendMessage({ type: "START_AUDIO_CAPTURE", tabId, meetingUrl, organizationId, title, recordingId })
     .then((response) => {
       if (response && response.ok === false) recordStatus.textContent = "Audio: " + friendlyAudioError(String(response.error || "no se pudo activar"));
     })
     .catch(() => {});
-  void askMic(false); // si falta el permiso del micrófono, Chrome lo pide ahora mismo
-});
+}
+
+// Debe llamarse directo desde un clic (el permiso opcional lo exige).
+function pickAudio({ organizationId, title, recordingId }) {
+  recordStatus.textContent = "Elige la pestaña de Meet y marca «Compartir audio de la pestaña»…";
+  return chrome.permissions
+    .request({ permissions: ["desktopCapture"] })
+    .then((granted) => {
+      if (!granted) {
+        recordStatus.textContent = "Sin ese permiso no se puede usar el selector: se graban solo los subtítulos.";
+        return;
+      }
+      chrome.desktopCapture.chooseDesktopMedia(["tab", "audio"], (streamId, options) => {
+        if (!streamId) {
+          recordStatus.textContent = "No elegiste ninguna pestaña: se graban solo los subtítulos.";
+          return;
+        }
+        if (options && options.canRequestAudioTrack === false) {
+          recordStatus.textContent = "Marca «Compartir audio de la pestaña» en el selector de Chrome.";
+          return;
+        }
+        chrome.runtime
+          .sendMessage({ type: "START_AUDIO_CAPTURE", tabId, meetingUrl: (lastState && lastState.meetingUrl) || meetingUrl, organizationId, title, recordingId, streamId })
+          .then((response) => {
+            recordStatus.textContent = response && response.ok === false ? "Audio: " + String(response.error || "no se pudo activar") : "";
+          })
+          .catch(() => {});
+      });
+    })
+    .catch(() => {
+      recordStatus.textContent = "No se pudo abrir el selector de pestañas.";
+    });
+}
 
 joinBtn.addEventListener("click", async () => {
   if (!meetingUrl) return;
@@ -489,10 +532,15 @@ async function render() {
       void askMic(false); // Chrome muestra el aviso «quiere usar tu micrófono» solo
     }
   }
-  if (audio.lastError) notices.append(notice("Audio: " + friendlyAudioError(audio.lastError), "error"));
+  const pickerArgs = { organizationId: state.organizationId, title: state.title, recordingId: state.recordingId };
+  const askPicker = () => void pickAudio(pickerArgs);
+  if (audio.lastError) {
+    const needsPicker = /invoked|activeTab|not been invoked|Chrome no dejó/i.test(audio.lastError);
+    notices.append(notice("Audio: " + friendlyAudioError(audio.lastError), "error", needsPicker ? "Elegir la pestaña de Meet (audio)" : undefined, askPicker));
+  }
   if (audio.failed) notices.append(notice(`${audio.failed} parte(s) del audio no se pudieron subir (se reintenta cada minuto).`, "error"));
   if (!audio.active && !audio.starting && audio.part === undefined && !audio.lastError && Date.now() - (state.startedAt || 0) > 6000) {
-    notices.append(notice("El audio no está grabando. Haz clic en el ícono de la extensión (barra de Chrome) para abrir el panel desde ahí, detén y vuelve a grabar.", "warn"));
+    notices.append(notice("El audio no está grabando. Puedes elegir la pestaña de Meet con el selector de Chrome, o abrir el panel con el ícono de la extensión, detener y volver a grabar.", "warn", "Elegir la pestaña de Meet (audio)", askPicker));
   }
 
   hideToggle.checked = state.hideMeetCaptions !== false;
@@ -534,7 +582,9 @@ detachBtn.addEventListener("click", () => {
 
 // ───────── Ajustes ─────────
 async function loadSettings() {
-  const s = await chrome.storage.local.get(["hideMeetCaptions", "autoOpenWindow", "captionLang", "micDeviceId", "recordMic"]);
+  const s = await chrome.storage.local.get(["hideMeetCaptions", "autoOpenWindow", "captionLang", "micDeviceId", "recordMic", "audioMethod"]);
+  audioMethod = s.audioMethod === "picker" ? "picker" : "auto";
+  audioMethodSelect.value = audioMethod;
   hideToggle.checked = s.hideMeetCaptions !== false;
   autoOpenToggle.checked = Boolean(s.autoOpenWindow);
   recordMicToggle.checked = s.recordMic !== false;
@@ -555,6 +605,10 @@ hideToggle.addEventListener("change", async () => {
 autoOpenToggle.addEventListener("change", () => chrome.storage.local.set({ autoOpenWindow: autoOpenToggle.checked }));
 recordMicToggle.addEventListener("change", () => chrome.storage.local.set({ recordMic: recordMicToggle.checked }));
 langSelect.addEventListener("change", () => chrome.storage.local.set({ captionLang: langSelect.value }));
+audioMethodSelect.addEventListener("change", () => {
+  audioMethod = audioMethodSelect.value === "picker" ? "picker" : "auto";
+  chrome.storage.local.set({ audioMethod });
+});
 
 // Micrófonos: la lista sale del navegador; los nombres solo aparecen si el permiso ya se concedió.
 async function loadMics(selectedId) {

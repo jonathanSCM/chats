@@ -65,7 +65,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-async function startRecording({ streamId, tabId, meetingUrl, organizationId, title, token, apiBase, micDeviceId, recordMic, recordingId }) {
+async function startRecording({ streamId, source, tabId, meetingUrl, organizationId, title, token, apiBase, micDeviceId, recordMic, recordingId }) {
   if (active) {
     if (session && session.tabId === tabId) return; // ya está grabando esta pestaña
     throw new Error("Ya hay una grabación de audio en otra pestaña.");
@@ -75,10 +75,32 @@ async function startRecording({ streamId, tabId, meetingUrl, organizationId, tit
   paused = false;
   stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, micState: "pending", paused: false, micLabel: null, lastError: null };
 
+  const picked = source === "desktop"; // plan B: la persona eligió la pestaña con el selector de Chrome
   try {
-    tabStream = await navigator.mediaDevices.getUserMedia({
-      audio: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId } },
-    });
+    if (picked) {
+      // El selector entrega un id de «escritorio»: pide audio y video, y del video no se usa nada.
+      const media = await navigator.mediaDevices.getUserMedia({
+        audio: { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: streamId } },
+        video: { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: streamId } },
+      });
+      media.getVideoTracks().forEach((t) => t.stop());
+      if (media.getAudioTracks().length === 0) {
+        media.getTracks().forEach((t) => t.stop());
+        throw new Error("la pestaña se compartió sin audio: marca «Compartir audio de la pestaña» en el selector de Chrome");
+      }
+      tabStream = new MediaStream(media.getAudioTracks());
+      // Si se pulsa «Dejar de compartir» en la barra de Chrome, la grabación termina limpia en vez de quedarse muda.
+      tabStream.getAudioTracks()[0].addEventListener("ended", () => {
+        if (!active) return;
+        stats.lastError = "Se dejó de compartir la pestaña: el audio se detuvo.";
+        dbg("se dejó de compartir la pestaña");
+        stopRecording();
+      });
+    } else {
+      tabStream = await navigator.mediaDevices.getUserMedia({
+        audio: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId } },
+      });
+    }
   } catch (error) {
     session = null;
     dbg("ERROR capturando la pestaña: " + (error && error.message ? error.message : error));
@@ -87,8 +109,9 @@ async function startRecording({ streamId, tabId, meetingUrl, organizationId, tit
 
   audioContext = new AudioContext();
   const tabSource = audioContext.createMediaStreamSource(tabStream);
-  // Capturar la pestaña la silencia: sin esto dejarías de escuchar a los demás apenas se activa la grabación.
-  tabSource.connect(audioContext.destination);
+  // Capturar la pestaña (tabCapture) la silencia: sin esto dejarías de escuchar a los demás apenas se activa la grabación.
+  // Con el selector de Chrome la pestaña sigue sonando sola: conectarla otra vez se oiría doble.
+  if (!picked) tabSource.connect(audioContext.destination);
   destination = audioContext.createMediaStreamDestination();
   tabSource.connect(destination);
 

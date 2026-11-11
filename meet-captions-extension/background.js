@@ -88,7 +88,7 @@ function debug(text) {
   writeQueue = writeQueue
     .then(async () => {
       const { debug: current = [] } = await chrome.storage.session.get("debug");
-      current.push({ t: new Date().toLocaleTimeString("es"), text: String(text).slice(0, 400) });
+      current.push({ t: new Date().toLocaleTimeString("es"), text: String(text).slice(0, 4000) });
       await chrome.storage.session.set({ debug: current.slice(-80) });
     })
     .catch(() => {});

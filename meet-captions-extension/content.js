@@ -250,14 +250,30 @@
     return null;
   }
 
+  // Texto del ícono de un botón de Meet (ligadura de Material Symbols: «mic_off», «call_end»…): no cambia con el idioma.
+  function iconOf(button) {
+    const i = button.querySelector('.google-symbols, [class*="symbols"], [class*="material-icons"], i');
+    return ((i && i.textContent) || "").trim();
+  }
+
   // ───────── Micrófono silenciado ─────────
   // Silenciar en Meet solo corta lo que se manda a los demás: la grabación abre el micrófono aparte. Por eso se vigila el
   // botón de Meet (data-is-muted; de respaldo su texto) y se le avisa al grabador, que CORTA tu voz por completo (silencio
   // total, no volumen bajo). Se revisa al instante cuando el botón cambia y cada 250 ms como respaldo: el corte ocurre en
   // menos de un cuarto de segundo, y mientras estás en silencio nada de tu micrófono entra a la grabación.
+  // Se busca en este orden (de lo más fiable a lo más débil): 1) el atributo data-is-muted del botón del micrófono; 2) el
+  // ícono del botón (Meet lo dibuja con una ligadura de texto, «mic» o «mic_off», igual en todos los idiomas); 3) el nombre
+  // accesible en español/inglés.
   function isMicMuted() {
     const el = document.querySelector('[data-is-muted][aria-label*="micrófono" i], [data-is-muted][aria-label*="microphone" i]');
     if (el) return el.getAttribute("data-is-muted") === "true";
+    const byAttr = document.querySelector('button[data-is-muted], [role="button"][data-is-muted]');
+    if (byAttr && /mic/i.test(iconOf(byAttr))) return byAttr.getAttribute("data-is-muted") === "true";
+    for (const b of document.querySelectorAll('[role="button"], button')) {
+      const icon = iconOf(b);
+      if (icon === "mic_off") return true;
+      if (icon === "mic") return false;
+    }
     const fallback = findButtonByName(/micrófono|microphone/i);
     if (!fallback) return false; // no se encontró el botón: mejor no cortar el micrófono por las dudas
     return /activar|turn on/i.test((fallback.getAttribute("aria-label") || "").trim());
@@ -306,8 +322,73 @@
     return true;
   }
 
+  // Dónde están los subtítulos. 1) La región con nombre accesible «Subtítulos»/«Captions» (y sus equivalentes en otros idiomas);
+  // 2) si Meet cambió ese nombre, la región enfocable con avatares que usa como contenedor de la transcripción.
+  const REGION_LABELS = /subt[ií]tul|caption|legenda|sous-titre|untertitel|sottotitol|ondertitel|napisy|altyazı|字幕|자막/i;
+  function findCaptionsRegion() {
+    for (const el of document.querySelectorAll('[role="region"]')) {
+      if (REGION_LABELS.test(el.getAttribute("aria-label") || "")) return el;
+    }
+    for (const el of document.querySelectorAll('div[role="region"][tabindex="0"]')) {
+      if (el.querySelector("img")) return el;
+    }
+    return null;
+  }
+
+  // Textos «hoja» de un bloque (elementos sin hijos con texto), sin contar botones ni íconos.
+  function leafTexts(root) {
+    const out = [];
+    for (const el of root.querySelectorAll("*")) {
+      if (el.children.length > 0 || el.closest('button, [role="button"], [aria-hidden="true"]')) continue;
+      const t = (el.textContent || "").trim();
+      if (t) out.push(t);
+    }
+    return out;
+  }
+
+  // Plan B cuando Meet cambia los nombres de clase (.nMcdL, .NWpY1d, .ygicle): cada intervención lleva el avatar (img) de quien
+  // habla; el primer texto es el nombre y el resto lo que dijo. Se apoya en la estructura, no en nombres de clase.
+  function structuralBlocks(region) {
+    const out = [];
+    const seen = new Set();
+    for (const img of region.querySelectorAll("img")) {
+      let item = img.parentElement;
+      while (item && item !== region && leafTexts(item).length < 2) item = item.parentElement;
+      if (!item || item === region || seen.has(item)) continue;
+      seen.add(item);
+      const texts = leafTexts(item);
+      const name = texts[0];
+      const text = texts.slice(1).join(" ").replace(/\s+/g, " ").trim();
+      if (name && text) out.push({ name, text });
+    }
+    return out;
+  }
+
+  // Estructura de la región de subtítulos SIN el contenido: los textos se reemplazan por su largo y se quitan fotos y datos
+  // personales. Queda en el diagnóstico para poder armar una copia de prueba con la estructura real de Meet cuando cambie.
+  function maskedCaptionsStructure() {
+    try {
+      const region = findCaptionsRegion();
+      if (!region) return "sin región de subtítulos";
+      const walk = (node) => {
+        if (node.nodeType === 3) return `<${(node.nodeValue || "").trim().length}>`;
+        if (node.nodeType !== 1) return "";
+        const tag = node.tagName.toLowerCase();
+        const attrs = [...node.attributes]
+          .filter((a) => ["class", "role", "tabindex", "aria-live"].includes(a.name) || a.name === "aria-label")
+          .map((a) => ` ${a.name}="${a.value}"`)
+          .join("");
+        const kids = [...node.childNodes].map(walk).join("");
+        return `<${tag}${attrs}>${kids}</${tag}>`;
+      };
+      return walk(region).slice(0, 3500);
+    } catch (error) {
+      return "error: " + (error && error.message ? error.message : error);
+    }
+  }
+
   function readCaptionsPanel() {
-    const region = document.querySelector('[role="region"][aria-label="Subtítulos"], [role="region"][aria-label="Captions"]');
+    const region = findCaptionsRegion();
     if (!region) return { blocks: [], fallback: "" };
     const blockEls = Array.from(region.querySelectorAll(".nMcdL"));
     if (blockEls.length > 0) {
@@ -319,7 +400,9 @@
         fallback: "",
       };
     }
-    return { blocks: [], fallback: (region.innerText || "").trim() };
+    const structural = structuralBlocks(region);
+    if (structural.length > 0) return { blocks: structural, fallback: "" };
+    return { blocks: [], fallback: (region.innerText || region.textContent || "").trim() };
   }
 
   // «La reunión terminó» solo si ANTES hubo más de una persona y DESPUÉS quedó una (o el botón de personas desapareció):
@@ -544,6 +627,7 @@
     window.ProShopCaptions.setHidden(hideMeetCaptions !== false); // por defecto la franja de Meet se esconde: se ven en el panel
     for (const ms of [1500, 5000]) setTimeout(() => !dead && dbg("pantalla de Meet: " + window.ProShopCaptions.describe()), ms);
     for (const ms of [8000, 22000]) setTimeout(() => !dead && dbg("estructura de cámaras: " + window.ProShopCaptions.estructura()), ms);
+    for (const ms of [15000, 45000]) setTimeout(() => !dead && dbg("estructura de subtítulos: " + maskedCaptionsStructure()), ms);
     syncMic(true);
     timer = setInterval(() => {
       if (dead) return;

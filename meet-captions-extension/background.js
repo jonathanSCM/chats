@@ -12,9 +12,11 @@ chrome.runtime.onStartup.addListener(setup);
 function setup() {
   // Panel lateral para todas las pestañas: el ícono abre el popup, y desde ahí se abre el panel.
   chrome.sidePanel?.setOptions({ path: "sidepanel.html", enabled: true }).catch(() => {});
-  // El ícono abre el panel directamente: ahí está todo (sesión, organización, grabar). Hacer clic en el ícono también es lo que
-  // le da a la extensión permiso (activeTab) para capturar el audio de esa pestaña.
-  chrome.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+  // OJO: NO se usa openPanelOnActionClick. Con esa opción Chrome abre el panel pero no cuenta el clic como «invocar la
+  // extensión», y la captura del audio de la pestaña falla con «Extension has not been invoked for the current page». El panel
+  // se abre desde chrome.action.onClicked (abajo), que sí concede el permiso activeTab para esa pestaña. Se fija en falso a
+  // propósito: versiones anteriores lo dejaron en verdadero y Chrome lo recuerda.
+  chrome.sidePanel?.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
   chrome.storage.session.setAccessLevel?.({ accessLevel: "TRUSTED_CONTEXTS" }).catch(() => {});
 }
 
@@ -32,6 +34,16 @@ function patchState(tabId, patch) {
     .catch(() => {});
   return writeQueue;
 }
+
+// Pestañas donde la persona hizo clic en el ícono: ahí Chrome deja capturar el audio (activeTab). El panel lo consulta para
+// decidir entre la captura automática y el selector de pestañas.
+const invoked = new Set();
+chrome.action.onClicked.addListener((tab) => {
+  if (tab.id == null) return;
+  chrome.sidePanel.open({ tabId: tab.id }).catch(() => openDetached(tab.id)); // sin ningún await antes: necesita el gesto del clic
+  invoked.add(tab.id);
+  debug(`[icono] clic en el ícono (pestaña ${tab.id}): la captura automática de audio queda permitida en esta pestaña`);
+});
 
 const MEETING_URL_RE = /^https:\/\/meet\.google\.com\/(?:meet\/)?[a-z]{3}-[a-z]{4}-[a-z]{3}/i;
 const detachedWindows = new Map(); // tabId -> id de la ventana separada (para no abrir dos)
@@ -68,6 +80,7 @@ chrome.windows.onRemoved.addListener((windowId) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   chrome.storage.session.remove(STATE_PREFIX + tabId).catch(() => {});
   autoOpened.delete(tabId);
+  invoked.delete(tabId);
 });
 
 // Registro de diagnóstico (últimos 80 eventos) que el panel muestra y permite copiar: sirve para ver por qué algo no arrancó.
@@ -149,6 +162,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         } catch (error) {
           console.error("[proshop-captions] No se pudo iniciar la captura de audio:", error);
           debug(`[audio] ERROR al iniciar: ${error && error.message ? error.message : error}`);
+          if (/invoked|activeTab/i.test(String(error))) invoked.delete(message.tabId); // el permiso no está: el panel usará el selector
           await patchState(message.tabId, { audio: { active: false, lastError: String(error) } });
           sendResponse({ ok: false, error: String(error) });
         }
@@ -161,6 +175,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
     case "SET_MIC_ENABLED":
       chrome.runtime.sendMessage({ type: "OFFSCREEN_SET_MIC_ENABLED", enabled: message.enabled }).catch(() => {});
+      return false;
+    case "IS_INVOKED":
+      sendResponse({ invoked: invoked.has(message.tabId) });
       return false;
     case "DEBUG":
       debug(message.text);

@@ -170,8 +170,10 @@
   }
 
   // ───────── Botón de la extensión en la pantalla de la reunión (con el logo del CRM) ─────────
-  function syncLauncher() {
-    if (!meetingUrl) {
+  async function syncLauncher() {
+    // Solo aparece con la sesión iniciada y el aviso de consentimiento aceptado: antes no hay nada que hacer desde aquí.
+    const { token, consent } = await store(["token", "consent"]);
+    if (!meetingUrl || !token || !consent || dead) {
       if (launcherEl) launcherEl.remove();
       launcherEl = null;
       return;
@@ -200,7 +202,7 @@
     const dot = launcherEl.querySelector("#proshop-launcher-rec");
     if (dot) dot.style.display = isRecording() ? "block" : "none";
   }
-  every(syncLauncher, 1000);
+  every(() => void syncLauncher(), 1000);
 
   // ───────── Indicador de grabación (visible para quien graba, como cualquier notetaker) ─────────
   const clock = (ms) => {

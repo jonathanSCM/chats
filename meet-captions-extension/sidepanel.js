@@ -8,6 +8,7 @@ const detached = params.get("detached") === "1";
 let tabId = params.get("tab") ? Number(params.get("tab")) : null;
 let meetingUrl = null;
 let lastState = null;
+let invokedCache = false; // ¿se hizo clic en el ícono en esta pestaña? (entonces la captura automática funciona)
 let audioMethod = "auto"; // «auto» (tabCapture) o «picker» (selector de pestañas de Chrome); se lee al abrir y al cambiarlo
 
 const $ = (id) => document.getElementById(id);
@@ -273,7 +274,8 @@ recordBtn.addEventListener("click", () => {
 // (se abrió con el botón de la pantalla de Meet, o el permiso no se mantuvo), queda el plan B: el selector de pestañas de Chrome,
 // que no depende de ese permiso. El permiso de «captura de pantalla» es OPCIONAL: solo se pide si se usa el selector.
 function startAudio({ organizationId, title, recordingId }) {
-  if (audioMethod === "picker") return pickAudio({ organizationId, title, recordingId });
+  // Sin el clic en el ícono Chrome no deja la captura automática: se va directo al selector de pestañas (este clic todavía vale).
+  if (audioMethod === "picker" || !invokedCache) return pickAudio({ organizationId, title, recordingId });
   return chrome.runtime
     .sendMessage({ type: "START_AUDIO_CAPTURE", tabId, meetingUrl, organizationId, title, recordingId })
     .then((response) => {
@@ -508,6 +510,7 @@ async function render() {
   }
   tabId = tab.id;
   meetingUrl = `https://meet.google.com/${tab.url.match(MEETING_URL_RE)[1].toLowerCase()}`;
+  invokedCache = Boolean((await chrome.runtime.sendMessage({ type: "IS_INVOKED", tabId }).catch(() => null))?.invoked);
   const key = "live:" + tab.id;
   const stored = await chrome.storage.session.get(key);
   const state = stored[key];

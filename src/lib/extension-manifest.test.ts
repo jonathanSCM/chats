@@ -28,7 +28,12 @@ describe("manifest de la extensión de Chrome", () => {
     expect(manifest.action.default_popup).toBeUndefined();
     expect(exists("popup.html")).toBe(false);
     expect(manifest.side_panel.default_path).toBe("sidepanel.html");
-    expect(readFileSync(path.join(dir, "background.js"), "utf8")).toContain("openPanelOnActionClick: true");
+    // openPanelOnActionClick NO se usa: con él Chrome no cuenta el clic como «invocar la extensión» y la captura del audio falla
+    // con «Extension has not been invoked for the current page». El panel se abre desde action.onClicked.
+    const background = readFileSync(path.join(dir, "background.js"), "utf8");
+    expect(background).toContain("openPanelOnActionClick: false");
+    expect(background).not.toContain("openPanelOnActionClick: true");
+    expect(background).toContain("chrome.action.onClicked.addListener");
   });
 
   it("el script de la pestaña de Meet no deja llamadas chrome.* sueltas: con la extensión recargada fallarían con «Extension context invalidated»", () => {

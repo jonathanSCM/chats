@@ -19,9 +19,10 @@ Pulsa «Grabar esta reunión» y la extensión, desde tu propio navegador:
 • Guarda los subtítulos de la reunión con el nombre de quien habla.
 • Graba el audio (las voces de los demás y tu micrófono, solo cuando no estás silenciado) y lo transcribe.
 • Te muestra los subtítulos en vivo en un panel lateral, que puedes separar en su propia ventana.
-• Al terminar, vincula la reunión al cliente que elijas en tu CRM ProShop, con su resumen y transcripción.
+• Va guardando los subtítulos en tu CRM mientras grabas, y si algo se corta (por ejemplo, se cierra el navegador) te ofrece recuperar lo que faltó.
+• Al terminar, la reunión queda en tu CRM ProShop con su transcripción y resumen.
 
-Pensada para equipos comerciales: la información de cada reunión queda en la ficha del cliente, sin tener que tomar notas a mano.
+Pensada para equipos comerciales: la información de cada reunión queda en tu CRM, sin tener que tomar notas a mano.
 
 Requiere una cuenta de CRM ProShop. Nunca empieza a grabar sola: solo cuando tú lo pides, y muestra un indicador mientras graba. Quien graba es responsable de avisar a los participantes y de contar con su consentimiento cuando la ley lo exija.
 

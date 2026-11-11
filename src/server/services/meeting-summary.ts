@@ -5,9 +5,10 @@ import {
   MEETING_SUMMARY_VERSION,
   MIN_TRANSCRIPT_CHARS,
   clampTranscript,
+  combineTranscripts,
+  TWO_SOURCES_RULE,
   meetingSummarySchema,
   parseMeetingSummary,
-  pickTranscript,
   renderSummaryText,
   type MeetingSummaryData,
 } from "@/lib/meeting-summary";
@@ -66,6 +67,7 @@ const SUMMARY_SYSTEM = [
   "- informacionComercial describe al CLIENTE o prospecto: su necesidad, el dolor concreto, el presupuesto mencionado, quién decide, la urgencia, las objeciones y lo acordado.",
   "- Si la reunión es interna y no hay cliente, dejá informacionComercial en null/listas vacías.",
   "- Los subtítulos en vivo pueden tener errores de transcripción: interpretá con cuidado y no cites literal lo dudoso.",
+  `- ${TWO_SOURCES_RULE}`,
   "- Sé breve y concreto. Cada ítem de una lista es una frase corta.",
 ].join("\n");
 
@@ -127,7 +129,7 @@ export async function generateMeetingSummary(meetingId: string): Promise<Generat
   if (!meeting) return { status: "not_found" };
   if (!(await isAiEnabledFor(meeting.organizationId))) return { status: "ai_disabled" };
 
-  const raw = pickTranscript(meeting.transcript, meeting.audioTranscript);
+  const raw = combineTranscripts(meeting.transcript, meeting.audioTranscript);
   if (!raw) return { status: "no_transcript" };
   if (raw.length < MIN_TRANSCRIPT_CHARS) {
     // Se marca como revisada para que el barrido no la vuelva a tomar hasta que cambie.

@@ -55,6 +55,29 @@ export function pickTranscript(transcript: string | null, audioTranscript: strin
   return live.length >= audio.length * 0.6 ? live : audio;
 }
 
+/**
+ * Las dos fuentes de una misma reunión, para que la IA las concilie: los subtítulos de Meet (traen quién habla, pero
+ * pueden tener huecos o errores) y la transcripción del audio (completa, sin nombres, con errores en nombres propios y
+ * cifras). Con una sola fuente, devuelve esa. Cada una se acota a la mitad del tope.
+ */
+export function combineTranscripts(transcript: string | null, audioTranscript: string | null): string {
+  const live = (transcript ?? "").trim();
+  const audio = (audioTranscript ?? "").trim();
+  if (!live) return audio;
+  if (!audio) return live;
+  const half = Math.floor(MAX_TRANSCRIPT_CHARS / 2);
+  const fit = (text: string) => (text.length <= half ? text : `${text.slice(0, half / 2)}\n[... parte intermedia omitida ...]\n${text.slice(-half / 2)}`);
+  return [
+    "FUENTE A — SUBTÍTULOS DE MEET (traen el nombre de quien habla; pueden tener huecos o errores):",
+    fit(live),
+    "FUENTE B — TRANSCRIPCIÓN DEL AUDIO (más completa, sin nombres; puede equivocar nombres propios y cifras):",
+    fit(audio),
+  ].join("\n\n");
+}
+
+export const TWO_SOURCES_RULE =
+  "Si la transcripción viene en dos fuentes (A: subtítulos con nombres, B: audio), son la MISMA reunión: concíliarlas en una sola, sin duplicar. Usa los nombres de A, el contenido de B donde A tenga huecos, y ante una contradicción elige lo que tenga sentido en el contexto. Los nombres propios, cifras y códigos que coincidan en las dos fuentes son los más confiables.";
+
 export function clampTranscript(text: string): string {
   if (text.length <= MAX_TRANSCRIPT_CHARS) return text;
   const half = Math.floor(MAX_TRANSCRIPT_CHARS / 2);

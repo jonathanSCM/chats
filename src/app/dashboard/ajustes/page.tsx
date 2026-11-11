@@ -8,6 +8,8 @@ import { InstallAppCard } from "../perfil/_components/install-app-card";
 import { getT } from "@/lib/i18n/server";
 import { loadMeetScripts } from "@/lib/meet-scripts";
 import { MeetScriptCard } from "./_components/meet-script-card";
+import { ExtensionCard } from "./_components/extension-card";
+import { loadExtensionPackage } from "@/lib/extension-package";
 import { checkCalendarConnections } from "@/server/services/google-calendar-user";
 
 export default async function SettingsPage({
@@ -21,6 +23,7 @@ export default async function SettingsPage({
 
   const { calendarConnected, calendarError } = await searchParams;
   const meetScripts = await loadMeetScripts();
+  const extensionPackage = await loadExtensionPackage();
 
   const calendarAccount = await prisma.googleCalendarAccount.findUnique({
     where: { userId: session.user.id },
@@ -57,6 +60,16 @@ export default async function SettingsPage({
         </CardDescription>
         <GoogleCalendarCard connectedEmail={calendarAccount?.googleEmail ?? null} notice={calendarNotice} broken={calendarBroken} />
       </Card>
+
+      {extensionPackage && (
+        <Card className="mb-6">
+          <CardTitle className="mb-1">{t("Extensión de Chrome para Meet")}</CardTitle>
+          <CardDescription className="mb-4">
+            {t("La forma recomendada de grabar reuniones: más estable que el script y con panel propio. Se instala una sola vez.")}
+          </CardDescription>
+          <ExtensionCard version={extensionPackage.version} />
+        </Card>
+      )}
 
       {meetScripts.length > 0 && (
         <Card className="mb-6">

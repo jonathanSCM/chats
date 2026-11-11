@@ -700,7 +700,7 @@ async function checkUpdate() {
     const mine = chrome.runtime.getManifest().version;
     const box = $("updateBox");
     if (version && newer(version, mine)) {
-      $("updateText").textContent = `Hay una versión nueva de la extensión: ${version} (tienes la ${mine}). Descarga el zip, reemplaza los archivos de tu carpeta y pulsa «Recargar» en chrome://extensions.`;
+      $("updateText").textContent = `Hay una versión nueva de la extensión: ${version} (tienes la ${mine}).`;
       $("updateBtn").onclick = () => chrome.tabs.create({ url: `${base}/dashboard/ajustes` });
       box.style.display = "block";
     } else box.style.display = "none";
@@ -708,6 +708,99 @@ async function checkUpdate() {
     /* sin conexión: no se avisa */
   }
 }
+
+// ───────── Actualizar sola ─────────
+// Chrome no actualiza las extensiones «sin empaquetar», pero esta puede reescribir sus propios archivos: la primera vez la persona
+// elige la carpeta donde está instalada (permiso de Chrome para esa carpeta), y desde ahí «Actualizar ahora» baja los archivos
+// nuevos del CRM, los escribe y recarga la extensión. Si no hay carpeta elegida o se niega el permiso, queda la descarga a mano.
+function idb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("proshop-update", 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("kv");
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbGet(key) {
+  const db = await idb();
+  return new Promise((resolve) => {
+    const r = db.transaction("kv").objectStore("kv").get(key);
+    r.onsuccess = () => resolve(r.result || null);
+    r.onerror = () => resolve(null);
+  });
+}
+async function idbSet(key, value) {
+  const db = await idb();
+  return new Promise((resolve) => {
+    const tx = db.transaction("kv", "readwrite");
+    if (value == null) tx.objectStore("kv").delete(key);
+    else tx.objectStore("kv").put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+async function writeFile(dir, path, bytes) {
+  const parts = path.split("/");
+  const name = parts.pop();
+  for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: true });
+  const fh = await dir.getFileHandle(name, { create: true });
+  const w = await fh.createWritable();
+  await w.write(bytes);
+  await w.close();
+}
+async function updateNow() {
+  const status = $("updateStatus");
+  const btn = $("updateNowBtn");
+  if (lastState && lastState.recording) {
+    status.textContent = "Termina la grabación antes de actualizar: la extensión se reinicia.";
+    return;
+  }
+  btn.disabled = true;
+  try {
+    let dir = await idbGet("dir");
+    if (!dir) {
+      status.textContent = "Elige la carpeta donde instalaste la extensión (la que cargaste en chrome://extensions).";
+      dir = await window.showDirectoryPicker({ id: "proshop-ext", mode: "readwrite" });
+    }
+    if ((await dir.queryPermission({ mode: "readwrite" })) !== "granted" && (await dir.requestPermission({ mode: "readwrite" })) !== "granted") {
+      status.textContent = "Chrome no dio permiso para escribir en esa carpeta.";
+      return;
+    }
+    // Comprobación: la carpeta tiene que ser la de ESTA extensión (mismo manifest), si no se escribiría en cualquier lado.
+    let name = null;
+    try {
+      const mf = await (await dir.getFileHandle("manifest.json")).getFile();
+      name = JSON.parse(await mf.text()).name;
+    } catch {
+      /* sin manifest */
+    }
+    if (name !== chrome.runtime.getManifest().name) {
+      await idbSet("dir", null);
+      status.textContent = "Esa no es la carpeta de la extensión (no tiene su manifest.json). Vuelve a pulsar y elige la correcta.";
+      return;
+    }
+    await idbSet("dir", dir);
+    status.textContent = "Descargando la versión nueva…";
+    const { token } = await chrome.storage.local.get(["token"]);
+    const res = await fetch(`${await apiBase()}/api/extension/files`, { headers: { Authorization: `Bearer ${token || ""}` }, cache: "no-store" });
+    if (!res.ok) throw new Error(res.status === 401 ? "Inicia sesión para actualizar." : `El CRM respondió ${res.status}.`);
+    const data = await res.json();
+    if (!data.files || !data.files.some((f) => f.path === "manifest.json")) throw new Error("Respuesta incompleta del CRM.");
+    status.textContent = "Instalando…";
+    const decode = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    // El manifest va al final: si algo falla a medias, la extensión sigue arrancando con el anterior.
+    const ordered = [...data.files.filter((f) => f.path !== "manifest.json"), ...data.files.filter((f) => f.path === "manifest.json")];
+    for (const f of ordered) await writeFile(dir, f.path, decode(f.base64));
+    status.textContent = `Versión ${data.version} instalada. Reiniciando la extensión…`;
+    setTimeout(() => chrome.runtime.reload(), 600);
+  } catch (error) {
+    if (error && error.name === "AbortError") status.textContent = "";
+    else status.textContent = "No se pudo actualizar: " + (error && error.message ? error.message : error);
+  } finally {
+    btn.disabled = false;
+  }
+}
+$("updateNowBtn").addEventListener("click", () => void updateNow());
 void checkUpdate();
 setInterval(checkUpdate, 60 * 60 * 1000);
 

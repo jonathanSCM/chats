@@ -88,6 +88,19 @@ async function collect(dir: string, base = ""): Promise<ZipEntry[]> {
   return out;
 }
 
+/** Los archivos de la extensión (sin README) para que ella misma se actualice escribiéndolos en su carpeta. */
+export async function loadExtensionFiles(): Promise<{ version: string | null; files: { path: string; base64: string }[] } | null> {
+  try {
+    const entries = await collect(extensionDir());
+    const manifest = entries.find((e) => e.name === "manifest.json");
+    if (!manifest) return null;
+    const version = (JSON.parse(manifest.data.toString("utf8")) as { version?: string }).version ?? null;
+    return { version, files: entries.map((e) => ({ path: e.name, base64: e.data.toString("base64") })) };
+  } catch {
+    return null;
+  }
+}
+
 export function extensionDir(): string {
   return path.join(process.cwd(), "meet-captions-extension");
 }

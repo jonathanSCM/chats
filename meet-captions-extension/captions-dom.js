@@ -69,6 +69,9 @@
 
   const hayTextoDeSubs = () => !!document.querySelector('div[jsname="tgaKEf"]');
 
+  // Solo se apagan al terminar los subtítulos que encendió la extensión: si ya estaban puestos antes, se dejan como estaban.
+  let encendimos = false;
+
   async function activarUnico() {
     if (hayTextoDeSubs()) return true;
     const tb0 = botonBarraCC();
@@ -81,6 +84,7 @@
       if (act) {
         log("pulso:", textoBtn(act));
         clicReal(act);
+        encendimos = true;
         await sleep(500);
         escape();
         return true;
@@ -107,7 +111,40 @@
     // Último recurso: la tecla C de Meet.
     document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "c", code: "KeyC", keyCode: 67, bubbles: true }));
     await sleep(800);
+    if (hayTextoDeSubs()) encendimos = true;
     return hayTextoDeSubs();
+  }
+
+  // Apaga los subtítulos de Meet (solo si los encendió la extensión). Misma ruta que al encenderlos, a la inversa.
+  async function desactivar() {
+    if (!encendimos) return false;
+    if (activando) await activando.catch(() => {});
+    encendimos = false;
+    if (!hayTextoDeSubs()) return false;
+    let abierto = false;
+    for (let i = 0; i < 16; i++) {
+      // ~4 s
+      const off = buscarBtn(RE_DESACT);
+      if (off) {
+        log("pulso:", textoBtn(off));
+        clicReal(off);
+        await sleep(500);
+        escape();
+        return true;
+      }
+      if (!abierto) {
+        const t = botonBarraCC();
+        if (t) {
+          clicReal(t);
+          abierto = true;
+          await sleep(400);
+          continue;
+        }
+      }
+      await sleep(250);
+    }
+    escape();
+    return false;
   }
 
   let activando = null;
@@ -464,5 +501,5 @@
     return JSON.stringify({ main: main ? r2(main) + " " + (main.getAttribute("style") || "") : null, conEstilo, cadenaCamara: cadena });
   }
 
-  self.ProShopCaptions = { activate, setHidden, isHidden: () => hidden, sleep, describe, hueco, estructura };
+  self.ProShopCaptions = { activate, desactivar, setHidden, isHidden: () => hidden, sleep, describe, hueco, estructura };
 })();

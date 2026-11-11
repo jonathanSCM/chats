@@ -379,6 +379,7 @@
     await sendTranscript(reason);
     void send({ type: "STOP_AUDIO_CAPTURE" });
     window.ProShopCaptions.setHidden(false);
+    void window.ProShopCaptions.desactivar().then((off) => dbg(off ? "subtítulos de Meet apagados" : "subtítulos de Meet: se dejan como estaban"));
     syncBadge();
     pushLive();
   }

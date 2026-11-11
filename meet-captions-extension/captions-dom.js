@@ -191,6 +191,7 @@
       overflow:hidden !important; flex:0 0 0 !important; gap:0 !important;
     }
     main[data-ps-hide="stage"]{ bottom:var(--ps-bottom) !important; }
+    [data-ps-hide="tile"]{ transform:scale(var(--ps-scale,1)) !important; transform-origin:50% 0 !important; }
   `;
 
   let hidden = false;
@@ -262,6 +263,31 @@
     main.dataset.psHide = "stage";
     main.style.setProperty("--ps-bottom", bottom + "px");
     if (antes !== bottom) window.dispatchEvent(new Event("resize")); // para que Meet recoloque las cámaras
+    escalar(main);
+  }
+
+  // Meet calcula el tamaño de las cámaras como si los subtítulos siguieran puestos y lo escribe en línea (p. ej. 965x543), y no
+  // lo recalcula aunque el escenario crezca: queda una cámara chica con negro debajo. Se agranda el bloque de cámaras (el primer
+  // elemento con ancho y alto en línea dentro de main) con una escala para que llene el espacio liberado, pegado arriba y centrado.
+  function escalar(main) {
+    const cont = [...main.querySelectorAll("[style]")].find((el) => {
+      const st = el.getAttribute("style") || "";
+      return /width/.test(st) && /height/.test(st) && el.offsetHeight > 150 && el.offsetWidth > 150 && !el.closest(OWN);
+    });
+    for (const o of main.querySelectorAll('[data-ps-hide="tile"]')) if (o !== cont) delete o.dataset.psHide;
+    if (!cont) {
+      document.documentElement.style.removeProperty("--ps-scale");
+      return;
+    }
+    const s = Math.min(main.clientWidth / cont.offsetWidth, main.clientHeight / cont.offsetHeight);
+    if (s > 1.02) {
+      touched.add(cont);
+      cont.dataset.psHide = "tile";
+      document.documentElement.style.setProperty("--ps-scale", Math.min(s, 2).toFixed(4));
+    } else {
+      delete cont.dataset.psHide;
+      document.documentElement.style.removeProperty("--ps-scale");
+    }
   }
 
   function restore() {
@@ -271,6 +297,7 @@
       node.style.removeProperty("--ps-bottom");
     }
     touched.clear();
+    document.documentElement.style.removeProperty("--ps-scale");
     if (habia) window.dispatchEvent(new Event("resize"));
   }
 

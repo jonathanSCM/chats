@@ -6,6 +6,8 @@ import { LanguageSwitch } from "@/components/language-switch";
 import { GoogleCalendarCard } from "../perfil/_components/google-calendar-card";
 import { InstallAppCard } from "../perfil/_components/install-app-card";
 import { getT } from "@/lib/i18n/server";
+import { loadMeetScripts } from "@/lib/meet-scripts";
+import { MeetScriptCard } from "./_components/meet-script-card";
 import { checkCalendarConnections } from "@/server/services/google-calendar-user";
 
 export default async function SettingsPage({
@@ -18,6 +20,7 @@ export default async function SettingsPage({
   const t = await getT();
 
   const { calendarConnected, calendarError } = await searchParams;
+  const meetScripts = await loadMeetScripts();
 
   const calendarAccount = await prisma.googleCalendarAccount.findUnique({
     where: { userId: session.user.id },
@@ -54,6 +57,27 @@ export default async function SettingsPage({
         </CardDescription>
         <GoogleCalendarCard connectedEmail={calendarAccount?.googleEmail ?? null} notice={calendarNotice} broken={calendarBroken} />
       </Card>
+
+      {meetScripts.length > 0 && (
+        <Card className="mb-6">
+          <CardTitle className="mb-1">{t("Scripts para Meet")}</CardTitle>
+          <CardDescription className="mb-4">
+            {t("Para instalarlos: abre Tampermonkey en Chrome → «Crear un nuevo script», borra lo que trae, pega el script completo y guarda (Ctrl+S). Si ya lo tenías, reemplaza el código por la versión nueva.")}
+          </CardDescription>
+          <div className="space-y-3">
+            {meetScripts.map((script) => (
+              <MeetScriptCard
+                key={script.id}
+                title={script.title}
+                description={script.description}
+                file={script.file}
+                version={script.version}
+                code={script.code}
+              />
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card className="mb-6">
         <CardTitle className="mb-1">{t("Instalar en mi dispositivo")}</CardTitle>

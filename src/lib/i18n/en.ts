@@ -219,6 +219,14 @@ export const en: Record<string, string> = {
   "Cada chat nuevo recibe su tarjeta en Seguimiento y la IA le pone calidad de lead y prioridad sin que nadie lo pida.":
     "Every new chat gets its Follow-up card and the AI sets its lead quality and priority without anyone asking.",
   Activado: "Enabled",
+  "Scripts para Meet": "Meet scripts",
+  "Para instalarlos: abre Tampermonkey en Chrome → «Crear un nuevo script», borra lo que trae, pega el script completo y guarda (Ctrl+S). Si ya lo tenías, reemplaza el código por la versión nueva.":
+    "To install: open Tampermonkey in Chrome → “Create a new script”, delete what it has, paste the full script and save (Ctrl+S). If you already had it, replace the code with the new version.",
+  "¡Copiado!": "Copied!",
+  "Copiar script": "Copy script",
+  "Descargar archivo": "Download file",
+  "No se pudo copiar: abre «Ver código», selecciónalo y cópialo a mano.": "Couldn't copy: open “View code”, select it and copy it by hand.",
+  "Ver código": "View code",
   "Sube la transcripción de una reunión que no se agendó acá (Zoom, Teams, otra herramienta). Queda en la ficha como una reunión realizada.":
     "Upload the transcript of a meeting that wasn't scheduled here (Zoom, Teams, another tool). It is saved on the card as a completed meeting.",
   "Nombre de la reunión (opcional)": "Meeting name (optional)",

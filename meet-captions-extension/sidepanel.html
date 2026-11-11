@@ -55,6 +55,7 @@
       .notice.error { background: var(--danger-bg); color: var(--danger); }
       .notice.warn { background: var(--warn-bg); color: var(--warn); }
       .notice.info { background: var(--bg2); color: var(--muted); }
+      .notice button { margin-top: 8px; padding: 7px 10px; background: var(--accent); border-color: var(--accent); color: #fff; width: 100%; }
       main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px 14px; }
       #captions { flex: 1; min-height: 0; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg2); }
       #captions p { margin: 0 0 8px; font-size: 14px; line-height: 1.5; }
@@ -87,6 +88,7 @@
     <header>
       <h1><span class="dot" id="dot"></span><span id="title">ProShop CRM</span></h1>
       <div class="sub" id="subtitle">Asistente de reunión</div>
+      <div class="sub" id="dest" style="margin-top: 2px; color: var(--fg); font-weight: 500"></div>
     </header>
     <div class="chips" id="chips"></div>
     <div id="notices"></div>

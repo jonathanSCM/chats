@@ -18,8 +18,9 @@ let segmentTimer = null;
 let active = false;
 let paused = false;
 let micSource = null;
+let micAttempt = 0; // cada intento de abrir el micrófono; los viejos que lleguen tarde se descartan
 let session = null; // { tabId, meetingUrl, organizationId, title }
-let stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, paused: false, micLabel: null, lastError: null };
+let stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, micState: "pending", paused: false, micLabel: null, lastError: null };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -67,7 +68,7 @@ async function startRecording({ streamId, tabId, meetingUrl, organizationId, tit
   }
   session = { tabId, meetingUrl, organizationId: organizationId || null, title: title || null };
   paused = false;
-  stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, paused: false, micLabel: null, lastError: null };
+  stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, micState: "pending", paused: false, micLabel: null, lastError: null };
 
   try {
     tabStream = await navigator.mediaDevices.getUserMedia({
@@ -85,36 +86,65 @@ async function startRecording({ streamId, tabId, meetingUrl, organizationId, tit
   destination = audioContext.createMediaStreamDestination();
   tabSource.connect(destination);
 
-  await connectMic((await chrome.storage.local.get(["micDeviceId"])).micDeviceId || "");
-
+  // Primero se empieza a grabar lo que dicen los demás; el micrófono se suma después y nunca frena esto: una página
+  // invisible como esta no puede mostrar el permiso del micrófono, y si se esperara aquí la grabación no arrancaría jamás.
   active = true;
   startSegment();
   publish();
+  void startMic();
 }
+
+async function startMic() {
+  let deviceId = "";
+  try {
+    deviceId = (chrome.storage && chrome.storage.local && (await chrome.storage.local.get(["micDeviceId"])).micDeviceId) || "";
+  } catch {
+    /* sin acceso al almacenamiento: micrófono predeterminado */
+  }
+  await connectMic(deviceId);
+  publish();
+}
+
+// Mientras graba, repite el estado cada pocos segundos: así el panel se corrige solo si algún aviso se perdió.
+setInterval(() => {
+  if (active) publish();
+}, 5000);
 
 // Abre el micrófono elegido (o el predeterminado) y lo mezcla en la grabación. Si el elegido ya no está (desenchufado),
 // usa el predeterminado en vez de quedarse sin tu voz.
 async function connectMic(deviceId) {
+  const attempt = ++micAttempt;
+  stats.micState = "pending";
+  stats.micAvailable = false;
+  stats.micLabel = null;
+  publish();
   const base = { echoCancellation: true, noiseSuppression: true };
+  const isDenied = (e) => Boolean(e && (e.name === "NotAllowedError" || e.name === "SecurityError"));
   let stream = null;
+  let denied = false;
   try {
+    // Sin permiso, esto puede quedarse esperando (aquí no hay ventana donde pedirlo): por eso el panel lo pide aparte y
+    // vuelve a llamar a esta función cuando ya está concedido.
     stream = await navigator.mediaDevices.getUserMedia({ audio: deviceId ? { ...base, deviceId: { exact: deviceId } } : base });
   } catch (error) {
-    if (deviceId) {
+    denied = isDenied(error);
+    if (deviceId && !denied) {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: base });
         stats.lastError = "El micrófono elegido no está disponible: se usa el predeterminado.";
       } catch (error2) {
-        console.warn("[proshop-captions] Sin micrófono:", error2);
+        denied = isDenied(error2);
       }
-    } else {
-      // Sin permiso de micrófono (se concede una vez desde el popup): se graba igual, solo sin tu voz.
-      console.warn("[proshop-captions] Sin micrófono:", error);
     }
   }
-  if (!stream || !audioContext) {
+  // Un intento viejo que llega tarde (se pidió otro micrófono, o la grabación ya terminó) se descarta sin dejar el micrófono abierto.
+  if (attempt !== micAttempt || !active || !audioContext) {
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+    return;
+  }
+  if (!stream) {
     stats.micAvailable = false;
-    stats.micLabel = null;
+    stats.micState = denied ? "denied" : "none";
     return;
   }
   micStream = stream;
@@ -122,6 +152,7 @@ async function connectMic(deviceId) {
   micSource.connect(destination);
   stream.getAudioTracks().forEach((t) => (t.enabled = stats.micEnabled)); // respeta el silencio de Meet
   stats.micAvailable = true;
+  stats.micState = "ok";
   stats.micLabel = (stream.getAudioTracks()[0] && stream.getAudioTracks()[0].label) || null;
 }
 

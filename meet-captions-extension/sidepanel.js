@@ -22,6 +22,7 @@ const langSelect = $("langSelect");
 const micSelect = $("micSelect");
 const micHint = $("micHint");
 const settings = $("settings");
+const dest = $("dest");
 $("ver").textContent = "ProShop CRM · extensión v" + chrome.runtime.getManifest().version;
 if (detached) detachBtn.style.display = "none";
 
@@ -31,11 +32,77 @@ function chip(text, kind) {
   el.textContent = text;
   return el;
 }
-function notice(text, kind) {
+function notice(text, kind, buttonLabel, onClick) {
   const el = document.createElement("div");
   el.className = "notice " + kind;
   el.textContent = text;
+  if (buttonLabel) {
+    const button = document.createElement("button");
+    button.textContent = buttonLabel;
+    button.addEventListener("click", onClick);
+    el.append(document.createElement("br"), button);
+  }
   return el;
+}
+
+// A qué organización va la reunión: la elegida al grabar o, si no, la activa del CRM.
+async function renderDest(state, future) {
+  const s = await chrome.storage.local.get(["orgList", "activeOrganizationId", "token", "apiBase"]);
+  let list = s.orgList;
+  let active = s.activeOrganizationId;
+  if (!list && s.token) {
+    try {
+      const base = (s.apiBase || "https://chats.proshop.lat").replace(/\/$/, "");
+      const res = await fetch(`${base}/api/extension/me`, { headers: { Authorization: `Bearer ${s.token}` } });
+      if (res.ok) {
+        const me = await res.json();
+        list = (me.organizations || []).map((o) => ({ id: o.id, name: o.name }));
+        active = me.activeOrganizationId;
+        await chrome.storage.local.set({ orgList: list, activeOrganizationId: active });
+      }
+    } catch {
+      /* sin conexión: no se muestra el nombre */
+    }
+  }
+  const id = (state && state.organizationId) || active;
+  const org = list && list.find((o) => o.id === id);
+  const title = state && state.title ? " · " + state.title : "";
+  dest.textContent = org ? `${future ? "Se enviará a" : "Se envía a"}: ${org.name}${title}` : title ? "Reunión" + title : "";
+}
+
+// Permiso del micrófono: este panel SÍ es una página visible, así que el aviso de Chrome aparece solo aquí (el ícono se
+// cierra al perder el foco y la grabación corre en una página invisible que no puede pedirlo).
+let micPromptTried = false;
+async function ensureMicPermission() {
+  let status = "prompt";
+  try {
+    status = (await navigator.permissions.query({ name: "microphone" })).state;
+  } catch {
+    /* sin API de permisos: se intenta pedir directo */
+  }
+  if (status === "granted") {
+    await chrome.storage.local.set({ micGranted: true });
+    return "granted";
+  }
+  if (status === "denied") return "denied";
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach((t) => t.stop());
+    await chrome.storage.local.set({ micGranted: true });
+    return "granted";
+  } catch (error) {
+    return error && error.name === "NotAllowedError" ? "denied" : "error";
+  }
+}
+async function reconnectMic() {
+  const { micDeviceId } = await chrome.storage.local.get(["micDeviceId"]);
+  chrome.runtime.sendMessage({ type: "OFFSCREEN_SET_MIC_DEVICE", deviceId: micDeviceId || "" }).catch(() => {});
+  void loadSettings(); // ahora sí se ven los nombres de los micrófonos
+}
+async function askMic(manual) {
+  const result = await ensureMicPermission();
+  if (result === "granted") await reconnectMic();
+  else if (manual) chrome.tabs.create({ url: chrome.runtime.getURL("permissions.html") }); // explica cómo desbloquearlo
 }
 
 async function resolveTab() {
@@ -87,6 +154,7 @@ async function render() {
   if (!tab || !tab.url || !MEETING_URL_RE.test(tab.url)) {
     dot.className = "dot";
     subtitle.textContent = "Asistente de reunión";
+    dest.textContent = "";
     notices.append(notice("Abre una reunión de Google Meet para usar el asistente.", "info"));
     renderCaptions([]);
     return;
@@ -96,6 +164,7 @@ async function render() {
   const stored = await chrome.storage.session.get(key);
   const state = stored[key];
   lastState = state || null;
+  await renderDest(state, !state || (!state.recording && !state.stopped));
 
   if (!state || (!state.recording && !state.stopped)) {
     dot.className = "dot";
@@ -116,6 +185,7 @@ async function render() {
   if (paused) chips.append(chip("En pausa: no se guarda nada", "warn"));
   chips.append(chip(`Subtítulos: ${state.lines || 0} líneas`, state.lines ? "ok" : ""));
   if (audio.active) chips.append(chip(`Audio: ${paused ? "en pausa" : "grabando"} · ${audio.uploaded || 0} partes enviadas`, paused ? "warn" : "ok"));
+  else if (audio.starting) chips.append(chip("Audio: iniciando…"));
   else if (audio.lastError || audio.failed) chips.append(chip("Audio: con problemas", "bad"));
   else chips.append(chip(state.stopped ? "Audio: terminado" : "Audio: sin grabar"));
   if (audio.active && audio.micAvailable) {
@@ -124,9 +194,25 @@ async function render() {
   }
 
   if (state.warning) notices.append(notice(state.warning, "warn"));
+  if (state.recording && audio.active && audio.micState && audio.micState !== "ok") {
+    notices.append(
+      notice(
+        audio.micState === "denied"
+          ? "El micrófono está bloqueado para la extensión: tu voz no se está grabando."
+          : "La extensión necesita permiso para usar tu micrófono: tu voz todavía no se graba.",
+        "warn",
+        "Permitir micrófono",
+        () => void askMic(true),
+      ),
+    );
+    if (!micPromptTried) {
+      micPromptTried = true;
+      void askMic(false); // Chrome muestra el aviso «quiere usar tu micrófono» solo, sin buscar ningún botón
+    }
+  }
   if (audio.lastError) notices.append(notice("Audio: " + audio.lastError, "error"));
   if (audio.failed) notices.append(notice(`${audio.failed} parte(s) del audio no se pudieron subir.`, "error"));
-  if (state.recording && !audio.active && audio.part === undefined && !audio.lastError) {
+  if (state.recording && !audio.active && !audio.starting && audio.part === undefined && !audio.lastError) {
     notices.append(notice("El audio no está grabando: usa «Grabar esta reunión» desde el ícono para activarlo.", "warn"));
   }
   if (state.stopped) notices.append(notice("Los subtítulos y el audio ya se enviaron al CRM.", "info"));

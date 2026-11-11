@@ -31,6 +31,10 @@ Con ese clic se activan a la vez: los subtítulos de Meet (en español), el audi
 - **Botón verde «PS»** en la pantalla de la reunión (abajo a la izquierda): abre el panel cuando quieras, aunque no estés
   grabando. Chrome no permite abrir el panel sin un clic, por eso el botón; para que la **ventana separada** aparezca sola
   al entrar, activa «Abrir la ventana sola…» en el ícono o en los Ajustes.
+- Muestra **a qué organización** se está enviando la reunión (y su nombre) arriba del panel.
+- **Permiso del micrófono**: si falta, el panel muestra un aviso con el botón «Permitir micrófono» y Chrome pide el permiso
+  solo («quiere usar tu micrófono»), sin tener que buscar ningún botón. El audio de la reunión empieza a grabarse igual
+  mientras tanto, y tu voz se suma apenas la permites.
 - La franja vacía de subtítulos de Meet se esconde aunque nadie esté hablando todavía.
 - Funciona al entrar a una reunión desde la pantalla de inicio de Meet, sin recargar la pestaña.
 - Al terminar (o al detener) pregunta **¿a qué cliente fue esta reunión?** para vincularla a una ficha de Seguimiento.

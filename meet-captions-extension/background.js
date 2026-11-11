@@ -15,11 +15,19 @@ function setup() {
   chrome.storage.session.setAccessLevel?.({ accessLevel: "TRUSTED_CONTEXTS" }).catch(() => {});
 }
 
-async function patchState(tabId, patch) {
-  if (tabId == null) return;
-  const key = STATE_PREFIX + tabId;
-  const stored = await chrome.storage.session.get(key);
-  await chrome.storage.session.set({ [key]: { ...(stored[key] || {}), ...patch, updatedAt: Date.now() } });
+// Las escrituras van en fila: antes, dos avisos casi a la vez (subtítulos y audio) leían el mismo estado y el último en
+// escribir borraba lo del otro, y el panel podía decir «audio sin grabar» con el audio andando.
+let writeQueue = Promise.resolve();
+function patchState(tabId, patch) {
+  if (tabId == null) return Promise.resolve();
+  writeQueue = writeQueue
+    .then(async () => {
+      const key = STATE_PREFIX + tabId;
+      const stored = await chrome.storage.session.get(key);
+      await chrome.storage.session.set({ [key]: { ...(stored[key] || {}), ...patch, updatedAt: Date.now() } });
+    })
+    .catch(() => {});
+  return writeQueue;
 }
 
 const MEETING_URL_RE = /^https:\/\/meet\.google\.com\/(?:meet\/)?[a-z]{3}-[a-z]{4}-[a-z]{3}/i;
@@ -92,6 +100,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "START_AUDIO_CAPTURE": {
       (async () => {
         try {
+          await patchState(message.tabId, { audio: { active: false, starting: true } });
           const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: message.tabId });
           await ensureOffscreenDocument();
           const started = await chrome.runtime.sendMessage({

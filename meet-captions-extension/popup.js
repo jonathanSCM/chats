@@ -76,6 +76,8 @@ async function loadOrganizations(token) {
     if (!res.ok) return;
     const { organizations, activeOrganizationId } = await res.json();
     if (!organizations || organizations.length === 0) return;
+    // El panel lateral muestra a qué organización va la reunión: necesita saber los nombres.
+    chrome.storage.local.set({ orgList: organizations.map((o) => ({ id: o.id, name: o.name })), activeOrganizationId });
     const { orgId } = await chrome.storage.local.get(["orgId"]);
     const selected = organizations.some((o) => o.id === orgId) ? orgId : activeOrganizationId;
     orgSelect.replaceChildren(
@@ -167,8 +169,6 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       recordBtn.addEventListener("click", () => {
         recordBtn.disabled = true;
 
-        // Abre el panel lateral con los subtítulos en vivo. Necesita el gesto de este clic, por eso va primero.
-        if (chrome.sidePanel && chrome.sidePanel.open) chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
 
         const organizationId = orgBox.style.display === "none" ? null : orgSelect.value;
         const title = meetingTitle();
@@ -182,6 +182,8 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
         // Audio real (se transcribe en el CRM), además de los subtítulos -- best
         // effort: si tabCapture falla por lo que sea, los subtítulos de
         // arriba siguen andando igual, no se cae toda la grabación por esto.
+        // Abre el panel lateral (necesita el gesto de este clic). Cierra este popup, pero los mensajes de grabación salen en este mismo instante.
+        if (chrome.sidePanel && chrome.sidePanel.open) chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
         chrome.runtime.sendMessage({ type: "START_AUDIO_CAPTURE", tabId: tab.id, meetingUrl, organizationId, title }, (response) => {
           if (chrome.runtime.lastError || !response?.ok) {
             meetingStatus.textContent += " Audio: no se pudo activar (sigue grabando solo subtítulos).";

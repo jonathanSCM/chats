@@ -19,7 +19,7 @@
     '[role="region"][aria-label*="ubtítulo" i],' +
     '[role="region"][aria-label*="ubtitulo" i]';
   // Elementos propios de la extensión: nunca se confunden con los subtítulos.
-  const OWN = "#proshop-captions-badge, #proshop-classify-panel";
+  const OWN = "#proshop-captions-badge, #proshop-classify-panel, #proshop-launcher";
 
   // ---------- Activar ----------
   const etiqueta = (b) => b.getAttribute("aria-label") || b.getAttribute("data-tooltip") || b.getAttribute("title") || "";
@@ -195,6 +195,7 @@
 
   let hidden = false;
   let cap = null;
+  let capIsPanel = false;
   let observer = null;
   let raf = 0;
   let styleEl = null;
@@ -277,7 +278,35 @@
     if (!node || node === cap) return;
     restore();
     cap = node;
+    capIsPanel = false;
     collapse(cap);
+  }
+
+  // Sin nadie hablando (o con subtítulos todavía vacíos) no hay texto que encontrar, pero Meet igual reserva el hueco
+  // del panel de subtítulos: queda una franja vacía. El panel se reconoce por su estructura (el panel inferior que NO es
+  // la barra de controles) y se pliega entero, con o sin texto.
+  const CONTROLES =
+    'button[aria-label*="Salir de la llamada" i],button[aria-label*="Leave call" i],[role="region"][aria-label*="ontroles" i],[role="region"][aria-label*="ontrols" i]';
+  function panelVacio() {
+    for (const w of document.querySelectorAll('[data-side="3"]')) {
+      if (w.querySelector(CONTROLES) || w.closest("[data-ps-hide]")) continue;
+      const r = w.getBoundingClientRect();
+      if (r.height >= 40 && r.top > window.innerHeight * 0.45) return w;
+    }
+    return null;
+  }
+  function collapsePanel(w) {
+    touched.add(w);
+    w.dataset.psHide = "collapse";
+    reclamar();
+    for (const ms of [300, 900, 2000]) setTimeout(reclamar, ms);
+  }
+  function bindPanel(w) {
+    if (!w || w === cap) return;
+    restore();
+    cap = w;
+    capIsPanel = true;
+    collapsePanel(w);
   }
 
   function startObserver() {
@@ -289,9 +318,10 @@
         if (!cap || !document.contains(cap)) {
           const c = buscar();
           if (c) bind(c);
+          else bindPanel(panelVacio());
           return;
         }
-        if (cap.dataset.psHide !== "leaf") collapse(cap);
+        if (!cap.dataset.psHide) (capIsPanel ? collapsePanel : collapse)(cap);
         else if (Date.now() - ultimoReclamo > 1200) reclamar(); // Meet re-maqueta a menudo
       });
     });
@@ -310,10 +340,12 @@
       startObserver();
       const c = buscar();
       if (c) bind(c);
+      else bindPanel(panelVacio());
     } else {
       if (observer) observer.disconnect();
       observer = null;
       cap = null;
+      capIsPanel = false;
       restore();
       if (styleEl) styleEl.remove();
       styleEl = null;

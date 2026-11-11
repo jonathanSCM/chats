@@ -39,23 +39,18 @@
         color: var(--fg);
         font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       }
-      header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        padding: 12px 14px;
-        border-bottom: 1px solid var(--line);
-      }
+      header { padding: 12px 14px; border-bottom: 1px solid var(--line); }
       header h1 { margin: 0; font-size: 14px; font-weight: 600; }
       header .sub { color: var(--muted); font-size: 11.5px; }
       .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 6px; }
       .dot.rec { background: #ef4444; animation: pulse 1.4s infinite; }
+      .dot.pause { background: #f59e0b; }
       @keyframes pulse { 50% { opacity: 0.35; } }
       .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px 0; }
       .chip { background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12px; }
       .chip.ok { color: var(--ok); }
       .chip.bad { color: var(--danger); }
+      .chip.warn { color: var(--warn); }
       .notice { margin: 10px 14px 0; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; }
       .notice.error { background: var(--danger-bg); color: var(--danger); }
       .notice.warn { background: var(--warn-bg); color: var(--warn); }
@@ -73,16 +68,25 @@
       }
       button.primary { background: var(--danger); border-color: var(--danger); color: #fff; }
       button:disabled { opacity: 0.45; cursor: not-allowed; }
-      label.toggle { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+      details { border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }
+      details summary { cursor: pointer; padding: 8px 12px; font-weight: 600; font-size: 12.5px; }
+      .settings { padding: 0 12px 12px; display: grid; gap: 10px; }
+      .settings label.field { display: grid; gap: 4px; color: var(--muted); font-size: 11.5px; }
+      select {
+        width: 100%; padding: 7px 8px; border-radius: 8px; border: 1px solid var(--line);
+        background: var(--bg); color: var(--fg); font: inherit;
+      }
+      label.toggle { display: flex; align-items: flex-start; gap: 8px; color: var(--fg); font-size: 12px; }
+      .meter { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+      .meter > div { height: 100%; width: 0; background: var(--accent); transition: width 0.08s linear; }
+      .hint { color: var(--muted); font-size: 11.5px; margin: 0; }
       .ver { color: var(--muted); font-size: 11px; text-align: center; }
     </style>
   </head>
   <body>
     <header>
-      <div>
-        <h1><span class="dot" id="dot"></span><span id="title">ProShop CRM</span></h1>
-        <div class="sub" id="subtitle">Asistente de reunión</div>
-      </div>
+      <h1><span class="dot" id="dot"></span><span id="title">ProShop CRM</span></h1>
+      <div class="sub" id="subtitle">Asistente de reunión</div>
     </header>
     <div class="chips" id="chips"></div>
     <div id="notices"></div>
@@ -91,10 +95,32 @@
     </main>
     <footer>
       <div class="row">
+        <button id="pauseBtn" disabled>Pausar</button>
         <button class="primary" id="stopBtn" disabled>Detener y enviar</button>
-        <button id="detachBtn">Separar en ventana</button>
       </div>
-      <label class="toggle"><input type="checkbox" id="hideToggle" checked /> Ocultar los subtítulos de la pantalla de Meet</label>
+      <button id="detachBtn">Separar en ventana</button>
+      <details id="settings">
+        <summary>Ajustes</summary>
+        <div class="settings">
+          <label class="field">
+            Micrófono
+            <select id="micSelect"></select>
+          </label>
+          <div class="meter" title="Nivel del micrófono elegido"><div id="meterBar"></div></div>
+          <p class="hint" id="micHint">Habla para ver si se mueve la barra: así sabes que ese es el micrófono correcto.</p>
+          <label class="field">
+            Idioma de los subtítulos
+            <select id="langSelect">
+              <option value="es">Español</option>
+              <option value="en">Inglés</option>
+              <option value="none">No cambiar (el que tenga Meet)</option>
+            </select>
+          </label>
+          <label class="toggle"><input type="checkbox" id="hideToggle" checked /> <span>Ocultar los subtítulos de la pantalla de Meet</span></label>
+          <label class="toggle"><input type="checkbox" id="autoOpenToggle" /> <span>Abrir esta ventana sola al entrar a una reunión</span></label>
+          <p class="hint">El micrófono y el idioma se aplican en la próxima reunión; el micrófono también cambia en vivo si ya estás grabando.</p>
+        </div>
+      </details>
       <div class="ver" id="ver"></div>
     </footer>
     <script src="sidepanel.js"></script>

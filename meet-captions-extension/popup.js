@@ -16,6 +16,12 @@ const orgSelect = document.getElementById("orgSelect");
 const orgOnly = document.getElementById("orgOnly");
 const micBtn = document.getElementById("micBtn");
 const micStatus = document.getElementById("micStatus");
+const autoOpen = document.getElementById("autoOpen");
+
+chrome.storage.local.get(["autoOpenWindow"], ({ autoOpenWindow }) => {
+  autoOpen.checked = Boolean(autoOpenWindow);
+});
+autoOpen.addEventListener("change", () => chrome.storage.local.set({ autoOpenWindow: autoOpen.checked }));
 
 // El offscreen document (donde se graba de verdad) no puede mostrar el
 // diálogo de permiso de micrófono -- es una página invisible. Por eso hay

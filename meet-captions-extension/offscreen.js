@@ -16,8 +16,10 @@ let destination = null;
 let recorder = null;
 let segmentTimer = null;
 let active = false;
+let paused = false;
+let micSource = null;
 let session = null; // { tabId, meetingUrl, organizationId, title }
-let stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, lastError: null };
+let stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, paused: false, micLabel: null, lastError: null };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -37,6 +39,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     stopRecording();
     return false;
   }
+  if (message?.type === "OFFSCREEN_PAUSE") {
+    pauseRecording();
+    return false;
+  }
+  if (message?.type === "OFFSCREEN_RESUME") {
+    resumeRecording();
+    return false;
+  }
+  if (message?.type === "OFFSCREEN_SET_MIC_DEVICE") {
+    void switchMic(message.deviceId || "");
+    return false;
+  }
   if (message?.type === "OFFSCREEN_SET_MIC_ENABLED") {
     stats.micEnabled = Boolean(message.enabled);
     if (micStream) micStream.getAudioTracks().forEach((t) => (t.enabled = stats.micEnabled));
@@ -52,7 +66,8 @@ async function startRecording({ streamId, tabId, meetingUrl, organizationId, tit
     throw new Error("Ya hay una grabación de audio en otra pestaña.");
   }
   session = { tabId, meetingUrl, organizationId: organizationId || null, title: title || null };
-  stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, lastError: null };
+  paused = false;
+  stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, paused: false, micLabel: null, lastError: null };
 
   try {
     tabStream = await navigator.mediaDevices.getUserMedia({
@@ -70,17 +85,69 @@ async function startRecording({ streamId, tabId, meetingUrl, organizationId, tit
   destination = audioContext.createMediaStreamDestination();
   tabSource.connect(destination);
 
-  try {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-    audioContext.createMediaStreamSource(micStream).connect(destination);
-    stats.micAvailable = true;
-  } catch (error) {
-    // Sin permiso de micrófono (se concede una vez desde el popup): se graba igual, solo sin tu voz.
-    stats.micAvailable = false;
-    console.warn("[proshop-captions] Sin micrófono:", error);
-  }
+  await connectMic((await chrome.storage.local.get(["micDeviceId"])).micDeviceId || "");
 
   active = true;
+  startSegment();
+  publish();
+}
+
+// Abre el micrófono elegido (o el predeterminado) y lo mezcla en la grabación. Si el elegido ya no está (desenchufado),
+// usa el predeterminado en vez de quedarse sin tu voz.
+async function connectMic(deviceId) {
+  const base = { echoCancellation: true, noiseSuppression: true };
+  let stream = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: deviceId ? { ...base, deviceId: { exact: deviceId } } : base });
+  } catch (error) {
+    if (deviceId) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: base });
+        stats.lastError = "El micrófono elegido no está disponible: se usa el predeterminado.";
+      } catch (error2) {
+        console.warn("[proshop-captions] Sin micrófono:", error2);
+      }
+    } else {
+      // Sin permiso de micrófono (se concede una vez desde el popup): se graba igual, solo sin tu voz.
+      console.warn("[proshop-captions] Sin micrófono:", error);
+    }
+  }
+  if (!stream || !audioContext) {
+    stats.micAvailable = false;
+    stats.micLabel = null;
+    return;
+  }
+  micStream = stream;
+  micSource = audioContext.createMediaStreamSource(stream);
+  micSource.connect(destination);
+  stream.getAudioTracks().forEach((t) => (t.enabled = stats.micEnabled)); // respeta el silencio de Meet
+  stats.micAvailable = true;
+  stats.micLabel = (stream.getAudioTracks()[0] && stream.getAudioTracks()[0].label) || null;
+}
+
+// Cambia de micrófono sin cortar la grabación.
+async function switchMic(deviceId) {
+  if (!active || !audioContext) return;
+  if (micSource) micSource.disconnect();
+  if (micStream) micStream.getTracks().forEach((t) => t.stop());
+  micSource = micStream = null;
+  stats.lastError = null;
+  await connectMic(deviceId);
+  publish();
+}
+
+// Pausa: se cierra la parte en curso (se sube) y no se graba nada hasta reanudar.
+function pauseRecording() {
+  if (!active || paused) return;
+  paused = true;
+  stats.paused = true;
+  if (recorder && recorder.state !== "inactive") recorder.stop();
+  publish();
+}
+function resumeRecording() {
+  if (!active || !paused) return;
+  paused = false;
+  stats.paused = false;
   startSegment();
   publish();
 }
@@ -98,8 +165,9 @@ function startSegment() {
       stats.part += 1;
       void uploadPart(blob, stats.part);
     }
-    if (active) startSegment();
-    else release();
+    if (active) {
+      if (!paused) startSegment();
+    } else release();
   };
   rec.start(1000);
   recorder = rec;
@@ -109,7 +177,8 @@ function startSegment() {
 function release() {
   for (const stream of [tabStream, micStream]) if (stream) stream.getTracks().forEach((t) => t.stop());
   if (audioContext && audioContext.state !== "closed") void audioContext.close();
-  tabStream = micStream = audioContext = destination = recorder = null;
+  tabStream = micStream = micSource = audioContext = destination = recorder = null;
+  paused = false;
   publish();
 }
 

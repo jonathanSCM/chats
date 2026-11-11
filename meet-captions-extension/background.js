@@ -22,8 +22,52 @@ async function patchState(tabId, patch) {
   await chrome.storage.session.set({ [key]: { ...(stored[key] || {}), ...patch, updatedAt: Date.now() } });
 }
 
+const MEETING_URL_RE = /^https:\/\/meet\.google\.com\/(?:meet\/)?[a-z]{3}-[a-z]{4}-[a-z]{3}/i;
+const detachedWindows = new Map(); // tabId -> id de la ventana separada (para no abrir dos)
+const autoOpened = new Set(); // pestañas donde ya se abrió sola la ventana
+
+async function openDetached(tabId, { focused = true } = {}) {
+  const known = detachedWindows.get(tabId);
+  if (known != null) {
+    try {
+      await chrome.windows.update(known, { focused: true });
+      return;
+    } catch {
+      detachedWindows.delete(tabId); // la cerraron: se abre otra
+    }
+  }
+  try {
+    const win = await chrome.windows.create({
+      url: chrome.runtime.getURL(`sidepanel.html?tab=${tabId}&detached=1`),
+      type: "popup",
+      width: 420,
+      height: 680,
+      focused,
+    });
+    if (win?.id != null) detachedWindows.set(tabId, win.id);
+  } catch (error) {
+    console.error("[proshop-captions] No se pudo abrir la ventana:", error);
+  }
+}
+
+chrome.windows.onRemoved.addListener((windowId) => {
+  for (const [tabId, id] of detachedWindows) if (id === windowId) detachedWindows.delete(tabId);
+});
+
 chrome.tabs.onRemoved.addListener((tabId) => {
   chrome.storage.session.remove(STATE_PREFIX + tabId).catch(() => {});
+  autoOpened.delete(tabId);
+});
+
+// Opción «abrir la ventana sola al entrar a una reunión» (se activa desde el ícono). Se abre una vez por pestaña y sin
+// quitarle el foco a Meet.
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  if (info.status !== "complete" || !tab.url || !MEETING_URL_RE.test(tab.url) || autoOpened.has(tabId)) return;
+  chrome.storage.local.get(["autoOpenWindow"]).then(({ autoOpenWindow }) => {
+    if (!autoOpenWindow || autoOpened.has(tabId)) return;
+    autoOpened.add(tabId);
+    void openDetached(tabId, { focused: false });
+  });
 });
 
 async function ensureOffscreenDocument() {
@@ -89,10 +133,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ tabId: sender.tab?.id ?? null });
       return false;
     case "OPEN_DETACHED":
-      chrome.windows
-        .create({ url: chrome.runtime.getURL(`sidepanel.html?tab=${message.tabId}&detached=1`), type: "popup", width: 420, height: 680 })
-        .catch(() => {});
+      void openDetached(message.tabId);
       return false;
+    case "OPEN_PANEL": {
+      // Lo manda el botón «PS» de la pestaña de Meet. Si Chrome no deja abrir el panel lateral, se abre la ventana separada.
+      const tabId = sender.tab?.id;
+      if (tabId == null) return false;
+      chrome.sidePanel.open({ tabId }).catch(() => openDetached(tabId));
+      return false;
+    }
     default:
       return false;
   }

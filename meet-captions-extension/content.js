@@ -16,19 +16,56 @@
   const END_CHECK_TICKS = 10; // cada 10 polls (~20s) se fija si la reunión terminó
   const API_PATH = "/api/extension/transcript";
 
-  const codeMatch = MEETING_CODE_RE.exec(window.location.pathname);
-  if (!codeMatch) return;
-
+  // Meet es una SPA: se pasa de la pantalla de inicio a una reunión SIN recargar la página, así que la reunión se mira de
+  // nuevo cada segundo en vez de decidirlo una sola vez al cargar (antes, entrar desde el inicio dejaba a la extensión
+  // sin conexión hasta recargar). Una vez que se empieza a grabar, el enlace queda fijo.
   // Siempre el link canónico, así la misma reunión cae en la misma fila del CRM sin importar cómo se abrió.
-  const meetingUrl = `https://meet.google.com/${codeMatch[1].toLowerCase()}`;
-
+  let meetingUrl = null;
   let started = false;
+  function syncMeetingUrl() {
+    if (started) return;
+    const match = MEETING_CODE_RE.exec(window.location.pathname);
+    meetingUrl = match ? `https://meet.google.com/${match[1].toLowerCase()}` : null;
+  }
+  syncMeetingUrl();
+  setInterval(syncMeetingUrl, 1000);
+
+  // Botón «PS» siempre a mano en la reunión: abre el panel lateral (o la ventana separada si Chrome no deja abrir el panel).
+  let launcherEl = null;
+  function syncLauncher() {
+    if (!meetingUrl) {
+      if (launcherEl) launcherEl.remove();
+      launcherEl = null;
+      return;
+    }
+    if (!launcherEl || !launcherEl.isConnected) {
+      launcherEl = document.createElement("div");
+      launcherEl.id = "proshop-launcher";
+      launcherEl.title = "ProShop CRM: abrir el panel de subtítulos";
+      launcherEl.style.cssText =
+        "position:fixed;bottom:64px;left:16px;z-index:999998;width:40px;height:40px;border-radius:50%;background:#00a884;" +
+        "color:#fff;font:600 13px/40px system-ui,sans-serif;text-align:center;cursor:pointer;user-select:none;" +
+        "box-shadow:0 2px 8px rgba(0,0,0,.35);";
+      launcherEl.textContent = "PS";
+      const rec = document.createElement("span");
+      rec.id = "proshop-launcher-rec";
+      rec.style.cssText = "position:absolute;top:2px;right:2px;width:10px;height:10px;border-radius:50%;background:#ef4444;display:none;";
+      launcherEl.appendChild(rec);
+      launcherEl.addEventListener("click", () => chrome.runtime.sendMessage({ type: "OPEN_PANEL" }).catch(() => {}));
+      document.body.appendChild(launcherEl);
+    }
+    const rec = launcherEl.querySelector("#proshop-launcher-rec");
+    if (rec) rec.style.display = started && !stopped ? "block" : "none";
+  }
+  setInterval(syncLauncher, 1000);
+
   let ticks = 0;
   let consecutiveEndSignals = 0;
   let sent = false;
   const finalizedKeys = new Set();
   const finalizedLines = [];
   let pending = null;
+  let paused = false; // en pausa: no se guarda nada hasta reanudar
   let stopped = false; // se detuvo con «Detener y enviar» o al terminar la reunión
   let warning = null; // aviso visible en el panel lateral (subtítulos que no se activaron, no llegan…)
   let noCaptionsWarned = false;
@@ -45,6 +82,7 @@
           meetingUrl,
           recording: started && !stopped,
           stopped,
+          paused,
           lines: finalizedLines.length,
           last: lines.slice(-60),
           warning,
@@ -135,6 +173,11 @@
     const activos = await window.ProShopCaptions.activate();
     if (!activos) return false;
     await sleep(500);
+    // Idioma de los subtítulos (Ajustes del panel): español por defecto; «none» no toca el idioma de Meet.
+    const { captionLang } = await chrome.storage.local.get(["captionLang"]);
+    const lang = captionLang || "es";
+    if (lang === "none") return true;
+    const langRe = lang === "en" ? /english|inglés/i : /español|spanish/i;
 
     try {
       const combo = document.querySelector('[role="combobox"][aria-label*="idioma de la reunión" i], [role="combobox"][aria-label*="meeting language" i]');
@@ -143,7 +186,7 @@
         combo.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
         await sleep(500);
         const options = document.querySelectorAll('[role="option"]');
-        const spanish = [...options].find((o) => /español/i.test(o.textContent || ""));
+        const spanish = [...options].find((o) => langRe.test(o.textContent || ""));
         if (spanish) {
           spanish.scrollIntoView({ block: "center" });
           spanish.click();
@@ -373,7 +416,11 @@
     checkMicMuteSync();
     const { blocks, fallback } = readCaptionsPanel();
 
-    if (blocks.length > 0) {
+    if (paused) {
+      // En pausa: lo que Meet muestre ahora se marca como ya visto para que NO se guarde al reanudar.
+      for (const b of blocks) finalizedKeys.add(`${b.name}:${b.text}`);
+      pending = null;
+    } else if (blocks.length > 0) {
       for (let i = 0; i < blocks.length - 1; i++) recordIfNew(blocks[i].name, blocks[i].text);
       pending = blocks[blocks.length - 1] || null;
     } else if (fallback && fallback.length >= 25) {
@@ -383,7 +430,7 @@
     // Vigilante: si llegan subtítulos se quita el aviso; si pasan ~90 s grabando sin ninguna línea, se avisa.
     if (finalizedLines.length > 0 || (pending && pending.text)) {
       if (warning) warning = null;
-    } else if (ticks >= 45 && !noCaptionsWarned) {
+    } else if (ticks >= 45 && !noCaptionsWarned && !paused) {
       noCaptionsWarned = true;
       warning = "Llevo 1½ minutos sin recibir subtítulos: actívalos en Meet (botón «Subtítulos» o CC) y que alguien hable. El audio sigue grabándose.";
     }
@@ -423,7 +470,7 @@
   });
 
   async function start() {
-    if (started) return;
+    if (started || !meetingUrl) return;
     started = true;
     ensureBadge();
     await sleep(500); // ya está en la llamada hace rato para cuando se activa a mano
@@ -443,7 +490,17 @@
   // leer subtítulos ni activa el badge.
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === "GET_STATUS") {
-      sendResponse({ onMeeting: true, recording: started && !stopped, lines: finalizedLines.length });
+      sendResponse({ onMeeting: Boolean(meetingUrl), recording: started && !stopped, lines: finalizedLines.length });
+      return false;
+    }
+    if (message?.type === "PAUSE_RECORDING" || message?.type === "RESUME_RECORDING") {
+      paused = message.type === "PAUSE_RECORDING";
+      if (paused && pending) {
+        recordIfNew(pending.name, pending.text); // lo dicho hasta ahora se conserva
+        pending = null;
+      }
+      pushLive();
+      sendResponse({ ok: true });
       return false;
     }
     if (message?.type === "STOP_AND_SEND") {

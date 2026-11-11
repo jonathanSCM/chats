@@ -461,6 +461,7 @@
     const { hideMeetCaptions } = await store(["hideMeetCaptions"]);
     window.ProShopCaptions.setHidden(hideMeetCaptions !== false); // por defecto la franja de Meet se esconde: se ven en el panel
     for (const ms of [1500, 5000]) setTimeout(() => !dead && dbg("pantalla de Meet: " + window.ProShopCaptions.describe()), ms);
+    for (const ms of [6000, 20000]) setTimeout(() => !dead && dbg("hueco bajo el escenario: " + window.ProShopCaptions.hueco()), ms);
     syncMic(true);
     timer = setInterval(() => {
       if (dead) return;

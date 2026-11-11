@@ -383,5 +383,34 @@
     });
   }
 
-  self.ProShopCaptions = { activate, setHidden, isHidden: () => hidden, sleep, describe };
+  // Radiografía del hueco entre el escenario (main) y la barra de controles: qué elementos lo ocupan y con qué estilos.
+  // Es el dato que hace falta para saber qué pliega Meet y qué no.
+  function hueco() {
+    const main = document.querySelector("main");
+    const barra = document.querySelector(CONTROLES);
+    const bw = barra && barra.closest('[data-side="3"]');
+    const top = main ? Math.round(main.getBoundingClientRect().bottom) : null;
+    const bottom = bw ? Math.round(bw.getBoundingClientRect().top) : window.innerHeight;
+    const cadena = (el) => {
+      const out = [];
+      for (let n = el, i = 0; n && n !== document.body && i < 9; n = n.parentElement, i++) {
+        const r = n.getBoundingClientRect();
+        const cs = getComputedStyle(n);
+        out.push(`${n.tagName.toLowerCase()}${n.id ? "#" + n.id : ""}.${String(n.className || "").split(" ").slice(0, 2).join(".")}[${n.getAttribute("data-side") || ""}${n.getAttribute("jsname") ? " js=" + n.getAttribute("jsname") : ""}] ${Math.round(r.top)}+${Math.round(r.height)} ${cs.position} ${cs.display}${n.dataset.psHide ? " ps=" + n.dataset.psHide : ""}`);
+      }
+      return out;
+    };
+    const medio = document.elementFromPoint(Math.round(window.innerWidth / 2), Math.round((top + bottom) / 2));
+    const ocupantes = [];
+    for (const el of document.querySelectorAll("body *")) {
+      const r = el.getBoundingClientRect();
+      if (r.height < 20 || r.width < 150 || r.bottom <= top || r.top >= bottom || el.closest(OWN)) continue;
+      if (ocupantes.length >= 22) break;
+      const cs = getComputedStyle(el);
+      ocupantes.push(`${el.tagName.toLowerCase()}.${String(el.className || "").split(" ").slice(0, 2).join(".")}[${el.getAttribute("data-side") || ""}] ${Math.round(r.top)}+${Math.round(r.height)} ${cs.position} h=${cs.height} mh=${cs.minHeight}${el.dataset.psHide ? " ps=" + el.dataset.psHide : ""}${el.querySelector("video") ? " VIDEO" : ""}`);
+    }
+    return JSON.stringify({ ventana: window.innerHeight, mainAbajo: top, barraArriba: bottom, hueco: top == null ? null : bottom - top, enElMedio: medio ? cadena(medio) : null, ocupantes });
+  }
+
+  self.ProShopCaptions = { activate, setHidden, isHidden: () => hidden, sleep, describe, hueco };
 })();

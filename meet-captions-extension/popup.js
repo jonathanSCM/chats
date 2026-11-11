@@ -161,6 +161,9 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       recordBtn.addEventListener("click", () => {
         recordBtn.disabled = true;
 
+        // Abre el panel lateral con los subtítulos en vivo. Necesita el gesto de este clic, por eso va primero.
+        if (chrome.sidePanel && chrome.sidePanel.open) chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
+
         const organizationId = orgBox.style.display === "none" ? null : orgSelect.value;
         const title = meetingTitle();
         chrome.tabs.sendMessage(tab.id, { type: "START_RECORDING", organizationId, title }, () => {
@@ -170,7 +173,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
           meetingStatus.style.color = "#059669";
         });
 
-        // Audio real para whisper.cpp, además de los subtítulos -- best
+        // Audio real (se transcribe en el CRM), además de los subtítulos -- best
         // effort: si tabCapture falla por lo que sea, los subtítulos de
         // arriba siguen andando igual, no se cae toda la grabación por esto.
         chrome.runtime.sendMessage({ type: "START_AUDIO_CAPTURE", tabId: tab.id, meetingUrl, organizationId, title }, (response) => {

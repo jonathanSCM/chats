@@ -109,6 +109,43 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        <Section title="Extensión de Chrome: asistente de reuniones de Google Meet">
+          <p>
+            La extensión «ProShop CRM — Asistente de reuniones de Meet» solo actúa cuando tú abres una reunión de Google Meet
+            y pulsas «Grabar esta reunión». Nunca empieza sola y no lee ninguna otra página ni tu historial de navegación.
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>
+              <strong className="text-ink">Qué datos usa:</strong> los subtítulos de la reunión (lo que dice cada persona y el
+              nombre con que aparece), el audio de la pestaña (las voces de los demás participantes), tu propio micrófono solo
+              mientras no estás silenciado en Meet, el enlace y el nombre de la reunión, y tu sesión del CRM para identificarte.
+            </li>
+            <li>
+              <strong className="text-ink">Para qué:</strong> guardar la transcripción, el audio y el resumen de esa reunión en
+              tu organización dentro del CRM, y vincularlos al cliente que elijas. No se usan para publicidad ni para ningún otro
+              fin.
+            </li>
+            <li>
+              <strong className="text-ink">Con quién se comparten:</strong> se envían a los servidores del CRM. Para
+              transcribir el audio y resumir la reunión se envían a nuestro proveedor de inteligencia artificial (OpenAI), solo
+              para ese fin. No los vendemos ni los compartimos con nadie más.
+            </li>
+            <li>
+              <strong className="text-ink">Cuánto tiempo y cómo borrarlos:</strong> quedan en tu organización mientras tu cuenta
+              esté activa; puedes eliminar la reunión (con su audio y transcripción) desde el CRM en cualquier momento.
+            </li>
+            <li>
+              <strong className="text-ink">Consentimiento de los participantes:</strong> quien graba es responsable de avisar a
+              los participantes y de contar con su consentimiento cuando la ley lo exija. Mientras graba, la extensión muestra
+              un indicador en pantalla y puedes detenerla cuando quieras con «Detener y enviar».
+            </li>
+          </ul>
+          <p className="mt-2">
+            El uso de la información recibida a través de la extensión se limita a ofrecer y mejorar estas funciones, y cumple
+            con la política de datos de usuario de la Chrome Web Store, incluidos los requisitos de uso limitado.
+          </p>
+        </Section>
+
         <Section title="3. Por qué usamos estos datos">
           <p>
             Para operar tu bot, cobrar tu suscripción, medir el uso contra los límites de tu

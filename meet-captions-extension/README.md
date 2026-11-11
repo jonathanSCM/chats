@@ -1,92 +1,52 @@
-# Extensión de subtítulos de Meet — ProShop CRM
+# ProShop CRM — Asistente de reuniones de Meet (extensión de Chrome, v2.0.0)
 
-Lee los subtítulos en vivo de Google Meet desde el navegador de quien esté en la reunión (no un
-bot separado) y manda la transcripción al CRM cuando la reunión termina. Es una función **aparte**
-del bot grabador (`meeting-bot/`) — ese sigue existiendo para cuando sí hace falta la grabación de
-audio real.
+Graba **los subtítulos y el audio** de tus reuniones de Google Meet y los guarda en tu CRM, con un **panel lateral** que
+muestra los subtítulos en vivo (y se puede separar en su propia ventana). Corre en tu navegador, como un participante
+más: no hay bot, nadie tiene que admitirlo.
 
-## Cómo funciona
+## Cómo probarla (modo desarrollador)
 
-**No graba nada sola.** Hay que activarla a mano en cada reunión que se quiera grabar:
+1. Abre `chrome://extensions` y activa **Modo de desarrollador** (arriba a la derecha).
+2. **Cargar descomprimida** → elige esta carpeta (`meet-captions-extension`).
+3. Fija el ícono (el rompecabezas de la barra → alfiler).
+4. Abre el ícono → **Conectar con el CRM** (usa tu sesión; no hay que pegar tokens).
+5. Una sola vez, **Activar micrófono** (Chrome pide el permiso en una pestaña).
+6. Entra a una reunión de Meet → ícono → (nombre y organización si quieres) → **Grabar esta reunión**.
 
-1. Entrá a la reunión de Meet como siempre.
-2. Tocá el ícono de la extensión → "Grabar esta reunión".
-3. Recién ahí prende los subtítulos de Meet (en español) si no estaban prendidos, y aparece el
-   indicador chico abajo a la izquierda ("ProShop CRM — subtítulos: N líneas").
-4. Lee el panel de subtítulos cada 2 segundos y arma líneas `Nombre: lo que dijo`.
-5. Detecta que la reunión terminó (mismo criterio que el bot: el contador de "Personas" baja a 1
-   o desaparece) y manda la transcripción a `POST /api/extension/transcript`.
-6. Si se cierra la pestaña antes de detectar el fin, manda lo acumulado hasta ese momento como
-   red de seguridad (`sendBeacon`) — pero solo si se había activado la grabación en el paso 2.
+Con ese clic se activan a la vez: los subtítulos de Meet (en español), el audio (voces + tu micrófono) y el panel lateral.
 
-Si no se toca "Grabar esta reunión", esa pestaña de Meet no manda absolutamente nada al CRM.
+## Qué hace
 
-Si el link de la reunión ya estaba agendado en el CRM, la transcripción se suma a esa reunión.
-Si no, se crea una nueva reunión **"Reunión Extensión"** — igual que hace "Unir el bot ya mismo"
-con llamadas en vivo sin agendar, pero con un nombre distinto para que se distinga de un vistazo.
+- **Subtítulos**: los activa si no lo están (sin apagarlos por error), los lee con el nombre de quien habla y los manda al
+  CRM al terminar. Si no logra activarlos, o no llega ninguno en ~90 s, **avisa** en el panel.
+- **Audio**: voces de la reunión + tu micrófono, **solo mientras no estás silenciado en Meet**. Se corta en partes de
+  10 minutos que se suben solas (con reintentos), así que una pestaña cerrada solo cuesta la parte en curso. El CRM lo
+  transcribe con Whisper y lo suma a la reunión.
+- **Panel lateral**: subtítulos en vivo, estado del audio y del micrófono, avisos de error, **Detener y enviar**,
+  **Separar en ventana**, y la opción de esconder la franja de subtítulos de Meet (así no ocupa pantalla).
+- Al terminar (o al detener) pregunta **¿a qué cliente fue esta reunión?** para vincularla a una ficha de Seguimiento.
+- Es **prueba de fallos**: si falla el audio siguen los subtítulos, y al revés.
 
-## O unir al asistente grabador, sin ir a la web
+## Archivos
 
-El mismo ícono tiene una segunda opción, independiente de "Grabar esta reunión": **"Unir al
-asistente"**. En vez de grabar en tu propio navegador, le avisa al bot grabador (`meeting-bot/`)
-para que entre a esta misma reunión ya mismo — mismo efecto que "Unir el bot ya mismo" en
-`/dashboard/reuniones`, pero sin salir de Meet ni pegar el link a mano. Como usa el mismo
-`resolveExtensionMeeting` que los subtítulos, si usás las dos opciones en la misma reunión todo
-queda junto en una sola reunión del CRM, no duplicado. Necesita haber iniciado sesión (el botón no
-aparece si todavía no conectaste tu cuenta).
+| Archivo | Qué hace |
+|---|---|
+| `manifest.json` | Permisos y piezas (MV3). Chrome 116 o más. |
+| `background.js` | Coordinador: tabCapture, estado en vivo, ventana separada. |
+| `offscreen.js` | Graba el audio en partes y las sube con reintentos. |
+| `content.js` | Lee los subtítulos de la pestaña de Meet y detecta el fin de la reunión. |
+| `captions-dom.js` | Activa los subtítulos de forma segura y esconde su franja. |
+| `popup.html/js` | Ícono: conexión, organización, nombre y «Grabar». |
+| `sidepanel.html/js` | Panel lateral / ventana separada. |
+| `permissions.html/js` | Concede el micrófono una vez (el popup se cierra al perder el foco). |
+| `authorize-bridge.js` | Guarda tu sesión del CRM al conectarte. |
 
-## Audio real (para whisper.cpp) — opcional, además de los subtítulos
+## Permisos (y por qué)
 
-Al tocar "Grabar esta reunión" también se intenta grabar el audio real (lo que dicen los demás
-participantes, capturado con `chrome.tabCapture`, mezclado con tu propio micrófono) y mandarlo a
-whisper.cpp -- reutiliza el mismo whisper.cpp que ya corre en `meeting-bot/`, no lo duplica. Es
-**best-effort**: si el audio falla por lo que sea, los subtítulos de arriba siguen funcionando
-igual, no se cae toda la grabación por esto.
+- `tabCapture` + `offscreen`: grabar el audio de la pestaña de la reunión (solo al pulsar «Grabar»).
+- `activeTab`: Chrome exige que el usuario invoque la extensión para capturar una pestaña.
+- `sidePanel`: el panel con los subtítulos en vivo.
+- `storage`: recordar tu sesión del CRM, la organización elegida y el estado en vivo.
+- Hosts: `meet.google.com` (leer los subtítulos) y el CRM (enviarlos y conectarte).
 
-**Paso único antes de la primera vez**: abrí el ícono de la extensión → "Activar micrófono (una
-sola vez)". Chrome tiene que pedir permiso de micrófono desde acá porque la grabación de audio en
-sí corre en una página invisible de la extensión (un "offscreen document") que no puede mostrar
-ese diálogo. Sin este paso, igual se graba el audio, pero solo se escucha lo que dicen los demás,
-no tu propia voz.
-
-El audio se sube como adjunto a la reunión (`grabacion-extension.webm`) y, si whisper.cpp pudo
-transcribirlo, también queda como `audioTranscript` (con su .txt aparte) — la misma distinción que
-ya existe para el bot grabador: `transcript` (subtítulos, con nombre de quién habló) y
-`audioTranscript` (whisper, sin nombres, tapa los huecos que los subtítulos puedan tener).
-
-Tu micrófono se pausa automáticamente en la grabación cuando te silenciás con el botón de Meet, y
-se reanuda cuando te reactivás — no queda grabando tu audio de fondo mientras la lucecita de Meet
-dice que estás en silencio.
-
-## Instalación (uso interno, sin publicar en la Chrome Web Store)
-
-1. Abrí `chrome://extensions` en Chrome.
-2. Activá "Modo de programador" (arriba a la derecha).
-3. Tocá "Cargar descomprimida" y seleccioná esta carpeta (`meet-captions-extension/`).
-4. Tocá el ícono de la extensión → "Iniciar sesión con el CRM". Se abre una pestaña al CRM: si
-   ya tenés sesión iniciada ahí (lo normal, se usa a diario), la extensión queda conectada sola,
-   sin generar ni pegar ningún token a mano.
-5. Entrá a una reunión de Meet, tocá el ícono de la extensión de nuevo, y tocá
-   **"Grabar esta reunión"**. Sin este paso no se graba nada.
-
-Cada vendedor instala la extensión una vez en su propio Chrome e inicia sesión con su propia
-cuenta del CRM — el token es personal (no uno solo por organización como antes), así que cada
-reunión queda registrada con quién la grabó.
-
-## Por qué este método y no un bot
-
-Investigado y confirmado contra la documentación de productos como Read.ai, Fireflies y Tactiq:
-un bot que entra como invitado a la llamada necesita que alguien lo admita y depende de la
-configuración de Google Workspace del organizador — la misma fricción que tuvimos con
-`meeting-bot/`. Leer los subtítulos desde el navegador de alguien que YA está adentro de la
-reunión evita ese problema por completo, al costo de no tener grabación de audio (Meet no
-reproduce tu propio micrófono de vuelta en tu pestaña, así que no se puede armar la grabación
-completa sin pedir un segundo permiso de micrófono y mezclar las dos fuentes — se dejó fuera de
-esta primera versión a propósito).
-
-## Publicar en la Chrome Web Store (opcional, a futuro)
-
-Con solo 1-2 vendedores usándola, no hace falta — "Cargar descomprimida" alcanza. Si en algún
-momento se quiere distribuir más fácil (sin que cada persona repita los pasos de arriba), se
-puede subir a la Chrome Web Store como extensión **no listada** (unlisted) o **privada**
-(restringida a la organización de Google Workspace), sin pasar por la revisión pública.
+La publicación en la Chrome Web Store está preparada en `STORE-LISTING.md`.

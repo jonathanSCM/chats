@@ -29,6 +29,31 @@
   const finalizedKeys = new Set();
   const finalizedLines = [];
   let pending = null;
+  let stopped = false; // se detuvo con «Detener y enviar» o al terminar la reunión
+  let warning = null; // aviso visible en el panel lateral (subtítulos que no se activaron, no llegan…)
+  let noCaptionsWarned = false;
+  let timer = null;
+
+  // Estado en vivo para el panel lateral y la ventana separada (el service worker lo guarda).
+  function pushLive() {
+    const lines = [...finalizedLines];
+    if (pending && pending.text) lines.push(`${pending.name}: ${pending.text}`);
+    chrome.runtime
+      .sendMessage({
+        type: "LIVE_STATE",
+        state: {
+          meetingUrl,
+          recording: started && !stopped,
+          stopped,
+          lines: finalizedLines.length,
+          last: lines.slice(-60),
+          warning,
+          micMuted: lastMicMuted === true,
+          hideMeetCaptions: window.ProShopCaptions.isHidden(),
+        },
+      })
+      .catch(() => {});
+  }
 
   function recordIfNew(name, text) {
     const key = `${name}:${text}`;
@@ -51,6 +76,7 @@
   function ensureBadge() {
     if (badgeEl) return badgeEl;
     badgeEl = document.createElement("div");
+    badgeEl.id = "proshop-captions-badge";
     badgeEl.style.cssText =
       "position:fixed;bottom:16px;left:16px;z-index:999999;background:#111827;color:#fff;" +
       "font:12px/1.4 system-ui,sans-serif;padding:8px 12px;border-radius:8px;" +
@@ -105,10 +131,10 @@
   // ── Activa subtítulos y los pone en español, igual que hace el bot
   // (services captions.ts) pero con DOM plano en vez de Playwright.
   async function enableCaptions() {
-    const button = findButtonByName(/subt[ií]tulos|captions/i);
-    if (!button) return false;
-    button.click();
-    await sleep(800);
+    // Revisa si ya estaban activos antes de pulsar (un clic de más los apagaría) y abre el panel de Meet si hace falta.
+    const activos = await window.ProShopCaptions.activate();
+    if (!activos) return false;
+    await sleep(500);
 
     try {
       const combo = document.querySelector('[role="combobox"][aria-label*="idioma de la reunión" i], [role="combobox"][aria-label*="meeting language" i]');
@@ -134,7 +160,7 @@
   // ── Mismo selector que meeting-bot/src/captions.ts, confirmado contra el
   // HTML real de una reunión con subtítulos andando.
   function readCaptionsPanel() {
-    const region = document.querySelector('[role="region"][aria-label="Subtítulos"]');
+    const region = document.querySelector('[role="region"][aria-label="Subtítulos"], [role="region"][aria-label="Captions"]');
     if (!region) return { blocks: [], fallback: "" };
 
     const blockEls = Array.from(region.querySelectorAll(".nMcdL"));
@@ -316,6 +342,21 @@
     });
   }
 
+  // Termina la grabación: manda subtítulos, sube la última parte del audio, vuelve a mostrar la franja de Meet y abre
+  // el panel «¿a qué cliente fue?». Seguro de llamar varias veces.
+  async function stopAndSend(reason) {
+    if (stopped) return;
+    stopped = true;
+    clearInterval(timer);
+    if (pending) recordIfNew(pending.name, pending.text);
+    await sendTranscript(reason);
+    // Sin efecto si nunca se activó el audio en esta reunión.
+    chrome.runtime.sendMessage({ type: "STOP_AUDIO_CAPTURE" });
+    window.ProShopCaptions.setHidden(false);
+    showClassifyPanel();
+    pushLive();
+  }
+
   let lastMicMuted = null;
   function checkMicMuteSync() {
     const muted = isMicMuted();
@@ -327,6 +368,7 @@
   }
 
   async function tick() {
+    if (stopped) return;
     ticks += 1;
     checkMicMuteSync();
     const { blocks, fallback } = readCaptionsPanel();
@@ -338,17 +380,20 @@
       recordIfNew("", fallback);
     }
 
+    // Vigilante: si llegan subtítulos se quita el aviso; si pasan ~90 s grabando sin ninguna línea, se avisa.
+    if (finalizedLines.length > 0 || (pending && pending.text)) {
+      if (warning) warning = null;
+    } else if (ticks >= 45 && !noCaptionsWarned) {
+      noCaptionsWarned = true;
+      warning = "Llevo 1½ minutos sin recibir subtítulos: actívalos en Meet (botón «Subtítulos» o CC) y que alguien hable. El audio sigue grabándose.";
+    }
+    pushLive();
+
     if (ticks % END_CHECK_TICKS === 0) {
       if (meetingLooksOver()) {
         consecutiveEndSignals += 1;
         if (consecutiveEndSignals >= 2) {
-          if (pending) recordIfNew(pending.name, pending.text);
-          void sendTranscript("fin de reunión detectado");
-          // Sin efecto si nunca se activó el audio en esta reunión (el
-          // offscreen document, si existe, revisa que haya algo grabando
-          // antes de hacer nada).
-          chrome.runtime.sendMessage({ type: "STOP_AUDIO_CAPTURE" });
-          showClassifyPanel();
+          void stopAndSend("fin de reunión detectado");
         }
       } else {
         consecutiveEndSignals = 0;
@@ -382,8 +427,14 @@
     started = true;
     ensureBadge();
     await sleep(500); // ya está en la llamada hace rato para cuando se activa a mano
-    await enableCaptions();
-    setInterval(() => void tick(), POLL_MS);
+    const activos = await enableCaptions();
+    if (!activos) {
+      warning = "No se pudieron activar los subtítulos de Meet: actívalos a mano con el botón «Subtítulos» (CC) de la barra de abajo.";
+    }
+    const { hideMeetCaptions } = await chrome.storage.local.get(["hideMeetCaptions"]);
+    window.ProShopCaptions.setHidden(hideMeetCaptions !== false); // por defecto la franja de Meet se esconde: se ven en el panel
+    timer = setInterval(() => void tick(), POLL_MS);
+    pushLive();
   }
 
   // No arranca solo: hay que abrir el ícono de la extensión y tocar "Grabar
@@ -392,7 +443,17 @@
   // leer subtítulos ni activa el badge.
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === "GET_STATUS") {
-      sendResponse({ onMeeting: true, recording: started, lines: finalizedLines.length });
+      sendResponse({ onMeeting: true, recording: started && !stopped, lines: finalizedLines.length });
+      return false;
+    }
+    if (message?.type === "STOP_AND_SEND") {
+      void stopAndSend("detenido a mano").then(() => sendResponse({ ok: true }));
+      return true; // respuesta async
+    }
+    if (message?.type === "SET_HIDE_CAPTIONS") {
+      window.ProShopCaptions.setHidden(Boolean(message.hidden));
+      pushLive();
+      sendResponse({ ok: true });
       return false;
     }
     if (message?.type === "START_RECORDING") {

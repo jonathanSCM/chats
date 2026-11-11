@@ -1,9 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "ProShop CRM - Subtítulos de Meet",
-  "version": "1.6.0",
-  "description": "Lee los subtítulos en vivo de Google Meet (y opcionalmente graba el audio real para whisper.cpp) y los manda al CRM al terminar la reunión, o le avisa al asistente grabador para que entre él solo -- las dos opciones desde el mismo ícono. Se identifica solo con tu sesión del CRM, sin tokens a mano.",
-  "permissions": ["storage", "activeTab", "tabCapture", "offscreen"],
+  "name": "ProShop CRM — Asistente de reuniones de Meet",
+  "short_name": "ProShop Meet",
+  "version": "2.0.0",
+  "minimum_chrome_version": "116",
+  "description": "Graba los subtítulos y el audio de tus reuniones de Google Meet y los guarda en tu CRM, con subtítulos en vivo en un panel.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": ["storage", "activeTab", "tabCapture", "offscreen", "sidePanel"],
   "host_permissions": [
     "https://meet.google.com/*",
     "https://chats.proshop.lat/*"
@@ -14,7 +22,7 @@
   "content_scripts": [
     {
       "matches": ["https://meet.google.com/*"],
-      "js": ["content.js"],
+      "js": ["captions-dom.js", "content.js"],
       "run_at": "document_idle"
     },
     {
@@ -25,6 +33,15 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Subtítulos de Meet — ProShop CRM"
+    "default_title": "ProShop CRM — Asistente de reuniones",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
   }
 }

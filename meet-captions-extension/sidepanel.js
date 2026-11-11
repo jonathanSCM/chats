@@ -14,6 +14,11 @@ const $ = (id) => document.getElementById(id);
 const dot = $("dot");
 const subtitle = $("subtitle");
 const dest = $("dest");
+const consentBox = $("consentBox");
+const consentCheck = $("consentCheck");
+const consentAccept = $("consentAccept");
+const consentLine = $("consentLine");
+const consentReset = $("consentReset");
 const chips = $("chips");
 const notices = $("notices");
 const captions = $("captions");
@@ -51,6 +56,25 @@ const settings = $("settings");
 $("ver").textContent = "ProShop CRM · extensión v" + chrome.runtime.getManifest().version;
 crmLink.href = `${CRM_BASE}/dashboard/reuniones`;
 if (detached) detachBtn.style.display = "none";
+
+// ───────── Consentimiento (aviso dentro de la extensión, antes de pedir nada) ─────────
+// Se muestra la primera vez y cada vez que cambie su texto (sube CONSENT_VERSION). Hasta aceptarlo no se pide el micrófono, ni la
+// sesión, ni se puede grabar.
+const CONSENT_VERSION = 1;
+async function getConsent() {
+  const { consent } = await chrome.storage.local.get(["consent"]);
+  return consent && consent.version >= CONSENT_VERSION ? consent : null;
+}
+consentCheck.addEventListener("change", () => (consentAccept.disabled = !consentCheck.checked));
+consentAccept.addEventListener("click", async () => {
+  await chrome.storage.local.set({ consent: { version: CONSENT_VERSION, at: Date.now() } });
+  consentCheck.checked = false;
+  consentAccept.disabled = true;
+});
+consentReset.addEventListener("click", async () => {
+  if (lastState && lastState.recording) return; // no se puede quitar el aviso en medio de una grabación
+  await chrome.storage.local.remove(["consent"]);
+});
 
 // ───────── Utilidades ─────────
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -446,18 +470,33 @@ function paintHeaderStatus() {
 function hideAllBoxes() {
   recordBox.style.display = "none";
   doneBox.style.display = "none";
+  consentBox.style.display = "none";
 }
 
 async function render() {
   const tab = await resolveTab();
   const auth = await chrome.storage.local.get(["token", "userName"]);
-  renderAccount(auth);
+  const consent = await getConsent();
   hideAllBoxes();
   chips.replaceChildren();
   notices.replaceChildren();
   stopBtn.disabled = true;
   pauseBtn.disabled = true;
   pauseBtn.textContent = "Pausar";
+  consentLine.textContent = consent ? `Aviso de consentimiento aceptado el ${new Date(consent.at).toLocaleDateString("es")}` : "";
+  consentReset.style.display = consent ? "inline" : "none";
+
+  // Sin aceptar el aviso no se muestra nada más: ni sesión, ni micrófono, ni grabar.
+  if (!consent) {
+    accountBox.style.display = "none";
+    consentBox.style.display = "grid";
+    dot.className = "dot";
+    subtitle.textContent = "Antes de empezar";
+    dest.textContent = "";
+    renderCaptions([]);
+    return;
+  }
+  renderAccount(auth);
 
   if (!tab || !tab.url || !MEETING_URL_RE.test(tab.url)) {
     dot.className = "dot";
@@ -700,6 +739,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     void renderDebug();
   }
   // La sesión del CRM la guarda la página del CRM al conectarte: el panel se actualiza solo y, si falta, pide el micrófono.
+  if (area === "local" && changes.consent) void render();
   if (area === "local" && (changes.token || changes.userName)) {
     void render();
     if (changes.token && changes.token.newValue && !micPromptTried) {

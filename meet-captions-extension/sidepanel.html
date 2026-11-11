@@ -113,6 +113,21 @@
       </div>
     </header>
 
+    <!-- Aviso de consentimiento: lo primero que se ve, antes de pedir micrófono, sesión o grabar nada -->
+    <section class="card" id="consentBox" style="display: none">
+      <h2>Antes de empezar</h2>
+      <p class="lead">Esta extensión graba reuniones de Google Meet <strong>solo cuando tú pulsas «Grabar»</strong>. Así funciona:</p>
+      <ul style="margin: 0; padding-left: 18px; display: grid; gap: 4px">
+        <li><strong>Qué graba:</strong> los subtítulos de la reunión (con el nombre de quien habla), el audio de la pestaña (las voces de los demás), tu micrófono <em>solo mientras no estás silenciado</em>, y el enlace y el nombre de la reunión.</li>
+        <li><strong>A dónde va:</strong> a tu organización dentro del CRM ProShop. Para transcribir el audio y resumir la reunión se envía a nuestro proveedor de inteligencia artificial (OpenAI), solo para eso.</li>
+        <li><strong>Qué no hace:</strong> no empieza sola, no lee otras páginas ni tu historial, y no vende ni usa tus datos para publicidad.</li>
+        <li><strong>Control:</strong> puedes pausar o detener cuando quieras, y borrar la reunión (con su audio y transcripción) desde el CRM.</li>
+      </ul>
+      <p class="hint">Más detalle en la <a class="link-a" href="https://chats.proshop.lat/privacy" target="_blank" rel="noopener">política de privacidad</a>.</p>
+      <label class="toggle"><input type="checkbox" id="consentCheck" /> <span>Entiendo que <strong>debo avisar a los participantes</strong> de que voy a grabar y contar con su consentimiento cuando la ley lo exija.</span></label>
+      <button class="accent big" id="consentAccept" disabled>Aceptar y continuar</button>
+    </section>
+
     <!-- Sesión + micrófono en un solo paso -->
     <section class="card" id="accountBox" style="display: none">
       <h2>Conecta la extensión con tu CRM</h2>
@@ -152,6 +167,7 @@
       <p class="hint" id="orgOnly" style="display: none"></p>
       <button class="accent big" id="recordBtn">Grabar esta reunión</button>
       <button id="joinBtn">Unir al asistente (graba y transcribe él solo)</button>
+      <p class="hint">Avisa a los participantes de que vas a grabar.</p>
       <p class="hint" id="recordStatus"></p>
     </section>
 
@@ -172,6 +188,10 @@
           <div class="row" style="align-items: center; justify-content: space-between">
             <span class="hint" id="accountLine"></span>
             <button class="link" id="logoutBtn" style="display: none">Cerrar sesión</button>
+          </div>
+          <div class="row" style="align-items: center; justify-content: space-between">
+            <span class="hint" id="consentLine"></span>
+            <button class="link" id="consentReset">Ver el aviso</button>
           </div>
           <label class="toggle"><input type="checkbox" id="recordMicToggle" checked /> <span>Grabar mi micrófono (se corta al instante cuando te silencias en Meet)</span></label>
           <label class="field">

@@ -49,6 +49,7 @@ Grabar y guardar en el CRM ProShop del usuario los subtítulos y el audio de las
   - *Información de autenticación*: token de sesión del CRM.
 - **No** vende datos, **no** los usa para publicidad ni para decidir créditos, **no** los transfiere salvo para operar la función (CRM y su proveedor de transcripción/IA).
 - **Código remoto**: no usa.
+- **Divulgación y consentimiento dentro de la extensión**: la primera vez, antes de pedir sesión o micrófono, el panel muestra qué se graba, a dónde va (CRM y su proveedor de IA), qué no hace y cómo controlarlo, y exige marcar una casilla («debo avisar a los participantes») para continuar. Se vuelve a mostrar si cambia el texto.
 - Marcar las tres certificaciones de «Uso limitado».
 
 ## Imágenes que hay que subir

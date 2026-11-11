@@ -1,4 +1,4 @@
-# ProShop CRM — Asistente de reuniones de Meet (extensión de Chrome, v2.0.0)
+# ProShop CRM — Asistente de reuniones de Meet (extensión de Chrome, v2.2)
 
 Graba **los subtítulos y el audio** de tus reuniones de Google Meet y los guarda en tu CRM, con un **panel lateral** que
 muestra los subtítulos en vivo (y se puede separar en su propia ventana). Corre en tu navegador, como un participante
@@ -9,9 +9,12 @@ más: no hay bot, nadie tiene que admitirlo.
 1. Abre `chrome://extensions` y activa **Modo de desarrollador** (arriba a la derecha).
 2. **Cargar descomprimida** → elige esta carpeta (`meet-captions-extension`).
 3. Fija el ícono (el rompecabezas de la barra → alfiler).
-4. Abre el ícono → **Conectar con el CRM** (usa tu sesión; no hay que pegar tokens).
-5. Una sola vez, **Activar micrófono** (Chrome pide el permiso en una pestaña).
-6. Entra a una reunión de Meet → ícono → (nombre y organización si quieres) → **Grabar esta reunión**.
+4. Entra a una reunión de Meet y **haz clic en el ícono**: se abre el panel con todo.
+5. Si no has iniciado sesión, el panel muestra **Iniciar sesión con el CRM** (usa tu sesión; no hay que pegar tokens).
+6. (Nombre y organización si quieres) → **Grabar esta reunión**. Chrome pide el permiso del micrófono una sola vez.
+
+Importante: para capturar el **audio**, Chrome exige que abras el panel **con el ícono** de la extensión (no con el botón «PS» de la
+pantalla). Si lo abriste con «PS», el panel te lo avisa: haz clic en el ícono y vuelve a pulsar «Grabar».
 
 Con ese clic se activan a la vez: los subtítulos de Meet (en español), el audio (voces + tu micrófono) y el panel lateral.
 
@@ -51,8 +54,7 @@ Con ese clic se activan a la vez: los subtítulos de Meet (en español), el audi
 | `offscreen.js` | Graba el audio en partes y las sube con reintentos. |
 | `content.js` | Lee los subtítulos de la pestaña de Meet y detecta el fin de la reunión. |
 | `captions-dom.js` | Activa los subtítulos de forma segura y esconde su franja. |
-| `popup.html/js` | Ícono: conexión, organización, nombre y «Grabar». |
-| `sidepanel.html/js` | Panel lateral / ventana separada. |
+| `sidepanel.html/js` | El panel (se abre con el ícono): sesión, organización, nombre, «Grabar», subtítulos en vivo y ajustes. También como ventana separada. |
 | `permissions.html/js` | Concede el micrófono una vez (el popup se cierra al perder el foco). |
 | `authorize-bridge.js` | Guarda tu sesión del CRM al conectarte. |
 

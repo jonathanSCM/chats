@@ -12,6 +12,9 @@ chrome.runtime.onStartup.addListener(setup);
 function setup() {
   // Panel lateral para todas las pestañas: el ícono abre el popup, y desde ahí se abre el panel.
   chrome.sidePanel?.setOptions({ path: "sidepanel.html", enabled: true }).catch(() => {});
+  // El ícono abre el panel directamente: ahí está todo (sesión, organización, grabar). Hacer clic en el ícono también es lo que
+  // le da a la extensión permiso (activeTab) para capturar el audio de esa pestaña.
+  chrome.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
   chrome.storage.session.setAccessLevel?.({ accessLevel: "TRUSTED_CONTEXTS" }).catch(() => {});
 }
 
@@ -180,3 +183,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
   }
 });
+
+setup();

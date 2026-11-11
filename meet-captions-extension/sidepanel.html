@@ -46,6 +46,8 @@
       .dot.rec { background: #ef4444; animation: pulse 1.4s infinite; }
       .dot.pause { background: #f59e0b; }
       @keyframes pulse { 50% { opacity: 0.35; } }
+      .card { margin: 10px 14px 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); display: grid; gap: 8px; }
+      .card .lead { margin: 0; font-size: 13px; }
       .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px 0; }
       .chip { background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12px; }
       .chip.ok { color: var(--ok); }
@@ -68,15 +70,18 @@
         background: var(--bg); color: var(--fg); font: inherit; font-weight: 500; cursor: pointer;
       }
       button.primary { background: var(--danger); border-color: var(--danger); color: #fff; }
+      button.accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+      button.big { padding: 12px 10px; font-size: 14px; font-weight: 600; }
+      button.link { flex: none; border: 0; background: none; color: var(--muted); text-decoration: underline; padding: 0; font-size: 11.5px; }
       button:disabled { opacity: 0.45; cursor: not-allowed; }
+      input[type="text"], select {
+        width: 100%; padding: 8px 9px; border-radius: 8px; border: 1px solid var(--line);
+        background: var(--bg); color: var(--fg); font: inherit;
+      }
+      label.field { display: grid; gap: 4px; color: var(--muted); font-size: 11.5px; }
       details { border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }
       details summary { cursor: pointer; padding: 8px 12px; font-weight: 600; font-size: 12.5px; }
       .settings { padding: 0 12px 12px; display: grid; gap: 10px; }
-      .settings label.field { display: grid; gap: 4px; color: var(--muted); font-size: 11.5px; }
-      select {
-        width: 100%; padding: 7px 8px; border-radius: 8px; border: 1px solid var(--line);
-        background: var(--bg); color: var(--fg); font: inherit;
-      }
       label.toggle { display: flex; align-items: flex-start; gap: 8px; color: var(--fg); font-size: 12px; }
       .meter { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
       .meter > div { height: 100%; width: 0; background: var(--accent); transition: width 0.08s linear; }
@@ -90,6 +95,30 @@
       <div class="sub" id="subtitle">Asistente de reunión</div>
       <div class="sub" id="dest" style="margin-top: 2px; color: var(--fg); font-weight: 500"></div>
     </header>
+
+    <!-- Inicio de sesión: aparece aquí mismo, sin tener que buscar nada en el ícono -->
+    <section class="card" id="accountBox" style="display: none">
+      <p class="lead"><strong>Conecta la extensión con tu CRM</strong> para guardar tus reuniones.</p>
+      <button class="accent big" id="loginBtn">Iniciar sesión con el CRM</button>
+      <p class="hint">Se abre el CRM en otra pestaña; si ya tienes sesión ahí (lo normal), queda conectado solo.</p>
+    </section>
+
+    <!-- Antes de grabar: todo lo necesario para empezar desde este panel -->
+    <section class="card" id="recordBox" style="display: none">
+      <label class="field">
+        Nombre de la reunión (opcional)
+        <input id="titleInput" type="text" maxlength="160" placeholder="Ej.: Demo con Ana - Financiera" />
+      </label>
+      <label class="field" id="orgField" style="display: none">
+        Organización de esta reunión
+        <select id="orgSelect"></select>
+      </label>
+      <p class="hint" id="orgOnly" style="display: none"></p>
+      <button class="accent big" id="recordBtn">Grabar esta reunión</button>
+      <button id="joinBtn">Unir al asistente (graba y transcribe él solo)</button>
+      <p class="hint" id="recordStatus"></p>
+    </section>
+
     <div class="chips" id="chips"></div>
     <div id="notices"></div>
     <main>
@@ -104,6 +133,10 @@
       <details id="settings">
         <summary>Ajustes</summary>
         <div class="settings">
+          <div class="row" style="align-items: center; justify-content: space-between">
+            <span class="hint" id="accountLine"></span>
+            <button class="link" id="logoutBtn" style="display: none">Cerrar sesión</button>
+          </div>
           <label class="field">
             Micrófono
             <select id="micSelect"></select>

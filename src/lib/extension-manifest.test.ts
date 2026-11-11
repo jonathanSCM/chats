@@ -15,13 +15,19 @@ describe("manifest de la extensión de Chrome", () => {
   it("todos los archivos que nombra existen", () => {
     const files: string[] = [
       manifest.background.service_worker,
-      manifest.action.default_popup,
       manifest.side_panel.default_path,
       ...Object.values<string>(manifest.icons),
       ...Object.values<string>(manifest.action.default_icon),
       ...manifest.content_scripts.flatMap((c: { js: string[] }) => c.js),
     ];
     for (const file of files) expect(exists(file), `falta ${file}`).toBe(true);
+  });
+
+  it("el ícono abre directamente el panel (sin popup): ahí están la sesión, la organización y el botón de grabar", () => {
+    expect(manifest.action.default_popup).toBeUndefined();
+    expect(exists("popup.html")).toBe(false);
+    expect(manifest.side_panel.default_path).toBe("sidepanel.html");
+    expect(readFileSync(path.join(dir, "background.js"), "utf8")).toContain("openPanelOnActionClick: true");
   });
 
   it("captions-dom.js se carga antes que content.js (content.js lo usa)", () => {

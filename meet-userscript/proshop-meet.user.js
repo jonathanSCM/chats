@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ProShop CRM — Subtítulos de Meet
 // @namespace    https://chats.proshop.lat
-// @version      1.5.0
+// @version      1.6.0
 // @description  Lee los subtítulos de Google Meet (y los saca a una ventana flotante) y los manda al CRM, o avisa al asistente para que entre solo. Se conecta con tu sesión del CRM (sin pegar tokens). Graba también el audio (voces de la reunión + tu micrófono, solo cuando no estás silenciado) y el CRM lo transcribe con Whisper.
 // @match        https://meet.google.com/*
 // @match        https://chats.proshop.lat/dashboard/extension-authorize*
@@ -169,7 +169,7 @@
     const log = (...a) => console.log(TAG, ...a);
     const W = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
 
-    let pip = null, out = null, cap = null, mo = null, raf = 0, vacioDesde = 0;
+    let pip = null, out = null, aviso = null, cap = null, mo = null, raf = 0, vacioDesde = 0;
     let yoActiveLosSubs = false;
     const touched = new Set();
 
@@ -231,8 +231,18 @@
 
     const hayTextoDeSubs = () => !!document.querySelector('div[jsname="tgaKEf"]');
 
-    // Devuelve true si los subtítulos quedaron (o ya estaban) activos.
-    async function activarSubs() {
+    // Devuelve true si los subtítulos quedaron (o ya estaban) activos. Un solo intento a la vez: si la grabación y la
+    // ventana lo piden juntas, comparten el mismo intento (un segundo clic los apagaría).
+    let activando = null;
+    function activarSubs() {
+      if (!activando) {
+        activando = activarSubsUnico().finally(() => {
+          activando = null;
+        });
+      }
+      return activando;
+    }
+    async function activarSubsUnico() {
       if (hayTextoDeSubs()) return true;
       const tb0 = botonBarraCC();
       if (tb0 && tb0.getAttribute("aria-pressed") === "true") {
@@ -482,6 +492,14 @@
       const lines = t.split("\n").map(norm).filter((l) => l && !ICONO_LINEA.test(l)).slice(-8);
       out.textContent = lines.length ? lines.join("\n") : "Esperando subtítulos…";
       out.style.opacity = lines.length ? "1" : ".5";
+      if (lines.length) setAviso(null); // ya llegan subtítulos: el aviso deja de valer
+    }
+
+    // Mensaje rojo arriba de los subtítulos en la ventana flotante (null lo quita).
+    function setAviso(text) {
+      if (!aviso) return;
+      aviso.textContent = text || "";
+      aviso.style.display = text ? "block" : "none";
     }
 
     function startObserver() {
@@ -553,6 +571,7 @@
       mo = null;
       pip = null;
       out = null;
+      aviso = null;
       cap = null;
       vacioDesde = 0;
       restore();
@@ -560,10 +579,12 @@
       if (st) st.remove();
     }
 
-    async function open() {
+    // silent: no avisa con un cuadro si el navegador no la soporta (se usa al abrirla sola junto con «Grabar»).
+    async function open(opts) {
+      const silent = Boolean(opts && opts.silent);
       if (pip) return true;
       if (!("documentPictureInPicture" in W)) {
-        alert("Este Chrome no soporta la ventana flotante (Document Picture-in-Picture, hace falta Chrome 116 o más).");
+        if (!silent) alert("Este Chrome no soporta la ventana flotante (Document Picture-in-Picture, hace falta Chrome 116 o más).");
         return false;
       }
       // El CSS va primero para que, al aparecer la franja, ya esté neutralizada.
@@ -591,7 +612,9 @@
       out.style.cssText = "white-space:pre-wrap;transition:opacity .15s";
       out.textContent = "Activando subtítulos…";
       out.style.opacity = ".5";
-      caja.append(out);
+      aviso = pip.document.createElement("div");
+      aviso.style.cssText = "display:none;margin-bottom:8px;padding:6px 10px;border-radius:6px;background:#b71c1c;font:600 13px/1.4 system-ui,sans-serif;";
+      caja.append(aviso, out);
       pip.document.body.append(caja);
 
       pip.addEventListener("pagehide", () => {
@@ -604,7 +627,8 @@
 
       startObserver();
       ctx.onChange();
-      await activarSubs();
+      const activos = await activarSubs();
+      if (!activos) setAviso("No pude activar los subtítulos de Meet. Actívalos a mano: botón «Subtítulos» (CC) en la barra de abajo de Meet.");
       for (let i = 0; i < 20 && pip && !cap; i++) {
         const c = buscar();
         if (c) bind(c);
@@ -645,7 +669,7 @@
       if (pip && cap) reclamar();
     });
 
-    return { open, close, toggle, isOpen: () => Boolean(pip), activarSubs };
+    return { open, close, toggle, isOpen: () => Boolean(pip), activarSubs, setAviso };
   }
 
   const popout = createPopout({
@@ -859,6 +883,11 @@
   function tick() {
     if (!session || !session.started) return;
     session.ticks += 1;
+    if (session.ticks === 45 && session.lines.length === 0 && !session.pending && !session.noCaptionsWarned) {
+      session.noCaptionsWarned = true;
+      popout.setAviso("Llevo 1½ minutos sin recibir subtítulos: activa los subtítulos en Meet (botón «Subtítulos» o CC) y que alguien hable.");
+      if (panelRefresh) panelRefresh("Sin subtítulos todavía: activa los subtítulos en Meet (botón CC). El audio sigue grabándose.");
+    }
     const { blocks, fallback } = readCaptionsPanel();
     if (blocks.length > 0) {
       for (let i = 0; i < blocks.length - 1; i++) recordIfNew(blocks[i].name, blocks[i].text);
@@ -888,7 +917,12 @@
     session.title = getTitle();
     ensureBadge();
     await sleep(500);
-    await enableCaptions();
+    const activos = await enableCaptions();
+    if (!activos) {
+      const aviso = "No se pudo activar los subtítulos de Meet: actívalos a mano con el botón «Subtítulos» (CC) de la barra de abajo.";
+      popout.setAviso(aviso);
+      if (panelRefresh) panelRefresh(aviso);
+    }
     session.timer = setInterval(tick, POLL_MS);
   }
 
@@ -1012,11 +1046,17 @@
     loadOrganizations();
 
     recordBtn.addEventListener("click", () => {
-      // El audio va primero y sin await antes: Chrome solo deja compartir la pestaña si viene directo del clic.
+      // Todo sale de este clic: audio, subtítulos y ventana flotante. Cada uno pide el gesto del usuario, así que se piden
+      // sin esperar nada antes (primero el audio, que es lo más importante). Si alguno falla, los otros siguen.
       const audioResult = startAudio();
+      const popResult = popout.open({ silent: true }).catch(() => false);
       void startRecording();
-      refresh("Subtítulos activados.");
+      refresh("Grabando subtítulos y audio…");
       audioResult.then((message) => message && refresh(message));
+      popResult.then((ok) => {
+        if (ok || popout.isOpen()) refresh();
+        else refresh("Grabando. La ventana de subtítulos no se abrió: pulsa «Subtítulos en ventana».");
+      });
     });
     popBtn.addEventListener("click", () => {
       popout.toggle().then(() => refresh());

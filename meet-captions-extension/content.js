@@ -71,6 +71,10 @@
   let noCaptionsWarned = false;
   let timer = null;
 
+  function dbg(text) {
+    chrome.runtime.sendMessage({ type: "DEBUG", text: "[página] " + text }).catch(() => {});
+  }
+
   // Estado en vivo para el panel lateral y la ventana separada (el service worker lo guarda).
   function pushLive() {
     const lines = [...finalizedLines];
@@ -476,12 +480,15 @@
     started = true;
     ensureBadge();
     await sleep(500); // ya está en la llamada hace rato para cuando se activa a mano
+    dbg("grabación iniciada: activando subtítulos…");
     const activos = await enableCaptions();
+    dbg(`subtítulos ${activos ? "activos" : "NO se pudieron activar"}`);
     if (!activos) {
       warning = "No se pudieron activar los subtítulos de Meet: actívalos a mano con el botón «Subtítulos» (CC) de la barra de abajo.";
     }
     const { hideMeetCaptions } = await chrome.storage.local.get(["hideMeetCaptions"]);
     window.ProShopCaptions.setHidden(hideMeetCaptions !== false); // por defecto la franja de Meet se esconde: se ven en el panel
+    for (const ms of [1500, 5000]) setTimeout(() => dbg("pantalla de Meet: " + window.ProShopCaptions.describe()), ms);
     timer = setInterval(() => void tick(), POLL_MS);
     pushLive();
   }

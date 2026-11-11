@@ -67,6 +67,17 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   autoOpened.delete(tabId);
 });
 
+// Registro de diagnóstico (últimos 80 eventos) que el panel muestra y permite copiar: sirve para ver por qué algo no arrancó.
+function debug(text) {
+  writeQueue = writeQueue
+    .then(async () => {
+      const { debug: current = [] } = await chrome.storage.session.get("debug");
+      current.push({ t: new Date().toLocaleTimeString("es"), text: String(text).slice(0, 400) });
+      await chrome.storage.session.set({ debug: current.slice(-80) });
+    })
+    .catch(() => {});
+}
+
 // Opción «abrir la ventana sola al entrar a una reunión» (se activa desde el ícono). Se abre una vez por pestaña y sin
 // quitarle el foco a Meet.
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
@@ -100,9 +111,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "START_AUDIO_CAPTURE": {
       (async () => {
         try {
+          debug(`[audio] pedido recibido (pestaña ${message.tabId})`);
           await patchState(message.tabId, { audio: { active: false, starting: true } });
           const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: message.tabId });
+          debug("[audio] Chrome dio permiso para capturar la pestaña");
           await ensureOffscreenDocument();
+          debug("[audio] página de grabación lista");
           const started = await chrome.runtime.sendMessage({
             type: "OFFSCREEN_START",
             streamId,
@@ -111,6 +125,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             organizationId: message.organizationId || null,
             title: message.title || null,
           });
+          debug(`[audio] la grabación respondió: ${started?.ok === false ? "error: " + started.error : started?.ok ? "ok" : "sin respuesta"}`);
           if (started?.ok === false) {
             await patchState(message.tabId, { audio: { active: false, lastError: started.error } });
             sendResponse({ ok: false, error: started.error });
@@ -119,6 +134,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ ok: true });
         } catch (error) {
           console.error("[proshop-captions] No se pudo iniciar la captura de audio:", error);
+          debug(`[audio] ERROR al iniciar: ${error && error.message ? error.message : error}`);
           await patchState(message.tabId, { audio: { active: false, lastError: String(error) } });
           sendResponse({ ok: false, error: String(error) });
         }
@@ -131,6 +147,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
     case "SET_MIC_ENABLED":
       chrome.runtime.sendMessage({ type: "OFFSCREEN_SET_MIC_ENABLED", enabled: message.enabled }).catch(() => {});
+      return false;
+    case "DEBUG":
+      debug(message.text);
       return false;
     case "LIVE_STATE":
       void patchState(sender.tab?.id, message.state);

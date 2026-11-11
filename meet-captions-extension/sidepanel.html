@@ -121,6 +121,11 @@
           <label class="toggle"><input type="checkbox" id="hideToggle" checked /> <span>Ocultar los subtítulos de la pantalla de Meet</span></label>
           <label class="toggle"><input type="checkbox" id="autoOpenToggle" /> <span>Abrir esta ventana sola al entrar a una reunión</span></label>
           <p class="hint">El micrófono y el idioma se aplican en la próxima reunión; el micrófono también cambia en vivo si ya estás grabando.</p>
+          <details>
+            <summary>Diagnóstico</summary>
+            <textarea id="debugBox" readonly rows="8" style="width: 100%; margin-top: 6px; font: 11px/1.4 ui-monospace, Consolas, monospace; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 6px"></textarea>
+            <button id="copyDebug" style="margin-top: 6px">Copiar diagnóstico</button>
+          </details>
         </div>
       </details>
       <div class="ver" id="ver"></div>

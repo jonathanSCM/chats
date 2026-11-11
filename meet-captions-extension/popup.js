@@ -182,8 +182,6 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
         // Audio real (se transcribe en el CRM), además de los subtítulos -- best
         // effort: si tabCapture falla por lo que sea, los subtítulos de
         // arriba siguen andando igual, no se cae toda la grabación por esto.
-        // Abre el panel lateral (necesita el gesto de este clic). Cierra este popup, pero los mensajes de grabación salen en este mismo instante.
-        if (chrome.sidePanel && chrome.sidePanel.open) chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
         chrome.runtime.sendMessage({ type: "START_AUDIO_CAPTURE", tabId: tab.id, meetingUrl, organizationId, title }, (response) => {
           if (chrome.runtime.lastError || !response?.ok) {
             meetingStatus.textContent += " Audio: no se pudo activar (sigue grabando solo subtítulos).";
@@ -191,6 +189,13 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
           }
           meetingStatus.textContent += " Audio activado.";
         });
+
+        // Abre el panel lateral (necesita el gesto de este clic). Cierra este popup, pero los mensajes de grabación salen en este mismo instante.
+        try {
+          if (chrome.sidePanel && chrome.sidePanel.open) chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
+        } catch {
+          /* si Chrome no deja abrirlo, se sigue grabando igual */
+        }
       });
     }
 

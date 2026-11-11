@@ -36,6 +36,8 @@ Con ese clic se activan a la vez: los subtítulos de Meet (en español), el audi
   solo («quiere usar tu micrófono»), sin tener que buscar ningún botón. El audio de la reunión empieza a grabarse igual
   mientras tanto, y tu voz se suma apenas la permites.
 - La franja vacía de subtítulos de Meet se esconde aunque nadie esté hablando todavía.
+- **Diagnóstico** (Ajustes del panel): registro de lo que hizo la extensión (audio, subtítulos, pantalla de Meet) con un botón
+  para copiarlo; sirve para ver por qué algo no arrancó.
 - Funciona al entrar a una reunión desde la pantalla de inicio de Meet, sin recargar la pestaña.
 - Al terminar (o al detener) pregunta **¿a qué cliente fue esta reunión?** para vincularla a una ficha de Seguimiento.
 - Es **prueba de fallos**: si falla el audio siguen los subtítulos, y al revés.

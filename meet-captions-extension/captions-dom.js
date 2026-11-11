@@ -289,15 +289,23 @@
     'button[aria-label*="Salir de la llamada" i],button[aria-label*="Leave call" i],[role="region"][aria-label*="ontroles" i],[role="region"][aria-label*="ontrols" i]';
   function panelVacio() {
     for (const w of document.querySelectorAll('[data-side="3"]')) {
-      if (w.querySelector(CONTROLES) || w.closest("[data-ps-hide]")) continue;
+      if (w.querySelector(CONTROLES)) continue;
+      if (w.querySelector(".a4cQT")) return w; // contenedor de subtítulos de Meet: aunque mida poco por fuera, reserva el hueco
       const r = w.getBoundingClientRect();
       if (r.height >= 40 && r.top > window.innerHeight * 0.45) return w;
     }
     return null;
   }
+  // Meet reserva el hueco según un hijo de alto fijo (el contenedor de subtítulos, ~216 px), no según el panel de afuera:
+  // plegar solo el panel no basta. Se pliegan el panel y todo lo que contiene (el texto sigue en el DOM, a 0 de alto).
   function collapsePanel(w) {
     touched.add(w);
     w.dataset.psHide = "collapse";
+    for (const d of w.querySelectorAll("*")) {
+      if (d.dataset.psHide) continue;
+      touched.add(d);
+      d.dataset.psHide = "collapse";
+    }
     reclamar();
     for (const ms of [300, 900, 2000]) setTimeout(reclamar, ms);
   }
@@ -322,6 +330,7 @@
           return;
         }
         if (!cap.dataset.psHide) (capIsPanel ? collapsePanel : collapse)(cap);
+        else if (capIsPanel && cap.querySelector(":not([data-ps-hide])")) collapsePanel(cap); // algo nuevo apareció dentro
         else if (Date.now() - ultimoReclamo > 1200) reclamar(); // Meet re-maqueta a menudo
       });
     });
@@ -356,5 +365,23 @@
     if (hidden && cap) reclamar();
   });
 
-  self.ProShopCaptions = { activate, setHidden, isHidden: () => hidden, sleep };
+  // Foto de lo que ve la extensión en la pantalla de Meet (para el diagnóstico del panel).
+  function describe() {
+    const main = document.querySelector("main");
+    const panels = [...document.querySelectorAll('[data-side="3"]')].map((w) => {
+      const r = w.getBoundingClientRect();
+      return `${w.getAttribute("data-priority") || "?"}:${Math.round(r.top)}+${Math.round(r.height)}${w.querySelector(CONTROLES) ? "(barra)" : ""}${w.dataset.psHide ? "[plegado]" : ""}`;
+    });
+    return JSON.stringify({
+      oculto: hidden,
+      enganchado: cap ? (capIsPanel ? "panel" : "texto") : "nada",
+      tgaKEf: !!document.querySelector('div[jsname="tgaKEf"]'),
+      a4cQT: document.querySelectorAll(".a4cQT").length,
+      paneles: panels,
+      mainAbajo: main ? Math.round(window.innerHeight - main.getBoundingClientRect().bottom) : null,
+      mainBottomCss: main ? main.style.bottom || main.style.inset || null : null,
+    });
+  }
+
+  self.ProShopCaptions = { activate, setHidden, isHidden: () => hidden, sleep, describe };
 })();

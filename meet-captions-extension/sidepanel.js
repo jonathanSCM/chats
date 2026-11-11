@@ -347,8 +347,25 @@ settings.addEventListener("toggle", () => (settings.open ? void startMeter() : s
 window.addEventListener("pagehide", stopMeter);
 
 // ───────── Arranque ─────────
+const debugBox = $("debugBox");
+async function renderDebug() {
+  const { debug = [], ...rest } = await chrome.storage.session.get("debug");
+  const state = tabId != null ? (await chrome.storage.session.get("live:" + tabId))["live:" + tabId] : null;
+  const head = `extensión v${chrome.runtime.getManifest().version} · pestaña ${tabId}\nestado: ${JSON.stringify(state ? { ...state, last: undefined } : null)}\n---\n`;
+  debugBox.value = head + debug.map((d) => `${d.t} ${d.text}`).join("\n");
+  void rest;
+}
+$("copyDebug").addEventListener("click", async () => {
+  await navigator.clipboard.writeText(debugBox.value);
+  $("copyDebug").textContent = "¡Copiado!";
+  setTimeout(() => ($("copyDebug").textContent = "Copiar diagnóstico"), 1800);
+});
+
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "session") void render();
+  if (area === "session") {
+    void render();
+    void renderDebug();
+  }
 });
 if (!detached) {
   chrome.tabs.onActivated.addListener(() => void render());
@@ -357,4 +374,4 @@ if (!detached) {
   });
 }
 void loadSettings();
-void render();
+void render().then(renderDebug);

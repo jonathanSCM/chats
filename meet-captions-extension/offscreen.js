@@ -22,6 +22,10 @@ let micAttempt = 0; // cada intento de abrir el micrófono; los viejos que llegu
 let session = null; // { tabId, meetingUrl, organizationId, title }
 let stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, micState: "pending", paused: false, micLabel: null, lastError: null };
 
+function dbg(text) {
+  chrome.runtime.sendMessage({ type: "DEBUG", text: "[grabador] " + text }).catch(() => {});
+}
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function publish() {
@@ -66,6 +70,7 @@ async function startRecording({ streamId, tabId, meetingUrl, organizationId, tit
     if (session && session.tabId === tabId) return; // ya está grabando esta pestaña
     throw new Error("Ya hay una grabación de audio en otra pestaña.");
   }
+  dbg(`inicio pedido (pestaña ${tabId})`);
   session = { tabId, meetingUrl, organizationId: organizationId || null, title: title || null };
   paused = false;
   stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, micState: "pending", paused: false, micLabel: null, lastError: null };
@@ -76,6 +81,7 @@ async function startRecording({ streamId, tabId, meetingUrl, organizationId, tit
     });
   } catch (error) {
     session = null;
+    dbg("ERROR capturando la pestaña: " + (error && error.message ? error.message : error));
     throw new Error("No se pudo capturar el audio de la pestaña: " + (error && error.message ? error.message : error));
   }
 
@@ -91,6 +97,7 @@ async function startRecording({ streamId, tabId, meetingUrl, organizationId, tit
   active = true;
   startSegment();
   publish();
+  dbg("grabando el audio de la pestaña");
   void startMic();
 }
 
@@ -102,6 +109,7 @@ async function startMic() {
     /* sin acceso al almacenamiento: micrófono predeterminado */
   }
   await connectMic(deviceId);
+  dbg(`micrófono: ${stats.micState}${stats.micLabel ? " (" + stats.micLabel + ")" : ""}`);
   publish();
 }
 
@@ -253,6 +261,7 @@ async function uploadPart(blob, part) {
       });
       if (res.status === 401) throw Object.assign(new Error("Sesión del CRM vencida: vuelve a conectarte."), { fatal: true });
       if (res.ok) {
+        dbg(`parte ${part} subida`);
         stats.uploaded += 1;
         stats.lastError = null;
         publish();
@@ -265,6 +274,7 @@ async function uploadPart(blob, part) {
       await sleep(4000 * attempt);
     }
   }
+  dbg(`parte ${part} NO se pudo subir: ${lastError && lastError.message ? lastError.message : lastError}`);
   stats.failed += 1;
   stats.lastError = lastError && lastError.message ? lastError.message : "No se pudo subir una parte del audio.";
   console.error(`[proshop-captions] No se pudo subir la parte ${part}:`, lastError);

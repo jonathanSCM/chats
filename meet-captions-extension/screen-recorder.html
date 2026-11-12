@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ProShop CRM — Grabar pantalla</title>
+    <style>
+      :root { --bg:#fff; --bg2:#f4f6f8; --fg:#111b21; --muted:#667781; --line:#e4e8ea; --accent:#00a884; --accent-fg:#fff; --danger:#c62828; --ok:#059669; }
+      @media (prefers-color-scheme: dark) { :root { --bg:#111b21; --bg2:#1a252c; --fg:#e9edef; --muted:#8696a0; --line:#26343c; } }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 13.5px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      h1 { margin: 0 0 2px; font-size: 16px; }
+      p { margin: 0 0 10px; }
+      .muted { color: var(--muted); font-size: 12px; }
+      .card { display: grid; gap: 8px; padding: 12px; margin: 12px 0; background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; }
+      .step { font-weight: 600; }
+      label.opt { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+      button { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; font-weight: 600; cursor: pointer; }
+      button.accent { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+      button.stop { background: var(--danger); border-color: var(--danger); color: #fff; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .where { word-break: break-all; font-size: 12.5px; }
+      .clock { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .rec { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 50%; background: var(--danger); animation: blink 1.2s infinite; }
+      @keyframes blink { 50% { opacity: 0.25; } }
+      .err { color: var(--danger); }
+      .ok { color: var(--ok); font-weight: 600; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <h1>Grabar pantalla</h1>
+    <p class="muted">El video se guarda en <b>tu computador</b>, en la carpeta que elijas. No se sube al CRM.</p>
+
+    <div id="setup">
+      <div class="card">
+        <div class="step">1. Qué grabar</div>
+        <label class="opt"><input type="checkbox" id="optSys" checked /> Audio de la pantalla o pestaña (lo que suena)</label>
+        <label class="opt"><input type="checkbox" id="optMic" /> Mi micrófono</label>
+      </div>
+      <div class="card">
+        <div class="step">2. Dónde guardarlo</div>
+        <button id="pickBtn">Elegir carpeta y nombre del archivo</button>
+        <div class="where muted" id="where">Sin elegir: al terminar se descargará en tu carpeta de Descargas.</div>
+      </div>
+      <div class="card">
+        <div class="step">3. Empezar</div>
+        <button class="accent" id="startBtn">Elegir pantalla y empezar a grabar</button>
+        <div class="muted">Chrome te pedirá elegir una pestaña, una ventana o toda la pantalla. Avisa a los participantes de que vas a grabar.</div>
+      </div>
+    </div>
+
+    <div id="live" hidden>
+      <div class="card">
+        <div><span class="rec"></span><span id="state">Grabando</span></div>
+        <div class="clock" id="clock">00:00</div>
+        <div class="muted" id="size">0 MB</div>
+        <div class="where muted" id="whereLive"></div>
+        <button class="stop" id="stopBtn">Detener y guardar</button>
+        <div class="muted">Puedes dejar esta ventana abierta en segundo plano. Si pulsas «Dejar de compartir» en la barra de Chrome, también se guarda.</div>
+      </div>
+    </div>
+
+    <div id="done" hidden>
+      <div class="card">
+        <div class="ok" id="doneText">Grabación guardada.</div>
+        <div class="where muted" id="doneWhere"></div>
+        <button class="accent" id="againBtn">Grabar otra</button>
+      </div>
+    </div>
+
+    <p class="err" id="err" hidden></p>
+    <script src="screen-recorder.js"></script>
+  </body>
+</html>

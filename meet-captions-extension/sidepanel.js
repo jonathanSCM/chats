@@ -546,6 +546,8 @@ pauseBtn.addEventListener("click", async () => {
   void render();
 });
 
+$("screenBtn").addEventListener("click", () => chrome.runtime.sendMessage({ type: "OPEN_SCREEN_RECORDER" }));
+
 stopBtn.addEventListener("click", async () => {
   if (tabId == null) return;
   stopBtn.disabled = true;

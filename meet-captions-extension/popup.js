@@ -21,8 +21,16 @@ function toMeetUrl(input) {
   return m ? `https://meet.google.com/${m[1]}-${m[2]}-${m[3]}` : null;
 }
 
+function bindScreen(id) {
+  $(id).onclick = () => {
+    chrome.runtime.sendMessage({ type: "OPEN_SCREEN_RECORDER" });
+    window.close();
+  };
+}
+
 function showMenu() {
   $("vMenu").hidden = false;
+  bindScreen("bScreen");
   $("bNew").onclick = () => open("https://meet.new");
   $("bOpen").onclick = () => open("https://meet.google.com/");
   const join = () => {
@@ -45,6 +53,7 @@ function showMenu() {
 function showRoom(tabId) {
   $("vRoom").hidden = false;
   $("sub").textContent = "En una reunión";
+  bindScreen("bScreen2");
   // sidePanel.open pide un clic de la persona: va directo, sin await antes.
   $("bPanel").onclick = () => {
     chrome.sidePanel

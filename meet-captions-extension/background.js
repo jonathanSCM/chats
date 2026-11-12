@@ -125,6 +125,18 @@ chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
   });
 });
 
+// Grabadora de pantalla (el video se guarda en el computador): una sola ventana; si ya está abierta, se trae al frente.
+async function openScreenRecorder() {
+  const url = chrome.runtime.getURL("screen-recorder.html");
+  const [existing] = await chrome.tabs.query({ url }).catch(() => []);
+  if (existing) {
+    await chrome.tabs.update(existing.id, { active: true }).catch(() => {});
+    if (existing.windowId != null) await chrome.windows.update(existing.windowId, { focused: true }).catch(() => {});
+    return;
+  }
+  await chrome.windows.create({ url, type: "popup", width: 480, height: 640 }).catch(() => chrome.tabs.create({ url }));
+}
+
 async function ensureOffscreenDocument() {
   const existing = await chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] });
   if (existing.length > 0) return;
@@ -243,6 +255,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
     case "GET_TAB_ID":
       sendResponse({ tabId: sender.tab?.id ?? null });
+      return false;
+    case "OPEN_SCREEN_RECORDER":
+      void openScreenRecorder();
       return false;
     case "OPEN_DETACHED":
       void openDetached(message.tabId);

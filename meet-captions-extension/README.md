@@ -29,9 +29,11 @@ Con ese clic se activan a la vez: los subtítulos de Meet (en español), el audi
 - **Audio**: voces de la reunión + tu micrófono, **solo mientras no estás silenciado en Meet**. Se corta en partes de
   10 minutos que se suben solas (con reintentos), así que una pestaña cerrada solo cuesta la parte en curso. El CRM lo
   transcribe con Whisper y lo suma a la reunión.
+- **Grabar pantalla**: botón en el panel y en el ícono. Graba la pantalla, una ventana o una pestaña (con el audio de lo que suena y,
+  si quieres, tu micrófono) y la guarda **en tu computador**, en la carpeta que elijas; no se sube al CRM.
 - **Panel lateral**: subtítulos en vivo, estado del audio y del micrófono, avisos de error, **Pausar / Reanudar**
   (en pausa no se guarda ni audio ni subtítulos, y lo dicho durante la pausa no aparece al reanudar), **Detener y
-  enviar** y **Separar en ventana**.
+  enviar** .
 - **Ajustes** (en el panel): elegir **qué micrófono** se graba (con barra de nivel para comprobarlo; cambia en vivo si ya
   grabas, y si el elegido se desconecta usa el predeterminado), idioma de los subtítulos, esconder la franja de Meet y abrir
   la ventana sola al entrar a una reunión.

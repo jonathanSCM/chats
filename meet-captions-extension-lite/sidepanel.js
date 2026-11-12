@@ -1,0 +1,535 @@
+// Panel del asistente (lateral y ventana separada). Aquí está TODO: iniciar sesión, elegir organización y nombre, grabar,
+// ver los subtítulos en vivo, pausar, detener y enviar, vincular la reunión a un cliente y los ajustes. Se abre con el ícono
+// de la extensión. Lee el estado en vivo que guarda background.js (chrome.storage.session); los ajustes van en storage.local.
+const MEETING_URL_RE = /^https:\/\/meet\.google\.com\/(?:meet\/)?([a-z]{3}-[a-z]{4}-[a-z]{3})/i;
+const CRM_BASE = "https://chats.proshop.lat";
+const params = new URLSearchParams(location.search);
+const detached = params.get("detached") === "1";
+let tabId = params.get("tab") ? Number(params.get("tab")) : null;
+let meetingUrl = null;
+let lastState = null;
+
+const $ = (id) => document.getElementById(id);
+const dot = $("dot");
+const subtitle = $("subtitle");
+const dest = $("dest");
+const consentBox = $("consentBox");
+const consentCheck = $("consentCheck");
+const consentAccept = $("consentAccept");
+const consentLine = $("consentLine");
+const consentReset = $("consentReset");
+const chips = $("chips");
+const notices = $("notices");
+const captions = $("captions");
+const stopBtn = $("stopBtn");
+const pauseBtn = $("pauseBtn");
+const detachBtn = $("detachBtn");
+const accountBox = $("accountBox");
+const loginBtn = $("loginBtn");
+const logoutBtn = $("logoutBtn");
+const accountLine = $("accountLine");
+const recordBox = $("recordBox");
+const titleInput = $("titleInput");
+const orgField = $("orgField");
+const orgSelect = $("orgSelect");
+const orgOnly = $("orgOnly");
+const recordBtn = $("recordBtn");
+const recordStatus = $("recordStatus");
+const doneBox = $("doneBox");
+const doneSummary = $("doneSummary");
+const crmLink = $("crmLink");
+const hideToggle = $("hideToggle");
+const autoOpenToggle = $("autoOpenToggle");
+const langSelect = $("langSelect");
+const settings = $("settings");
+$("ver").textContent = "ProShop CRM · extensión v" + chrome.runtime.getManifest().version;
+crmLink.href = `${CRM_BASE}/dashboard/reuniones`;
+if (detached) detachBtn.style.display = "none";
+
+// ───────── Consentimiento (aviso dentro de la extensión, antes de pedir nada) ─────────
+// Se muestra la primera vez y cada vez que cambie su texto (sube CONSENT_VERSION). Hasta aceptarlo no se pide el micrófono, ni la
+// sesión, ni se puede grabar.
+const CONSENT_VERSION = 1;
+async function getConsent() {
+  const { consent } = await chrome.storage.local.get(["consent"]);
+  return consent && consent.version >= CONSENT_VERSION ? consent : null;
+}
+consentCheck.addEventListener("change", () => (consentAccept.disabled = !consentCheck.checked));
+consentAccept.addEventListener("click", async () => {
+  await chrome.storage.local.set({ consent: { version: CONSENT_VERSION, at: Date.now() } });
+  consentCheck.checked = false;
+  consentAccept.disabled = true;
+});
+consentReset.addEventListener("click", async () => {
+  if (lastState && lastState.recording) return; // no se puede quitar el aviso en medio de una grabación
+  await chrome.storage.local.remove(["consent"]);
+});
+
+// ───────── Utilidades ─────────
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const clock = (ms) => {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return (h ? `${h}:${String(m).padStart(2, "0")}` : String(m)) + `:${String(s).padStart(2, "0")}`;
+};
+
+function chip(text, kind) {
+  const el = document.createElement("span");
+  el.className = "chip" + (kind ? " " + kind : "");
+  el.textContent = text;
+  return el;
+}
+function notice(text, kind, buttonLabel, onClick) {
+  const el = document.createElement("div");
+  el.className = "notice " + kind;
+  el.textContent = text;
+  if (buttonLabel) {
+    const button = document.createElement("button");
+    button.textContent = buttonLabel;
+    button.addEventListener("click", onClick);
+    el.append(document.createElement("br"), button);
+  }
+  return el;
+}
+async function apiBase() {
+  const { apiBase: stored } = await chrome.storage.local.get(["apiBase"]);
+  return (stored || CRM_BASE).replace(/\/$/, "");
+}
+
+// ───────── A qué organización va la reunión ─────────
+async function renderDest(state, future) {
+  const s = await chrome.storage.local.get(["orgList", "activeOrganizationId", "token"]);
+  let list = s.orgList;
+  let active = s.activeOrganizationId;
+  if (!list && s.token) {
+    try {
+      const res = await fetch(`${await apiBase()}/api/extension/me`, { headers: { Authorization: `Bearer ${s.token}` } });
+      if (res.ok) {
+        const me = await res.json();
+        list = (me.organizations || []).map((o) => ({ id: o.id, name: o.name }));
+        active = me.activeOrganizationId;
+        await chrome.storage.local.set({ orgList: list, activeOrganizationId: active });
+      }
+    } catch {
+      /* sin conexión: no se muestra el nombre */
+    }
+  }
+  const id = (state && state.organizationId) || active;
+  const org = list && list.find((o) => o.id === id);
+  const title = state && state.title ? " · " + state.title : "";
+  dest.textContent = org ? `${future ? "Se enviará a" : "Se envía a"}: ${org.name}${title}` : title ? "Reunión" + title : "";
+}
+
+// ───────── Cuenta ─────────
+function renderAccount(auth) {
+  accountBox.style.display = auth.token ? "none" : "grid";
+  accountLine.textContent = auth.token ? "Conectado" + (auth.userName ? " como " + auth.userName : "") : "Sin conectar";
+  logoutBtn.style.display = auth.token ? "inline" : "none";
+}
+
+loginBtn.addEventListener("click", () => {
+  chrome.tabs.create({ url: `${CRM_BASE}/dashboard/extension-authorize` });
+});
+logoutBtn.addEventListener("click", async () => {
+  await chrome.storage.local.remove(["token", "userName", "orgList", "activeOrganizationId"]);
+  orgSelect.dataset.loaded = "";
+  void render();
+});
+
+// ───────── Organización y nombre (antes de grabar) ─────────
+async function loadOrgs(token) {
+  if (orgSelect.dataset.loaded === token) return;
+  try {
+    const s = await chrome.storage.local.get(["orgId"]);
+    const res = await fetch(`${await apiBase()}/api/extension/me`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return;
+    const me = await res.json();
+    const orgs = me.organizations || [];
+    await chrome.storage.local.set({ orgList: orgs.map((o) => ({ id: o.id, name: o.name })), activeOrganizationId: me.activeOrganizationId });
+    orgSelect.replaceChildren(
+      ...orgs.map((o) => {
+        const option = document.createElement("option");
+        option.value = o.id;
+        option.textContent = o.name;
+        return option;
+      }),
+    );
+    const selected = orgs.some((o) => o.id === s.orgId) ? s.orgId : me.activeOrganizationId;
+    orgSelect.value = selected;
+    await chrome.storage.local.set({ orgId: selected });
+    orgField.style.display = orgs.length > 1 ? "grid" : "none";
+    orgOnly.style.display = orgs.length === 1 ? "block" : "none";
+    if (orgs.length === 1) orgOnly.textContent = `Organización: ${orgs[0].name}`;
+    orgSelect.dataset.loaded = token;
+  } catch {
+    /* sin conexión: se usa la organización recordada / la activa del CRM */
+  }
+}
+orgSelect.addEventListener("change", () => chrome.storage.local.set({ orgId: orgSelect.value }));
+
+async function showRecordBox(token, { fresh } = {}) {
+  recordBox.style.display = "grid";
+  const key = meetingUrl + (fresh ? "|" + fresh : "");
+  if (recordBox.dataset.key !== key) {
+    // Reunión distinta (o una grabación nueva): se recupera lo escrito para ESA reunión y se vuelve a habilitar el botón.
+    recordBox.dataset.key = key;
+    const draftKey = `titleDraft:${meetingUrl}`;
+    titleInput.value = fresh ? "" : (await chrome.storage.local.get([draftKey]))[draftKey] || "";
+    if (fresh) chrome.storage.local.remove(draftKey);
+    recordBtn.disabled = false;
+    recordBtn.textContent = fresh ? "Grabar otra reunión" : "Grabar esta reunión";
+    recordStatus.textContent = "";
+  }
+  await loadOrgs(token);
+}
+titleInput.addEventListener("input", () => meetingUrl && chrome.storage.local.set({ [`titleDraft:${meetingUrl}`]: titleInput.value }));
+const currentTitle = () => titleInput.value.replace(/\s+/g, " ").trim() || null;
+const currentOrg = () => (orgField.style.display === "none" ? null : orgSelect.value);
+
+// Grabar: subtítulos (pestaña de Meet) + audio (coordinador). Cada vez es una grabación nueva con su propio id: la del cliente
+// y la del equipo en la misma sala quedan como reuniones separadas. Si el audio no arranca, los subtítulos siguen igual.
+recordBtn.addEventListener("click", async () => {
+  if (tabId == null || !meetingUrl) return;
+  recordBtn.disabled = true;
+  setTimeout(() => (recordBtn.disabled = false), 8000); // si algo falló, se puede volver a intentar
+  recordStatus.textContent = "Iniciando…";
+  const organizationId = currentOrg();
+  const title = currentTitle();
+  const recordingId = crypto.randomUUID();
+  chrome.tabs
+    .sendMessage(tabId, { type: "START_RECORDING", organizationId, title, recordingId, audioOff: true })
+    .then((response) => {
+      if (response && response.ok === false) recordStatus.textContent = response.error || "No se pudo empezar a grabar.";
+    })
+    .catch(() => {
+      recordStatus.textContent = "No se pudo conectar con la reunión: recarga la pestaña de Meet e inténtalo de nuevo.";
+    });
+});
+
+function showDoneBox(state) {
+  doneBox.style.display = "grid";
+  const parts = [];
+  if (state.startedAt && state.endedAt) parts.push(`Duración ${clock(state.endedAt - state.startedAt)}`);
+  parts.push(`${state.lines || 0} líneas de subtítulos`);
+  doneSummary.textContent = parts.join(" · ") + (state.title ? ` · ${state.title}` : "");
+}
+
+// ───────── Pantalla ─────────
+async function resolveTab() {
+  if (tabId != null) {
+    try {
+      return await chrome.tabs.get(tabId);
+    } catch {
+      return null;
+    }
+  }
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  return tab || null;
+}
+
+function renderCaptions(lines) {
+  const nearBottom = captions.scrollHeight - captions.scrollTop - captions.clientHeight < 60;
+  captions.replaceChildren();
+  if (!lines || lines.length === 0) {
+    const p = document.createElement("p");
+    p.className = "empty";
+    p.textContent = "Los subtítulos aparecen aquí cuando alguien hable.";
+    captions.append(p);
+    return;
+  }
+  for (const line of lines) {
+    const p = document.createElement("p");
+    const i = line.indexOf(": ");
+    if (i > 0 && i < 40) {
+      const who = document.createElement("span");
+      who.className = "who";
+      who.textContent = line.slice(0, i) + ":";
+      p.append(who, document.createTextNode(line.slice(i + 2)));
+    } else {
+      p.textContent = line;
+    }
+    captions.append(p);
+  }
+  if (nearBottom) captions.scrollTop = captions.scrollHeight;
+}
+
+// Cronómetro de la grabación en curso (se actualiza solo cada segundo, sin redibujar todo).
+let clockTimer = null;
+function paintHeaderStatus() {
+  const s = lastState;
+  if (!s || !s.recording || !s.startedAt) return;
+  subtitle.textContent = "";
+  const label = document.createTextNode(s.paused ? "Grabación en pausa · " : "Grabando · ");
+  const time = document.createElement("span");
+  time.id = "clock";
+  time.textContent = clock(Date.now() - s.startedAt);
+  subtitle.append(label, time);
+}
+
+function hideAllBoxes() {
+  recordBox.style.display = "none";
+  doneBox.style.display = "none";
+  consentBox.style.display = "none";
+}
+
+async function render() {
+  const tab = await resolveTab();
+  const auth = await chrome.storage.local.get(["token", "userName"]);
+  const consent = await getConsent();
+  hideAllBoxes();
+  chips.replaceChildren();
+  notices.replaceChildren();
+  stopBtn.disabled = true;
+  pauseBtn.disabled = true;
+  pauseBtn.textContent = "Pausar";
+  consentLine.textContent = consent ? `Aviso de consentimiento aceptado el ${new Date(consent.at).toLocaleDateString("es")}` : "";
+  consentReset.style.display = consent ? "inline" : "none";
+
+  // Sin aceptar el aviso no se muestra nada más: ni sesión, ni micrófono, ni grabar.
+  if (!consent) {
+    accountBox.style.display = "none";
+    consentBox.style.display = "grid";
+    dot.className = "dot";
+    subtitle.textContent = "Antes de empezar";
+    dest.textContent = "";
+    renderCaptions([]);
+    return;
+  }
+  renderAccount(auth);
+
+  if (!tab || !tab.url || !MEETING_URL_RE.test(tab.url)) {
+    dot.className = "dot";
+    subtitle.textContent = "Asistente de reuniones";
+    dest.textContent = "";
+    if (auth.token) notices.append(notice("Abre una reunión de Google Meet para grabarla.", "info"));
+    renderCaptions([]);
+    return;
+  }
+  tabId = tab.id;
+  meetingUrl = `https://meet.google.com/${tab.url.match(MEETING_URL_RE)[1].toLowerCase()}`;
+  const key = "live:" + tab.id;
+  const stored = await chrome.storage.session.get(key);
+  const state = stored[key];
+  lastState = state || null;
+  const recording = Boolean(state && state.recording);
+  const stopped = Boolean(state && state.stopped && !state.recording);
+  await renderDest(state, !recording && !stopped);
+
+  if (!auth.token) {
+    dot.className = "dot";
+    subtitle.textContent = "Reunión detectada";
+    renderCaptions([]);
+    return;
+  }
+
+  // Sin grabar, o ya terminada: se puede empezar una grabación (nueva) desde aquí mismo.
+  if (!recording) {
+    dot.className = "dot" + (stopped ? " done" : "");
+    subtitle.textContent = stopped ? "Grabación terminada" : "Reunión detectada";
+    if (stopped) showDoneBox(state);
+    void showRecordBox(auth.token, { fresh: stopped ? state.recordingId : null });
+    renderCaptions(stopped ? state.last : []);
+    return;
+  }
+
+  const paused = Boolean(state.paused);
+  dot.className = "dot" + (paused ? " pause" : " rec");
+  paintHeaderStatus();
+  stopBtn.disabled = false;
+  pauseBtn.disabled = false;
+  pauseBtn.textContent = paused ? "Reanudar" : "Pausar";
+
+  if (paused) chips.append(chip("En pausa: no se guarda nada", "warn"));
+  chips.append(chip(`Subtítulos: ${state.lines || 0} líneas`, state.lines ? "ok" : ""));
+  if (state.warning) notices.append(notice(state.warning, "warn"));
+  hideToggle.checked = state.hideMeetCaptions !== false;
+  renderCaptions(state.last);
+}
+
+// ───────── Botones ─────────
+pauseBtn.addEventListener("click", async () => {
+  if (tabId == null || !lastState) return;
+  const pausing = !lastState.paused;
+  pauseBtn.disabled = true;
+  try {
+    await chrome.tabs.sendMessage(tabId, { type: pausing ? "PAUSE_RECORDING" : "RESUME_RECORDING" });
+  } catch {
+    /* la pestaña ya no está */
+  }
+  void render();
+});
+
+stopBtn.addEventListener("click", async () => {
+  if (tabId == null) return;
+  stopBtn.disabled = true;
+  stopBtn.textContent = "Enviando…";
+  try {
+    await chrome.tabs.sendMessage(tabId, { type: "STOP_AND_SEND" });
+  } catch {
+    /* la pestaña ya no está: nada que enviar desde aquí */
+  }
+  stopBtn.textContent = "Detener y enviar";
+  void render();
+});
+
+detachBtn.addEventListener("click", () => {
+  if (tabId == null) return;
+  chrome.runtime.sendMessage({ type: "OPEN_DETACHED", tabId });
+  window.close(); // el panel lateral se cierra; la ventana nueva sigue mostrando lo mismo
+});
+
+// ───────── Ajustes ─────────
+async function loadSettings() {
+  const s = await chrome.storage.local.get(["hideMeetCaptions", "autoOpenWindow", "captionLang"]);
+  hideToggle.checked = s.hideMeetCaptions !== false;
+  autoOpenToggle.checked = Boolean(s.autoOpenWindow);
+  langSelect.value = s.captionLang || "es";
+}
+
+hideToggle.addEventListener("change", async () => {
+  await chrome.storage.local.set({ hideMeetCaptions: hideToggle.checked });
+  if (tabId != null) {
+    try {
+      await chrome.tabs.sendMessage(tabId, { type: "SET_HIDE_CAPTIONS", hidden: hideToggle.checked });
+    } catch {
+      /* sin grabación activa en esa pestaña: queda guardado para la próxima */
+    }
+  }
+});
+autoOpenToggle.addEventListener("change", () => chrome.storage.local.set({ autoOpenWindow: autoOpenToggle.checked }));
+langSelect.addEventListener("change", () => chrome.storage.local.set({ captionLang: langSelect.value }));
+
+// ───────── Diagnóstico ─────────
+const debugBox = $("debugBox");
+async function renderDebug() {
+  const { debug = [] } = await chrome.storage.session.get("debug");
+  const state = tabId != null ? (await chrome.storage.session.get("live:" + tabId))["live:" + tabId] : null;
+  const head = `extensión v${chrome.runtime.getManifest().version} · pestaña ${tabId}\nestado: ${JSON.stringify(state ? { ...state, last: undefined } : null)}\n---\n`;
+  debugBox.value = head + debug.map((d) => `${d.t} ${d.text}`).join("\n");
+}
+$("copyDebug").addEventListener("click", async () => {
+  await navigator.clipboard.writeText(debugBox.value);
+  $("copyDebug").textContent = "¡Copiado!";
+  setTimeout(() => ($("copyDebug").textContent = "Copiar diagnóstico"), 1800);
+});
+
+// ───────── Arranque ─────────
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "session") {
+    void render();
+    void renderDebug();
+  }
+  // La sesión del CRM la guarda la página del CRM al conectarte: el panel se actualiza solo.
+  if (area === "local" && changes.consent) void render();
+  if (area === "local" && (changes.token || changes.userName)) void render();
+});
+if (!detached) {
+  chrome.tabs.onActivated.addListener(() => void render());
+  chrome.tabs.onUpdated.addListener((_id, info) => {
+    if (info.url || info.status === "complete") void render();
+  });
+}
+clockTimer = setInterval(paintHeaderStatus, 1000);
+void clockTimer;
+// ───────── Recuperar una grabación que quedó sin cerrar ─────────
+// Mientras se graba, la página de Meet guarda cada ~30 s una copia local («rec:<id>») y se borra al enviarse bien. Si queda una
+// (se cerró el navegador, falló la red al detener…), aquí se ofrece mandarla al CRM. Se considera «sin cerrar» si lleva más de 5
+// minutos sin actualizarse (las que están grabando ahora se actualizan cada 30 s) o si ya se detuvo pero el envío falló.
+const RECOVER_STALE_MS = 5 * 60 * 1000;
+const RECOVER_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+let recoverKey = null;
+async function checkRecover() {
+  try {
+    const all = await chrome.storage.local.get(null);
+    const now = Date.now();
+    const old = [];
+    let found = null;
+    for (const [key, rec] of Object.entries(all)) {
+      if (!key.startsWith("rec:") || !rec) continue;
+      if (now - (rec.updatedAt || 0) > RECOVER_MAX_AGE_MS) {
+        old.push(key);
+        continue;
+      }
+      const live = lastState && lastState.recording && lastState.recordingId === rec.recordingId;
+      if (live) continue;
+      if (rec.closed || now - (rec.updatedAt || 0) > RECOVER_STALE_MS) {
+        if (!found || (rec.updatedAt || 0) > (found.rec.updatedAt || 0)) found = { key, rec };
+      }
+    }
+    if (old.length) await chrome.storage.local.remove(old);
+    const box = $("recoverBox");
+    if (!found) {
+      recoverKey = null;
+      box.style.display = "none";
+      return;
+    }
+    recoverKey = found.key;
+    const rec = found.rec;
+    const pendingLines = (rec.lines || []).length - (rec.sentCount || 0);
+    const when = new Date(rec.updatedAt || now).toLocaleString("es", { dateStyle: "short", timeStyle: "short" });
+    $("recoverText").textContent = `Quedó una grabación sin cerrar${rec.title ? ` («${rec.title}»)` : ""} del ${when}: ${rec.lines.length} líneas de subtítulos, ${Math.max(0, pendingLines)} sin enviar. ¿La mando al CRM?`;
+    $("recoverStatus").textContent = "";
+    box.style.display = "block";
+  } catch {
+    /* sin acceso al almacenamiento: no se ofrece nada */
+  }
+}
+async function recoverSend() {
+  if (!recoverKey) return;
+  const status = $("recoverStatus");
+  const btn = $("recoverSend");
+  btn.disabled = true;
+  try {
+    const rec = (await chrome.storage.local.get(recoverKey))[recoverKey];
+    if (!rec) return;
+    const { token, orgId } = await chrome.storage.local.get(["token", "orgId"]);
+    if (!token) {
+      status.textContent = "Inicia sesión para enviarla.";
+      return;
+    }
+    const all = (rec.lines || []).join("\n");
+    if (all.trim().length < 40) {
+      await chrome.storage.local.remove(recoverKey);
+      await checkRecover();
+      return;
+    }
+    status.textContent = "Enviando…";
+    const org = rec.organizationId || orgId || null;
+    const res = await fetch(`${await apiBase()}/api/extension/transcript`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        meetingUrl: rec.meetingUrl,
+        transcript: (rec.lines || []).slice(rec.sentCount || 0).join("\n"),
+        recordingId: rec.recordingId,
+        final: true,
+        ...(org ? { organizationId: org } : {}),
+        ...(rec.title ? { title: rec.title } : {}),
+      }),
+    });
+    if (!res.ok) throw new Error(`El CRM respondió ${res.status}.`);
+    await chrome.storage.local.remove(recoverKey);
+    status.textContent = "✓ Enviada al CRM.";
+    setTimeout(checkRecover, 1500);
+  } catch (error) {
+    status.textContent = "No se pudo enviar: " + (error && error.message ? error.message : error);
+  } finally {
+    btn.disabled = false;
+  }
+}
+$("recoverSend").addEventListener("click", () => void recoverSend());
+$("recoverDiscard").addEventListener("click", async () => {
+  if (recoverKey) await chrome.storage.local.remove(recoverKey);
+  await checkRecover();
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && Object.keys(changes).some((k) => k.startsWith("rec:"))) void checkRecover();
+});
+void checkRecover();
+setInterval(checkRecover, 60 * 1000);
+
+
+void loadSettings();
+void render().then(renderDebug);

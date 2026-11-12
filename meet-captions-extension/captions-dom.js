@@ -68,18 +68,31 @@
   }
 
   const hayTextoDeSubs = () => !!document.querySelector('div[jsname="tgaKEf"]');
+  // ¿Los subtítulos de Meet están encendidos? El texto (tgaKEf) solo existe mientras alguien habla, así que también se mira la
+  // región «Subtítulos» que Meet pone al encenderlos y el estado (aria-pressed) del botón CC de la barra.
+  function subsEncendidos() {
+    if (hayTextoDeSubs()) return true;
+    for (const r of document.querySelectorAll('[role="region"][aria-label]')) {
+      if (/^\s*(subt[ií]tulos|captions)\s*$/i.test(r.getAttribute("aria-label") || "")) return true;
+    }
+    const b = botonBarraCC();
+    return Boolean(b && b.getAttribute("aria-pressed") === "true");
+  }
 
   // Solo se apagan al terminar los subtítulos que encendió la extensión: si ya estaban puestos antes, se dejan como estaban.
   let encendimos = false;
 
   async function activarUnico() {
-    if (hayTextoDeSubs()) return true;
-    const tb0 = botonBarraCC();
-    if (tb0 && tb0.getAttribute("aria-pressed") === "true") return true;
+    if (subsEncendidos()) return true;
 
     let abierto = false;
     for (let i = 0; i < 28; i++) {
       // ~7 s
+      if (abierto && subsEncendidos()) {
+        // El botón CC de la barra encendió los subtítulos directamente (sin menú).
+        encendimos = true;
+        return true;
+      }
       const act = buscarBtn(RE_ACTIVAR);
       if (act) {
         log("pulso:", textoBtn(act));
@@ -104,15 +117,22 @@
       }
       await sleep(250);
     }
-    if (abierto) {
-      escape();
-      return false;
+    if (abierto) escape();
+    if (subsEncendidos()) {
+      encendimos = true;
+      return true;
     }
-    // Último recurso: la tecla C de Meet.
-    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "c", code: "KeyC", keyCode: 67, bubbles: true }));
-    await sleep(800);
-    if (hayTextoDeSubs()) encendimos = true;
-    return hayTextoDeSubs();
+    // Último recurso: el atajo de teclado de Meet (C, o Mayús+C), probando cada uno y mirando si se encendieron.
+    for (const mayus of [false, true]) {
+      const init = { key: mayus ? "C" : "c", code: "KeyC", keyCode: 67, which: 67, shiftKey: mayus, bubbles: true, cancelable: true };
+      for (const t of [document.activeElement, document.body]) if (t) t.dispatchEvent(new KeyboardEvent("keydown", init));
+      await sleep(800);
+      if (subsEncendidos()) {
+        encendimos = true;
+        return true;
+      }
+    }
+    return false;
   }
 
   // Apaga los subtítulos de Meet (solo si los encendió la extensión). Misma ruta que al encenderlos, a la inversa.
@@ -120,7 +140,7 @@
     if (!encendimos) return false;
     if (activando) await activando.catch(() => {});
     encendimos = false;
-    if (!hayTextoDeSubs()) return false;
+    if (!subsEncendidos()) return false;
     let abierto = false;
     for (let i = 0; i < 16; i++) {
       // ~4 s
@@ -132,6 +152,7 @@
         escape();
         return true;
       }
+      if (abierto && !subsEncendidos()) return true; // el botón CC los apagó directamente
       if (!abierto) {
         const t = botonBarraCC();
         if (t) {

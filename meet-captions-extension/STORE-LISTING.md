@@ -7,7 +7,7 @@ Todo lo que pide el panel de desarrollador, listo para copiar. Cuenta de desarro
 - **Nombre**: ProShop CRM — Asistente de reuniones de Meet
 - **Categoría**: Productividad
 - **Idioma**: Español
-- **Resumen corto (máx. 132)**: Graba los subtítulos y el audio de tus reuniones de Google Meet y los guarda en tu CRM, con subtítulos en vivo en un panel.
+- **Resumen corto (máx. 132)**: Guarda en tu CRM los subtítulos de tus reuniones de Google Meet (y, si quieres, el audio), con subtítulos en vivo en un panel.
 - **URL de la política de privacidad**: https://chats.proshop.lat/privacy (ya incluye la sección de la extensión)
 - **Sitio web / soporte**: https://chats.proshop.lat — proshop.soporte@gmail.com
 
@@ -17,7 +17,7 @@ Convierte tus reuniones de Google Meet en información útil para tu CRM, sin bo
 
 Pulsa «Grabar esta reunión» y la extensión, desde tu propio navegador:
 • Guarda los subtítulos de la reunión con el nombre de quien habla.
-• Graba el audio (las voces de los demás y tu micrófono, solo cuando no estás silenciado) y lo transcribe.
+• Opcionalmente graba el audio (las voces de los demás y tu micrófono, solo cuando no estás silenciado) y lo transcribe. Con el interruptor «Grabar audio» apagado en Ajustes, guarda solo los subtítulos y no pide micrófono ni captura de pestaña.
 • Te muestra los subtítulos en vivo en un panel lateral, que puedes separar en su propia ventana.
 • Va guardando los subtítulos en tu CRM mientras grabas, y si algo se corta (por ejemplo, se cierra el navegador) te ofrece recuperar lo que faltó.
 • Al terminar, la reunión queda en tu CRM ProShop con su transcripción y resumen.
@@ -28,7 +28,7 @@ Requiere una cuenta de CRM ProShop. Nunca empieza a grabar sola: solo cuando tú
 
 ## Propósito único
 
-Grabar y guardar en el CRM ProShop del usuario los subtítulos y el audio de las reuniones de Google Meet que el usuario decide grabar.
+Guardar en el CRM ProShop del usuario los subtítulos (y, de forma opcional, el audio) de las reuniones de Google Meet que el usuario decide grabar.
 
 ## Justificación de permisos
 

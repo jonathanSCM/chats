@@ -1,0 +1,77 @@
+{
+  "manifest_version": 3,
+  "name": "ProShop CRM — Subtítulos de Meet",
+  "short_name": "ProShop Subtítulos",
+  "version": "1.0.0",
+  "minimum_chrome_version": "116",
+  "description": "Guarda en tu CRM los subtítulos de tus reuniones de Google Meet, con subtítulos en vivo en un panel. No graba audio ni usa el micrófono.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "https://meet.google.com/*",
+    "https://chats.proshop.lat/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://meet.google.com/*"
+      ],
+      "js": [
+        "captions-dom.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://chats.proshop.lat/dashboard/extension-authorize*"
+      ],
+      "js": [
+        "authorize-bridge.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "ProShop CRM — Subtítulos de Meet",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_popup": "popup.html"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/icon48.png"
+      ],
+      "matches": [
+        "https://meet.google.com/*"
+      ]
+    }
+  ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+P"
+      },
+      "description": "Abrir el panel de subtítulos de ProShop CRM"
+    }
+  }
+}

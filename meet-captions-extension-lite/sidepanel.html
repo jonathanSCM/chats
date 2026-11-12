@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ProShop CRM — Subtítulos de Meet</title>
+    <style>
+      :root {
+        --bg: #ffffff;
+        --bg2: #f8fafc;
+        --fg: #111b21;
+        --muted: #667781;
+        --line: #e2e8f0;
+        --accent: #00a884;
+        --accent-fg: #ffffff;
+        --danger: #c62828;
+        --danger-bg: #fdecea;
+        --ok: #059669;
+        --warn-bg: #fff7e6;
+        --warn: #8a5a00;
+        --shadow: 0 1px 2px rgba(17, 27, 33, 0.06);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #111b21;
+          --bg2: #1a252c;
+          --fg: #e9edef;
+          --muted: #8696a0;
+          --line: #26343c;
+          --danger-bg: #3a1c1c;
+          --warn-bg: #3a2f14;
+          --warn: #f2c66d;
+          --shadow: none;
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: flex;
+        flex-direction: column;
+        background: var(--bg);
+        color: var(--fg);
+        font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+      header img { width: 34px; height: 34px; border-radius: 9px; flex: none; }
+      header .meta { min-width: 0; flex: 1; }
+      header h1 { margin: 0; font-size: 14px; font-weight: 650; display: flex; align-items: center; }
+      header .sub { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 6px; flex: none; }
+      .dot.rec { background: #ef4444; animation: pulse 1.4s infinite; }
+      .dot.pause { background: #f59e0b; }
+      .dot.done { background: var(--ok); }
+      @keyframes pulse { 50% { opacity: 0.35; } }
+      #clock { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--fg); }
+      .card { margin: 10px 14px 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg2); display: grid; gap: 8px; box-shadow: var(--shadow); }
+      .card .lead { margin: 0; font-size: 13px; }
+      .card h2 { margin: 0; font-size: 13px; font-weight: 650; }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px 0; }
+      .chip { background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12px; }
+      .chip.ok { color: var(--ok); }
+      .chip.bad { color: var(--danger); }
+      .chip.warn { color: var(--warn); }
+      .notice { margin: 10px 14px 0; padding: 8px 10px; border-radius: 10px; font-size: 12.5px; }
+      .notice.error { background: var(--danger-bg); color: var(--danger); }
+      .notice.warn { background: var(--warn-bg); color: var(--warn); }
+      .notice.info { background: var(--bg2); color: var(--muted); }
+      .notice button { margin-top: 8px; padding: 7px 10px; background: var(--accent); border-color: var(--accent); color: var(--accent-fg); width: 100%; }
+      main { flex: 1; min-height: 120px; display: flex; flex-direction: column; padding: 10px 14px; }
+      #captions { flex: 1; min-height: 0; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--bg2); }
+      #captions p { margin: 0 0 8px; font-size: 14px; line-height: 1.5; }
+      #captions .who { font-weight: 600; margin-right: 4px; }
+      #captions .empty { color: var(--muted); font-size: 12.5px; }
+      footer { padding: 10px 14px 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+      .row { display: flex; gap: 8px; }
+      button {
+        flex: 1; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line);
+        background: var(--bg); color: var(--fg); font: inherit; font-weight: 550; cursor: pointer;
+      }
+      button:hover:not(:disabled) { border-color: var(--muted); }
+      button.primary { background: var(--danger); border-color: var(--danger); color: #fff; }
+      button.accent { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+      button.big { padding: 12px 10px; font-size: 14px; font-weight: 650; }
+      button.link { flex: none; border: 0; background: none; color: var(--muted); text-decoration: underline; padding: 0; font-size: 11.5px; font-weight: 400; }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      input[type="text"], select {
+        width: 100%; padding: 8px 9px; border-radius: 10px; border: 1px solid var(--line);
+        background: var(--bg); color: var(--fg); font: inherit;
+      }
+      input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+      label.field { display: grid; gap: 4px; color: var(--muted); font-size: 11.5px; }
+      details { border: 1px solid var(--line); border-radius: 12px; background: var(--bg2); }
+      details summary { cursor: pointer; padding: 8px 12px; font-weight: 650; font-size: 12.5px; }
+      .settings { padding: 0 12px 12px; display: grid; gap: 10px; }
+      label.toggle { display: flex; align-items: flex-start; gap: 8px; color: var(--fg); font-size: 12px; }
+      .meter { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+      .meter > div { height: 100%; width: 0; background: var(--accent); transition: width 0.08s linear; }
+      .hint { color: var(--muted); font-size: 11.5px; margin: 0; }
+      .ver { color: var(--muted); font-size: 11px; text-align: center; }
+      .link-a { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 12.5px; }
+      .link-a:hover { text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="icons/icon128.png" alt="" />
+      <div class="meta">
+        <h1><span class="dot" id="dot"></span><span id="title">ProShop CRM</span></h1>
+        <div class="sub" id="subtitle">Subtítulos de Meet</div>
+        <div class="sub" id="dest" style="color: var(--fg); font-weight: 500"></div>
+      </div>
+    </header>
+    <div class="notice warn" id="recoverBox" style="display: none">
+      <span id="recoverText"></span>
+      <button id="recoverSend">Enviar al CRM</button>
+      <button id="recoverDiscard" class="link" style="margin-top: 4px">Descartar</button>
+      <p class="hint" id="recoverStatus" style="margin: 6px 0 0"></p>
+    </div>
+
+    <!-- Aviso de consentimiento: lo primero que se ve, antes de pedir micrófono, sesión o grabar nada -->
+    <section class="card" id="consentBox" style="display: none">
+      <h2>Antes de empezar</h2>
+      <p class="lead">Esta extensión guarda los subtítulos de reuniones de Google Meet <strong>solo cuando tú pulsas «Grabar»</strong>. Así funciona:</p>
+      <ul style="margin: 0; padding-left: 18px; display: grid; gap: 4px">
+        <li><strong>Qué graba:</strong> solo los <em>subtítulos</em> de la reunión (con el nombre de quien habla) y el enlace y el nombre de la reunión. <strong>No graba audio ni usa tu micrófono.</strong></li>
+        <li><strong>A dónde va:</strong> a tu organización dentro del CRM ProShop, donde se guarda la transcripción y se puede resumir la reunión.</li>
+        <li><strong>Qué no hace:</strong> no empieza sola, no lee otras páginas ni tu historial, y no vende ni usa tus datos para publicidad.</li>
+        <li><strong>Control:</strong> puedes pausar o detener cuando quieras, y borrar la reunión (con su transcripción) desde el CRM.</li>
+      </ul>
+      <p class="hint">Más detalle en la <a class="link-a" href="https://chats.proshop.lat/privacy" target="_blank" rel="noopener">política de privacidad</a>.</p>
+      <label class="toggle"><input type="checkbox" id="consentCheck" /> <span>Entiendo que <strong>debo avisar a los participantes</strong> de que voy a grabar y contar con su consentimiento cuando la ley lo exija.</span></label>
+      <button class="accent big" id="consentAccept" disabled>Aceptar y continuar</button>
+    </section>
+
+    <!-- Sesión + micrófono en un solo paso -->
+    <section class="card" id="accountBox" style="display: none">
+      <h2>Conecta la extensión con tu CRM</h2>
+      <p class="lead">Se abre el CRM para iniciar sesión (si ya la tienes abierta, queda conectado solo).</p>
+      <button class="accent big" id="loginBtn">Iniciar sesión</button>
+    </section>
+
+    <!-- Reunión terminada: resumen y volver a grabar -->
+    <section class="card" id="doneBox" style="display: none">
+      <h2>✓ Grabación enviada al CRM</h2>
+      <p class="hint" id="doneSummary"></p>
+      <a class="link-a" id="crmLink" href="#" target="_blank" rel="noopener">Ver las reuniones en el CRM</a>
+    </section>
+
+    <!-- Antes de grabar -->
+    <section class="card" id="recordBox" style="display: none">
+      <label class="field">
+        Nombre de la reunión (opcional)
+        <input id="titleInput" type="text" maxlength="160" placeholder="Ej.: Demo con Ana - Financiera" />
+      </label>
+      <label class="field" id="orgField" style="display: none">
+        Organización de esta reunión
+        <select id="orgSelect"></select>
+      </label>
+      <p class="hint" id="orgOnly" style="display: none"></p>
+      <button class="accent big" id="recordBtn">Grabar esta reunión</button>
+      <p class="hint">Avisa a los participantes de que vas a guardar los subtítulos. Activa los subtítulos en Meet si no se activan solos.</p>
+      <p class="hint" id="recordStatus"></p>
+    </section>
+
+    <div class="chips" id="chips"></div>
+    <div id="notices"></div>
+    <main>
+      <div id="captions"><p class="empty">Los subtítulos aparecen aquí.</p></div>
+    </main>
+    <footer>
+      <div class="row">
+        <button id="pauseBtn" disabled>Pausar</button>
+        <button class="primary" id="stopBtn" disabled>Detener y enviar</button>
+      </div>
+      <button id="detachBtn">Separar en ventana</button>
+      <details id="settings">
+        <summary>Ajustes</summary>
+        <div class="settings">
+          <div class="row" style="align-items: center; justify-content: space-between">
+            <span class="hint" id="accountLine"></span>
+            <button class="link" id="logoutBtn" style="display: none">Cerrar sesión</button>
+          </div>
+          <div class="row" style="align-items: center; justify-content: space-between">
+            <span class="hint" id="consentLine"></span>
+            <button class="link" id="consentReset">Ver el aviso</button>
+          </div>
+          <label class="field">
+            Idioma de los subtítulos
+            <select id="langSelect">
+              <option value="es">Español</option>
+              <option value="en">Inglés</option>
+              <option value="none">No cambiar (el que tenga Meet)</option>
+            </select>
+          </label>
+          <label class="toggle"><input type="checkbox" id="hideToggle" checked /> <span>Ocultar los subtítulos de la pantalla de Meet</span></label>
+          <label class="toggle"><input type="checkbox" id="autoOpenToggle" /> <span>Abrir esta ventana sola al entrar a una reunión</span></label>
+          <p class="hint">El idioma se aplica en la próxima grabación. Atajo para abrir el panel: Alt+Shift+P.</p>
+          <details>
+            <summary>Diagnóstico</summary>
+            <textarea id="debugBox" readonly rows="8" style="width: 100%; margin-top: 6px; font: 11px/1.4 ui-monospace, Consolas, monospace; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 6px"></textarea>
+            <button id="copyDebug" style="margin-top: 6px">Copiar diagnóstico</button>
+          </details>
+        </div>
+      </details>
+      <div class="ver" id="ver"></div>
+    </footer>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

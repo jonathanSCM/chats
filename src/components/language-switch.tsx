@@ -1,7 +1,6 @@
 "use client";
 
 import { useTransition } from "react";
-import { Languages } from "lucide-react";
 import { setLocaleAction } from "@/server/actions/locale";
 import { useLocale } from "@/lib/i18n/client";
 import type { Locale } from "@/lib/i18n";
@@ -43,24 +42,5 @@ export function LanguageSwitch() {
         </button>
       ))}
     </div>
-  );
-}
-
-/** Botón del menú lateral: muestra el idioma al que se cambia (en su propio idioma, para que se entienda siempre). */
-export function LanguageToggle() {
-  const current = useLocale();
-  const { isPending, change } = useChangeLocale();
-  const target = OPTIONS.find((o) => o.value !== current) ?? OPTIONS[0];
-  return (
-    <button
-      type="button"
-      disabled={isPending}
-      onClick={() => change(target.value)}
-      title={`${target.label} (${target.value.toUpperCase()})`}
-      className="nav-item flex h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-medium text-[var(--sidebar-ink)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-white disabled:opacity-50"
-    >
-      <Languages size={18} />
-      <span className="nav-label">{target.label}</span>
-    </button>
   );
 }

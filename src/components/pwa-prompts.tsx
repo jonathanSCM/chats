@@ -14,6 +14,27 @@ const CHECK_EVERY_MS = 5 * 60_000;
 // Tiempo para que el detector de Android viejo termine, y para que llegue el evento de instalar.
 const SETTLE_MS = 1500;
 const WAIT_FOR_EVENT_MS = 3500;
+// El aviso de instalar sale una sola vez al día (la primera visita de cada día), no en cada carga.
+const INSTALL_HINT_DAY_KEY = "proshop:install-hint-day";
+
+function todayKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+function installHintSeenToday(): boolean {
+  try {
+    return window.localStorage.getItem(INSTALL_HINT_DAY_KEY) === todayKey();
+  } catch {
+    return false; // sin almacenamiento: se comporta como antes
+  }
+}
+function markInstallHintSeen() {
+  try {
+    window.localStorage.setItem(INSTALL_HINT_DAY_KEY, todayKey());
+  } catch {
+    /* sin almacenamiento */
+  }
+}
 
 function isStandalone(): boolean {
   const nav = navigator as Navigator & { standalone?: boolean };
@@ -73,8 +94,8 @@ function hintText(kind: InstallHintKind): { body: string; steps: React.ReactNode
 
 /**
  * Dos avisos chicos abajo de la pantalla:
- *  1) "Instala ProShop en tu pantalla de inicio": sale en cada carga mientras la app no esté
- *     instalada. Con botón "Instalar" si el navegador lo permite; si no, con los pasos que
+ *  1) "Instala ProShop en tu pantalla de inicio": sale una vez al día (la primera visita del día)
+ *     mientras la app no esté instalada. Con botón "Instalar" si el navegador lo permite; si no, con los pasos que
  *     corresponden a ese teléfono (iPhone, WhatsApp/Instagram, Android viejo, menú de Chrome).
  *  2) "Hay una versión nueva": para que quien tiene la app abierta la actualice con un toque.
  * Nada de esto bloquea la pantalla y todo se puede descartar (hasta recargar).
@@ -88,7 +109,7 @@ export function PwaPrompts() {
   );
   const [standalone, setStandalone] = useState(true); // true hasta comprobar: evita parpadeo
   const [device, setDevice] = useState({ userAgent: "", maxTouchPoints: 0 });
-  // "Ahora no" solo oculta el aviso hasta que se recargue la página: no se guarda.
+  // Una vez mostrado, no vuelve a salir hasta el día siguiente (se guarda el día en este navegador).
   const [dismissed, setDismissed] = useState(false);
   const [settled, setSettled] = useState(false);
   const [waitedForEvent, setWaitedForEvent] = useState(false);
@@ -99,6 +120,7 @@ export function PwaPrompts() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- lecturas únicas del navegador al montar
     setStandalone(isStandalone());
     setDevice({ userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints });
+    if (installHintSeenToday()) setDismissed(true);
     const t1 = window.setTimeout(() => setSettled(true), SETTLE_MS);
     const t2 = window.setTimeout(() => setWaitedForEvent(true), WAIT_FOR_EVENT_MS);
     return () => {
@@ -176,6 +198,11 @@ export function PwaPrompts() {
           maxTouchPoints: device.maxTouchPoints,
           waitedForEvent,
         });
+
+  const showingInstall = kind !== null;
+  useEffect(() => {
+    if (showingInstall) markInstallHintSeen(); // ya se mostró hoy: en la próxima carga del día no vuelve a salir
+  }, [showingInstall]);
 
   if (!updateAvailable && !kind) return null;
 

@@ -24,7 +24,6 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { SidebarToggle } from "@/components/layout/sidebar-toggle";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LanguageToggle } from "@/components/language-switch";
 import { OrgTimeZoneProvider } from "@/components/org-time";
 import { getT } from "@/lib/i18n/server";
 import { ServerClock } from "@/components/layout/server-clock";
@@ -138,7 +137,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <ServerClock initialIso={serverNowIso} timeZone={serverTimeZone} />
         </Link>
         <NavLink href="/dashboard/ajustes" icon={<Settings size={18} />}>{t("Ajustes")}</NavLink>
-        <LanguageToggle />
         <ThemeToggle />
         {/* Selector solo si pertenece a más de una organización -- si no, no
             aparece nada acá (el nombre fijo de arriba alcanza). Afuera del

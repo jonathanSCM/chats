@@ -195,6 +195,8 @@
             <span class="hint" id="consentLine"></span>
             <button class="link" id="consentReset">Ver el aviso</button>
           </div>
+          <label class="toggle"><input type="checkbox" id="recordAudioToggle" checked /> <span><strong>Grabar audio</strong> (más precisión; transcribe con IA). Apagado: solo subtítulos de Meet, sin pedir micrófono ni captura de pestaña</span></label>
+          <div id="audioSettings" style="display: grid; gap: 8px">
           <label class="toggle"><input type="checkbox" id="recordMicToggle" checked /> <span>Grabar mi micrófono (se corta al instante cuando te silencias en Meet)</span></label>
           <label class="field">
             Cómo capturar el audio de la reunión
@@ -210,6 +212,7 @@
           </label>
           <div class="meter" title="Nivel del micrófono elegido"><div id="meterBar"></div></div>
           <p class="hint" id="micHint">Habla para ver si se mueve la barra: así sabes que ese es el micrófono correcto.</p>
+          </div>
           <label class="field">
             Idioma de los subtítulos
             <select id="langSelect">

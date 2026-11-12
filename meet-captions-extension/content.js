@@ -95,6 +95,7 @@
   let maxParticipantsSeen = 0;
   let lockedOrgId; // organización de ESTA grabación (se fija al pulsar «Grabar»); sin elegir va null
   let lockedTitle = null; // nombre de la reunión (opcional), fijado al pulsar «Grabar»
+  let lockedAudioOff = false; // «Grabar audio» apagado en Ajustes al pulsar «Grabar»: solo subtítulos, sin micrófono ni captura de pestaña
   const finalizedKeys = new Set();
   const finalizedLines = [];
 
@@ -125,6 +126,7 @@
     maxParticipantsSeen = 0;
     lockedOrgId = undefined;
     lockedTitle = null;
+    lockedAudioOff = false;
     finalizedKeys.clear();
     finalizedLines.length = 0;
     sentCount = 0;
@@ -149,6 +151,7 @@
         lines: finalizedLines.length + (pending && pending.text ? 1 : 0),
         organizationId: lockedOrgId === undefined ? null : lockedOrgId,
         title: lockedTitle,
+        audioOff: lockedAudioOff,
         last: lines.slice(-60),
         warning,
         micMuted: lastMicMuted === true,
@@ -658,6 +661,7 @@
         if (phase === "stopped") resetSession(); // otra grabación en la misma reunión: empieza de cero
         lockedOrgId = message.organizationId || null;
         lockedTitle = message.title || null;
+        lockedAudioOff = message.audioOff === true;
         recordingId = message.recordingId || crypto.randomUUID();
         void start().then((ok) => sendResponse({ ok }));
         return true; // respuesta async

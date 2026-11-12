@@ -47,6 +47,8 @@ const crmLink = $("crmLink");
 const hideToggle = $("hideToggle");
 const autoOpenToggle = $("autoOpenToggle");
 const recordMicToggle = $("recordMicToggle");
+const recordAudioToggle = $("recordAudioToggle");
+const audioSettings = $("audioSettings");
 const langSelect = $("langSelect");
 const audioMethodSelect = $("audioMethodSelect");
 const micSelect = $("micSelect");
@@ -138,7 +140,8 @@ async function openMicTab() {
 // Aviso suave (no bloquea nada) cuando el micrófono todavía no está activado, antes de grabar.
 async function renderMicSetup() {
   const state = await micPermissionState();
-  micSetup.style.display = state === "granted" ? "none" : "flex";
+  const audioOn = (await chrome.storage.local.get(["recordAudio"])).recordAudio !== false;
+  micSetup.style.display = state === "granted" || !audioOn ? "none" : "flex";
   micSetupText.textContent = state === "denied" ? "El micrófono está bloqueado: tu voz no se grabará." : "Activa el micrófono una vez para que se grabe también tu voz.";
 }
 micSetupBtn.addEventListener("click", () => void openMicTab());
@@ -247,7 +250,7 @@ const currentOrg = () => (orgField.style.display === "none" ? null : orgSelect.v
 
 // Grabar: subtítulos (pestaña de Meet) + audio (coordinador). Cada vez es una grabación nueva con su propio id: la del cliente
 // y la del equipo en la misma sala quedan como reuniones separadas. Si el audio no arranca, los subtítulos siguen igual.
-recordBtn.addEventListener("click", () => {
+recordBtn.addEventListener("click", async () => {
   if (tabId == null || !meetingUrl) return;
   recordBtn.disabled = true;
   setTimeout(() => (recordBtn.disabled = false), 8000); // si algo falló, se puede volver a intentar
@@ -255,15 +258,16 @@ recordBtn.addEventListener("click", () => {
   const organizationId = currentOrg();
   const title = currentTitle();
   const recordingId = crypto.randomUUID();
+  const audioOff = (await chrome.storage.local.get(["recordAudio"])).recordAudio === false;
   chrome.tabs
-    .sendMessage(tabId, { type: "START_RECORDING", organizationId, title, recordingId })
+    .sendMessage(tabId, { type: "START_RECORDING", organizationId, title, recordingId, audioOff })
     .then((response) => {
       if (response && response.ok === false) recordStatus.textContent = response.error || "No se pudo empezar a grabar.";
     })
     .catch(() => {
       recordStatus.textContent = "No se pudo conectar con la reunión: recarga la pestaña de Meet e inténtalo de nuevo.";
     });
-  startAudio({ organizationId, title, recordingId });
+  if (!audioOff) startAudio({ organizationId, title, recordingId });
 });
 
 // ───────── Audio de la reunión: dos formas de capturar la pestaña ─────────
@@ -472,6 +476,14 @@ async function render() {
 
   if (paused) chips.append(chip("En pausa: no se guarda nada", "warn"));
   chips.append(chip(`Subtítulos: ${state.lines || 0} líneas`, state.lines ? "ok" : ""));
+  if (state.audioOff) {
+    // «Grabar audio» apagado: solo subtítulos. Sin chips ni avisos de audio ni de micrófono.
+    chips.append(chip("Audio: apagado (solo subtítulos)"));
+    if (state.warning) notices.append(notice(state.warning, "warn"));
+    hideToggle.checked = state.hideMeetCaptions !== false;
+    renderCaptions(state.last);
+    return;
+  }
   if (audio.active) chips.append(chip(`Audio: ${paused ? "en pausa" : "grabando"} · ${audio.uploaded || 0} partes enviadas`, paused ? "warn" : "ok"));
   else if (audio.starting) chips.append(chip("Audio: iniciando…"));
   else if (audio.lastError || audio.failed) chips.append(chip("Audio: con problemas", "bad"));
@@ -548,7 +560,9 @@ detachBtn.addEventListener("click", () => {
 
 // ───────── Ajustes ─────────
 async function loadSettings() {
-  const s = await chrome.storage.local.get(["hideMeetCaptions", "autoOpenWindow", "captionLang", "micDeviceId", "recordMic", "audioMethod"]);
+  const s = await chrome.storage.local.get(["hideMeetCaptions", "autoOpenWindow", "captionLang", "micDeviceId", "recordMic", "audioMethod", "recordAudio"]);
+  recordAudioToggle.checked = s.recordAudio !== false;
+  paintAudioSetting();
   audioMethod = s.audioMethod === "picker" ? "picker" : "auto";
   audioMethodSelect.value = audioMethod;
   hideToggle.checked = s.hideMeetCaptions !== false;
@@ -569,6 +583,16 @@ hideToggle.addEventListener("change", async () => {
   }
 });
 autoOpenToggle.addEventListener("change", () => chrome.storage.local.set({ autoOpenWindow: autoOpenToggle.checked }));
+// «Grabar audio» apagado = solo subtítulos: no se pide micrófono ni captura de pestaña, y se atenúan los ajustes de audio.
+function paintAudioSetting() {
+  audioSettings.style.opacity = recordAudioToggle.checked ? "" : "0.45";
+  audioSettings.style.pointerEvents = recordAudioToggle.checked ? "" : "none";
+  void renderMicSetup();
+}
+recordAudioToggle.addEventListener("change", async () => {
+  await chrome.storage.local.set({ recordAudio: recordAudioToggle.checked });
+  paintAudioSetting();
+});
 recordMicToggle.addEventListener("change", () => chrome.storage.local.set({ recordMic: recordMicToggle.checked }));
 langSelect.addEventListener("change", () => chrome.storage.local.set({ captionLang: langSelect.value }));
 audioMethodSelect.addEventListener("change", () => {

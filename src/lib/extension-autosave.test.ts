@@ -88,6 +88,17 @@ describe("guardado por partes de los subtítulos", () => {
     expect(meet.fetchMock).not.toHaveBeenCalled();
   });
 
+  it("con «Grabar audio» apagado, el estado lo indica (el panel no pide audio ni micrófono) y los subtítulos se guardan igual", async () => {
+    const started = meet.message({ type: "START_RECORDING", organizationId: null, title: "Solo texto", recordingId: "rec-2", audioOff: true });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(await started).toEqual({ ok: true });
+    feed(L1, L2, L3);
+    await vi.advanceTimersByTimeAsync(31_000);
+    const live = meet.messages.filter((m) => m.type === "LIVE_STATE").at(-1) as unknown as { state: { audioOff: boolean } };
+    expect(live.state.audioOff).toBe(true);
+    expect(meet.posts()[0].transcript).toBe(`${L1.name}: ${L1.text}\n${L2.name}: ${L2.text}`);
+  });
+
   it("al cerrar la pestaña sin detener, el sendBeacon manda lo que falta con cierre", async () => {
     await startRecording();
     feed(L1, L2, L3);

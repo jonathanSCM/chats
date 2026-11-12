@@ -25,7 +25,6 @@ const notices = $("notices");
 const captions = $("captions");
 const stopBtn = $("stopBtn");
 const pauseBtn = $("pauseBtn");
-const detachBtn = $("detachBtn");
 const accountBox = $("accountBox");
 const loginBtn = $("loginBtn");
 const logoutBtn = $("logoutBtn");
@@ -57,7 +56,6 @@ const gearBtn = $("gearBtn");
 const backBtn = $("backBtn");
 $("ver").textContent = "ProShop CRM · extensión v" + chrome.runtime.getManifest().version;
 crmLink.href = `${CRM_BASE}/dashboard/reuniones`;
-if (detached) detachBtn.style.display = "none";
 
 // ───────── Consentimiento (aviso dentro de la extensión, antes de pedir nada) ─────────
 // Se muestra la primera vez y cada vez que cambie su texto (sube CONSENT_VERSION). Hasta aceptarlo no se pide el micrófono, ni la
@@ -361,10 +359,16 @@ async function resolveTab() {
   return tab || null;
 }
 
+// Pegado al final: sigue los subtítulos nuevos salvo que la persona suba a leer algo anterior (y vuelve a seguirlos al bajar).
+let stickBottom = true;
+captions.addEventListener("scroll", () => {
+  stickBottom = captions.scrollHeight - captions.scrollTop - captions.clientHeight < 40;
+});
 function renderCaptions(lines) {
-  const nearBottom = captions.scrollHeight - captions.scrollTop - captions.clientHeight < 60;
+  const prevTop = captions.scrollTop;
   captions.replaceChildren();
   if (!lines || lines.length === 0) {
+    stickBottom = true;
     const p = document.createElement("p");
     p.className = "empty";
     p.textContent = "Los subtítulos aparecen aquí cuando alguien hable.";
@@ -384,7 +388,9 @@ function renderCaptions(lines) {
     }
     captions.append(p);
   }
-  if (nearBottom) captions.scrollTop = captions.scrollHeight;
+  const follow = stickBottom;
+  captions.scrollTop = follow ? captions.scrollHeight : prevTop;
+  if (follow) requestAnimationFrame(() => (captions.scrollTop = captions.scrollHeight));
 }
 
 // Cronómetro de la grabación en curso (se actualiza solo cada segundo, sin redibujar todo).
@@ -463,7 +469,7 @@ async function render() {
     subtitle.textContent = stopped ? "Grabación terminada" : "Reunión detectada";
     if (stopped) showDoneBox(state);
     void showRecordBox(auth.token, { fresh: stopped ? state.recordingId : null });
-    renderCaptions(stopped ? state.last : []);
+    renderCaptions([]); // terminada y enviada: el panel queda limpio
     return;
   }
 
@@ -553,11 +559,6 @@ stopBtn.addEventListener("click", async () => {
   void render();
 });
 
-detachBtn.addEventListener("click", () => {
-  if (tabId == null) return;
-  chrome.runtime.sendMessage({ type: "OPEN_DETACHED", tabId });
-  window.close(); // el panel lateral se cierra; la ventana nueva sigue mostrando lo mismo
-});
 
 // ───────── Ajustes ─────────
 async function loadSettings() {

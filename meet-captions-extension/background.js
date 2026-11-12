@@ -97,6 +97,10 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   chrome.storage.session.remove(STATE_PREFIX + tabId).catch(() => {});
   autoOpened.delete(tabId);
   invoked.delete(tabId);
+  // Si la pestaña cerrada estaba grabando audio, se suelta la captura (sube la última parte) para no bloquear la próxima reunión.
+  chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] }).then((ctx) => {
+    if (ctx.length > 0) chrome.runtime.sendMessage({ type: "OFFSCREEN_STOP", tabId }).catch(() => {});
+  }).catch(() => {});
 });
 
 // Registro de diagnóstico (últimos 80 eventos) que el panel muestra y permite copiar: sirve para ver por qué algo no arrancó.

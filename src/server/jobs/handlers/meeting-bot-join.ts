@@ -145,7 +145,7 @@ export async function handleMeetingBotJoin(rawPayload: unknown): Promise<void> {
     type: "vexa_bot_poll",
     uniqueKey: `vexa-poll-${meetingId}`,
     payload: { meetingId, nativeMeetingId: code, startedAt: new Date().toISOString(), vexaSessionId: sessionId ?? undefined, joinAttempt: attempt },
-    runAfter: new Date(Date.now() + 15_000),
+    runAfter: new Date(Date.now() + 4_000), // el asistente tarda ~15-20 s en entrar: se empieza a mirar enseguida
   });
 }
 

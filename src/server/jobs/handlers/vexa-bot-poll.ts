@@ -25,6 +25,9 @@ export const vexaBotPollPayload = z.object({
 // en vez de seguir encolando para siempre (una reunión real no dura tanto).
 const MAX_POLL_MS = 4 * 60 * 60 * 1000;
 const POLL_INTERVAL_MS = 15_000;
+// Mientras el asistente está entrando (pidiéndolo, uniéndose, en la sala de espera) se mira más seguido: el panel y el aviso
+// de «ya entró» no tienen por qué ir hasta 15 s atrasados. Ya dentro de la reunión, cada 15 s alcanza.
+const JOINING_POLL_INTERVAL_MS = 5_000;
 
 function vexaConfig(): { url: string; apiKey: string } | null {
   const url = process.env.VEXA_API_URL;
@@ -106,7 +109,7 @@ export async function handleVexaBotPoll(rawPayload: unknown): Promise<void> {
     await enqueue({
       type: "vexa_bot_poll",
       payload: { meetingId, nativeMeetingId, startedAt, vexaSessionId: sessionIdForJobs, joinAttempt },
-      runAfter: new Date(Date.now() + POLL_INTERVAL_MS),
+      runAfter: new Date(Date.now() + JOINING_POLL_INTERVAL_MS),
     });
     return;
   }
@@ -130,7 +133,7 @@ export async function handleVexaBotPoll(rawPayload: unknown): Promise<void> {
     await enqueue({
       type: "vexa_bot_poll",
       payload: { meetingId, nativeMeetingId, startedAt, vexaSessionId: sessionIdForJobs, joinAttempt },
-      runAfter: new Date(Date.now() + POLL_INTERVAL_MS),
+      runAfter: new Date(Date.now() + (entry.status === "active" ? POLL_INTERVAL_MS : JOINING_POLL_INTERVAL_MS)),
     });
     return;
   }

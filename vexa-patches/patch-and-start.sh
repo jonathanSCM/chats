@@ -15,6 +15,8 @@ node /patches/apply-shots.js /app/core/meetings/modules/join/dist || echo "[pros
 
 node /patches/apply-guest-blocked.js /app/core/meetings/modules/join/dist || echo "[proshop-guest-blocked] Fallo el parche (no fatal)."
 
+node /patches/apply-fast-leave.js /app/core/meetings/services/bot/dist || echo "[proshop-fast-leave] Fallo el parche (no fatal)."
+
 node /patches/apply-startup-403.js /app/core/meetings/modules/join/dist || echo "[proshop-startup-403] Fallo el parche (no fatal)."
 
 exec /entrypoint.sh "$@"

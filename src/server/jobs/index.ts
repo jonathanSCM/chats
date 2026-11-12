@@ -52,10 +52,11 @@ const BATCH_SIZE = 10;
  * también el webhook justo después de encolar, para que en la práctica el
  * trabajo corra en milisegundos y el cron quede solo como red de seguridad.
  */
-export async function processJobs(): Promise<{ processed: number; failed: number }> {
-  await requeueStaleJobs();
+export async function processJobs(options: { types?: string[] } = {}): Promise<{ processed: number; failed: number }> {
+  // El latido rápido del asistente (solo ciertos tipos) no repite el barrido de trabajos colgados: eso lo hace el cron.
+  if (!options.types) await requeueStaleJobs();
 
-  const jobs = await claimJobs(BATCH_SIZE);
+  const jobs = await claimJobs(BATCH_SIZE, options.types);
   let processed = 0;
   let failed = 0;
 

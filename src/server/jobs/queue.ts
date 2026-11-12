@@ -98,7 +98,7 @@ export interface ClaimedJob {
  * el disparo inmediato del webhook), cada uno se lleva filas distintas en vez
  * de pelearse por las mismas o bloquearse.
  */
-export async function claimJobs(limit: number): Promise<ClaimedJob[]> {
+export async function claimJobs(limit: number, types?: string[]): Promise<ClaimedJob[]> {
   // NOW() AT TIME ZONE 'UTC' y no NOW() a secas: las columnas son
   // `timestamp` sin zona y Prisma escribe siempre en UTC, mientras que NOW()
   // devuelve la hora local del servidor. Comparar contra NOW() directamente
@@ -113,6 +113,7 @@ export async function claimJobs(limit: number): Promise<ClaimedJob[]> {
       SELECT "id" FROM "jobs"
       WHERE "status" = 'PENDING'
         AND "runAfter" <= (NOW() AT TIME ZONE 'UTC')
+        ${types && types.length > 0 ? Prisma.sql`AND "type" = ANY(${types})` : Prisma.empty}
       ORDER BY "runAfter" ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED

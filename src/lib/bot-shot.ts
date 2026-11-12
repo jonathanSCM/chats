@@ -8,10 +8,10 @@ export type ShotPageKind = "meet" | "inactive" | "sign-in" | "other";
 export const SHOT_REASONS = {
   // El asistente ni llegó a la sala: Meet lo mandó a su página de inicio al abrir el link.
   inactive:
-    "Meet no abrió la sala y mandó al asistente a su página de inicio. O el link no es de una reunión en curso (ya terminó o no existe), o es una reunión de una cuenta de Google Workspace (empresa) que no admite invitados sin cuenta de Google.",
+    "Meet no abrió la sala y mandó al asistente a su página de inicio. Puede ser un rechazo pasajero de Google (el CRM reintenta solo), que el link no sea de una reunión en curso (ya terminó o no existe), o que sea una reunión de una cuenta de Google Workspace (empresa) que no admite invitados sin cuenta de Google.",
   // El asistente sí llegó a pedir entrada y Meet lo echó ("No puedes unirte a esta videollamada") sin que nadie respondiera.
   blocked:
-    "Meet no dejó entrar al asistente: le mostró «No puedes unirte a esta videollamada» y lo devolvió a la página de inicio. Pasa cuando la reunión es de una cuenta de Google Workspace (empresa) que no admite invitados sin cuenta de Google, o cuando el anfitrión la restringió. No es una falla del CRM: a esa reunión el asistente no puede entrar como invitado.",
+    "Meet no dejó entrar al asistente: le mostró «No puedes unirte a esta videollamada» y lo devolvió a la página de inicio. Google rechaza a veces al asistente al azar (el CRM reintenta solo varias veces); si insiste en todos los intentos, la reunión puede ser de una cuenta de Google Workspace (empresa) que no admite invitados sin cuenta de Google, o el anfitrión la restringió. En ese caso usa la extensión de Chrome desde la reunión.",
   "sign-in": "Meet pidió iniciar sesión con una cuenta de Google: esa reunión no deja entrar a invitados anónimos.",
 } as const;
 

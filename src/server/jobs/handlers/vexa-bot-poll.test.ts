@@ -25,6 +25,7 @@ vi.mock("../queue", () => ({ enqueue: m.enqueue, enqueueOrReschedule: m.reschedu
 vi.mock("@/lib/media-storage", () => ({ saveMediaFile: m.saveMedia }));
 vi.mock("@/server/services/ai/credits", () => ({ chargeCredits: m.charge }));
 
+import { SHOT_REASONS } from "@/lib/bot-shot";
 import { handleVexaBotPoll } from "./vexa-bot-poll";
 
 const iso = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000).toISOString();
@@ -209,13 +210,64 @@ describe("handleVexaBotPoll (entrada fallida y sala de espera)", () => {
     expect(m.reschedule).toHaveBeenCalledWith(
       expect.objectContaining({ type: "meeting_bot_join", payload: { meetingId: "mtg1", attempt: 1 } }),
     );
-    expect(m.meetingUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: { botStatus: "PENDING" } }));
+    expect(m.meetingUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: { botStatus: "PENDING", botFailureReason: null } }));
+  });
+
+  it("el primer reintento es rápido (15 s) y el siguiente espera más", async () => {
+    m.meetingFind.mockResolvedValue(meetingRow());
+    vexa([failedEntry("never_reached_lobby")]);
+    const before = Date.now();
+    await handleVexaBotPoll(payload({ vexaSessionId: 7, joinAttempt: 0 }));
+    const first = (m.reschedule.mock.calls[0][0] as { runAfter: Date }).runAfter.getTime() - before;
+    expect(first).toBeGreaterThanOrEqual(14_000);
+    expect(first).toBeLessThan(20_000);
+    m.reschedule.mockClear();
+    await handleVexaBotPoll(payload({ vexaSessionId: 7, joinAttempt: 1 }));
+    expect((m.reschedule.mock.calls[0][0] as { runAfter: Date }).runAfter.getTime() - Date.now()).toBeGreaterThan(40_000);
+  });
+
+  it("si Google bloqueó al invitado («You can't join this video call») reintenta en vez de darlo por perdido", async () => {
+    m.meetingFind.mockResolvedValue(meetingRow());
+    vexa([
+      entry({
+        id: 7,
+        status: "failed",
+        failure_stage: "awaiting_admission",
+        data: { join_evidence: { reason: "awaiting_admission_rejected", detail: "Google Meet blocked the guest: You can't join this video call" } },
+      }),
+    ]);
+    await handleVexaBotPoll(payload({ vexaSessionId: 7 }));
+    expect(m.reschedule).toHaveBeenCalledWith(expect.objectContaining({ type: "meeting_bot_join", payload: { meetingId: "mtg1", attempt: 1 } }));
+  });
+
+  it("si una captura ya anotó que Meet lo mandó a su página de inicio, igual reintenta y borra ese motivo", async () => {
+    m.meetingFind.mockResolvedValue(meetingRow({ botFailureReason: SHOT_REASONS.inactive }));
+    vexa([failedEntry("stopped_while_joining")]);
+    await handleVexaBotPoll(payload({ vexaSessionId: 7 }));
+    expect(m.reschedule).toHaveBeenCalledWith(expect.objectContaining({ payload: { meetingId: "mtg1", attempt: 1 } }));
+    expect(m.meetingUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: { botStatus: "PENDING", botFailureReason: null } }));
+  });
+
+  it("un rechazo del anfitrión (no el bloqueo de Google) no se reintenta", async () => {
+    m.meetingFind.mockResolvedValue(meetingRow());
+    vexa([
+      entry({ id: 7, status: "failed", failure_stage: "awaiting_admission", data: { join_evidence: { reason: "awaiting_admission_rejected", detail: "Bot admission was rejected by meeting admin" } } }),
+    ]);
+    await handleVexaBotPoll(payload({ vexaSessionId: 7 }));
+    expect(m.reschedule).not.toHaveBeenCalled();
+  });
+
+  it("si el motivo anotado es el de iniciar sesión (cuenta de Google obligatoria) no insiste", async () => {
+    m.meetingFind.mockResolvedValue(meetingRow({ botFailureReason: SHOT_REASONS["sign-in"] }));
+    vexa([failedEntry("stopped_while_joining")]);
+    await handleVexaBotPoll(payload({ vexaSessionId: 7 }));
+    expect(m.reschedule).not.toHaveBeenCalled();
   });
 
   it("tras agotar los reintentos queda FAILED con el motivo a la vista", async () => {
     m.meetingFind.mockResolvedValue(meetingRow());
     vexa([failedEntry("never_reached_lobby")]);
-    await handleVexaBotPoll(payload({ vexaSessionId: 7, joinAttempt: 2 }));
+    await handleVexaBotPoll(payload({ vexaSessionId: 7, joinAttempt: 3 }));
     expect(m.reschedule).not.toHaveBeenCalled();
     expect(m.meetingUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ botStatus: "FAILED", botFailureReason: expect.stringMatching(/Meet no dejó/) }) }),

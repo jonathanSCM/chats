@@ -35,10 +35,10 @@ export function describeJoinFailure(entry: Pick<VexaSessionEntry, "data" | "fail
     case "awaiting_admission_rejected":
       // El parche de ProShop (vexa-patches/apply-guest-blocked.js) deja en el detalle que Meet mostró "You can't join this
       // video call": no lo rechazó una persona, Meet bloqueó al invitado anónimo.
-      if (/video call/i.test(entry.data?.join_evidence?.detail ?? "")) return SHOT_REASONS.blocked;
+      if (isGoogleGuestBlock(entry)) return SHOT_REASONS.blocked;
       return "Quien organiza la reunión rechazó al asistente.";
     case "never_reached_lobby":
-      return "Meet no dejó que el asistente llegara a la sala (el link no abrió una reunión activa, o Meet lo bloqueó).";
+      return "Meet no dejó que el asistente llegara a la sala (rechazó su arranque, el link no abrió una reunión activa, o lo bloqueó). El CRM ya lo reintentó varias veces.";
     case "stopped_while_joining":
       return "Se canceló antes de que el asistente llegara a entrar.";
     default:
@@ -46,13 +46,34 @@ export function describeJoinFailure(entry: Pick<VexaSessionEntry, "data" | "fail
   }
 }
 
-export const MAX_JOIN_RETRIES = 2;
+/** Meet mostró «You can't join this video call» al pedir entrar: lo decidió Google, no una persona. */
+export function isGoogleGuestBlock(entry: Pick<VexaSessionEntry, "data">): boolean {
+  return /video call/i.test(entry.data?.join_evidence?.detail ?? "");
+}
+
+/**
+ * Reintentos de entrada tras un rechazo de Google. Medido el 12-nov-2026 en el servidor: Meet rechaza al asistente al azar
+ * (403 al arrancar, o «You can't join this video call» al pedir entrar) y la misma sala entra bien a los pocos minutos; en
+ * una prueba pasó al 3.er intento seguido. Por eso se insiste unas veces antes de dar la reunión por perdida.
+ */
+export const MAX_JOIN_RETRIES = 3;
+
+/** Espera antes del reintento número `attempt + 1`: corta al principio (suele bastar) y más larga después. */
+export function joinRetryDelayMs(attempt: number): number {
+  return [15_000, 45_000, 90_000][Math.min(Math.max(attempt, 0), 2)];
+}
+
+/** Motivos que anotan las capturas cuando Meet mandó al asistente a su página de inicio: suelen ser pasajeros (ver arriba). */
+export function isTransientShotReason(reason: string | null): boolean {
+  return reason === SHOT_REASONS.inactive || reason === SHOT_REASONS.blocked;
+}
 
 /**
  * ¿Vale la pena pedir el asistente de nuevo? Solo si el fallo suele ser pasajero:
- *  - `never_reached_lobby`: Meet no mostró la sala (a veces se arregla al segundo intento).
+ *  - `never_reached_lobby`: Meet no mostró la sala (rechazó el arranque; a veces se arregla al segundo intento).
+ *  - Bloqueo automático de Google («You can't join this video call»), que no es una decisión del anfitrión.
  *  - `awaiting_admission_timeout` en una reunión agendada que todavía no terminó: el anfitrión suele llegar tarde.
- * Nunca después de un rechazo ni de una cancelación a mano, y con tope de reintentos.
+ * Nunca después de un rechazo del anfitrión ni de una cancelación a mano, y con tope de reintentos.
  */
 export function shouldRetryJoin(params: {
   entry: Pick<VexaSessionEntry, "data" | "failure_stage">;
@@ -63,6 +84,8 @@ export function shouldRetryJoin(params: {
   if (params.attempt >= MAX_JOIN_RETRIES || params.meetingEnded) return false;
   const code = joinFailureCode(params.entry);
   if (code === "never_reached_lobby") return true;
+  // Un rechazo de una PERSONA (anfitrión) nunca se reintenta; el bloqueo automático de Google sí.
+  if (code === "awaiting_admission_rejected") return isGoogleGuestBlock(params.entry);
   return code === "awaiting_admission_timeout" && params.scheduledInAdvance;
 }
 

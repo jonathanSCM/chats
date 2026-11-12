@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MAX_JOIN_RETRIES, decideConflict, describeJoinFailure, parseSessionId, pickSession, shouldRetryJoin, type VexaSessionEntry } from "./vexa-session";
+import { MAX_JOIN_RETRIES, decideConflict, describeJoinFailure, isTransientShotReason, joinRetryDelayMs, parseSessionId, pickSession, shouldRetryJoin, type VexaSessionEntry } from "./vexa-session";
+import { SHOT_REASONS } from "./bot-shot";
 
 const entry = (over: Partial<VexaSessionEntry>): VexaSessionEntry => ({
   id: 1,
@@ -112,7 +113,8 @@ describe("describeJoinFailure", () => {
       data: { join_evidence: { reason: "awaiting_admission_rejected", detail: "Google Meet blocked the guest: You can't join this video call (…)" } },
     };
     expect(describeJoinFailure(blocked)).toMatch(/Workspace/);
-    expect(describeJoinFailure(blocked)).not.toMatch(/rechazó/);
+    expect(describeJoinFailure(blocked)).toMatch(/extensión/);
+    expect(describeJoinFailure(blocked)).not.toMatch(/rechazó al asistente/);
     // un rechazo real del anfitrión sigue diciéndolo
     expect(
       describeJoinFailure({ failure_stage: "awaiting_admission", data: { join_evidence: { reason: "awaiting_admission_rejected", detail: "Bot admission was rejected by meeting admin" } } }),
@@ -132,8 +134,27 @@ describe("shouldRetryJoin", () => {
     expect(shouldRetryJoin({ ...base, entry: failed("awaiting_admission_timeout"), scheduledInAdvance: false })).toBe(false);
   });
 
+  const googleBlock = { failure_stage: "awaiting_admission", data: { join_evidence: { reason: "awaiting_admission_rejected", detail: "Google Meet blocked the guest: You can't join this video call (…)" } } };
+
+  it("reintenta el bloqueo automático de Google («You can't join this video call»), que no decidió una persona", () => {
+    expect(shouldRetryJoin({ ...base, entry: googleBlock, scheduledInAdvance: false })).toBe(true);
+    expect(shouldRetryJoin({ ...base, entry: googleBlock, attempt: MAX_JOIN_RETRIES })).toBe(false);
+  });
+
+  it("insiste hasta 3 veces, con espera creciente", () => {
+    expect(MAX_JOIN_RETRIES).toBe(3);
+    expect([0, 1, 2, 3].map(joinRetryDelayMs)).toEqual([15_000, 45_000, 90_000, 90_000]);
+  });
+
+  it("los motivos que anotan las capturas (página de inicio / bloqueado) se consideran pasajeros; el de iniciar sesión no", () => {
+    expect(isTransientShotReason(SHOT_REASONS.inactive)).toBe(true);
+    expect(isTransientShotReason(SHOT_REASONS.blocked)).toBe(true);
+    expect(isTransientShotReason(SHOT_REASONS["sign-in"])).toBe(false);
+    expect(isTransientShotReason(null)).toBe(false);
+  });
+
   it("no reintenta tras un rechazo, una cancelación, una reunión terminada o con el tope alcanzado", () => {
-    expect(shouldRetryJoin({ ...base, entry: failed("awaiting_admission_rejected") })).toBe(false);
+    expect(shouldRetryJoin({ ...base, entry: failed("awaiting_admission_rejected") })).toBe(false); // rechazo del anfitrión
     expect(shouldRetryJoin({ ...base, entry: failed("stopped_while_joining") })).toBe(false);
     expect(shouldRetryJoin({ ...base, entry: failed("never_reached_lobby"), meetingEnded: true })).toBe(false);
     expect(shouldRetryJoin({ ...base, entry: failed("never_reached_lobby"), attempt: MAX_JOIN_RETRIES })).toBe(false);

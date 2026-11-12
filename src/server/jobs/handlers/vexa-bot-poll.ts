@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
 import { enqueue, enqueueOrReschedule } from "../queue";
-import { NON_TERMINAL_STATUSES, describeJoinFailure, pickSession, shouldRetryJoin, type VexaSessionEntry } from "@/lib/vexa-session";
+import { MAX_JOIN_RETRIES, NON_TERMINAL_STATUSES, describeJoinFailure, isTransientShotReason, joinRetryDelayMs, pickSession, shouldRetryJoin, type VexaSessionEntry } from "@/lib/vexa-session";
 import { isLikelyWhisperHallucination } from "@/lib/whisper-filter";
 import { billableMinutes, creditsForAudio } from "@/lib/ai-credits";
 import { chargeCredits } from "@/server/services/ai/credits";
@@ -239,30 +239,36 @@ async function handleJoinFailure(meetingId: string, entry: VexaSessionEntry, att
     select: { status: true, botStatus: true, botFailureReason: true, createdAt: true, scheduledAt: true, durationMinutes: true, meetingUrl: true },
   });
   const endsAt = meeting ? meeting.scheduledAt.getTime() + meeting.durationMinutes * 60_000 : 0;
-  // Si una captura ya mostró por qué (p. ej. Meet lo mandó a su página de inicio), ese motivo vale más que el de Vexa
-  // y no se reintenta: el link no abre una reunión en curso.
+  // Si una captura ya mostró por qué (p. ej. Meet lo mandó a su página de inicio), ese motivo vale más que el de Vexa. Antes eso
+  // cortaba todo reintento («el link no abre una reunión»), pero en el servidor se vio que Google rechaza al asistente al azar y
+  // la misma sala entra bien minutos después: esos dos motivos se reintentan igual (el CRM los anotó al sacarlo de la sala).
   const knownReason = meeting?.botFailureReason ?? null;
-  const retry =
-    knownReason === null &&
+  const transient = isTransientShotReason(knownReason);
+  const mayRetry =
+    (knownReason === null || transient) &&
     Boolean(meeting?.meetingUrl) &&
     meeting?.status !== "CANCELED" &&
-    meeting?.botStatus !== null && // si alguien lo canceló a mano, el estado ya no es de un bot pedido
-    shouldRetryJoin({
-      entry,
-      attempt,
-      // Agendada con tiempo (no "Unir ya"): el anfitrión suele llegar tarde, vale la pena volver a golpear la puerta.
-      scheduledInAdvance: meeting ? meeting.scheduledAt.getTime() - meeting.createdAt.getTime() > 2 * 60_000 : false,
-      meetingEnded: Date.now() > endsAt,
-    });
+    meeting?.botStatus !== null; // si alguien lo canceló a mano, el estado ya no es de un bot pedido
+  const retry =
+    mayRetry &&
+    (transient
+      ? attempt < MAX_JOIN_RETRIES && Date.now() <= endsAt
+      : shouldRetryJoin({
+          entry,
+          attempt,
+          // Agendada con tiempo (no "Unir ya"): el anfitrión suele llegar tarde, vale la pena volver a golpear la puerta.
+          scheduledInAdvance: meeting ? meeting.scheduledAt.getTime() - meeting.createdAt.getTime() > 2 * 60_000 : false,
+          meetingEnded: Date.now() > endsAt,
+        }));
 
   if (retry) {
     console.warn(`[vexa-bot-poll] La reunión ${meetingId} no pudo entrar (${entry.data?.join_evidence?.reason ?? entry.failure_stage}); reintento ${attempt + 1}.`);
-    await prisma.meeting.update({ where: { id: meetingId }, data: { botStatus: "PENDING" } });
+    await prisma.meeting.update({ where: { id: meetingId }, data: { botStatus: "PENDING", botFailureReason: null } });
     await enqueueOrReschedule({
       type: "meeting_bot_join",
       uniqueKey: `meeting-bot-${meetingId}`,
       payload: { meetingId, attempt: attempt + 1 },
-      runAfter: new Date(Date.now() + 20_000),
+      runAfter: new Date(Date.now() + joinRetryDelayMs(attempt)),
     });
     return;
   }

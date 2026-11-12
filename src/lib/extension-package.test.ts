@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { inflateRawSync } from "node:zlib";
-import { buildZip, loadExtensionPackage } from "./extension-package";
+import { buildExtensionZip, buildZip } from "./extension-package";
 
 describe("extension-package", () => {
   it("arma un zip válido con directorio central y datos recuperables", () => {
@@ -16,7 +16,7 @@ describe("extension-package", () => {
   });
 
   it("empaqueta la extensión real con manifest en la raíz y sin README", async () => {
-    const pkg = await loadExtensionPackage();
+    const pkg = await buildExtensionZip();
     expect(pkg).not.toBeNull();
     expect(pkg!.version).toMatch(/^\d+\.\d+\.\d+$/);
     const text = pkg!.zip.toString("latin1");
@@ -46,7 +46,6 @@ describe("permiso del micrófono", () => {
 
 describe("paquete para la Chrome Web Store", () => {
   it("quita la auto-actualización (código alojado fuera del paquete) y el aviso de versión, y el JS sigue siendo válido", async () => {
-    const { buildExtensionZip } = await import("./extension-package");
     const store = await buildExtensionZip({ store: true });
     const manual = await buildExtensionZip({ store: false });
     expect(store).not.toBeNull();

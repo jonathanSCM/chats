@@ -53,7 +53,8 @@ const langSelect = $("langSelect");
 const audioMethodSelect = $("audioMethodSelect");
 const micSelect = $("micSelect");
 const micHint = $("micHint");
-const settings = $("settings");
+const gearBtn = $("gearBtn");
+const backBtn = $("backBtn");
 $("ver").textContent = "ProShop CRM · extensión v" + chrome.runtime.getManifest().version;
 crmLink.href = `${CRM_BASE}/dashboard/reuniones`;
 if (detached) detachBtn.style.display = "none";
@@ -629,7 +630,7 @@ async function loadMics(selectedId) {
 micSelect.addEventListener("change", async () => {
   await chrome.storage.local.set({ micDeviceId: micSelect.value });
   chrome.runtime.sendMessage({ type: "OFFSCREEN_SET_MIC_DEVICE", deviceId: micSelect.value }).catch(() => {}); // en vivo si ya graba
-  if (settings.open) void startMeter();
+  if (document.body.classList.contains("settings-open")) void startMeter();
 });
 navigator.mediaDevices.addEventListener?.("devicechange", () => void loadSettings());
 
@@ -667,7 +668,19 @@ async function startMeter() {
   };
   tick();
 }
-settings.addEventListener("toggle", () => (settings.open ? void startMeter() : stopMeter()));
+// Ajustes: otra vista del mismo panel (engranaje arriba a la derecha; «Volver» regresa).
+function showSettings(on) {
+  document.body.classList.toggle("settings-open", on);
+  gearBtn.setAttribute("aria-pressed", String(on));
+  if (on) {
+    void renderDebug();
+    void startMeter();
+  } else {
+    stopMeter();
+  }
+}
+gearBtn.addEventListener("click", () => showSettings(!document.body.classList.contains("settings-open")));
+backBtn.addEventListener("click", () => showSettings(false));
 window.addEventListener("pagehide", stopMeter);
 
 // ───────── Diagnóstico ─────────

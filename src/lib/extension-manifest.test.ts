@@ -24,9 +24,11 @@ describe("manifest de la extensión de Chrome", () => {
     for (const file of files) expect(exists(file), `falta ${file}`).toBe(true);
   });
 
-  it("el ícono abre directamente el panel (sin popup): ahí están la sesión, la organización y el botón de grabar", () => {
-    expect(manifest.action.default_popup).toBeUndefined();
-    expect(exists("popup.html")).toBe(false);
+  it("en una sala de Meet el ícono abre directamente el panel (sin popup); en otras pestañas, el menú de popup.html", () => {
+    // El popup por defecto es el menú (nueva reunión / unirse / abrir Meet); en las salas background.js lo quita por pestaña
+    // (action.setPopup con "") para que el clic llegue a action.onClicked y abra el panel.
+    expect(manifest.action.default_popup).toBe("popup.html");
+    expect(exists("popup.html")).toBe(true);
     expect(manifest.side_panel.default_path).toBe("sidepanel.html");
     // openPanelOnActionClick NO se usa: con él Chrome no cuenta el clic como «invocar la extensión» y la captura del audio falla
     // con «Extension has not been invoked for the current page». El panel se abre desde action.onClicked.
@@ -34,6 +36,7 @@ describe("manifest de la extensión de Chrome", () => {
     expect(background).toContain("openPanelOnActionClick: false");
     expect(background).not.toContain("openPanelOnActionClick: true");
     expect(background).toContain("chrome.action.onClicked.addListener");
+    expect(background).toContain("chrome.action.setPopup");
   });
 
   it("el script de la pestaña de Meet no deja llamadas chrome.* sueltas: con la extensión recargada fallarían con «Extension context invalidated»", () => {

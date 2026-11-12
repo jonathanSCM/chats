@@ -88,19 +88,6 @@ async function collect(dir: string, base = ""): Promise<ZipEntry[]> {
   return out;
 }
 
-/** Los archivos de la extensión (sin README) para que ella misma se actualice escribiéndolos en su carpeta. */
-export async function loadExtensionFiles(): Promise<{ version: string | null; files: { path: string; base64: string }[] } | null> {
-  try {
-    const entries = await collect(extensionDir());
-    const manifest = entries.find((e) => e.name === "manifest.json");
-    if (!manifest) return null;
-    const version = (JSON.parse(manifest.data.toString("utf8")) as { version?: string }).version ?? null;
-    return { version, files: entries.map((e) => ({ path: e.name, base64: e.data.toString("base64") })) };
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Versión para la Chrome Web Store. La tienda actualiza las extensiones sola y PROHÍBE el código alojado fuera del paquete, así
  * que se quita el «Actualizar ahora» (que baja archivos del CRM y los escribe en la carpeta) y el aviso de versión nueva, que
@@ -144,16 +131,4 @@ export async function buildExtensionZip(options: { store?: boolean } = {}): Prom
 
 export function extensionDir(): string {
   return path.join(process.cwd(), "meet-captions-extension");
-}
-
-export async function loadExtensionPackage(): Promise<{ zip: Buffer; version: string | null } | null> {
-  try {
-    const entries = await collect(extensionDir());
-    const manifest = entries.find((e) => e.name === "manifest.json");
-    if (!manifest) return null;
-    const version = (JSON.parse(manifest.data.toString("utf8")) as { version?: string }).version ?? null;
-    return { zip: buildZip(entries), version };
-  } catch {
-    return null; // si la carpeta no está en este despliegue, simplemente no se ofrece
-  }
 }

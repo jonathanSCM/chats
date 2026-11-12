@@ -46,6 +46,22 @@ chrome.action.onClicked.addListener((tab) => {
 });
 
 const MEETING_URL_RE = /^https:\/\/meet\.google\.com\/(?:meet\/)?[a-z]{3}-[a-z]{4}-[a-z]{3}/i;
+
+// Ícono de la barra: en una sala de Meet NO lleva popup, así el clic abre el panel (action.onClicked, que además concede activeTab
+// para capturar el audio de esa pestaña). En cualquier otra pestaña abre popup.html (nueva reunión, unirse con enlace, abrir Meet).
+function syncPopup(tabId, url) {
+  if (tabId == null) return;
+  const inRoom = Boolean(url && MEETING_URL_RE.test(url));
+  chrome.action.setPopup({ tabId, popup: inRoom ? "" : "popup.html" }).catch(() => {});
+}
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  if (info.url || info.status === "complete") syncPopup(tabId, info.url || tab.url);
+});
+// Pestañas de Meet que ya estaban abiertas cuando arrancó la extensión.
+chrome.tabs.query({ url: "https://meet.google.com/*" }).then((tabs) => tabs.forEach((t) => syncPopup(t.id, t.url))).catch(() => {});
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  chrome.tabs.get(tabId).then((tab) => syncPopup(tabId, tab.url)).catch(() => {});
+});
 const detachedWindows = new Map(); // tabId -> id de la ventana separada (para no abrir dos)
 const autoOpened = new Set(); // pestañas donde ya se abrió sola la ventana
 

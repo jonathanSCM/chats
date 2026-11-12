@@ -155,9 +155,18 @@ async function connectMic(deviceId) {
   const isDenied = (e) => Boolean(e && (e.name === "NotAllowedError" || e.name === "SecurityError"));
   let stream = null;
   let denied = false;
+  // Esta página es invisible: NO puede mostrar el aviso de Chrome, y pedir el micrófono sin permiso se queda colgado. Se
+  // consulta antes (sin pedir nada); el permiso se da una sola vez en la pestaña «Activar micrófono» y de aquí en adelante
+  // vale para todas las reuniones.
+  const perm = await micPermission();
+  if (attempt !== micAttempt || !active) return;
+  if (perm !== "granted") {
+    stats.micAvailable = false;
+    stats.micState = perm === "denied" ? "denied" : "needs-permission";
+    watchMicPermission();
+    return;
+  }
   try {
-    // Sin permiso, esto puede quedarse esperando (aquí no hay ventana donde pedirlo): por eso el panel lo pide aparte y
-    // vuelve a llamar a esta función cuando ya está concedido.
     stream = await navigator.mediaDevices.getUserMedia({ audio: deviceId ? { ...base, deviceId: { exact: deviceId } } : base });
   } catch (error) {
     denied = isDenied(error);
@@ -187,6 +196,30 @@ async function connectMic(deviceId) {
   stats.micAvailable = true;
   stats.micState = "ok";
   stats.micLabel = (stream.getAudioTracks()[0] && stream.getAudioTracks()[0].label) || null;
+}
+
+/** Estado del permiso del micrófono SIN pedirlo: "granted" | "prompt" | "denied". Si Chrome no responde, se trata como «falta». */
+async function micPermission() {
+  try {
+    const status = await Promise.race([navigator.permissions.query({ name: "microphone" }), sleep(3000).then(() => null)]);
+    return status ? status.state : "prompt";
+  } catch {
+    return "prompt";
+  }
+}
+
+// Cuando la persona da el permiso (en la pestaña «Activar micrófono»), el micrófono se suma a la grabación en curso solo.
+let permWatch = null;
+async function watchMicPermission() {
+  if (permWatch) return;
+  try {
+    permWatch = await navigator.permissions.query({ name: "microphone" });
+    permWatch.onchange = () => {
+      if (permWatch.state === "granted" && active && !micStream) void switchMic((session && session.micDeviceId) || "");
+    };
+  } catch {
+    permWatch = null;
+  }
 }
 
 // Cambia de micrófono sin cortar la grabación.

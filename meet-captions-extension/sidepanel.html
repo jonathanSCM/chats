@@ -141,8 +141,8 @@
     <!-- Sesión + micrófono en un solo paso -->
     <section class="card" id="accountBox" style="display: none">
       <h2>Conecta la extensión con tu CRM</h2>
-      <p class="lead">Un solo paso: se pide el permiso del micrófono y se abre el CRM para iniciar sesión (si ya la tienes, queda conectado solo).</p>
-      <button class="accent big" id="loginBtn">Iniciar sesión y permitir el micrófono</button>
+      <p class="lead">Se abre el CRM para iniciar sesión (si ya la tienes abierta, queda conectado solo).</p>
+      <button class="accent big" id="loginBtn">Iniciar sesión</button>
     </section>
 
     <!-- Reunión terminada: resumen y volver a grabar -->
@@ -163,6 +163,10 @@
         <select id="orgSelect"></select>
       </label>
       <p class="hint" id="orgOnly" style="display: none"></p>
+      <div class="notice warn" id="micSetup" style="display: none; margin: 0; flex-direction: column">
+        <span id="micSetupText"></span>
+        <button id="micSetupBtn">Activar micrófono</button>
+      </div>
       <button class="accent big" id="recordBtn">Grabar esta reunión</button>
       <button id="joinBtn">Unir al asistente (graba y transcribe él solo)</button>
       <p class="hint">Avisa a los participantes de que vas a grabar. Para capturar el audio sin selector, abre el asistente con el ícono de la extensión (barra de Chrome); si no, Chrome te pedirá elegir la pestaña de Meet.</p>

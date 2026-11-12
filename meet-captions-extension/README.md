@@ -66,7 +66,7 @@ Con ese clic se activan a la vez: los subtítulos de Meet (en español), el audi
 | `content.js` | Lee los subtítulos de la pestaña de Meet y detecta el fin de la reunión. |
 | `captions-dom.js` | Activa los subtítulos de forma segura y esconde su franja. |
 | `sidepanel.html/js` | El panel (se abre con el ícono): sesión, organización, nombre, «Grabar», subtítulos en vivo y ajustes. También como ventana separada. |
-| `permissions.html/js` | Concede el micrófono una vez (el popup se cierra al perder el foco). |
+| `permissions.html/js` | Única página que pide el micrófono (una vez, en una pestaña normal: el panel lateral pierde el foco y descartaba el aviso). |
 | `authorize-bridge.js` | Guarda tu sesión del CRM al conectarte. |
 
 ## Permisos (y por qué)

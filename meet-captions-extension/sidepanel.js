@@ -31,6 +31,9 @@ const loginBtn = $("loginBtn");
 const logoutBtn = $("logoutBtn");
 const accountLine = $("accountLine");
 const recordBox = $("recordBox");
+const micSetup = $("micSetup");
+const micSetupText = $("micSetupText");
+const micSetupBtn = $("micSetupBtn");
 const titleInput = $("titleInput");
 const orgField = $("orgField");
 const orgSelect = $("orgSelect");
@@ -112,39 +115,44 @@ async function apiBase() {
 }
 
 // ───────── Micrófono: el permiso se pide desde aquí (página visible) ─────────
-let micPromptTried = false;
-async function ensureMicPermission() {
-  let status = "prompt";
+// El panel NUNCA pide el micrófono por su cuenta (el aviso de Chrome sobre un panel lateral se descarta al perder el foco y se
+// repetía). Se pide una sola vez, solo cuando la persona pulsa «Activar micrófono», en una pestaña normal de la extensión.
+// Quien graba (página invisible) se entera solo cuando el permiso queda concedido.
+async function micPermissionState() {
   try {
-    status = (await navigator.permissions.query({ name: "microphone" })).state;
+    return (await navigator.permissions.query({ name: "microphone" })).state; // "granted" | "prompt" | "denied"; no pide nada
   } catch {
-    /* sin API de permisos: se intenta pedir directo */
+    return "prompt";
   }
-  if (status === "granted") {
-    await chrome.storage.local.set({ micGranted: true });
-    return "granted";
+}
+async function openMicTab() {
+  const url = chrome.runtime.getURL("permissions.html");
+  const [existing] = await chrome.tabs.query({ url });
+  if (existing) {
+    await chrome.tabs.update(existing.id, { active: true });
+    if (existing.windowId != null) await chrome.windows.update(existing.windowId, { focused: true });
+  } else {
+    await chrome.tabs.create({ url });
   }
-  if (status === "denied") return "denied";
+}
+// Aviso suave (no bloquea nada) cuando el micrófono todavía no está activado, antes de grabar.
+async function renderMicSetup() {
+  const state = await micPermissionState();
+  micSetup.style.display = state === "granted" ? "none" : "flex";
+  micSetupText.textContent = state === "denied" ? "El micrófono está bloqueado: tu voz no se grabará." : "Activa el micrófono una vez para que se grabe también tu voz.";
+}
+micSetupBtn.addEventListener("click", () => void openMicTab());
+(async () => {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach((t) => t.stop());
-    await chrome.storage.local.set({ micGranted: true });
-    return "granted";
-  } catch (error) {
-    return error && error.name === "NotAllowedError" ? "denied" : "error";
+    const status = await navigator.permissions.query({ name: "microphone" });
+    status.onchange = () => {
+      void renderMicSetup();
+      void loadSettings(); // con permiso se ven los nombres de los micrófonos
+    };
+  } catch {
+    /* sin API de permisos */
   }
-}
-async function reconnectMic() {
-  const { micDeviceId } = await chrome.storage.local.get(["micDeviceId"]);
-  chrome.runtime.sendMessage({ type: "OFFSCREEN_SET_MIC_DEVICE", deviceId: micDeviceId || "" }).catch(() => {});
-  void loadSettings(); // ahora sí se ven los nombres de los micrófonos
-}
-async function askMic(manual) {
-  const result = await ensureMicPermission();
-  if (result === "granted") await reconnectMic();
-  else if (manual) chrome.tabs.create({ url: chrome.runtime.getURL("permissions.html") }); // explica cómo desbloquearlo
-  return result;
-}
+})();
 
 // ───────── A qué organización va la reunión ─────────
 async function renderDest(state, future) {
@@ -177,14 +185,8 @@ function renderAccount(auth) {
   logoutBtn.style.display = auth.token ? "inline" : "none";
 }
 
-// Un solo clic: pide el permiso del micrófono (aviso de Chrome) y, enseguida, abre el CRM para iniciar sesión.
-loginBtn.addEventListener("click", async () => {
-  loginBtn.disabled = true;
-  loginBtn.textContent = "Permite el micrófono en el aviso de Chrome…";
-  await Promise.race([ensureMicPermission(), sleep(20000)]); // si no contesta, igual se sigue
+loginBtn.addEventListener("click", () => {
   chrome.tabs.create({ url: `${CRM_BASE}/dashboard/extension-authorize` });
-  loginBtn.textContent = "Iniciar sesión y permitir el micrófono";
-  loginBtn.disabled = false;
 });
 logoutBtn.addEventListener("click", async () => {
   await chrome.storage.local.remove(["token", "userName", "orgList", "activeOrganizationId"]);
@@ -225,6 +227,7 @@ orgSelect.addEventListener("change", () => chrome.storage.local.set({ orgId: org
 
 async function showRecordBox(token, { fresh } = {}) {
   recordBox.style.display = "grid";
+  void renderMicSetup();
   const key = meetingUrl + (fresh ? "|" + fresh : "");
   if (recordBox.dataset.key !== key) {
     // Reunión distinta (o una grabación nueva): se recupera lo escrito para ESA reunión y se vuelve a habilitar el botón.
@@ -261,7 +264,6 @@ recordBtn.addEventListener("click", () => {
       recordStatus.textContent = "No se pudo conectar con la reunión: recarga la pestaña de Meet e inténtalo de nuevo.";
     });
   startAudio({ organizationId, title, recordingId });
-  void askMic(false); // si falta el permiso del micrófono, Chrome lo pide ahora mismo
 });
 
 // ───────── Audio de la reunión: dos formas de capturar la pestaña ─────────
@@ -482,21 +484,19 @@ async function render() {
   }
 
   if (state.warning) notices.append(notice(state.warning, "warn"));
-  if (audio.active && audio.micState && audio.micState !== "ok" && audio.micState !== "off") {
+  if (audio.active && (audio.micState === "denied" || audio.micState === "needs-permission")) {
     notices.append(
       notice(
         audio.micState === "denied"
           ? "El micrófono está bloqueado para la extensión: tu voz no se está grabando."
-          : "La extensión necesita permiso para usar tu micrófono: tu voz todavía no se graba.",
+          : "Falta activar el micrófono (una sola vez): tu voz todavía no se graba. Cuando lo actives se suma sola, sin cortar la grabación.",
         "warn",
-        "Permitir micrófono",
-        () => void askMic(true),
+        "Activar micrófono",
+        () => void openMicTab(),
       ),
     );
-    if (!micPromptTried) {
-      micPromptTried = true;
-      void askMic(false); // Chrome muestra el aviso «quiere usar tu micrófono» solo
-    }
+  } else if (audio.active && audio.micState === "none") {
+    notices.append(notice("No se encontró ningún micrófono: solo se graban las voces de los demás.", "warn"));
   }
   const pickerArgs = { organizationId: state.organizationId, title: state.title, recordingId: state.recordingId };
   const askPicker = () => void pickAudio(pickerArgs);
@@ -599,7 +599,7 @@ async function loadMics(selectedId) {
   micSelect.value = devices.some((d) => d.deviceId === selectedId) ? selectedId : "";
   micHint.textContent = named
     ? "Habla para ver si se mueve la barra: así sabes que ese es el micrófono correcto."
-    : "Para ver los nombres de tus micrófonos, permite el micrófono cuando Chrome lo pida (una sola vez).";
+    : "Para ver los nombres de tus micrófonos, primero activa el micrófono (botón «Activar micrófono»).";
 }
 
 micSelect.addEventListener("change", async () => {
@@ -623,6 +623,7 @@ function stopMeter() {
 }
 async function startMeter() {
   stopMeter();
+  if ((await micPermissionState()) !== "granted") return; // nunca se pide el permiso desde aquí
   try {
     meterStream = await navigator.mediaDevices.getUserMedia({ audio: micSelect.value ? { deviceId: { exact: micSelect.value } } : true });
   } catch {
@@ -665,15 +666,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
     void render();
     void renderDebug();
   }
-  // La sesión del CRM la guarda la página del CRM al conectarte: el panel se actualiza solo y, si falta, pide el micrófono.
+  // La sesión del CRM la guarda la página del CRM al conectarte: el panel se actualiza solo.
   if (area === "local" && changes.consent) void render();
-  if (area === "local" && (changes.token || changes.userName)) {
-    void render();
-    if (changes.token && changes.token.newValue && !micPromptTried) {
-      micPromptTried = true;
-      void askMic(false);
-    }
-  }
+  if (area === "local" && (changes.token || changes.userName)) void render();
 });
 if (!detached) {
   chrome.tabs.onActivated.addListener(() => void render());

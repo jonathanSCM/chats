@@ -25,6 +25,25 @@ describe("extension-package", () => {
   });
 });
 
+describe("permiso del micrófono", () => {
+  it("solo la pestaña «Activar micrófono» lo pide; el panel y el grabador consultan el permiso antes de abrir el micrófono", async () => {
+    const { readFileSync } = await import("node:fs");
+    const read = (f: string) => readFileSync(`${process.cwd()}/meet-captions-extension/${f}`, "utf8");
+    const side = read("sidepanel.js");
+    expect(side).not.toContain("askMic");
+    expect(side).not.toContain("ensureMicPermission");
+    // El único getUserMedia del panel es el medidor de nivel, y va detrás de la consulta del permiso.
+    expect(side.match(/getUserMedia/g)).toHaveLength(1);
+    expect(side.indexOf('(await micPermissionState()) !== "granted"')).toBeGreaterThan(-1);
+    expect(side.indexOf('(await micPermissionState()) !== "granted"')).toBeLessThan(side.indexOf("getUserMedia"));
+    const off = read("offscreen.js");
+    const connect = off.slice(off.indexOf("async function connectMic"));
+    expect(connect.indexOf("await micPermission()")).toBeGreaterThan(-1);
+    expect(connect.indexOf("await micPermission()")).toBeLessThan(connect.indexOf("getUserMedia"));
+    expect(read("permissions.js")).toContain("getUserMedia({ audio: true })");
+  });
+});
+
 describe("paquete para la Chrome Web Store", () => {
   it("quita la auto-actualización (código alojado fuera del paquete) y el aviso de versión, y el JS sigue siendo válido", async () => {
     const { buildExtensionZip } = await import("./extension-package");

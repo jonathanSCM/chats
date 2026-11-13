@@ -71,4 +71,17 @@ describe("grabar, detener y volver a grabar", () => {
     await Promise.all([meet.message({ type: "STOP_AND_SEND" }), meet.message({ type: "STOP_AND_SEND" })]);
     expect(meet.posts().filter((p) => p.final)).toHaveLength(1);
   });
+
+  it("con una reunión del CRM elegida, cada envío lleva su id y el primero marca el inicio de la grabación", async () => {
+    await meet.message({ type: "START_RECORDING", organizationId: null, title: null, recordingId: "r1", meetingId: "m-crm-1", meetingLabel: "Demo con Ana" });
+    await vi.advanceTimersByTimeAsync(3000);
+    feed(A, B, C);
+    await vi.advanceTimersByTimeAsync(31_000);
+    await meet.message({ type: "STOP_AND_SEND" });
+    const posts = meet.posts() as unknown as { meetingId?: string; start?: boolean; final: boolean }[];
+    expect(posts.every((p) => p.meetingId === "m-crm-1")).toBe(true);
+    expect(posts[0].start).toBe(true); // primer envío: el servidor abre la sección con fecha y hora
+    expect(posts.slice(1).every((p) => !p.start)).toBe(true);
+    expect(states().at(-1)).toMatchObject({ meetingId: "m-crm-1", meetingLabel: "Demo con Ana" });
+  });
 });

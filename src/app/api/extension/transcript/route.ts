@@ -4,6 +4,7 @@ import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
 import {
   ExtensionMeetingNotFoundError,
+  appendRecordingText,
   isPlatformBotEmail,
   resolveExtensionMeeting,
   resolveExtensionOrg,
@@ -42,6 +43,10 @@ const bodySchema = z.object({
   title: z.string().max(300).optional(),
   // Id de esta grabación (la extensión de Chrome): cada grabación es su propia reunión.
   recordingId: z.string().max(80).optional(),
+  // Reunión del CRM elegida en el panel de la extensión (opcional).
+  meetingId: z.string().max(80).optional(),
+  // true en el primer envío de una grabación: el texto se guarda como sección nueva, con su fecha y hora.
+  start: z.boolean().optional(),
 });
 
 // El content script de la extensión corre pegado al origen de la propia
@@ -71,7 +76,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return withCors(new NextResponse("Datos inválidos", { status: 400 }));
   }
-  const { meetingUrl, transcript, final, vexaSessionId, organizationId: requestedOrganizationId, title, recordingId } = parsed.data;
+  const { meetingUrl, transcript, final, vexaSessionId, organizationId: requestedOrganizationId, title, recordingId, meetingId, start } = parsed.data;
 
   const addition = transcript.trim();
   // Una parte intermedia (final=false) sin texto no tiene nada que guardar.
@@ -110,6 +115,7 @@ export async function POST(req: NextRequest) {
       vexaSessionId,
       title,
       recordingId,
+      meetingId,
       onlyExisting: isPlatformBotEmail(user.email),
     });
   } catch (error) {
@@ -125,7 +131,10 @@ export async function POST(req: NextRequest) {
   // se duplicaría en cascada con cada actualización.
   // El cierre sin texto nuevo (la extensión ya mandó todo por partes) solo termina: sin nada acumulado no hay qué cerrar.
   if (!addition && !resolved.transcript) return withCors(NextResponse.json({ ok: true, ignored: true }, { status: 202 }));
-  const newTranscriptValue = !addition ? (resolved.transcript as string) : resolved.transcript ? `${resolved.transcript}\n\n${transcript}` : transcript;
+  const organization = addition && start ? await prisma.organization.findUnique({ where: { id: org.organizationId }, select: { timezone: true } }) : null;
+  const newTranscriptValue = !addition
+    ? (resolved.transcript as string)
+    : appendRecordingText({ existing: resolved.transcript, addition: transcript, startsRecording: start === true, chosenByPerson: Boolean(meetingId), at: new Date(), timeZone: organization?.timezone });
   const meeting = addition
     ? await prisma.meeting.update({ where: { id: resolved.id }, data: { transcript: newTranscriptValue }, select: { id: true } })
     : { id: resolved.id };

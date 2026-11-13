@@ -66,7 +66,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-async function startRecording({ streamId, source, tabId, meetingUrl, organizationId, title, token, apiBase, micDeviceId, recordMic, recordingId }) {
+async function startRecording({ streamId, source, tabId, meetingUrl, organizationId, title, token, apiBase, micDeviceId, recordMic, recordingId, meetingId }) {
   if (active && session && session.tabId === tabId) return; // ya está grabando esta pestaña
   if (active) {
     // Una grabación vieja de otra pestaña (cerrada, o que quedó colgada) no debe bloquear esta: se cierra (sube su última parte).
@@ -81,7 +81,7 @@ async function startRecording({ streamId, source, tabId, meetingUrl, organizatio
     release();
   }
   dbg(`inicio pedido (pestaña ${tabId})`);
-  session = { tabId, meetingUrl, organizationId: organizationId || null, title: title || null, token: token || null, apiBase: apiBase || null, micDeviceId: micDeviceId || "", recordMic: recordMic !== false, recordingId: recordingId || null };
+  session = { tabId, meetingUrl, organizationId: organizationId || null, title: title || null, token: token || null, apiBase: apiBase || null, micDeviceId: micDeviceId || "", recordMic: recordMic !== false, recordingId: recordingId || null, meetingId: meetingId || null };
   paused = false;
   stats = { part: 0, uploaded: 0, failed: 0, micEnabled: true, micAvailable: false, micState: "pending", paused: false, micLabel: null, lastError: null };
 
@@ -311,6 +311,7 @@ async function sendPart(blob, part, current) {
       "X-Meeting-Url": (current && current.meetingUrl) || "",
       "X-Audio-Part": String(part),
       ...(current && current.recordingId ? { "X-Recording-Id": current.recordingId } : {}),
+      ...(current && current.meetingId ? { "X-Meeting-Id": current.meetingId } : {}),
       ...(current && current.organizationId ? { "X-Organization-Id": current.organizationId } : {}),
       // Los encabezados HTTP no admiten tildes ni emojis: va codificado y el servidor lo decodifica.
       ...(current && current.title ? { "X-Meeting-Title": encodeURIComponent(current.title) } : {}),

@@ -97,6 +97,29 @@
       #settingsView { display: none; flex: 1; min-height: 0; overflow-y: auto; flex-direction: column; }
       body.settings-open #mainView { display: none; }
       body.settings-open #settingsView { display: flex; }
+      body.meet-open #mainView, body.meet-open #settingsView { display: none; }
+      #meetView { display: none; flex: 1; min-height: 0; flex-direction: column; }
+      body.meet-open #meetView { display: flex; }
+      .meetpick { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left; padding: 9px 11px; }
+      .meetpick .lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .meetpick .go { flex: none; color: var(--accent); font-weight: 650; }
+      .meetpick.chosen { border-color: var(--accent); }
+      .mv-tools { display: grid; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+      .mv-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; background: var(--bg2); border-radius: 10px; }
+      .mv-tabs button { border: 0; background: none; padding: 6px 8px; border-radius: 8px; font-weight: 600; color: var(--muted); }
+      .mv-tabs button[aria-pressed="true"] { background: var(--bg); color: var(--fg); box-shadow: var(--shadow); }
+      #mvList { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 14px 14px; display: grid; gap: 6px; align-content: start; }
+      .mv-day { margin: 10px 0 0; font-size: 11.5px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+      .mv-card { display: grid; grid-template-columns: 52px 1fr; gap: 10px; align-items: start; width: 100%; text-align: left; padding: 9px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg2); }
+      .mv-card:hover { border-color: var(--muted); }
+      .mv-card .t { font-variant-numeric: tabular-nums; font-weight: 650; font-size: 13px; }
+      .mv-card .n { font-weight: 600; font-size: 13.5px; line-height: 1.3; }
+      .mv-card .c { color: var(--muted); font-size: 12px; }
+      .mv-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+      .mv-tag { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); }
+      .mv-tag.here { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+      .mv-tag.warn { background: var(--warn-bg); border-color: transparent; color: var(--warn); }
+      .mv-msg { color: var(--muted); text-align: center; padding: 22px 8px; font-size: 12.5px; }
       .settings-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 1; }
       .settings-bar h2 { margin: 0; font-size: 14px; font-weight: 650; }
       .back { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; }
@@ -167,7 +190,12 @@
 
     <!-- Antes de grabar -->
     <section class="card" id="recordBox" style="display: none">
-      <label class="field">
+      <div class="field">
+        Reunión del CRM
+        <button class="meetpick" id="meetPickBtn" type="button"><span class="lbl" id="meetPickLabel">Detectar sola (recomendado)</span><span class="go">Elegir…</span></button>
+        <span class="hint" id="meetPickHint">Elige una reunión agendada si lo que vas a grabar pertenece a ella.</span>
+      </div>
+      <label class="field" id="titleField">
         Nombre de la reunión (opcional)
         <input id="titleInput" type="text" maxlength="160" placeholder="Ej.: Demo con Ana - Financiera" />
       </label>
@@ -200,6 +228,21 @@
       <button id="screenBtn">Grabar pantalla (se guarda en tu computador)</button>
     </footer>
     </div>
+    <section id="meetView">
+      <div class="settings-bar">
+        <button class="back" id="mvBack"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Volver</button>
+        <h2>Reunión del CRM</h2>
+      </div>
+      <div class="mv-tools">
+        <input id="mvSearch" type="text" placeholder="Buscar por nombre o cliente…" autocomplete="off" />
+        <div class="mv-tabs">
+          <button id="mvUpcoming" aria-pressed="true">Hoy y próximas</button>
+          <button id="mvAll" aria-pressed="false">Todas</button>
+        </div>
+      </div>
+      <div class="mv-tools" style="border-bottom: 0; padding-top: 0"><button id="mvClear">Detectar sola (quitar elección)</button></div>
+      <div id="mvList"></div>
+    </section>
     <section id="settingsView">
       <div class="settings-bar">
         <button class="back" id="backBtn"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Volver</button>

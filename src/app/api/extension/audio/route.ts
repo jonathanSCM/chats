@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/server/db/client";
 import { saveMediaFile } from "@/lib/media-storage";
-import { resolveExtensionMeeting, resolveExtensionOrg } from "@/server/services/extension-meeting";
+import { appendRecordingText, resolveExtensionMeeting, resolveExtensionOrg } from "@/server/services/extension-meeting";
 import { transcribeAudio } from "@/server/services/audio-transcription";
 
 /**
@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
     // El nombre viaja codificado (encabezado HTTP): encodeURIComponent en la extensión.
     title: safeDecode(req.headers.get("x-meeting-title")),
     recordingId: req.headers.get("x-recording-id"),
+    meetingId: req.headers.get("x-meeting-id"),
   });
 
   const part = Number(req.headers.get("x-audio-part"));
@@ -88,11 +89,19 @@ export async function POST(req: NextRequest) {
   if (!result.transcript) return NextResponse.json({ ok: true, meetingId: resolved.id, transcribed: true, empty: true });
 
   // Se relee el texto actual: las partes llegan una tras otra y cada una se suma a lo que ya hay.
-  const current = await prisma.meeting.findUnique({ where: { id: resolved.id }, select: { audioTranscript: true } });
+  const current = await prisma.meeting.findUnique({ where: { id: resolved.id }, select: { audioTranscript: true, organization: { select: { timezone: true } } } });
   await prisma.meeting.update({
     where: { id: resolved.id },
     data: {
-      audioTranscript: current?.audioTranscript ? `${current.audioTranscript}\n\n${result.transcript}` : result.transcript,
+      // La primera parte de una grabación abre una sección nueva con su fecha y hora (no se mezcla con las anteriores).
+      audioTranscript: appendRecordingText({
+        existing: current?.audioTranscript,
+        addition: result.transcript,
+        startsRecording: part === 1,
+        chosenByPerson: Boolean(req.headers.get("x-meeting-id")),
+        at: new Date(),
+        timeZone: current?.organization?.timezone,
+      }),
     },
   });
 

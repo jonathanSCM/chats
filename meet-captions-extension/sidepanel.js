@@ -177,7 +177,7 @@ async function renderDest(state, future) {
   }
   const id = (state && state.organizationId) || active;
   const org = list && list.find((o) => o.id === id);
-  const title = state && state.title ? " · " + state.title : "";
+  const title = state && (state.meetingLabel || state.title) ? " · " + (state.meetingLabel || state.title) : "";
   dest.textContent = org ? `${future ? "Se enviará a" : "Se envía a"}: ${org.name}${title}` : title ? "Reunión" + title : "";
 }
 
@@ -226,7 +226,10 @@ async function loadOrgs(token) {
     /* sin conexión: se usa la organización recordada / la activa del CRM */
   }
 }
-orgSelect.addEventListener("change", () => chrome.storage.local.set({ orgId: orgSelect.value }));
+orgSelect.addEventListener("change", () => {
+  chrome.storage.local.set({ orgId: orgSelect.value });
+  setChosen(null); // las reuniones son de cada organización
+});
 
 async function showRecordBox(token, { fresh } = {}) {
   recordBox.style.display = "grid";
@@ -235,6 +238,7 @@ async function showRecordBox(token, { fresh } = {}) {
   if (recordBox.dataset.key !== key) {
     // Reunión distinta (o una grabación nueva): se recupera lo escrito para ESA reunión y se vuelve a habilitar el botón.
     recordBox.dataset.key = key;
+    setChosen(null);
     const draftKey = `titleDraft:${meetingUrl}`;
     titleInput.value = fresh ? "" : (await chrome.storage.local.get([draftKey]))[draftKey] || "";
     if (fresh) chrome.storage.local.remove(draftKey);
@@ -250,6 +254,173 @@ const currentOrg = () => (orgField.style.display === "none" ? null : orgSelect.v
 
 // Grabar: subtítulos (pestaña de Meet) + audio (coordinador). Cada vez es una grabación nueva con su propio id: la del cliente
 // y la del equipo en la misma sala quedan como reuniones separadas. Si el audio no arranca, los subtítulos siguen igual.
+// ───────── Reunión del CRM (elegir a cuál pertenece lo que se graba) ─────────
+let chosenMeeting = null; // { id, title, client, scheduledAt }
+let mvScope = "upcoming";
+let mvSkip = 0;
+let mvSeq = 0;
+let mvTimer = null;
+const mvList = $("mvList");
+const mvSearch = $("mvSearch");
+
+function paintChosen() {
+  const btn = $("meetPickBtn");
+  btn.classList.toggle("chosen", Boolean(chosenMeeting));
+  $("meetPickLabel").textContent = chosenMeeting ? chosenMeeting.title + (chosenMeeting.client ? " · " + chosenMeeting.client : "") : "Detectar sola (recomendado)";
+  $("titleField").style.display = chosenMeeting ? "none" : "grid";
+  $("meetPickHint").textContent = chosenMeeting
+    ? "Esta grabación se guarda dentro de esa reunión del CRM, con su propia fecha y hora."
+    : "Elige una reunión agendada si lo que vas a grabar pertenece a ella.";
+}
+function setChosen(meeting) {
+  chosenMeeting = meeting;
+  paintChosen();
+}
+function showMeetings(on) {
+  document.body.classList.toggle("meet-open", on);
+  if (on) {
+    void loadMeetings(true);
+    mvSearch.focus();
+  }
+}
+$("meetPickBtn").addEventListener("click", () => showMeetings(true));
+$("mvBack").addEventListener("click", () => showMeetings(false));
+$("mvClear").addEventListener("click", () => {
+  setChosen(null);
+  showMeetings(false);
+});
+for (const [id, scope] of [["mvUpcoming", "upcoming"], ["mvAll", "all"]]) {
+  $(id).addEventListener("click", () => {
+    mvScope = scope;
+    $("mvUpcoming").setAttribute("aria-pressed", String(scope === "upcoming"));
+    $("mvAll").setAttribute("aria-pressed", String(scope === "all"));
+    void loadMeetings(true);
+  });
+}
+mvSearch.addEventListener("input", () => {
+  clearTimeout(mvTimer);
+  mvTimer = setTimeout(() => void loadMeetings(true), 300);
+});
+
+const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+function dayLabel(iso) {
+  const d = new Date(iso);
+  const diff = Math.round((startOfDay(d) - startOfDay(new Date())) / 86400000);
+  if (diff === 0) return "Hoy";
+  if (diff === 1) return "Mañana";
+  if (diff === -1) return "Ayer";
+  const text = d.toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long", ...(d.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}) });
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+const STATUS_TEXT = { SCHEDULED: "Agendada", CONFIRMED: "Confirmada", DONE: "Realizada", NO_SHOW: "No se presentó" };
+const meetCode = () => (meetingUrl || "").split("/").pop();
+
+function mvMessage(text) {
+  const p = document.createElement("p");
+  p.className = "mv-msg";
+  p.textContent = text;
+  return p;
+}
+
+function mvCard(m) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "mv-card";
+  const t = document.createElement("span");
+  t.className = "t";
+  t.textContent = new Date(m.scheduledAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+  const body = document.createElement("span");
+  const n = document.createElement("div");
+  n.className = "n";
+  n.textContent = m.title;
+  body.append(n);
+  if (m.client) {
+    const c = document.createElement("div");
+    c.className = "c";
+    c.textContent = m.client;
+    body.append(c);
+  }
+  const tags = document.createElement("div");
+  tags.className = "mv-tags";
+  const tag = (text, cls) => {
+    const s = document.createElement("span");
+    s.className = "mv-tag" + (cls ? " " + cls : "");
+    s.textContent = text;
+    tags.append(s);
+  };
+  if (m.meetingUrl && meetCode() && m.meetingUrl.toLowerCase().includes(meetCode())) tag("Esta sala de Meet", "here");
+  if (STATUS_TEXT[m.status]) tag(STATUS_TEXT[m.status]);
+  if (m.hasTranscript) tag("Ya tiene grabaciones", "warn");
+  if (tags.childElementCount) body.append(tags);
+  b.append(t, body);
+  b.addEventListener("click", () => {
+    setChosen({ id: m.id, title: m.title, client: m.client, scheduledAt: m.scheduledAt });
+    showMeetings(false);
+  });
+  return b;
+}
+
+async function loadMeetings(reset) {
+  const seq = ++mvSeq;
+  if (reset) {
+    mvSkip = 0;
+    mvList.replaceChildren(mvMessage("Buscando reuniones…"));
+  }
+  try {
+    const { token } = await chrome.storage.local.get(["token"]);
+    if (!token) throw new Error("Inicia sesión para ver tus reuniones.");
+    const url = new URL(`${await apiBase()}/api/extension/meetings/list`);
+    url.searchParams.set("scope", mvScope);
+    url.searchParams.set("skip", String(mvSkip));
+    const q = mvSearch.value.trim();
+    if (q) url.searchParams.set("q", q);
+    const org = currentOrg();
+    if (org) url.searchParams.set("organizationId", org);
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) });
+    if (!res.ok) throw new Error(res.status === 401 ? "La sesión del CRM venció: vuelve a iniciar sesión." : `El CRM respondió ${res.status}.`);
+    const data = await res.json();
+    if (seq !== mvSeq) return; // llegó una búsqueda más nueva
+    if (reset) mvList.replaceChildren();
+    mvList.querySelector(".mv-more")?.remove();
+    const items = data.meetings || [];
+    if (reset && items.length === 0) {
+      mvList.append(mvMessage(q ? "No hay reuniones con ese nombre." : mvScope === "upcoming" ? "No hay reuniones de hoy en adelante. Prueba «Todas»." : "Todavía no hay reuniones."));
+    }
+    let lastDay = reset ? "" : mvList.dataset.lastDay || "";
+    for (const m of items) {
+      const day = dayLabel(m.scheduledAt);
+      if (day !== lastDay) {
+        const h = document.createElement("h3");
+        h.className = "mv-day";
+        h.textContent = day;
+        mvList.append(h);
+        lastDay = day;
+      }
+      mvList.append(mvCard(m));
+    }
+    mvList.dataset.lastDay = lastDay;
+    mvSkip += items.length;
+    if (data.hasMore) {
+      const more = document.createElement("button");
+      more.className = "mv-more";
+      more.textContent = "Ver más";
+      more.addEventListener("click", () => {
+        more.disabled = true;
+        void loadMeetings(false);
+      });
+      mvList.append(more);
+    }
+  } catch (error) {
+    if (seq !== mvSeq) return;
+    const msg = error && error.name === "TimeoutError" ? "El CRM no respondió. Revisa tu conexión." : error && error.message ? error.message : "No se pudieron cargar las reuniones.";
+    mvList.replaceChildren(mvMessage(msg));
+    const retry = document.createElement("button");
+    retry.textContent = "Reintentar";
+    retry.addEventListener("click", () => void loadMeetings(true));
+    mvList.append(retry);
+  }
+}
+
 // Muestra el motivo de un fallo al empezar, con el botón para recargar Meet cuando es la solución.
 function startFailed(text, offerReload) {
   recordStatus.textContent = text;
@@ -275,10 +446,12 @@ recordBtn.addEventListener("click", async () => {
   const organizationId = currentOrg();
   const title = currentTitle();
   const recordingId = crypto.randomUUID();
+  const meetingId = chosenMeeting ? chosenMeeting.id : null;
+  const meetingLabel = chosenMeeting ? chosenMeeting.title : null;
   const audioOff = (await chrome.storage.local.get(["recordAudio"])).recordAudio === false;
   let answered = false;
   chrome.tabs
-    .sendMessage(tabId, { type: "START_RECORDING", organizationId, title, recordingId, audioOff })
+    .sendMessage(tabId, { type: "START_RECORDING", organizationId, title, recordingId, audioOff, meetingId, meetingLabel })
     .then((response) => {
       answered = true;
       if (response && response.ok === false) startFailed(response.error || "No se pudo empezar a grabar.", false);
@@ -288,7 +461,8 @@ recordBtn.addEventListener("click", async () => {
       // La pestaña de Meet se abrió antes de instalar o actualizar la extensión: hay que recargarla una vez.
       startFailed("No se pudo conectar con la pestaña de Meet. Recárgala (botón de abajo) y vuelve a entrar a la reunión.", true);
     });
-  if (!audioOff) startAudio({ organizationId, title, recordingId });
+  if (!audioOff) startAudio({ organizationId, title, recordingId, meetingId });
+  setChosen(null); // la elección vale para esta grabación; la siguiente empieza de nuevo
   // Vigilante: si en 12 s no hay grabación en marcha, se dice qué hacer en vez de quedarse mudo.
   setTimeout(async () => {
     const key = "live:" + tabId;
@@ -303,11 +477,11 @@ recordBtn.addEventListener("click", async () => {
 // Automático: Chrome da la captura de la pestaña si la extensión se abrió con su ícono (permiso activeTab). Si Chrome no la da
 // (se abrió con el botón de la pantalla de Meet, o el permiso no se mantuvo), queda el plan B: el selector de pestañas de Chrome,
 // que no depende de ese permiso. El permiso de «captura de pantalla» es OPCIONAL: solo se pide si se usa el selector.
-function startAudio({ organizationId, title, recordingId }) {
+function startAudio({ organizationId, title, recordingId, meetingId }) {
   // Sin el clic en el ícono Chrome no deja la captura automática: se va directo al selector de pestañas (este clic todavía vale).
-  if (audioMethod === "picker" || !invokedCache) return pickAudio({ organizationId, title, recordingId });
+  if (audioMethod === "picker" || !invokedCache) return pickAudio({ organizationId, title, recordingId, meetingId });
   return chrome.runtime
-    .sendMessage({ type: "START_AUDIO_CAPTURE", tabId, meetingUrl, organizationId, title, recordingId })
+    .sendMessage({ type: "START_AUDIO_CAPTURE", tabId, meetingUrl, organizationId, title, recordingId, meetingId })
     .then((response) => {
       if (response && response.ok === false) recordStatus.textContent = "Audio: " + friendlyAudioError(String(response.error || "no se pudo activar"));
     })
@@ -315,7 +489,7 @@ function startAudio({ organizationId, title, recordingId }) {
 }
 
 // Debe llamarse directo desde un clic (el permiso opcional lo exige).
-function pickAudio({ organizationId, title, recordingId }) {
+function pickAudio({ organizationId, title, recordingId, meetingId }) {
   recordStatus.textContent = "Elige la pestaña de Meet y marca «Compartir audio de la pestaña»…";
   return chrome.permissions
     .request({ permissions: ["desktopCapture"] })
@@ -334,7 +508,7 @@ function pickAudio({ organizationId, title, recordingId }) {
           return;
         }
         chrome.runtime
-          .sendMessage({ type: "START_AUDIO_CAPTURE", tabId, meetingUrl: (lastState && lastState.meetingUrl) || meetingUrl, organizationId, title, recordingId, streamId })
+          .sendMessage({ type: "START_AUDIO_CAPTURE", tabId, meetingUrl: (lastState && lastState.meetingUrl) || meetingUrl, organizationId, title, recordingId, meetingId, streamId })
           .then((response) => {
             recordStatus.textContent = response && response.ok === false ? "Audio: " + String(response.error || "no se pudo activar") : "";
           })
@@ -572,7 +746,7 @@ async function renderNow() {
   } else if (audio.active && audio.micState === "none") {
     notices.append(notice("No se encontró ningún micrófono: solo se graban las voces de los demás.", "warn"));
   }
-  const pickerArgs = { organizationId: state.organizationId, title: state.title, recordingId: state.recordingId };
+  const pickerArgs = { organizationId: state.organizationId, title: state.title, recordingId: state.recordingId, meetingId: state.meetingId || null };
   const askPicker = () => void pickAudio(pickerArgs);
   if (audio.lastError) {
     const needsPicker = /invoked|activeTab|not been invoked|Chrome no dejó/i.test(audio.lastError);
@@ -973,8 +1147,10 @@ async function recoverSend() {
         transcript: (rec.lines || []).slice(rec.sentCount || 0).join("\n"),
         recordingId: rec.recordingId,
         final: true,
+        ...((rec.sentCount || 0) === 0 ? { start: true } : {}),
         ...(org ? { organizationId: org } : {}),
         ...(rec.title ? { title: rec.title } : {}),
+        ...(rec.meetingId ? { meetingId: rec.meetingId } : {}),
       }),
     });
     if (!res.ok) throw new Error(`El CRM respondió ${res.status}.`);

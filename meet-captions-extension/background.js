@@ -212,6 +212,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             micDeviceId: micDeviceId || "",
             recordMic: recordMic !== false,
             recordingId: message.recordingId || null,
+            meetingId: message.meetingId || null,
             tabId: message.tabId,
             meetingUrl: message.meetingUrl,
             organizationId: message.organizationId || null,

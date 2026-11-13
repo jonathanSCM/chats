@@ -94,6 +94,8 @@
   let pending = null;
   let maxParticipantsSeen = 0;
   let lockedOrgId; // organización de ESTA grabación (se fija al pulsar «Grabar»); sin elegir va null
+  let lockedMeetingLabel = null;
+  let lockedMeetingId = null; // reunión del CRM elegida en el panel (opcional): lo grabado se suma a ella
   let lockedTitle = null; // nombre de la reunión (opcional), fijado al pulsar «Grabar»
   let lockedAudioOff = false; // «Grabar audio» apagado en Ajustes al pulsar «Grabar»: solo subtítulos, sin micrófono ni captura de pestaña
   const finalizedKeys = new Set();
@@ -126,6 +128,8 @@
     maxParticipantsSeen = 0;
     lockedOrgId = undefined;
     lockedTitle = null;
+    lockedMeetingId = null;
+    lockedMeetingLabel = null;
     lockedAudioOff = false;
     finalizedKeys.clear();
     finalizedLines.length = 0;
@@ -154,6 +158,8 @@
         organizationId: lockedOrgId === undefined ? null : lockedOrgId,
         title: lockedTitle,
         audioOff: lockedAudioOff,
+        meetingId: lockedMeetingId,
+        meetingLabel: lockedMeetingLabel,
         last: lines.slice(-60),
         warning,
         micMuted: lastMicMuted === true,
@@ -472,6 +478,8 @@
         meetingUrl,
         organizationId: lockedOrgId === undefined ? null : lockedOrgId,
         title: lockedTitle,
+        meetingId: lockedMeetingId,
+        meetingLabel: lockedMeetingLabel,
         startedAt,
         lines: [...finalizedLines],
         sentCount,
@@ -482,7 +490,7 @@
   }
 
   // Un envío al CRM. `final` = cierre de la grabación (el servidor guarda el adjunto con el texto completo).
-  async function postTranscript(text, final) {
+  async function postTranscript(text, final, start) {
     const { apiBase, token, orgId: storedOrgId } = await store(["apiBase", "token", "orgId"]);
     const orgId = lockedOrgId !== undefined ? lockedOrgId : storedOrgId || null;
     if (!token) {
@@ -495,7 +503,7 @@
         method: "POST",
         signal: AbortSignal.timeout(30000), // sin respuesta en 30 s se da por fallido (se reintenta): nunca deja la grabación colgada
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ meetingUrl, transcript: text, recordingId, final, ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}) }),
+        body: JSON.stringify({ meetingUrl, transcript: text, recordingId, final, ...(start ? { start: true } : {}), ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}), ...(lockedMeetingId ? { meetingId: lockedMeetingId } : {}) }),
       });
       dbg(`subtítulos enviados (${final ? "cierre" : "parte"}): ${res.status}`);
       return res.ok;
@@ -514,7 +522,7 @@
         await saveLocal(false);
         if (total <= sentCount || currentTranscript().trim().length < MIN_TRANSCRIPT) return;
         const text = finalizedLines.slice(sentCount, total).join("\n");
-        if (await postTranscript(text, false)) {
+        if (await postTranscript(text, false, sentCount === 0)) {
           sentCount = Math.max(sentCount, total);
           await saveLocal(false);
         }
@@ -535,7 +543,7 @@
     sent = true;
     const total = finalizedLines.length;
     const rest = finalizedLines.slice(sentCount, total).join("\n");
-    if (await postTranscript(rest, true)) {
+    if (await postTranscript(rest, true, sentCount === 0)) {
       sentCount = total;
       void storeRemove(recKey());
     } else {
@@ -618,7 +626,7 @@
         const orgId = lockedOrgId !== undefined ? lockedOrgId : storedOrgId || null;
         const base = (apiBase || "https://chats.proshop.lat").replace(/\/$/, "");
         const blob = new Blob(
-          [JSON.stringify({ meetingUrl, transcript, token, recordingId, final: true, ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}) })],
+          [JSON.stringify({ meetingUrl, transcript, token, recordingId, final: true, ...(sentCount === 0 ? { start: true } : {}), ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}), ...(lockedMeetingId ? { meetingId: lockedMeetingId } : {}) })],
           { type: "application/json" },
         );
         // Se asume enviado: se borra la copia local para que el panel no ofrezca enviarla otra vez.
@@ -681,6 +689,8 @@
         if (phase === "stopped") resetSession(); // otra grabación en la misma reunión: empieza de cero
         lockedOrgId = message.organizationId || null;
         lockedTitle = message.title || null;
+        lockedMeetingId = message.meetingId || null;
+        lockedMeetingLabel = message.meetingLabel || null;
         lockedAudioOff = message.audioOff === true;
         recordingId = message.recordingId || crypto.randomUUID();
         // Se contesta de inmediato (la fase ya cambió): activar los subtítulos tarda varios segundos y el panel no debe quedarse esperando.

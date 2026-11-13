@@ -20,7 +20,8 @@ vi.mock("@/server/db/client", () => ({
 }));
 vi.mock("@/lib/media-storage", () => ({ saveMediaFile: m.save }));
 vi.mock("@/server/services/meeting-link", () => ({ attemptAutoLinkMeeting: m.link }));
-vi.mock("@/server/services/extension-meeting", () => ({
+vi.mock("@/server/services/extension-meeting", async (importActual) => ({
+  ...(await importActual<typeof import("@/server/services/extension-meeting")>()),
   ExtensionMeetingNotFoundError: class extends Error {},
   isPlatformBotEmail: () => false,
   resolveExtensionOrg: m.resolveOrg,

@@ -152,6 +152,9 @@ export async function resolveExtensionMeeting(params: {
   // Id de esta grabación de la extensión (uno por cada vez que se pulsa «Grabar»). Sin él (script de Tampermonkey, versiones
   // viejas) todo lo de la misma sala va a la misma reunión, como siempre.
   recordingId?: string | null;
+  // Reunión del CRM que la persona eligió en el panel de la extensión: todo lo que llegue va a ESA reunión (si es de la organización
+  // y no está cancelada). No se renombra ni se le cambia nada: se le suma el texto y el audio.
+  meetingId?: string | null;
   // Solo buscar: si no existe, lanza ExtensionMeetingNotFoundError en vez de crear una "Reunión Extensión" suelta.
   // Lo usa el asistente de Vexa: el CRM solo debe guardar lo de reuniones que él mismo pidió.
   onlyExisting?: boolean;
@@ -159,6 +162,17 @@ export async function resolveExtensionMeeting(params: {
   const { organizationId, recordedById = null, vexaSessionId = null } = params;
   const title = cleanMeetingTitle(params.title);
   const recordingId = cleanRecordingId(params.recordingId);
+
+  if (params.meetingId) {
+    const chosen = await prisma.meeting.findFirst({
+      where: { id: params.meetingId, organizationId, status: { not: "CANCELED" } },
+      select: { id: true, transcript: true, audioTranscript: true, recordedById: true },
+    });
+    if (chosen) {
+      if (!chosen.recordedById && recordedById) await prisma.meeting.update({ where: { id: chosen.id }, data: { recordedById } });
+      return chosen;
+    }
+  }
 
   // Una grabación que ya tiene su reunión: todo lo que llegue con ese id va ahí (subtítulos, cada parte del audio, el cliente).
   if (recordingId) {
@@ -227,4 +241,35 @@ export async function resolveExtensionMeeting(params: {
     },
     select: { id: true, transcript: true, audioTranscript: true },
   });
+}
+
+/**
+ * Encabezado que separa una grabación de las anteriores dentro del texto de una misma reunión, con su fecha y hora (en la zona
+ * horaria de la organización). Así varias grabaciones de la misma reunión no se mezclan: cada una queda como su propia sección.
+ */
+export function recordingHeader(at: Date, timeZone: string | null | undefined): string {
+  let when: string;
+  try {
+    when = new Intl.DateTimeFormat("es", { dateStyle: "long", timeStyle: "short", timeZone: timeZone || "America/La_Paz" }).format(at);
+  } catch {
+    when = at.toISOString();
+  }
+  return `── Grabación del ${when} ──`;
+}
+
+/**
+ * Suma `addition` al texto que ya tenía la reunión. Si es el inicio de una grabación y la reunión ya tenía texto (o la persona la
+ * eligió a propósito), antes va el encabezado con la fecha y hora; el resto de las partes de esa misma grabación se pegan sin él.
+ */
+export function appendRecordingText(params: {
+  existing: string | null | undefined;
+  addition: string;
+  startsRecording: boolean;
+  chosenByPerson: boolean;
+  at: Date;
+  timeZone?: string | null;
+}): string {
+  const { existing, addition, startsRecording, chosenByPerson, at, timeZone } = params;
+  const withHeader = startsRecording && (chosenByPerson || Boolean(existing)) ? `${recordingHeader(at, timeZone)}\n${addition}` : addition;
+  return existing ? `${existing}\n\n${withHeader}` : withHeader;
 }

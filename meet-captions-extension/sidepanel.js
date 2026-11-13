@@ -40,6 +40,7 @@ const orgOnly = $("orgOnly");
 const recordBtn = $("recordBtn");
 const joinBtn = $("joinBtn");
 const recordStatus = $("recordStatus");
+const reloadMeetBtn = $("reloadMeetBtn");
 const doneBox = $("doneBox");
 const doneSummary = $("doneSummary");
 const crmLink = $("crmLink");
@@ -249,24 +250,53 @@ const currentOrg = () => (orgField.style.display === "none" ? null : orgSelect.v
 
 // Grabar: subtítulos (pestaña de Meet) + audio (coordinador). Cada vez es una grabación nueva con su propio id: la del cliente
 // y la del equipo en la misma sala quedan como reuniones separadas. Si el audio no arranca, los subtítulos siguen igual.
+// Muestra el motivo de un fallo al empezar, con el botón para recargar Meet cuando es la solución.
+function startFailed(text, offerReload) {
+  recordStatus.textContent = text;
+  recordBtn.disabled = false;
+  reloadMeetBtn.style.display = offerReload ? "block" : "none";
+}
+reloadMeetBtn.addEventListener("click", async () => {
+  if (tabId == null) return;
+  reloadMeetBtn.disabled = true;
+  recordStatus.textContent = "Recargando Meet… vuelve a entrar a la reunión y pulsa «Grabar».";
+  await chrome.tabs.reload(tabId).catch(() => {});
+  setTimeout(() => {
+    reloadMeetBtn.disabled = false;
+    reloadMeetBtn.style.display = "none";
+  }, 4000);
+});
+
 recordBtn.addEventListener("click", async () => {
   if (tabId == null || !meetingUrl) return;
-  recordBtn.disabled = true;
-  setTimeout(() => (recordBtn.disabled = false), 8000); // si algo falló, se puede volver a intentar
+  recordBtn.disabled = true; // un solo clic: no se puede pulsar dos veces mientras arranca
+  reloadMeetBtn.style.display = "none";
   recordStatus.textContent = "Iniciando…";
   const organizationId = currentOrg();
   const title = currentTitle();
   const recordingId = crypto.randomUUID();
   const audioOff = (await chrome.storage.local.get(["recordAudio"])).recordAudio === false;
+  let answered = false;
   chrome.tabs
     .sendMessage(tabId, { type: "START_RECORDING", organizationId, title, recordingId, audioOff })
     .then((response) => {
-      if (response && response.ok === false) recordStatus.textContent = response.error || "No se pudo empezar a grabar.";
+      answered = true;
+      if (response && response.ok === false) startFailed(response.error || "No se pudo empezar a grabar.", false);
     })
     .catch(() => {
-      recordStatus.textContent = "No se pudo conectar con la reunión: recarga la pestaña de Meet e inténtalo de nuevo.";
+      answered = true;
+      // La pestaña de Meet se abrió antes de instalar o actualizar la extensión: hay que recargarla una vez.
+      startFailed("No se pudo conectar con la pestaña de Meet. Recárgala (botón de abajo) y vuelve a entrar a la reunión.", true);
     });
   if (!audioOff) startAudio({ organizationId, title, recordingId });
+  // Vigilante: si en 12 s no hay grabación en marcha, se dice qué hacer en vez de quedarse mudo.
+  setTimeout(async () => {
+    const key = "live:" + tabId;
+    const state = (await chrome.storage.session.get(key))[key];
+    if (state && state.recording && state.recordingId === recordingId) return;
+    if (reloadMeetBtn.style.display === "block") return; // ya se explicó
+    startFailed(answered ? "No arrancó la grabación. Inténtalo de nuevo; si sigue igual, recarga la pestaña de Meet." : "La pestaña de Meet no responde. Recárgala y vuelve a intentarlo.", true);
+  }, 12000);
 });
 
 // ───────── Audio de la reunión: dos formas de capturar la pestaña ─────────

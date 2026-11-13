@@ -546,6 +546,7 @@
 
   // Termina esta grabación: manda los subtítulos, sube la última parte del audio y vuelve a mostrar la franja de Meet.
   // Después se puede empezar otra grabación (la de otro cliente, la del equipo…). Seguro de llamar varias veces.
+  let stopTail = Promise.resolve();
   async function stopAndSend(reason) {
     if (!isRecording()) return;
     phase = "stopped";
@@ -558,7 +559,8 @@
     await sendTranscript(reason);
     void send({ type: "STOP_AUDIO_CAPTURE" });
     window.ProShopCaptions.setHidden(false);
-    void window.ProShopCaptions.desactivar().then((off) => dbg(off ? "subtítulos de Meet apagados" : "subtítulos de Meet: se dejan como estaban"));
+    // Apagar los subtítulos tarda un rato: una grabación nueva espera a que termine (stopTail) para no encontrarlos apagándose.
+    stopTail = window.ProShopCaptions.desactivar().then((off) => dbg(off ? "subtítulos de Meet apagados" : "subtítulos de Meet: se dejan como estaban")).catch(() => {});
     syncBadge();
     pushLive();
   }
@@ -636,6 +638,7 @@
     syncBadge();
     pushLive();
     void saveLocal(false);
+    await Promise.race([stopTail, sleep(6000)]); // si la grabación anterior aún está apagando los subtítulos de Meet
     await sleep(500); // por si se activa justo al entrar a la llamada
     dbg("grabación iniciada: activando subtítulos…");
     const activos = await enableCaptions();
@@ -680,8 +683,10 @@
         lockedTitle = message.title || null;
         lockedAudioOff = message.audioOff === true;
         recordingId = message.recordingId || crypto.randomUUID();
-        void start().then((ok) => sendResponse({ ok }));
-        return true; // respuesta async
+        // Se contesta de inmediato (la fase ya cambió): activar los subtítulos tarda varios segundos y el panel no debe quedarse esperando.
+        void start().catch((error) => dbg("ERROR al iniciar: " + (error && error.message ? error.message : error)));
+        sendResponse({ ok: true });
+        return false;
       }
       case "PAUSE_RECORDING":
       case "RESUME_RECORDING":

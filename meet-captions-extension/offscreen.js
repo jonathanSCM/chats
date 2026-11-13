@@ -67,17 +67,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 async function startRecording({ streamId, source, tabId, meetingUrl, organizationId, title, token, apiBase, micDeviceId, recordMic, recordingId }) {
+  if (active && session && session.tabId === tabId) return; // ya está grabando esta pestaña
   if (active) {
-    if (session && session.tabId === tabId) return; // ya está grabando esta pestaña
-    // Una grabación vieja de otra pestaña (cerrada, o que quedó colgada) no debe bloquear esta: se cierra (sube su última
-    // parte) y se espera a que suelte todo antes de empezar la nueva.
+    // Una grabación vieja de otra pestaña (cerrada, o que quedó colgada) no debe bloquear esta: se cierra (sube su última parte).
     dbg(`había una grabación de la pestaña ${session && session.tabId}: se cierra para empezar la de la ${tabId}`);
     stopRecording();
-    for (let i = 0; i < 40 && (active || audioContext); i++) await sleep(100);
-    if (active || audioContext) {
-      active = false;
-      release();
-    }
+  }
+  // Una grabación que se está cerrando (acaba de pulsarse «Detener») todavía tiene la captura abierta: se espera a que suelte todo.
+  // Si no, su cierre le quitaría la captura a la grabación nueva y quedaría muda.
+  for (let i = 0; i < 30 && (active || audioContext || recorder); i++) await sleep(100);
+  if (active || audioContext || recorder) {
+    active = false;
+    release();
   }
   dbg(`inicio pedido (pestaña ${tabId})`);
   session = { tabId, meetingUrl, organizationId: organizationId || null, title: title || null, token: token || null, apiBase: apiBase || null, micDeviceId: micDeviceId || "", recordMic: recordMic !== false, recordingId: recordingId || null };

@@ -45,4 +45,19 @@ describe("la extensión no se queda colgada", () => {
     const lite = readFileSync(path.join(process.cwd(), "meet-captions-extension-lite", "captions-dom.js"), "utf8").replace(/\r\n/g, "\n");
     expect(lite).toBe(code("captions-dom.js"));
   });
+
+  it("al pulsar «Grabar» siempre hay respuesta: contesta al instante, avisa si no arranca y ofrece recargar Meet", () => {
+    const panel = code("sidepanel.js");
+    expect(panel).toMatch(/function startFailed\(/);
+    expect(panel).toMatch(/setTimeout\(async \(\) => \{[\s\S]{0,400}state\.recording && state\.recordingId === recordingId/);
+    expect(panel).toMatch(/reloadMeetBtn/);
+    expect(code("sidepanel.html")).toContain('id="reloadMeetBtn"');
+    // La página de Meet contesta antes de activar los subtítulos (eso tarda segundos).
+    expect(code("content.js")).toMatch(/void start\(\)\.catch[\s\S]{0,200}sendResponse\(\{ ok: true \}\)/);
+  });
+
+  it("una grabación nueva espera a que la anterior suelte la captura y los subtítulos (detener y volver a grabar)", () => {
+    expect(code("offscreen.js")).toMatch(/for \(let i = 0; i < 30 && \(active \|\| audioContext \|\| recorder\); i\+\+\) await sleep\(100\)/);
+    expect(code("content.js")).toMatch(/await Promise\.race\(\[stopTail, sleep\(6000\)\]\)/);
+  });
 });

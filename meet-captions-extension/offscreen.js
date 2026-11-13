@@ -304,6 +304,7 @@ async function sendPart(blob, part, current) {
   const base = ((current && current.apiBase) || "https://chats.proshop.lat").replace(/\/$/, "");
   const res = await fetch(base + "/api/extension/audio", {
     method: "POST",
+    signal: AbortSignal.timeout(180000), // una parte de ~2 MB: si en 3 min no hubo respuesta, se reintenta
     headers: {
       Authorization: `Bearer ${token}`,
       "X-Meeting-Url": (current && current.meetingUrl) || "",

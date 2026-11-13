@@ -406,11 +406,16 @@
     collapsePanel(w);
   }
 
+  let lastObserverRun = 0;
   function startObserver() {
     observer = new MutationObserver(() => {
       if (raf) return;
-      raf = requestAnimationFrame(() => {
+      // Como mucho una revisión cada 400 ms: Meet cambia su pantalla decenas de veces por segundo y reaccionar a cada cambio
+      // (plegar, medir, forzar un nuevo diseño) hacía que la pestaña se trabara.
+      const wait = Math.max(0, 400 - (Date.now() - lastObserverRun));
+      raf = setTimeout(() => {
         raf = 0;
+        lastObserverRun = Date.now();
         if (!hidden) return;
         if (!cap || !document.contains(cap)) {
           const c = buscar();
@@ -421,7 +426,7 @@
         if (!cap.dataset.psHide) (capIsPanel ? collapsePanel : collapse)(cap);
         else if (capIsPanel && cap.querySelector(":not([data-ps-hide])")) collapsePanel(cap); // algo nuevo apareció dentro
         else if (Date.now() - ultimoReclamo > 1200) reclamar(); // Meet re-maqueta a menudo
-      });
+      }, wait);
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }

@@ -135,12 +135,14 @@
   let lastMicMuted = null;
 
   // Estado en vivo para el panel (el service worker lo guarda).
+  // Solo se manda al panel cuando algo cambió (o cada 10 s de latido): antes iba cada 2 s aunque nadie hablara, y cada envío hace
+  // que el panel y el almacenamiento trabajen de más.
+  let lastLiveJson = "";
+  let lastLiveAt = 0;
   function pushLive() {
     const lines = [...finalizedLines];
     if (pending && pending.text) lines.push(`${pending.name}: ${pending.text}`);
-    void send({
-      type: "LIVE_STATE",
-      state: {
+    const state = {
         meetingUrl,
         recording: isRecording(),
         stopped: phase === "stopped",
@@ -156,7 +158,14 @@
         warning,
         micMuted: lastMicMuted === true,
         hideMeetCaptions: window.ProShopCaptions ? window.ProShopCaptions.isHidden() : true,
-      },
+    };
+    const json = JSON.stringify(state);
+    if (json === lastLiveJson && Date.now() - lastLiveAt < 10000) return;
+    lastLiveJson = json;
+    lastLiveAt = Date.now();
+    void send({
+      type: "LIVE_STATE",
+      state,
     });
   }
 
@@ -267,9 +276,16 @@
   // Se busca en este orden (de lo más fiable a lo más débil): 1) el atributo data-is-muted del botón del micrófono; 2) el
   // ícono del botón (Meet lo dibuja con una ligadura de texto, «mic» o «mic_off», igual en todos los idiomas); 3) el nombre
   // accesible en español/inglés.
+  // Se recuerda el botón encontrado: buscar entre todos los botones de Meet cuatro veces por segundo es lo más caro de esta página.
+  let micBtnCache = null;
   function isMicMuted() {
+    if (micBtnCache && micBtnCache.isConnected && micBtnCache.hasAttribute("data-is-muted")) return micBtnCache.getAttribute("data-is-muted") === "true";
+    micBtnCache = null;
     const el = document.querySelector('[data-is-muted][aria-label*="micrófono" i], [data-is-muted][aria-label*="microphone" i]');
-    if (el) return el.getAttribute("data-is-muted") === "true";
+    if (el) {
+      micBtnCache = el;
+      return el.getAttribute("data-is-muted") === "true";
+    }
     const byAttr = document.querySelector('button[data-is-muted], [role="button"][data-is-muted]');
     if (byAttr && /mic/i.test(iconOf(byAttr))) return byAttr.getAttribute("data-is-muted") === "true";
     for (const b of document.querySelectorAll('[role="button"], button')) {
@@ -287,7 +303,7 @@
     lastMicMuted = muted;
     void send({ type: "SET_MIC_ENABLED", enabled: !muted });
   }
-  every(() => syncMic(false), 250);
+  every(() => syncMic(false), 400);
   try {
     const muteObserver = new MutationObserver(() => syncMic(false));
     muteObserver.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ["data-is-muted"] });
@@ -477,6 +493,7 @@
     try {
       const res = await fetch(base + API_PATH, {
         method: "POST",
+        signal: AbortSignal.timeout(30000), // sin respuesta en 30 s se da por fallido (se reintenta): nunca deja la grabación colgada
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ meetingUrl, transcript: text, recordingId, final, ...(orgId ? { organizationId: orgId } : {}), ...(lockedTitle ? { title: lockedTitle } : {}) }),
       });

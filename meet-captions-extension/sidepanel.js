@@ -201,7 +201,7 @@ async function loadOrgs(token) {
   if (orgSelect.dataset.loaded === token) return;
   try {
     const s = await chrome.storage.local.get(["orgId"]);
-    const res = await fetch(`${await apiBase()}/api/extension/me`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${await apiBase()}/api/extension/me`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) });
     if (!res.ok) return;
     const me = await res.json();
     const orgs = me.organizations || [];
@@ -412,7 +412,32 @@ function hideAllBoxes() {
   consentBox.style.display = "none";
 }
 
-async function render() {
+// Los cambios llegan a ráfagas (cada línea de subtítulo, cada aviso del diagnóstico): dibujar una vez por ráfaga y nunca dos a la
+// vez evita que el panel se ponga lento, parpadee o muestre avisos repetidos.
+let renderRunning = null;
+let renderAgain = false;
+function render() {
+  if (renderRunning) {
+    renderAgain = true;
+    return renderRunning;
+  }
+  renderRunning = (async () => {
+    try {
+      await renderNow();
+    } catch (error) {
+      console.error("[proshop-captions] render", error);
+    } finally {
+      renderRunning = null;
+      if (renderAgain) {
+        renderAgain = false;
+        setTimeout(() => void render(), 150);
+      }
+    }
+  })();
+  return renderRunning;
+}
+
+async function renderNow() {
   const tab = await resolveTab();
   const auth = await chrome.storage.local.get(["token", "userName"]);
   const consent = await getConsent();
@@ -553,7 +578,8 @@ stopBtn.addEventListener("click", async () => {
   stopBtn.disabled = true;
   stopBtn.textContent = "Enviando…";
   try {
-    await chrome.tabs.sendMessage(tabId, { type: "STOP_AND_SEND" });
+    // Si la página no contesta (enviando con mala red, pestaña colgada) el botón no se queda pegado: a los 60 s se libera.
+    await Promise.race([chrome.tabs.sendMessage(tabId, { type: "STOP_AND_SEND" }), new Promise((resolve) => setTimeout(resolve, 60000))]);
   } catch {
     /* la pestaña ya no está: nada que enviar desde aquí */
   }
@@ -688,6 +714,14 @@ window.addEventListener("pagehide", stopMeter);
 
 // ───────── Diagnóstico ─────────
 const debugBox = $("debugBox");
+let debugTimer = null;
+function scheduleDebug() {
+  if (debugTimer) return;
+  debugTimer = setTimeout(() => {
+    debugTimer = null;
+    void renderDebug();
+  }, 1000);
+}
 async function renderDebug() {
   const { debug = [] } = await chrome.storage.session.get("debug");
   const state = tabId != null ? (await chrome.storage.session.get("live:" + tabId))["live:" + tabId] : null;
@@ -704,7 +738,7 @@ $("copyDebug").addEventListener("click", async () => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "session") {
     void render();
-    void renderDebug();
+    scheduleDebug();
   }
   // La sesión del CRM la guarda la página del CRM al conectarte: el panel se actualiza solo.
   if (area === "local" && changes.consent) void render();

@@ -23,7 +23,7 @@ describe("aviso de consentimiento de la extensión", () => {
   });
 
   it("el panel corta en el aviso antes de mostrar sesión, micrófono o el botón de grabar", () => {
-    const render = js.slice(js.indexOf("async function render()"));
+    const render = js.slice(js.indexOf("async function renderNow()"));
     expect(render.indexOf("if (!consent)")).toBeGreaterThan(-1);
     expect(render.indexOf("if (!consent)")).toBeLessThan(render.indexOf("renderAccount(auth)"));
     expect(render.indexOf("if (!consent)")).toBeLessThan(render.indexOf("showRecordBox("));
